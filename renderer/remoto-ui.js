@@ -54,7 +54,9 @@
         <div class="linha-rem"><div><b>Sincronizar celular</b><div class="mut">Abre um QR code de uso único, válido por 2 minutos.</div></div><button class="btn-pri" id="rem-qr">Mostrar QR code</button></div>
       </div>
       <h3 style="margin:22px 0 8px">Celulares vinculados</h3>
-      <div id="rem-lista"></div>`
+      <div id="rem-lista"></div>
+      <h3 style="margin:22px 0 8px">Atividade recente</h3>
+      <div id="rem-eventos" class="mut">Carregando…</div>`
     $('#rem-ativo').checked = est.ativo
     $('#rem-ativo').onchange = async (e) => {
       const r = await window.sb.remoto.ativar(e.target.checked)
@@ -62,6 +64,17 @@
     }
     $('#rem-qr').onclick = mostrarQr
     pintar()
+    carregarEventos()
+  }
+
+  const ROTULO = { 'celular-vinculado': 'Celular vinculado', 'celular-revogado': 'Celular desconectado', 'arquivo-enviado': 'Arquivo enviado pelo celular', 'arquivo-entregue': 'Arquivo recebido neste computador', 'computador-registrado': 'Este computador foi registrado' }
+  async function carregarEventos() {
+    const el = $('#rem-eventos')
+    if (!el) return
+    if (!est.ativo) return (el.textContent = 'Ative o acesso remoto para ver a atividade.')
+    const r = await window.sb.remoto.eventos()
+    if (!$('#rem-eventos')) return
+    el.innerHTML = r.ok && r.dado.length ? r.dado.slice(0, 12).map((e) => `<div class="item-ed"><span class="t">${esc(ROTULO[e.tipo] || e.tipo)} ${e.detalhe && e.tipo !== 'computador-registrado' ? `<span class="mut">· ${esc(e.detalhe)}</span>` : ''}</span><span class="mut">${esc(quando(e.quando))}</span></div>`).join('') : '<div class="mut">Nada ainda.</div>'
   }
 
   function pintar() {
@@ -116,6 +129,7 @@
   window.sb.remoto.aoEstado((e) => {
     est = e
     pintar()
+    carregarEventos()
     aoMudar?.()
   })
   window.sb.remoto.estado().then((e) => (est = e))

@@ -359,6 +359,7 @@ app.whenReady().then(() => {
   ipcMain.handle('remoto:estado', () => remoto.estado())
   ipcMain.handle('remoto:ativar', seguro((sim) => remoto.ativar(sim)))
   ipcMain.handle('remoto:vincular', seguro(() => remoto.vincular()))
+  ipcMain.handle('remoto:eventos', seguro(() => remoto.eventos()))
   ipcMain.handle('remoto:revogar', seguro((id) => remoto.revogar(id)))
   ipcMain.handle('remoto:responder', (_e, msg) => remoto.emitir(msg))
   remoto.iniciar()

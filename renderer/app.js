@@ -4,8 +4,8 @@
   let cfg = null
   let chats = []
   let atual = null
-  let enviando = null // id do chat em resposta
-  let resposta = null // elementos da resposta em curso
+  const respostas = new Map() // id do chat -> resposta em curso (várias conversas respondem ao mesmo tempo)
+  let relogio = null
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null
   let modelos = []
@@ -104,7 +104,7 @@
       b.className = 'chat' + (c.id === atual ? ' ativo' : '') + (c.fixado ? ' fixado' : '')
       b.tabIndex = 0
       b.setAttribute('role', 'button')
-      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
+      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
       b.onclick = (e) => {
         if (e.target.closest('.fixar')) {
           c.fixado = !c.fixado
@@ -280,6 +280,7 @@
   function desenhar() {
     const el = $('conversa')
     const c = chatAtual()
+    alternarBotao(respostas.has(atual))
     el.innerHTML = ''
     $('titulo').textContent = c && c.msgs.length ? c.titulo : 'Nova conversa'
     if (!c || c.msgs.length === 0) {
@@ -287,6 +288,8 @@
       return
     }
     for (const m of c.msgs) el.appendChild(bolha(m))
+    const viva = respostas.get(c.id)
+    if (viva) el.appendChild(montarVivo(viva))
     el.scrollTop = el.scrollHeight
   }
 
@@ -384,9 +387,59 @@
   }
 
   // ---------- envio ----------
+  // resposta em curso de uma conversa: o estado vive em `respostas`; a bolha só existe enquanto a conversa está na tela
+  function cartaoPermissao(r, p) {
+    const d = document.createElement('div')
+    d.className = 'permissao'
+    d.innerHTML = `<div><b>${IC.shield} O agente pede permissão</b><div class="mut">${esc(p.titulo)}</div></div><div class="facoes"><button data-p="permitir" class="primario">Permitir</button><button data-p="sempre">Permitir sempre nesta conversa</button><button data-p="negar">Negar</button></div>`
+    d.onclick = (e) => {
+      const resp = e.target.dataset?.p
+      if (!resp) return
+      window.sb.responderPermissao(p.req, resp)
+      r.perms = r.perms.filter((x) => x.req !== p.req)
+      d.remove()
+    }
+    return d
+  }
+  function montarVivo(r) {
+    const d = document.createElement('div')
+    d.className = 'msg assistant'
+    d.innerHTML = `${QUEM}</div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
+    r.el = d
+    if (r.raz) {
+      const det = d.querySelector('.raciocinio')
+      det.hidden = false
+      det.open = true
+      det.querySelector('.rtxt').textContent = r.raz
+    }
+    if (r.aviso) {
+      const a = d.querySelector('.aviso')
+      a.hidden = false
+      a.textContent = r.aviso
+    }
+    renderPartes(d.querySelector('.partes'), r.partes)
+    for (const p of r.perms) d.appendChild(cartaoPermissao(r, p))
+    return d
+  }
+  const visivel = (r) => r.el && r.el.isConnected && r.id === atual
+
+  // manda uma mensagem a uma conversa (a que está na tela ou outra, como no controle remoto)
+  function enviarMensagem(c, texto, anexos) {
+    c.msgs.push({ role: 'user', em: Date.now(), content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
+    if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
+    c.em = Date.now()
+    salvar()
+    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…' })
+    if (!relogio) relogio = setInterval(tiquetaque, 1000)
+    if (c.id === atual) desenhar()
+    alternarBotao(respostas.has(atual))
+    listar()
+    window.sb.enviar({ id: c.id, mensagens: c.msgs.map(({ role, content }) => ({ role, content })), alvo: cfg.ativo, anexos: anexos.map((a) => a.caminho) })
+  }
+
   async function enviar() {
-    if (enviando) {
-      window.sb.parar(enviando)
+    if (respostas.has(atual)) {
+      window.sb.parar(atual)
       return
     }
     const t = $('texto').value.trim()
@@ -397,44 +450,30 @@
     const anexos = anexosPendentes
     anexosPendentes = []
     desenharAnexos()
-    const texto = t || 'Veja o(s) arquivo(s) anexado(s).'
-    c.msgs.push({ role: 'user', em: Date.now(), content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
-    if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
-    c.em = Date.now()
     $('texto').value = ''
     $('texto').style.height = 'auto'
-    desenhar()
-    listar()
-    const caixa = $('conversa')
-    const d = document.createElement('div')
-    d.className = 'msg assistant'
-    d.innerHTML = `${QUEM}</div><div class="atividade" id="atividade"><span class="ponto-vivo"></span><span class="atv-txt">Enviando…</span><span class="tempo">0 s</span><span class="atv-extra"></span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
-    caixa.appendChild(d)
-    caixa.scrollTop = caixa.scrollHeight
-    resposta = { id: c.id, el: d, partes: [], raz: '', midias: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Enviando…', timer: null }
-    resposta.timer = setInterval(tiquetaque, 1000)
-    enviando = c.id
-    alternarBotao(true)
-    resposta.fase = 'Aguardando o modelo…'
-    window.sb.enviar({ id: c.id, mensagens: c.msgs.map(({ role, content }) => ({ role, content })), alvo: cfg.ativo, anexos: anexos.map((a) => a.caminho) })
+    enviarMensagem(c, t || 'Veja o(s) arquivo(s) anexado(s).', anexos)
   }
 
-  function fim(texto, erro, uso) {
-    if (!resposta) return
-    clearInterval(resposta.timer)
-    const c = chats.find((x) => x.id === resposta.id)
+  function fim(id, texto, erro, uso) {
+    const r = respostas.get(id)
+    if (!r) return
+    respostas.delete(id)
+    if (!respostas.size) {
+      clearInterval(relogio)
+      relogio = null
+    }
+    const c = chats.find((x) => x.id === id)
     if (c) {
-      const partes = resposta.partes.length ? resposta.partes : texto ? [{ t: 'texto', v: texto }] : []
+      const partes = r.partes.length ? r.partes : texto ? [{ t: 'texto', v: texto }] : []
       if (erro) partes.push({ t: 'texto', v: `⚠ ${erro}` })
       const conteudo = partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || '(sem resposta)'
-      c.msgs.push({ role: 'assistant', content: conteudo, partes, raciocinio: resposta.raz || undefined, midias: resposta.midias, inicio: resposta.inicio, fim: Date.now(), uso: uso || undefined })
+      c.msgs.push({ role: 'assistant', content: conteudo, partes, raciocinio: r.raz || undefined, midias: r.midias, inicio: r.inicio, fim: Date.now(), uso: uso || undefined })
       c.em = Date.now()
       salvar()
     }
-    resposta = null
-    enviando = null
-    alternarBotao(false)
-    if (c && c.id === atual) desenhar()
+    if (id === atual) desenhar()
+    alternarBotao(respostas.has(atual))
     listar()
   }
 
@@ -444,86 +483,88 @@
   }
   // atualiza o relógio e avisa quando o modelo fica muito tempo sem dar sinal
   function tiquetaque() {
-    if (!resposta) return
-    const at = resposta.el.querySelector('.atividade')
-    if (!at) return
-    const parado = Date.now() - resposta.ultimo
-    at.querySelector('.tempo').textContent = fmtTempo(Date.now() - resposta.inicio)
-    at.querySelector('.atv-txt').textContent = parado > 20000 && resposta.fase !== 'Executando ferramenta' ? resposta.fase.replace('…', '') + ' (sem novidades há ' + fmtTempo(parado) + ')' : resposta.fase
-    const demora = parado > 60000
-    at.classList.toggle('demora', demora)
-    const extra = at.querySelector('.atv-extra')
-    if (demora && !extra.firstChild) {
-      extra.innerHTML = 'O modelo está demorando. <button data-act="parar">Parar</button>' + (cfg.raciocinio && cfg.raciocinio !== 'none' ? ' <button data-act="desligar">Parar e desligar o raciocínio</button>' : '')
-    } else if (!demora && extra.firstChild) extra.innerHTML = ''
+    for (const r of respostas.values()) {
+      if (!visivel(r)) continue
+      const at = r.el.querySelector('.atividade')
+      if (!at) continue
+      const parado = Date.now() - r.ultimo
+      at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
+      at.querySelector('.atv-txt').textContent = parado > 20000 && r.fase !== 'Executando ferramenta' ? r.fase.replace('…', '') + ' (sem novidades há ' + fmtTempo(parado) + ')' : r.fase
+      const demora = parado > 60000
+      at.classList.toggle('demora', demora)
+      const extra = at.querySelector('.atv-extra')
+      if (demora && !extra.firstChild) {
+        extra.innerHTML = 'O modelo está demorando. <button data-act="parar">Parar</button>' + (cfg.raciocinio && cfg.raciocinio !== 'none' ? ' <button data-act="desligar">Parar e desligar o raciocínio</button>' : '')
+      } else if (!demora && extra.firstChild) extra.innerHTML = ''
+    }
   }
   document.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-act]')
-    if (!a || !enviando) return
+    if (!a || !respostas.has(atual)) return
     if (a.dataset.act === 'desligar') {
       cfg = await window.sb.salvarCfg({ raciocinio: 'none' })
       pintarPensar()
     }
-    window.sb.parar(enviando)
+    window.sb.parar(atual)
   })
-  function sinal(fase) {
-    if (!resposta) return
-    resposta.ultimo = Date.now()
-    if (fase) resposta.fase = fase
+  function sinal(r, fase) {
+    r.ultimo = Date.now()
+    if (fase) r.fase = fase
   }
   const EXT_MIDIA = /\.(png|jpe?g|gif|webp|svg|mp3|wav|ogg|m4a|mp4|mov)$/i
   window.sb.aoDelta((d) => {
-    if (!resposta || d.id !== resposta.id) return
-    const caixa = $('conversa')
+    const r = respostas.get(d.id)
+    if (!r) return
     if (d.raciocinio) {
-      resposta.raz += d.raciocinio
-      sinal('Pensando… (' + Math.round(resposta.raz.length / 4) + ' palavras)')
-      const det = resposta.el.querySelector('.raciocinio')
-      det.hidden = false
-      det.open = true
-      det.querySelector('.rtxt').textContent = resposta.raz
+      r.raz += d.raciocinio
+      sinal(r, 'Pensando… (' + Math.round(r.raz.length / 4) + ' palavras)')
+      if (visivel(r)) {
+        const det = r.el.querySelector('.raciocinio')
+        det.hidden = false
+        det.open = true
+        det.querySelector('.rtxt').textContent = r.raz
+      }
     }
     if (d.aviso) {
-      sinal()
-      const a = resposta.el.querySelector('.aviso')
-      a.hidden = false
-      a.textContent = d.aviso
+      sinal(r)
+      r.aviso = d.aviso
+      if (visivel(r)) {
+        const a = r.el.querySelector('.aviso')
+        a.hidden = false
+        a.textContent = d.aviso
+      }
     }
     if (d.texto) {
-      sinal('Escrevendo a resposta…')
-      const ult = resposta.partes[resposta.partes.length - 1]
+      sinal(r, 'Escrevendo a resposta…')
+      const ult = r.partes[r.partes.length - 1]
       if (ult && ult.t === 'texto') ult.v += d.texto
-      else resposta.partes.push({ t: 'texto', v: d.texto })
+      else r.partes.push({ t: 'texto', v: d.texto })
     }
     if (d.ferramenta) {
       const f = d.ferramenta
-      sinal(f.status === 'completed' || f.status === 'failed' ? 'Analisando o resultado…' : 'Executando ferramenta')
-      const existente = resposta.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
+      sinal(r, f.status === 'completed' || f.status === 'failed' ? 'Analisando o resultado…' : 'Executando ferramenta')
+      const existente = r.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
       if (existente) Object.assign(existente.f, Object.fromEntries(Object.entries(f).filter(([, v]) => v !== null && v !== undefined && v !== '')))
-      else resposta.partes.push({ t: 'ferr', f: { ...f } })
-      if (f.status === 'completed' && f.caminho && f.tipo === 'edit' && EXT_MIDIA.test(f.caminho) && !resposta.midias.includes(f.caminho)) resposta.midias.push(f.caminho)
+      else r.partes.push({ t: 'ferr', f: { ...f } })
+      if (f.status === 'completed' && f.caminho && f.tipo === 'edit' && EXT_MIDIA.test(f.caminho) && !r.midias.includes(f.caminho)) r.midias.push(f.caminho)
     }
-    renderPartes(resposta.el.querySelector('.partes'), resposta.partes)
-    caixa.scrollTop = caixa.scrollHeight
+    if (visivel(r)) {
+      renderPartes(r.el.querySelector('.partes'), r.partes)
+      $('conversa').scrollTop = $('conversa').scrollHeight
+    }
   })
-  window.sb.aoFim((d) => fim(d.texto, '', d.uso))
-  window.sb.aoErro((d) => fim('', d.erro))
+  window.sb.aoFim((d) => fim(d.id, d.texto, '', d.uso))
+  window.sb.aoErro((d) => fim(d.id, '', d.erro))
 
   // permissões do agente (cartão na conversa)
   window.sb.aoPermissao((p) => {
-    if (!resposta || p.id !== resposta.id) return
-    const caixa = $('conversa')
-    const d = document.createElement('div')
-    d.className = 'permissao'
-    d.innerHTML = `<div><b>${IC.shield} O agente pede permissão</b><div class="mut">${esc(p.titulo)}</div></div><div class="facoes"><button data-p="permitir" class="primario">Permitir</button><button data-p="sempre">Permitir sempre nesta conversa</button><button data-p="negar">Negar</button></div>`
-    d.onclick = (e) => {
-      const r = e.target.dataset?.p
-      if (!r) return
-      window.sb.responderPermissao(p.req, r)
-      d.remove()
+    const r = respostas.get(p.id)
+    if (!r) return
+    r.perms.push(p)
+    if (visivel(r)) {
+      r.el.appendChild(cartaoPermissao(r, p))
+      $('conversa').scrollTop = $('conversa').scrollHeight
     }
-    resposta.el.appendChild(d)
-    caixa.scrollTop = caixa.scrollHeight
   })
 
   // ações dos cartões e mídia
@@ -798,11 +839,13 @@
   // ---------- controle remoto: ordens vindas do celular (spec 20) ----------
   window.sb.remoto.aoComando((m) => {
     const R = (o) => window.sb.remoto.responder({ para: m.de, ...o })
-    const resumo = () => chats.slice().sort((a, b) => (b.fixado ? 1 : 0) - (a.fixado ? 1 : 0) || b.em - a.em).slice(0, 80).map((c) => ({ id: c.id, titulo: tituloLimpo(c.titulo), fixado: !!c.fixado, em: c.em, ocupado: enviando === c.id }))
+    const resumo = () => chats.slice().sort((a, b) => (b.fixado ? 1 : 0) - (a.fixado ? 1 : 0) || b.em - a.em).slice(0, 80).map((c) => ({ id: c.id, titulo: tituloLimpo(c.titulo), fixado: !!c.fixado, em: c.em, ocupado: respostas.has(c.id) }))
     if (m.t === 'chats') return R({ t: 'chats', lista: resumo() })
     if (m.t === 'abrir') {
       const c = chats.find((x) => x.id === m.id)
-      return R({ t: 'historico', id: m.id, ocupado: enviando === m.id, msgs: c ? c.msgs.slice(-60).map((x) => ({ role: x.role, content: String(x.content || '').slice(0, 8000), em: x.em, inicio: x.inicio, fim: x.fim, uso: x.uso })) : [] })
+      const r = respostas.get(m.id)
+      const parcial = r ? r.partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') : ''
+      return R({ t: 'historico', id: m.id, ocupado: !!r, parcial, ferramentas: r ? r.partes.filter((p) => p.t === 'ferr').map((p) => ({ id: p.f.id, titulo: p.f.titulo, status: p.f.status })) : [], msgs: c ? c.msgs.slice(-60).map((x) => ({ role: x.role, content: String(x.content || '').slice(0, 8000), em: x.em, inicio: x.inicio, fim: x.fim, uso: x.uso, anexos: (x.anexos || []).map((a) => a.nome) })) : [] })
     }
     if (m.t === 'novo') {
       criarChat()
@@ -811,12 +854,11 @@
     if (m.t === 'enviar') {
       const c = chats.find((x) => x.id === m.id)
       const texto = String(m.texto || '').trim().slice(0, 8000)
-      if (!c || !texto) return R({ t: 'erro', id: m.id, texto: 'Conversa não encontrada.' })
-      if (enviando) return R({ t: 'erro', id: m.id, texto: 'O computador está respondendo outra mensagem. Espere terminar.' })
+      const anexos = Array.isArray(m.anexos) ? m.anexos : []
+      if (!c || (!texto && !anexos.length)) return R({ t: 'erro', id: m.id, texto: 'Conversa não encontrada.' })
+      if (respostas.has(c.id)) return R({ t: 'erro', id: m.id, texto: 'Esta conversa ainda está respondendo. Espere terminar ou toque em parar.' })
       if (!cfg.ativo) return R({ t: 'erro', id: m.id, texto: 'Nenhum modelo escolhido no computador.' })
-      abrir(c.id)
-      $('texto').value = texto
-      enviar()
+      enviarMensagem(c, texto || 'Veja o(s) arquivo(s) anexado(s).', anexos)
       return R({ t: 'comecou', id: c.id })
     }
   })

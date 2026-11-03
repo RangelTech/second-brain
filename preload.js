@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('sb', {
     ativar: (s) => ipcRenderer.invoke('remoto:ativar', s),
     vincular: () => ipcRenderer.invoke('remoto:vincular'),
     revogar: (id) => ipcRenderer.invoke('remoto:revogar', id),
+    eventos: () => ipcRenderer.invoke('remoto:eventos'),
     responder: (m) => ipcRenderer.invoke('remoto:responder', m),
     aoEstado: (fn) => ipcRenderer.on('remoto:estado', (_e, d) => fn(d)),
     aoComando: (fn) => ipcRenderer.on('remoto:cmd', (_e, d) => fn(d)),

@@ -90,12 +90,27 @@ function criar({ app, janela, executar }) {
       avisar()
       agendar()
     })
-    meu.on('error', (e) => {
+    // a ponte não reconhece as credenciais (banco recriado, por exemplo): registra de novo na próxima tentativa
+    meu.on('unexpected-response', (req, res) => {
+      if (res.statusCode === 401) {
+        cfg.computadorId = ''
+        cfg.chave = ''
+        salvar()
+      }
+      erro = res.statusCode === 401 ? 'Registrando este computador de novo…' : `A ponte respondeu ${res.statusCode}.`
+      req.destroy()
+      if (ws === meu) {
+        conectado = false
+        avisar()
+        agendar()
+      }
+    })
+    meu.on('error', () => {
       erro = 'Sem conexão com a ponte.'
-      if (e && /401|Unexpected server response/.test(String(e.message))) erro = 'A ponte não reconheceu este computador.'
     })
   }
   function agendar() {
+    clearTimeout(religar)
     if (!cfg.ativo) return
     tentativas++
     religar = setTimeout(conectar, Math.min(30000, 1000 * 2 ** Math.min(tentativas, 5)))
@@ -111,9 +126,32 @@ function criar({ app, janela, executar }) {
     } catch {}
   }
 
+  // baixa um anexo do celular para a pasta de anexos da conversa (a ponte apaga o arquivo depois da entrega)
+  async function baixar(chat, a) {
+    const r = await fetch(`${cfg.url}/api/arquivos/${encodeURIComponent(a.id)}`, { headers: { Authorization: `Bearer ${cfg.computadorId}.${decifrar(cfg.chave)}` } })
+    if (!r.ok) throw new Error(`Não consegui baixar ${a.nome}.`)
+    const dir = path.join(app.getPath('userData'), 'conversas', String(chat).replace(/[^\w-]/g, '_'), 'anexos')
+    fs.mkdirSync(dir, { recursive: true })
+    const destino = path.join(dir, Date.now().toString(36) + '-' + String(a.nome || 'arquivo').replace(/[\\/:*?"<>|]/g, '_'))
+    fs.writeFileSync(destino, Buffer.from(await r.arrayBuffer()))
+    return { nome: a.nome, caminho: destino }
+  }
+
   // ordem vinda do celular
-  function tratar(m) {
-    if (m.t === 'enviar') origemRemota.add(String(m.id))
+  async function tratar(m) {
+    if (m.t === 'enviar') {
+      origemRemota.add(String(m.id))
+      const anexos = []
+      for (const a of m.arquivos || []) {
+        try {
+          anexos.push(await baixar(m.id, a))
+        } catch (e) {
+          enviar({ para: m.de, t: 'erro', id: m.id, texto: String(e.message || e) })
+        }
+      }
+      m = { ...m, anexos }
+      delete m.arquivos
+    }
     executar(m)
   }
 
@@ -139,6 +177,9 @@ function criar({ app, janela, executar }) {
       await registrar()
       const j = await api('POST', '/api/vinculo')
       return { url: `${cfg.url}/v/${j.codigo}`, expiraEm: j.expiraEm }
+    },
+    async eventos() {
+      return (await api('GET', '/api/eventos')).lista
     },
     async revogar(id) {
       await api('DELETE', '/api/celulares/' + encodeURIComponent(id))
