@@ -29,7 +29,7 @@ function criar({ app, avisar }) {
 
   function git(...args) {
     try {
-      return execFileSync('git', ['-C', raiz, '-c', 'user.name=Second Brain', '-c', 'user.email=skills@secondbrain.local', ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+      return execFileSync('git', ['-C', raiz, '-c', 'user.name=Segundo Cérebro', '-c', 'user.email=skills@secondbrain.local', ...args], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
     } catch {
       return null
     }

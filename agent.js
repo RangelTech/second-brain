@@ -45,6 +45,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
   const home = prepararBase(app)
   // a configuração é escrita pelo app, nunca à mão: o modelo é o combo do motor local
   const yaml = [
+    '_config_version: 52',
     'model:',
     `  default: ${JSON.stringify(modelo || 'principal')}`,
     '  provider: "custom"',
@@ -67,7 +68,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
 function contextoDeSistema({ pasta, ferramentas }) {
   const agora = new Date()
   return [
-    'Você é o Second Brain, o agente do aplicativo de desktop da Rangel Tech. Responda em português do Brasil, de forma direta.',
+    'Você é o Segundo Cérebro, o agente do aplicativo de desktop da Rangel Tech. Responda em português do Brasil, de forma direta.',
     `Sistema operacional: ${os.type()} ${os.release()} (${process.platform}). Usuário: ${os.userInfo().username}. Pasta pessoal: ${os.homedir()}.`,
     `Pasta de trabalho: ${pasta}. Crie e edite arquivos nela, a menos que o usuário peça outra pasta.`,
     `Data e hora: ${agora.toLocaleString('pt-BR')}.`,
@@ -106,15 +107,25 @@ class Sessao {
     if (!bin) throw new Error('Não encontrei o Hermes (hermes-acp). Instale o Hermes ou defina SECOND_BRAIN_HERMES_BIN.')
     const home = prepararHome(app, { base, modelo, pasta, raciocinio })
     if (!fs.existsSync(path.join(home, 'installs'))) emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
-    this.filho = spawn(bin, [], { cwd: pasta, env: { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1' }, windowsHide: true })
-    this.filho.stdout.on('data', (d) => this.aoDados(d))
-    this.filho.stderr.on('data', (d) => registrar(this.app, 'stderr ' + d.toString('utf8').trim().slice(0, 300)))
-    this.filho.on('exit', () => {
+    this.bin = bin
+    this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1' }
+    this.subir()
+    this.pronta = this.iniciar()
+  }
+
+  // sobe (ou sobe de novo) o processo do Hermes
+  subir() {
+    this.buf = ''
+    const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true })
+    this.filho = filho
+    filho.stdout.on('data', (d) => this.aoDados(d))
+    filho.stderr.on('data', (d) => registrar(this.app, 'stderr ' + d.toString('utf8').trim().slice(0, 300)))
+    filho.on('exit', () => {
+      if (this.filho !== filho) return // foi substituído de propósito
       for (const p of this.pendentes.values()) p.rej(new Error('O agente encerrou.'))
       this.pendentes.clear()
       this.morto = true
     })
-    this.pronta = this.iniciar()
   }
 
   enviar(o) {
@@ -194,10 +205,33 @@ class Sessao {
       })
     }
   }
+  // Na primeira vez o Hermes monta o ambiente e às vezes o session/new não responde: se passar do prazo,
+  // reinicia o processo (o ambiente já está pronto) e tenta de novo, até 3 vezes.
+  comPrazo(promessa, ms) {
+    return Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('prazo')), ms))])
+  }
   async iniciar() {
-    await this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } })
-    const r = await this.chamar('session/new', { cwd: this.pasta, mcpServers: [] })
-    this.sid = r.sessionId
+    let ultimo
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      try {
+        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : tentativa === 1 ? 240000 : 90000
+        await this.comPrazo(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }), prazo)
+        const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: [] }), prazo)
+        this.sid = r.sessionId
+        return
+      } catch (e) {
+        ultimo = e
+        registrar(this.app, `iniciar falhou (tentativa ${tentativa}): ${e.message}`)
+        if (e.message !== 'prazo') throw e
+        const antigo = this.filho
+        this.pendentes.clear()
+        this.subir()
+        try {
+          antigo.kill()
+        } catch {}
+      }
+    }
+    throw new Error('O agente não respondeu ao iniciar: ' + (ultimo?.message || 'sem detalhe'))
   }
   async perguntar(texto, anexos = []) {
     clearTimeout(this.ocioso)

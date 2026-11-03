@@ -1,4 +1,4 @@
-// Second Brain (Rangel Tech): janela de chat + roteador local de provedores e combos (estilo 9Router).
+// Segundo Cérebro (Rangel Tech): janela de chat, agente e ponte para o motor de provedores.
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = require('electron')
 const embed = require('./embed-router')
 const { Sessao, prepararBase } = require('./agent')
@@ -9,12 +9,14 @@ const fs = require('fs')
 // janela encoberta não pode congelar a interface (testes e uso em segundo plano)
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+// pasta de dados sem acento (o Python do agente vive dentro dela)
+app.setPath('userData', path.join(app.getPath('appData'), 'SegundoCerebro'))
 const HOME = app.getPath('home')
 const PADRAO = {
   ativo: '',
   soConversa: false,
   raciocinio: 'low',
-  pasta: path.join(app.getPath('documents'), 'Second Brain'),
+  pasta: path.join(app.getPath('documents'), 'Segundo Cerebro'),
   hermesHome: path.join(HOME, 'hermes'),
 }
 
@@ -60,7 +62,7 @@ async function chaveLocal() {
   try {
     return decifrar(fs.readFileSync(arqChave, 'utf8'))
   } catch {}
-  const r = await embed.api('POST', '/api/keys', { name: 'Second Brain (local)' })
+  const r = await embed.api('POST', '/api/keys', { name: 'Segundo Cérebro (local)' })
   const chave = r.json?.key
   if (!chave) throw new Error('Não consegui criar a chave local do motor de provedores.')
   fs.writeFileSync(arqChave, cifrar(chave))
@@ -126,7 +128,7 @@ async function responder(alvo, msgs, ctx) {
   if (!alvo) throw new Error('Escolha um modelo ou combo no topo do chat (cadastre um provedor em Configurações > Provedores).')
   if (cfg.soConversa) {
     const chave = await chaveLocal()
-    return chamarOpenAI({ nome: 'Second Brain', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
+    return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
   }
   const sessao = await sessaoDoChat(ctx.chat, alvo, ctx)
   ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
@@ -139,7 +141,7 @@ async function responder(alvo, msgs, ctx) {
 async function listarModelos() {
   const saida = []
   const combos = await embed.api('GET', '/api/combos')
-  for (const c of combos.json?.combos ?? []) if (!c.kind || c.kind === 'llm') saida.push({ id: c.name, nome: c.name, grupo: 'Combos' })
+  for (const c of combos.json?.combos ?? []) if (!c.kind || c.kind === 'llm') saida.push({ id: c.name, nome: c.name, grupo: 'Combos', sub: `${(c.models || []).length} modelo${(c.models || []).length === 1 ? '' : 's'}` })
   const conex = (await embed.api('GET', '/api/providers')).json?.connections ?? []
   const ativos = conex.filter((c) => c.isActive !== false)
   const nos = new Map(((await embed.api('GET', '/api/provider-nodes')).json?.nodes ?? []).map((n) => [n.id, n]))
@@ -153,14 +155,14 @@ async function listarModelos() {
     const no = nos.get(c.provider)
     if (!no) continue
     if (no.prefix === 'unl') {
-      saida.push({ id: 'unl/qwen-abliterated', nome: 'Unlimited', grupo: 'Modelos', provedor: c.provider })
+      saida.push({ id: 'unl/qwen-abliterated', nome: 'Unlimited', grupo: 'Modelos', provedor: c.provider, logo: 'unlimited', sub: 'IA da casa' })
       continue
     }
     const r = await embed.api('GET', `/api/providers/${c.id}/models`)
     const lista = Array.isArray(r.json?.models) ? r.json.models : []
     for (const m of lista) {
       const id = typeof m === 'string' ? m : m.id || m.name
-      if (id) saida.push({ id: `${no.prefix}/${id}`, nome: `${id}`, grupo: 'Modelos', provedor: c.provider })
+      if (id) saida.push({ id: `${no.prefix}/${id}`, nome: `${id}`, grupo: 'Modelos', provedor: c.provider, sub: no.name })
     }
   }
   return saida
@@ -175,11 +177,12 @@ const abortos = new Map()
 function criarJanela() {
   janela = new BrowserWindow({
     width: 1240,
+    center: true,
     height: 800,
     minWidth: 760,
     minHeight: 520,
     backgroundColor: '#1f1d1a',
-    title: 'Second Brain',
+    title: 'Segundo Cérebro',
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   })
@@ -223,7 +226,7 @@ app.whenReady().then(() => {
   ipcMain.handle('skills:versao', seguro((r, h) => skills.versao(r, h)))
   // exportar e importar dados (conversas, configuração sem chaves, skills do usuário, combos)
   ipcMain.handle('dados:exportar', async () => {
-    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'second-brain-dados.json', filters: [{ name: 'Dados do Second Brain', extensions: ['json'] }] })
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'segundo-cerebro-dados.json', filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
     const pacote = { versao: 1, em: new Date().toISOString(), chats: ler('chats.json', []), config: { ...cfg }, skills: {}, combos: [], estrategias: {} }
     for (const it of skills.listar()) if (it.tipo === 'arquivo' && !it.somenteLeitura && it.tamanho < 300000) pacote.skills[it.caminho] = skills.ler(it.caminho)
@@ -235,7 +238,7 @@ app.whenReady().then(() => {
     return { ok: true, caminho: r.filePath, chats: pacote.chats.length, skills: Object.keys(pacote.skills).length, combos: pacote.combos.length }
   })
   ipcMain.handle('dados:importar', async () => {
-    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Second Brain', extensions: ['json'] }] })
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
     const pacote = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'))
     if (pacote.versao !== 1) return { ok: false, erro: 'Arquivo de outra versão.' }

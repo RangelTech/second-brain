@@ -1,8 +1,8 @@
 {
   "name": "second-brain",
-  "productName": "Second Brain",
-  "version": "0.2.1",
-  "description": "Second Brain by Rangel Tech: agente de IA no desktop com provedores e combos",
+  "productName": "Segundo Cérebro",
+  "version": "0.3.0",
+  "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
     "name": "Rangel Tech",
@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "net.rangeltech.secondbrain",
-    "productName": "Second Brain",
+    "productName": "Segundo Cérebro",
     "icon": "build/icon.png",
     "files": [
       "main.js",
@@ -45,14 +45,15 @@
       "category": "Utility",
       "maintainer": "Rangel Tech <contato@rangeltech.net>",
       "synopsis": "Agente de IA para desktop",
-      "description": "Second Brain: agente de IA com provedores, combos e a IA Unlimited",
-      "artifactName": "Second-Brain-${version}-linux-${arch}.${ext}"
+      "description": "Segundo Cérebro: agente de IA com provedores, combos e a IA Unlimited",
+      "artifactName": "Segundo-Cerebro-${version}-linux-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Second-Brain-Setup-${version}.${ext}"
+      "artifactName": "Segundo-Cerebro-Instalador-${version}.${ext}",
+      "shortcutName": "Segundo Cérebro"
     },
     "extraResources": [
       {
@@ -77,7 +78,7 @@
       }
     ],
     "portable": {
-      "artifactName": "Second-Brain-Portable-${version}.${ext}"
+      "artifactName": "Segundo-Cerebro-Portatil-${version}.${ext}"
     }
   },
   "devDependencies": {

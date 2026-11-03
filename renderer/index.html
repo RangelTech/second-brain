@@ -3,58 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
-<title>Second Brain</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; script-src 'self'">
+<title>Segundo Cérebro</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="config.css">
+<link rel="stylesheet" href="chat.css">
 </head>
 <body>
 <div class="app" id="app">
   <aside class="lateral" id="lateral">
     <div class="topo">
-      <div class="marca"><img class="logo-img" src="img/second-brain.svg" alt=""><span>Second Brain</span></div>
-      <button class="icone" id="recolher" title="Recolher a barra lateral" aria-label="Recolher a barra lateral">«</button>
+      <div class="marca"><img class="logo-img" src="img/segundo-cerebro-64.png" alt=""><span>Segundo Cérebro</span></div>
+      <button class="btn-ic" id="recolher" aria-label="Recolher a barra lateral"><i data-ic="panel"></i></button>
     </div>
-    <button class="novo" id="novo"><span>＋</span> Novo chat</button>
-    <input class="busca" id="busca" placeholder="Buscar conversas" aria-label="Buscar conversas">
+    <button class="novo" id="novo"><i data-ic="plus"></i><span>Nova conversa</span></button>
+    <label class="busca-caixa"><i data-ic="search"></i><input class="busca" id="busca" placeholder="Buscar conversas" aria-label="Buscar conversas"></label>
     <div class="rotulo">Conversas</div>
     <nav class="lista" id="lista" aria-label="Conversas"></nav>
     <div class="rodape">
-      <button class="item" id="abrir-config">⚙ Configurações</button>
+      <button class="item" id="abrir-config"><i data-ic="settings"></i><span>Configurações</span></button>
     </div>
   </aside>
+  <div class="cortina" id="cortina"></div>
   <main class="central">
     <header class="barra">
-      <button class="icone mostrar" id="mostrar" title="Mostrar a barra lateral" aria-label="Mostrar a barra lateral">»</button>
-      <div class="titulo" id="titulo">Novo chat</div>
-      <div class="controles">
-        <label class="agente" title="Sem ferramentas: o modelo só conversa, sem ler arquivos nem rodar comandos"><input type="checkbox" id="so-conversa"> Só conversa</label>
-        <select id="alvo" aria-label="Modelo ou combo"></select>
-      </div>
+      <button class="btn-ic mostrar" id="mostrar" aria-label="Mostrar a barra lateral"><i data-ic="panel"></i></button>
+      <div class="titulo" id="titulo">Nova conversa</div>
     </header>
-    <section class="conversa" id="conversa" aria-live="polite">
-      <div class="vazio" id="vazio">
-        <img class="logo-img grande" src="img/second-brain.svg" alt="">
-        <h1>Como posso ajudar?</h1>
-        <p>Converse com o Unlimited. Ele lê arquivos, roda comandos, cria sites e chama o Claude Code ou o Codex quando precisar.</p>
-      </div>
-    </section>
-    <div class="boas-vindas" id="boas-vindas" hidden><b>Bem-vindo ao Second Brain.</b> Para começar, conecte o Unlimited (ou outro provedor).<button class="primario" id="bv-ir">Conectar agora</button></div>
+    <section class="conversa" id="conversa" aria-live="polite"></section>
+    <div class="boas-vindas" id="boas-vindas" hidden>
+      <div><b>Bem-vindo ao Segundo Cérebro.</b><span> Para começar, conecte um provedor (por exemplo, o Unlimited).</span></div>
+      <button class="primario" id="bv-ir">Conectar agora</button>
+    </div>
     <footer class="entrada">
       <div class="aviso-geral" id="aviso-geral" hidden></div>
-      <div class="anexos" id="anexos" hidden></div>
-      <div class="caixa">
-        <input type="file" id="arquivo-input" multiple hidden>
-        <button class="icone-caixa" id="anexar" aria-label="Anexar arquivo" title="Anexar arquivo (ou arraste para cá)">📎</button>
-        <textarea id="texto" rows="1" placeholder="Escreva uma mensagem…" title="Enter envia, Shift+Enter quebra a linha" aria-label="Mensagem"></textarea>
-        <button class="icone-caixa" id="microfone" aria-label="Gravar áudio" title="Gravar áudio">🎙</button>
-        <button id="enviar" class="enviar" aria-label="Enviar">↑</button>
+      <div class="compositor" id="compositor">
+        <div class="anexos" id="anexos" hidden></div>
+        <textarea id="texto" rows="1" placeholder="Escreva uma mensagem, anexe um arquivo ou grave um áudio" aria-label="Mensagem"></textarea>
+        <div class="ferramentas">
+          <input type="file" id="arquivo-input" multiple hidden>
+          <button class="btn-ic" id="anexar" aria-label="Anexar arquivo" title="Anexar arquivo"><i data-ic="clip"></i></button>
+          <button class="chip-modo" id="modo" aria-label="Modo do assistente"><i data-ic="sparkles"></i><span id="modo-nome">Agente</span></button>
+          <span class="espaco"></span>
+          <div class="seletor">
+            <button class="chip-modelo" id="modelo" aria-haspopup="listbox" aria-expanded="false"><span class="mlogo" id="modelo-logo"></span><span class="mnome" id="modelo-nome">Escolher modelo</span><i data-ic="chevronDown"></i></button>
+            <div class="menu-modelo" id="menu-modelo" role="listbox" hidden></div>
+          </div>
+          <button class="btn-ic" id="microfone" aria-label="Gravar áudio" title="Gravar áudio"><i data-ic="mic"></i></button>
+          <button id="enviar" class="enviar" aria-label="Enviar"><i data-ic="arrowUp"></i></button>
+        </div>
       </div>
-      <div class="dica" id="dica">Pasta de trabalho: <span id="pasta"></span></div>
+      <div class="sob-compositor">
+        <button class="chip-pasta" id="pasta-chip" aria-label="Pasta de trabalho"><i data-ic="folder"></i><span id="pasta">Documentos/Segundo Cerebro</span></button>
+      </div>
     </footer>
   </main>
   <section class="config" id="config" hidden></section>
 </div>
+<script src="icons.js"></script>
 <script src="provider-catalog.js"></script>
 <script src="config.js"></script>
 <script src="skills-ui.js"></script>

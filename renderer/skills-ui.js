@@ -88,7 +88,7 @@
       <div class="sk-barra"><b class="sk-nome">${esc(SK.aberta)}</b><span id="sk-sujo" class="selo err" hidden>não salvo</span><span class="gap"></span>
         ${ro ? '<button id="sk-copiar">Copiar para minhas</button>' : '<button id="sk-previa">Pré-visualizar</button><button id="sk-hist">Histórico</button><button class="btn-perigo" id="sk-apagar">Apagar</button><button class="btn-pri" id="sk-salvar">Salvar</button>'}</div>
       <div class="sk-corpo"><textarea id="sk-texto" spellcheck="false" ${ro ? 'readonly' : ''}></textarea><div class="sk-previa corpo" id="sk-prev" hidden></div></div>
-      <div class="msg" id="sk-msg" hidden></div>`
+      <div class="alerta" id="sk-msg" hidden></div>`
     const ta = $('#sk-texto')
     ta.value = SK.original
     const sujo = () => ($('#sk-sujo').hidden = ta.value === SK.original)
@@ -163,7 +163,7 @@
   }
 
   function novaSkill() {
-    const j = janela(`<h3>Nova skill</h3><div class="campo"><label for="ns-nome">Nome</label><input type="text" id="ns-nome" placeholder="ex.: relatorio-semanal"></div><div class="campo"><label for="ns-cat">Categoria (pasta)</label><input type="text" id="ns-cat" value="minhas"></div><div class="msg" id="ns-msg" hidden></div><div class="rodape-j"><button id="ns-cancelar">Cancelar</button><button class="btn-pri" id="ns-ok">Criar</button></div>`)
+    const j = janela(`<h3>Nova skill</h3><div class="campo"><label for="ns-nome">Nome</label><input type="text" id="ns-nome" placeholder="ex.: relatorio-semanal"></div><div class="campo"><label for="ns-cat">Categoria (pasta)</label><input type="text" id="ns-cat" value="minhas"></div><div class="alerta" id="ns-msg" hidden></div><div class="rodape-j"><button id="ns-cancelar">Cancelar</button><button class="btn-pri" id="ns-ok">Criar</button></div>`)
     j.q('#ns-cancelar').onclick = j.fechar
     j.q('#ns-ok').onclick = async () => {
       const r = await window.sb.skills.criar(j.q('#ns-nome').value, j.q('#ns-cat').value)

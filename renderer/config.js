@@ -1,4 +1,4 @@
-// Configurações do Second Brain: Provedores, Combos, Uso e Cota.
+// Configurações do Segundo Cérebro: Provedores, Combos, Uso e Cota.
 // As telas são nativas; os dados vêm do motor de provedores (rotas /api/* via window.sb.api).
 ;(() => {
   const CAT = (window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []
@@ -72,7 +72,7 @@
     return { el: f, q: (s) => f.querySelector(s), fechar: () => f.remove() }
   }
   const aviso = (el, tipo, txt) => {
-    el.className = 'msg ' + tipo
+    el.className = 'alerta ' + tipo
     el.textContent = txt
     el.hidden = !txt
   }
@@ -134,7 +134,7 @@
     })
     const chip = (id, nome) => `<button class="chip ${S.filtro === id ? 'on' : ''}" data-filtro="${id}">${nome}</button>`
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Provedores</h1><p>Contas e chaves que o Second Brain usa para responder. Conecte quantas quiser e depois monte combos com elas.</p></div>
+      <div class="cfg-cab"><div><h1>Provedores</h1><p>Contas e chaves que o Segundo Cérebro usa para responder. Conecte quantas quiser e depois monte combos com elas.</p></div>
         <div class="cfg-acoes"><button data-acao="compat">＋ Compatível com OpenAI</button></div></div>
       <div class="destaque">
         <img src="img/unlimited.svg" alt="">
@@ -192,7 +192,7 @@
       <div class="campo"><label for="m-nome">Nome (opcional)</label><input type="text" id="m-nome" placeholder="${esc(p.nome)}"></div>
       <div class="campo"><label for="m-chave">Chave de API</label><input type="password" id="m-chave" autocomplete="off" placeholder="Cole a chave"></div>
       ${p.urlChave ? `<div class="passo">Não tem chave? <a href="#" id="m-onde">Abrir o site do ${esc(p.nome)}</a></div>` : ''}
-      <div class="msg" id="m-msg" hidden></div>
+      <div class="alerta" id="m-msg" hidden></div>
       <div class="rodape-j"><button id="m-cancelar">Cancelar</button><button class="btn-pri" id="m-ok">Conectar</button></div>`)
     j.q('#m-cancelar').onclick = j.fechar
     if (p.urlChave) j.q('#m-onde').onclick = (e) => (e.preventDefault(), window.sb.abrirExterno(p.urlChave))
@@ -233,9 +233,9 @@
     const dispositivo = OAUTH_DISPOSITIVO.includes(p.id)
     const j = janela(`
       <h3>${logoHtml(p.id)} Conectar ${esc(p.nome)}</h3>
-      ${suportado ? `<div class="passo" id="m-passo">Entre com a sua conta ${esc(p.nome)}. O login abre no navegador e o Second Brain guarda o acesso neste computador.</div>
-      <div id="m-area"></div>` : `<div class="msg">A entrada por conta de ${esc(p.nome)} ainda não está disponível no Second Brain.${modoChave ? ' Você pode usar uma chave de API.' : ''}</div>`}
-      <div class="msg" id="m-msg" hidden></div>
+      ${suportado ? `<div class="passo" id="m-passo">Entre com a sua conta ${esc(p.nome)}. O login abre no navegador e o Segundo Cérebro guarda o acesso neste computador.</div>
+      <div id="m-area"></div>` : `<div class="alerta">A entrada por conta de ${esc(p.nome)} ainda não está disponível no Segundo Cérebro.${modoChave ? ' Você pode usar uma chave de API.' : ''}</div>`}
+      <div class="alerta" id="m-msg" hidden></div>
       <div class="rodape-j"><button id="m-cancelar">Fechar</button>${modoChave ? '<button id="m-chave">Usar chave de API</button>' : ''}${suportado ? '<button class="btn-pri" id="m-ok">Entrar com a conta</button>' : ''}</div>`)
     j.q('#m-cancelar').onclick = () => (parar(), j.fechar())
     if (modoChave) j.q('#m-chave').onclick = () => (parar(), j.fechar(), modalChave(p))
@@ -319,7 +319,7 @@
       <h3><img class="lg" src="img/unlimited.svg" alt=""> Unlimited</h3>
       <div class="passo">Cole a chave do Unlimited que a Rangel Tech enviou. A chave fica cifrada neste computador.</div>
       <div class="campo"><label for="u-chave">Chave</label><input type="password" id="u-chave" autocomplete="off" placeholder="Cole a chave"></div>
-      <div class="msg" id="u-msg" hidden></div>
+      <div class="alerta" id="u-msg" hidden></div>
       <div class="rodape-j"><button id="u-cancelar">Cancelar</button><button class="btn-pri" id="u-ok">${atual ? 'Trocar chave' : 'Conectar'}</button></div>`)
     j.q('#u-cancelar').onclick = j.fechar
     j.q('#u-ok').onclick = async () => {
@@ -361,7 +361,7 @@
       <div class="campo"><label for="c-pref">Prefixo (aparece antes do modelo, ex.: meu/gpt-4o)</label><input type="text" id="c-pref" placeholder="meu"></div>
       <div class="campo"><label for="c-base">Endereço base</label><input type="text" id="c-base" placeholder="https://api.exemplo.com/v1"></div>
       <div class="campo"><label for="c-chave">Chave de API</label><input type="password" id="c-chave" autocomplete="off"></div>
-      <div class="msg" id="c-msg" hidden></div>
+      <div class="alerta" id="c-msg" hidden></div>
       <div class="rodape-j"><button id="c-cancelar">Cancelar</button><button class="btn-pri" id="c-ok">Conectar</button></div>`)
     j.q('#c-cancelar').onclick = j.fechar
     j.q('#c-ok').onclick = async () => {
@@ -417,7 +417,7 @@
       })
       .join('')
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Combos</h1><p>Um combo agrupa modelos sob um nome. O chat usa o nome do combo e o Second Brain decide qual modelo responde, na ordem ou em rodízio.</p></div>
+      <div class="cfg-cab"><div><h1>Combos</h1><p>Um combo agrupa modelos sob um nome. O chat usa o nome do combo e o Segundo Cérebro decide qual modelo responde, na ordem ou em rodízio.</p></div>
         <div class="cfg-acoes"><button class="btn-pri" data-acao="novo">＋ Novo combo</button></div></div>
       ${S.combos.length ? `<div class="combos">${cartoes}</div>` : `<div class="vazio-cfg">${S.modelos.some((m) => m.grupo === 'Modelos') ? 'Nenhum combo ainda. Crie o primeiro.' : 'Conecte um provedor antes de criar combos.'}</div>`}`
   }
@@ -434,7 +434,7 @@
       <div class="campo"><label>Modelos, em ordem de preferência</label><div class="itens-ed" id="cb-itens"></div>
         <div class="cfg-acoes"><select id="cb-sel" style="flex:1">${modelosDisp.length ? modelosDisp.map((m) => `<option value="${esc(m.id)}">${esc(m.nome)} · ${esc(nomeProvedor(m.provedor))}</option>`).join('') : '<option value="">Conecte um provedor primeiro</option>'}</select>
         <button id="cb-add">Adicionar</button></div></div>
-      <div class="msg" id="cb-msg" hidden></div>
+      <div class="alerta" id="cb-msg" hidden></div>
       <div class="rodape-j"><button id="cb-cancelar">Cancelar</button><button class="btn-pri" id="cb-ok">Salvar</button></div>`, true)
     const desenhar = () => {
       j.q('#cb-itens').innerHTML = itens.length
@@ -497,7 +497,7 @@
     }
     const nomeChave = (k, v) => (v.rawModel ? `${nomeModelo(`${(S.nodes.find((n) => n.name === v.provider)?.prefix) || ''}/${v.rawModel}`) || v.rawModel} · ${v.provider || ''}` : nomeProvedor(k))
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Uso</h1><p>Quanto o Second Brain consumiu por provedor e modelo. O custo é uma estimativa pela tabela de preços; contas de assinatura não cobram por token.</p></div>
+      <div class="cfg-cab"><div><h1>Uso</h1><p>Quanto o Segundo Cérebro consumiu por provedor e modelo. O custo é uma estimativa pela tabela de preços; contas de assinatura não cobram por token.</p></div>
         <div class="cfg-acoes"><select id="periodo">${[['today', 'Hoje'], ['24h', '24 horas'], ['7d', '7 dias'], ['30d', '30 dias'], ['60d', '60 dias'], ['all', 'Tudo']].map(([v, n]) => `<option value="${v}" ${S.periodo === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
       <div class="kpis">
         <div class="kpi"><span>Pedidos</span><b>${fmt(d.totalRequests)}</b></div>
@@ -564,7 +564,7 @@
         corpo.innerHTML = cotas.length
           ? cotas
               .map((q) => {
-                if (q.erro) return `<div class="msg err" style="margin-top:10px">${esc(q.erro)}</div>`
+                if (q.erro) return `<div class="alerta err" style="margin-top:10px">${esc(q.erro)}</div>`
                 const rest = q.restante == null ? null : Math.max(0, Math.min(100, q.restante))
                 const cls = rest == null ? '' : rest <= 10 ? 'bx' : rest <= 35 ? 'med' : ''
                 return `<div class="medidor"><div class="linha-m"><span>${esc(q.nome)}</span><span class="mut">${rest == null ? '' : Math.round(rest) + '% restante'}${q.reset ? ' · ' + esc(quandoReseta(q.reset)) : ''}</span></div>${rest == null ? '' : `<div class="trilho"><i class="${cls}" style="width:${rest}%"></i></div>`}</div>`
@@ -610,7 +610,7 @@
   async function telaSobre() {
     const i = await window.sb.info()
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Sobre</h1><p>Second Brain, da Rangel Tech.</p></div></div>
+      <div class="cfg-cab"><div><h1>Sobre</h1><p>Segundo Cérebro, da Rangel Tech.</p></div></div>
       <div class="kpis"><div class="kpi"><span>Versão</span><b>${esc(i.versao)}</b></div><div class="kpi"><span>Sistema</span><b>${esc(i.so)}</b></div><div class="kpi"><span>Electron</span><b>${esc(i.electron)}</b></div></div>
       <h2>Dados e logs</h2>
       <p class="mut">Tudo fica neste computador: <code>${esc(i.dados)}</code>. Nada é enviado para fora, além das chamadas aos provedores que você conectou.</p>
@@ -618,9 +618,9 @@
       <h2>Seus dados</h2>
       <p class="mut">Leve conversas, combos, skills suas e configurações (sem chaves) para outro computador. As chaves dos provedores você conecta de novo lá.</p>
       <div class="cfg-acoes"><button id="so-exp">Exportar dados…</button><button id="so-imp">Importar dados…</button></div>
-      <div class="msg" id="so-msg" hidden style="margin-top:10px"></div>
+      <div class="alerta" id="so-msg" hidden style="margin-top:10px"></div>
       <h2>Licenças</h2>
-      <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Second Brain é MIT.</p>`
+      <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Segundo Cérebro é MIT.</p>`
     $('#so-logs').onclick = () => window.sb.abrirLogs()
     $('#so-exp').onclick = async () => {
       const r = await window.sb.exportarDados()

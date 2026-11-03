@@ -1,5 +1,6 @@
 (() => {
   const $ = (id) => document.getElementById(id)
+  const IC = window.IC
   let cfg = null
   let chats = []
   let atual = null
@@ -7,9 +8,11 @@
   let resposta = null // elementos da resposta em curso
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null
+  let modelos = []
 
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
   const attr = (s) => esc(s).replace(/'/g, '&#39;')
+  const CAT = Object.fromEntries(((window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []).map((p) => [p.id, p]))
 
   // markdown mínimo: blocos de código, código em linha, negrito, títulos, listas, links http(s)
   function md(t) {
@@ -41,23 +44,30 @@
       })
       .join('')
   }
-
   window.SBmd = md
+
   const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   const salvar = () => window.sb.salvarChats(chats)
   const chatAtual = () => chats.find((c) => c.id === atual)
+  const estreito = () => window.matchMedia('(max-width:820px)').matches
 
-  // ---------- lista de conversas ----------
+  // ---------- barra lateral ----------
+  function recolher(sim) {
+    $('app').classList.toggle('recolhido', sim)
+  }
+
   function listar() {
     const q = $('busca').value.trim().toLowerCase()
     const el = $('lista')
     el.innerHTML = ''
     for (const c of chats.filter((c) => !q || c.titulo.toLowerCase().includes(q)).sort((a, b) => b.em - a.em)) {
-      const b = document.createElement('button')
+      const b = document.createElement('div')
       b.className = 'chat' + (c.id === atual ? ' ativo' : '')
-      b.innerHTML = `<span class="nome">${esc(c.titulo)}</span><span class="apagar" title="Apagar" role="button" aria-label="Apagar conversa">✕</span>`
+      b.tabIndex = 0
+      b.setAttribute('role', 'button')
+      b.innerHTML = `<span class="nome">${esc(c.titulo)}</span><button class="apagar btn-ic" title="Apagar conversa" aria-label="Apagar conversa">${IC.x}</button>`
       b.onclick = (e) => {
-        if (e.target.classList.contains('apagar')) {
+        if (e.target.closest('.apagar')) {
           chats = chats.filter((x) => x.id !== c.id)
           if (atual === c.id) atual = null
           salvar()
@@ -66,8 +76,9 @@
           return
         }
         abrir(c.id)
-        if (window.matchMedia('(max-width:760px)').matches) $('app').classList.add('recolhido')
+        if (estreito()) recolher(true)
       }
+      b.onkeydown = (e) => e.key === 'Enter' && b.click()
       el.appendChild(b)
     }
   }
@@ -79,38 +90,42 @@
     $('texto').focus()
   }
   function criarChat() {
-    const c = { id: novoId(), titulo: 'Novo chat', msgs: [], em: Date.now() }
+    const c = { id: novoId(), titulo: 'Nova conversa', msgs: [], em: Date.now() }
     chats.push(c)
     salvar()
     abrir(c.id)
   }
 
   // ---------- desenho das mensagens ----------
-  const ICONE_FERR = { read: '📖', edit: '✏️', delete: '🗑', move: '↔', search: '🔎', execute: '⌨', think: '💭', fetch: '🌐', other: '🔧' }
-  const ROTULO_FERR = { read: 'Lendo arquivo', edit: 'Escrevendo arquivo', delete: 'Apagando', move: 'Movendo', search: 'Buscando', execute: 'Rodando comando', think: 'Pensando', fetch: 'Acessando a web', other: 'Usando ferramenta' }
+  const ICONE_FERR = { read: 'file', edit: 'pencil', delete: 'trash', move: 'move', search: 'search', execute: 'terminal', think: 'sparkles', fetch: 'globe', other: 'sparkles' }
+  const ROTULO_FERR = { read: 'Lendo', edit: 'Escrevendo', delete: 'Apagando', move: 'Movendo', search: 'Buscando', execute: 'Executando', think: 'Pensando', fetch: 'Acessando a web', other: 'Usando ferramenta' }
   const nomeArq = (p) => String(p || '').split(/[\\/]/).pop()
 
   function cartaoFerramenta(f) {
     const d = document.createElement('div')
-    d.className = 'ferr ' + (f.status || '')
     d.dataset.id = f.id || ''
     atualizarCartao(d, f)
     return d
   }
+  // "read_file: C:\pasta\a.txt" -> "a.txt"; "terminal: ls -la" -> "ls -la"
+  function tituloLimpo(t) {
+    let x = String(t || '').replace(/^[a-z_]+:\s*/i, '')
+    if (/^[A-Za-z]:[\\/]/.test(x) || x.startsWith('/')) x = x.split(/[\\/]/).pop()
+    return x.replace(/^[0-9a-z]{6,9}-(?=.+\.\w+$)/i, '')
+  }
   function atualizarCartao(d, f) {
-    const estado = f.status === 'completed' ? '✓' : f.status === 'failed' ? '✕' : '…'
+    const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
-    const titulo = f.titulo || ROTULO_FERR[tipo]
+    const titulo = tituloLimpo(f.titulo)
     const caminho = f.caminho
     d.className = 'ferr ' + (f.status || 'pending')
-    d.innerHTML = `<details ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${ICONE_FERR[tipo] || ICONE_FERR.other}</span><span class="ft"><b>${esc(ROTULO_FERR[tipo] || '')}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
+    d.innerHTML = `<details ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${IC[ICONE_FERR[tipo]] || IC.sparkles}</span><span class="ft"><b>${esc(ROTULO_FERR[tipo] || '')}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
       <div class="fcorpo">${f.entrada ? `<div class="mut">${esc(f.entrada)}</div>` : ''}${f.conteudo ? `<pre>${esc(f.conteudo)}</pre>` : ''}</div></details>
-      ${caminho && f.status === 'completed' && (tipo === 'edit' || tipo === 'read') ? `<div class="facoes"><button data-abrir="${attr(caminho)}">Abrir ${esc(nomeArq(caminho))}</button><button data-mostrar="${attr(caminho)}">Mostrar na pasta</button></div>` : ''}`
+      ${caminho && f.status === 'completed' && tipo === 'edit' ? `<div class="facoes"><button data-abrir="${attr(caminho)}">${IC.file}Abrir ${esc(nomeArq(caminho))}</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>` : ''}`
   }
 
   function partesDe(m) {
-    if (m.partes) return m.partes
-    return [{ t: 'texto', v: m.content }]
+    return m.partes || [{ t: 'texto', v: m.content }]
   }
   function renderPartes(el, partes) {
     el.innerHTML = ''
@@ -124,13 +139,14 @@
     }
   }
 
+  const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Segundo Cérebro`
   function bolha(m) {
     const d = document.createElement('div')
     d.className = 'msg ' + m.role
     if (m.role === 'user') {
-      d.innerHTML = `<div class="quem">Você</div><div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">📎 ${esc(a.nome)}</div>`).join('')}`
+      d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}`
     } else {
-      d.innerHTML = `<div class="quem"><img class="pv" src="img/unlimited.svg" alt="">Unlimited</div>${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}<div class="partes"></div>`
+      d.innerHTML = `${QUEM}</div>${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}<div class="partes"></div>`
       renderPartes(d.querySelector('.partes'), partesDe(m))
       for (const a of m.midias || []) d.appendChild(midia(a))
     }
@@ -143,16 +159,15 @@
     d.className = 'midia'
     const ext = (caminho.split('.').pop() || '').toLowerCase()
     const tipo = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext) ? 'img' : ['mp3', 'wav', 'ogg', 'webm', 'm4a'].includes(ext) ? 'audio' : ['mp4', 'mov'].includes(ext) ? 'video' : 'arq'
-    const rotulo = `<div class="facoes"><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">Mostrar na pasta</button></div>`
-    if (tipo === 'arq') d.innerHTML = `<div class="anexo-msg">📄 ${esc(nomeArq(caminho))}</div>${rotulo}`
+    const acoes = `<div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>`
+    if (tipo === 'arq') d.innerHTML = `<div class="anexo-msg">${IC.file}${esc(nomeArq(caminho))}</div>${acoes}`
     else {
-      d.innerHTML = `<div class="mut">${esc(nomeArq(caminho))}</div>${rotulo}`
+      d.innerHTML = `<div class="mut">${esc(nomeArq(caminho))}</div>${acoes}`
       window.sb.lerArquivo(caminho).then((r) => {
         if (!r.ok) return
         const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', webm: tipo === 'video' ? 'video/webm' : 'audio/webm', m4a: 'audio/mp4', mp4: 'video/mp4', mov: 'video/quicktime' }[ext]
-        const url = `data:${mime};base64,${r.base64}`
         const el = document.createElement(tipo === 'img' ? 'img' : tipo)
-        el.src = url
+        el.src = `data:${mime};base64,${r.base64}`
         if (tipo !== 'img') el.controls = true
         el.className = 'midia-el'
         d.insertBefore(el, d.firstChild)
@@ -161,13 +176,35 @@
     return d
   }
 
+  const SUGESTOES = [
+    { ic: 'globe', t: 'Criar um site', d: 'Monte um portfólio a partir do seu currículo', p: 'Crie um site de portfólio profissional com base no meu currículo (vou anexar o PDF).' },
+    { ic: 'file', t: 'Resumir um documento', d: 'Leia um PDF, Word ou planilha e resuma', p: 'Leia o arquivo anexado e faça um resumo com os pontos principais e os próximos passos.' },
+    { ic: 'terminal', t: 'Organizar arquivos', d: 'Arrume uma pasta do seu computador', p: 'Liste os arquivos da minha pasta de trabalho e proponha uma organização por tipo, sem mover nada ainda.' },
+    { ic: 'sparkles', t: 'Pedir uma segunda opinião', d: 'Chame o Claude Code ou o Codex', p: 'Peça uma segunda opinião ao Claude Code sobre o texto que vou colar a seguir.' },
+  ]
+  function telaInicial() {
+    const d = document.createElement('div')
+    d.className = 'vazio'
+    d.id = 'vazio'
+    d.innerHTML = `<img class="logo-img logo-grande" src="img/segundo-cerebro.png" alt=""><h1>Como posso ajudar?</h1><p>Seu assistente pessoal: lê arquivos, roda comandos, cria sites e documentos.</p>
+      <div class="sugestoes">${SUGESTOES.map((s, i) => `<button class="sugestao" data-sug="${i}">${IC[s.ic]}<div><b>${esc(s.t)}</b><span>${esc(s.d)}</span></div></button>`).join('')}</div>`
+    d.onclick = (e) => {
+      const b = e.target.closest('[data-sug]')
+      if (!b) return
+      $('texto').value = SUGESTOES[+b.dataset.sug].p
+      $('texto').dispatchEvent(new Event('input'))
+      $('texto').focus()
+    }
+    return d
+  }
+
   function desenhar() {
     const el = $('conversa')
     const c = chatAtual()
     el.innerHTML = ''
-    $('titulo').textContent = c ? c.titulo : 'Novo chat'
+    $('titulo').textContent = c && c.msgs.length ? c.titulo : 'Nova conversa'
     if (!c || c.msgs.length === 0) {
-      el.innerHTML = `<div class="vazio" id="vazio"><img class="logo-img grande" src="img/second-brain.svg" alt=""><h1>Como posso ajudar?</h1><p>Converse com o Unlimited. Ele lê arquivos, roda comandos, cria sites e chama o Claude Code ou o Codex quando precisar.</p></div>`
+      el.appendChild(telaInicial())
       return
     }
     for (const m of c.msgs) el.appendChild(bolha(m))
@@ -176,7 +213,7 @@
 
   function alternarBotao(parar) {
     const b = $('enviar')
-    b.textContent = parar ? '■' : '↑'
+    b.innerHTML = parar ? IC.stop : IC.arrowUp
     b.classList.toggle('parar', parar)
     b.setAttribute('aria-label', parar ? 'Parar' : 'Enviar')
   }
@@ -185,7 +222,7 @@
   function desenharAnexos() {
     const el = $('anexos')
     el.hidden = anexosPendentes.length === 0
-    el.innerHTML = anexosPendentes.map((a, i) => `<span class="chip-anexo">${a.tipo === 'audio' ? '🎙' : '📎'} ${esc(a.nome)}<button data-rm="${i}" aria-label="Remover anexo">✕</button></span>`).join('')
+    el.innerHTML = anexosPendentes.map((a, i) => `<span class="chip-anexo">${a.tipo === 'audio' ? IC.mic : IC.clip}${esc(a.nome)}<button data-rm="${i}" aria-label="Remover anexo">${IC.x}</button></span>`).join('')
   }
   async function adicionarArquivo(arquivo) {
     if (!chatAtual()) criarChat()
@@ -209,9 +246,9 @@
     e.target.value = ''
   }
   $('anexos').onclick = (e) => {
-    const i = e.target.dataset?.rm
-    if (i === undefined) return
-    anexosPendentes.splice(+i, 1)
+    const b = e.target.closest('[data-rm]')
+    if (!b) return
+    anexosPendentes.splice(+b.dataset.rm, 1)
     desenharAnexos()
   }
   const caixaEl = document.querySelector('.entrada')
@@ -228,6 +265,7 @@
     for (const f of arquivos) await adicionarArquivo(f)
   })
 
+  const hora = () => new Date().toTimeString().slice(0, 8).replace(/:/g, '')
   async function alternarGravacao() {
     const b = $('microfone')
     if (gravador) {
@@ -243,13 +281,15 @@
         fluxo.getTracks().forEach((t) => t.stop())
         gravador = null
         b.classList.remove('gravando')
+        b.title = 'Gravar áudio'
         b.setAttribute('aria-label', 'Gravar áudio')
         const blob = new Blob(partes, { type: rec.mimeType || 'audio/webm' })
-        if (blob.size) await adicionarArquivo(new File([blob], `audio-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}.webm`, { type: blob.type }))
+        if (blob.size) await adicionarArquivo(new File([blob], `audio-${hora()}.webm`, { type: blob.type }))
       }
       rec.start()
       gravador = rec
       b.classList.add('gravando')
+      b.title = 'Parar gravação'
       b.setAttribute('aria-label', 'Parar gravação')
     } catch (e) {
       aviso('Não consegui acessar o microfone: ' + (e.message || e))
@@ -272,6 +312,7 @@
     }
     const t = $('texto').value.trim()
     if (!t && !anexosPendentes.length) return
+    if (!cfg.ativo) return aviso('Escolha um modelo antes de enviar (ou conecte um provedor em Configurações).')
     if (!chatAtual()) criarChat()
     const c = chatAtual()
     const anexos = anexosPendentes
@@ -279,7 +320,7 @@
     desenharAnexos()
     const texto = t || 'Veja o(s) arquivo(s) anexado(s).'
     c.msgs.push({ role: 'user', content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
-    if (c.titulo === 'Novo chat') c.titulo = texto.slice(0, 42)
+    if (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat') c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     $('texto').value = ''
     $('texto').style.height = 'auto'
@@ -288,13 +329,13 @@
     const caixa = $('conversa')
     const d = document.createElement('div')
     d.className = 'msg assistant'
-    d.innerHTML = `<div class="quem"><img class="pv" src="img/unlimited.svg" alt="">Unlimited <span class="pensando" id="pensando">trabalhando…</span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
+    d.innerHTML = `${QUEM}<span class="pensando" id="pensando">trabalhando</span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
     caixa.appendChild(d)
     caixa.scrollTop = caixa.scrollHeight
     resposta = { id: c.id, el: d, partes: [], raz: '', midias: [] }
     enviando = c.id
     alternarBotao(true)
-    window.sb.enviar({ id: c.id, mensagens: c.msgs.map(({ role, content }) => ({ role, content })), alvo: $('alvo').value, anexos: anexos.map((a) => a.caminho) })
+    window.sb.enviar({ id: c.id, mensagens: c.msgs.map(({ role, content }) => ({ role, content })), alvo: cfg.ativo, anexos: anexos.map((a) => a.caminho) })
   }
 
   function fim(texto, erro) {
@@ -354,7 +395,7 @@
     const caixa = $('conversa')
     const d = document.createElement('div')
     d.className = 'permissao'
-    d.innerHTML = `<div><b>O agente quer permissão</b><div class="mut">${esc(p.titulo)}</div></div><div class="facoes"><button data-p="permitir" class="primario">Permitir</button><button data-p="sempre">Permitir sempre nesta conversa</button><button data-p="negar">Negar</button></div>`
+    d.innerHTML = `<div><b>${IC.shield} O agente pede permissão</b><div class="mut">${esc(p.titulo)}</div></div><div class="facoes"><button data-p="permitir" class="primario">Permitir</button><button data-p="sempre">Permitir sempre nesta conversa</button><button data-p="negar">Negar</button></div>`
     d.onclick = (e) => {
       const r = e.target.dataset?.p
       if (!r) return
@@ -376,47 +417,119 @@
       e.preventDefault()
       window.sb.abrirExterno(a.href)
     }
+    if (!e.target.closest('.seletor')) fecharMenu()
   })
 
-  // ---------- alvo, modo, pasta ----------
-  async function preencherAlvo() {
-    const s = $('alvo')
-    const lista = await window.sb.modelos()
-    s.innerHTML = ''
-    if (!lista.length) s.appendChild(new Option('Nenhum modelo: cadastre um provedor', ''))
-    $('boas-vindas').hidden = lista.length > 0
-    for (const grupo of ['Combos', 'Modelos']) {
-      const itens = lista.filter((m) => m.grupo === grupo)
-      if (!itens.length) continue
-      const og = document.createElement('optgroup')
-      og.label = grupo
-      for (const m of itens) og.appendChild(new Option(m.nome, m.id))
-      s.appendChild(og)
-    }
-    if (lista.some((m) => m.id === cfg.ativo)) s.value = cfg.ativo
-    else if (lista.length) {
-      s.value = lista[0].id
-      cfg = await window.sb.salvarCfg({ ativo: lista[0].id })
-    }
-    $('so-conversa').checked = !!cfg.soConversa
-    $('pasta').textContent = cfg.pasta
+  // ---------- modelo, modo e pasta ----------
+  const logoModelo = (m) => {
+    if (!m) return `<span class="mlogo">${IC.layers}</span>`
+    if (m.logo === 'unlimited') return '<span class="mlogo"><img src="img/unlimited.svg" alt=""></span>'
+    if (m.grupo === 'Combos') return `<span class="mlogo">${IC.layers}</span>`
+    const p = CAT[m.provedor]
+    return p && p.logo ? `<span class="mlogo"><img src="img/providers/${esc(p.id)}.png" alt=""></span>` : `<span class="mlogo">${IC.sparkles}</span>`
   }
+  const subModelo = (m) => (m.grupo === 'Combos' ? m.sub || 'Combo' : (CAT[m.provedor] && CAT[m.provedor].nome) || m.sub || '')
+
+  function pintarSeletor() {
+    const m = modelos.find((x) => x.id === cfg.ativo)
+    $('modelo-logo').innerHTML = m ? logoModelo(m).replace(/^<span class="mlogo">|<\/span>$/g, '') : ''
+    $('modelo-nome').textContent = m ? m.nome : modelos.length ? 'Escolher modelo' : 'Sem provedor'
+    $('modelo').title = m ? `${m.nome} · ${subModelo(m)}` : 'Escolher modelo'
+  }
+  function pintarModo() {
+    const agente = !cfg.soConversa
+    const b = $('modo')
+    b.classList.toggle('agente', agente)
+    b.innerHTML = `${agente ? IC.sparkles : IC.chat}<span id="modo-nome">${agente ? 'Agente' : 'Conversa'}</span>`
+    b.title = agente ? 'Modo agente: lê arquivos, roda comandos e cria coisas. Clique para só conversar.' : 'Só conversa, sem ferramentas. Clique para ativar o agente.'
+  }
+  function pintarPasta() {
+    const partes = String(cfg.pasta || '').split(/[\\/]/).filter(Boolean)
+    $('pasta').textContent = partes.slice(-2).join('/') || 'Escolher pasta'
+    $('pasta-chip').title = 'Pasta de trabalho: ' + cfg.pasta + ' (clique para mudar)'
+  }
+  function fecharMenu() {
+    $('menu-modelo').hidden = true
+    $('modelo').setAttribute('aria-expanded', 'false')
+  }
+  function abrirMenu() {
+    const menu = $('menu-modelo')
+    if (!modelos.length) {
+      menu.innerHTML = '<div class="menu-vazio">Nenhum provedor conectado.<br><button class="primario" id="menu-conectar" style="margin-top:8px">Conectar provedor</button></div>'
+    } else {
+      menu.innerHTML = ['Combos', 'Modelos']
+        .map((g) => {
+          const itens = modelos.filter((m) => m.grupo === g)
+          if (!itens.length) return ''
+          return `<div class="menu-grupo">${g}</div>${itens.map((m) => `<button class="menu-item ${m.id === cfg.ativo ? 'on' : ''}" role="option" data-id="${attr(m.id)}">${logoModelo(m)}<span class="mnome">${esc(m.nome)}<small>${esc(subModelo(m))}</small></span><span class="ok">${IC.check}</span></button>`).join('')}`
+        })
+        .join('')
+    }
+    menu.hidden = false
+    $('modelo').setAttribute('aria-expanded', 'true')
+    ;(menu.querySelector('.menu-item.on') || menu.querySelector('.menu-item'))?.focus()
+  }
+  $('modelo').onclick = (e) => {
+    e.stopPropagation()
+    $('menu-modelo').hidden ? abrirMenu() : fecharMenu()
+  }
+  $('menu-modelo').onclick = async (e) => {
+    if (e.target.id === 'menu-conectar') return fecharMenu(), window.SBConfig.abrir('prov')
+    const b = e.target.closest('.menu-item')
+    if (!b) return
+    cfg = await window.sb.salvarCfg({ ativo: b.dataset.id })
+    pintarSeletor()
+    fecharMenu()
+    $('texto').focus()
+  }
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && fecharMenu())
+  $('modo').onclick = async () => {
+    cfg = await window.sb.salvarCfg({ soConversa: !cfg.soConversa })
+    pintarModo()
+  }
+  $('pasta-chip').onclick = async () => {
+    const p = await window.sb.escolherPasta()
+    if (p) {
+      cfg = await window.sb.salvarCfg({ pasta: p })
+      pintarPasta()
+    }
+  }
+
+  async function preencherAlvo() {
+    modelos = await window.sb.modelos()
+    if (!modelos.some((m) => m.id === cfg.ativo) && modelos.length) cfg = await window.sb.salvarCfg({ ativo: (modelos.find((m) => m.grupo === 'Combos') || modelos[0]).id })
+    $('boas-vindas').hidden = modelos.length > 0
+    pintarSeletor()
+    pintarModo()
+    pintarPasta()
+  }
+  window.preencherAlvo = preencherAlvo
 
   async function iniciar() {
     cfg = await window.sb.cfg()
     chats = await window.sb.chats()
+    window.aplicarIcones()
+    pintarModo()
+    pintarPasta()
+    alternarBotao(false)
     preencherAlvo()
     setTimeout(preencherAlvo, 6000)
     listar()
     desenhar()
-    if (window.matchMedia('(max-width:760px)').matches) $('app').classList.add('recolhido')
-    $('novo').onclick = criarChat
+    const mq = window.matchMedia('(max-width:820px)')
+    const ajustar = () => {
+      if (mq.matches) recolher(true)
+      $('texto').placeholder = window.matchMedia('(max-width:560px)').matches ? 'Escreva uma mensagem…' : 'Escreva uma mensagem, anexe um arquivo ou grave um áudio'
+    }
+    ajustar()
+    mq.addEventListener('change', ajustar)
+    window.matchMedia('(max-width:560px)').addEventListener('change', ajustar)
+    $('novo').onclick = () => (criarChat(), estreito() && recolher(true))
     $('enviar').onclick = enviar
     $('busca').oninput = listar
-    $('recolher').onclick = () => $('app').classList.add('recolhido')
-    $('mostrar').onclick = () => $('app').classList.toggle('recolhido')
-    $('alvo').onchange = async () => (cfg = await window.sb.salvarCfg({ ativo: $('alvo').value }))
-    $('so-conversa').onchange = async () => (cfg = await window.sb.salvarCfg({ soConversa: $('so-conversa').checked }))
+    $('recolher').onclick = () => recolher(true)
+    $('mostrar').onclick = () => recolher(!$('app').classList.contains('recolhido'))
+    $('cortina').onclick = () => recolher(true)
     $('abrir-config').onclick = () => window.SBConfig.abrir()
     $('bv-ir').onclick = () => window.SBConfig.abrir('prov')
     window.SBConfig.aoFechar = async () => {
@@ -425,7 +538,7 @@
     }
     const t = $('texto')
     t.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault()
         enviar()
       }
