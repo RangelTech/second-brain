@@ -15,7 +15,8 @@
     "router:build": "node scripts/baixar-router.mjs && npm --prefix router install --no-audit --no-fund && npm --prefix router run build && node scripts/pos-build-router.js",
     "dist": "electron-builder --win nsis portable --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
-    "router:fetch": "node scripts/baixar-router.mjs"
+    "router:fetch": "node scripts/baixar-router.mjs",
+    "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true"
   },
   "build": {
     "appId": "net.rangeltech.secondbrain",
@@ -36,7 +37,8 @@
         "nsis",
         "portable"
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": [
@@ -47,14 +49,18 @@
       "maintainer": "Rangel Tech <contato@rangeltech.net>",
       "synopsis": "Agente de IA para desktop",
       "description": "Segundo Cérebro: agente de IA com provedores, combos e a IA Unlimited",
-      "artifactName": "Segundo-Cerebro-${version}-linux-${arch}.${ext}"
+      "artifactName": "Segundo-Cerebro-${version}-linux-${arch}.${ext}",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "Segundo-Cerebro-Instalador-${version}.${ext}",
-      "shortcutName": "Segundo Cérebro"
+      "shortcutName": "Segundo Cérebro",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     },
     "extraResources": [
       {
@@ -69,6 +75,10 @@
       {
         "from": "skills-globais",
         "to": "skills-globais"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
       }
     ],
     "publish": [

@@ -11,7 +11,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            alvo: dist
+            alvo: dist:ci
           - os: ubuntu-latest
             alvo: dist:linux
     runs-on: ${{ matrix.os }}

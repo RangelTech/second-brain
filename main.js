@@ -184,6 +184,7 @@ function criarJanela() {
     minHeight: 520,
     backgroundColor: '#1f1d1a',
     title: 'Segundo Cérebro',
+    icon: require('fs').existsSync(path.join(process.resourcesPath || '', 'icon.png')) ? path.join(process.resourcesPath, 'icon.png') : path.join(__dirname, 'build', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   })
