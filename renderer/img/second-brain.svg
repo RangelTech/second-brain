@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Second Brain">
+  <defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="70" y1="60" x2="190" y2="210"><stop offset="0" stop-color="#e8875a"/><stop offset="1" stop-color="#c15f3c"/></linearGradient></defs>
+  <rect width="256" height="256" rx="56" fill="#1f1d1a"/>
+  <g fill="url(#g)">
+    <circle cx="96" cy="100" r="40"/><circle cx="160" cy="100" r="40"/>
+    <circle cx="86" cy="148" r="40"/><circle cx="170" cy="148" r="40"/>
+    <rect x="86" y="100" width="84" height="48"/>
+    <rect x="108" y="170" width="40" height="34" rx="14"/>
+  </g>
+  <g stroke="#1f1d1a" stroke-width="8" stroke-linecap="round" fill="none">
+    <path d="M128 66v110"/>
+    <path d="M128 100c-14 0-26-6-32-18"/><path d="M128 100c14 0 26-6 32-18"/>
+    <path d="M128 140c-18 0-32-6-40-20"/><path d="M128 140c18 0 32-6 40-20"/>
+    <path d="M128 176c-10 0-18-4-24-12"/><path d="M128 176c10 0 18-4 24-12"/>
+  </g>
+</svg>

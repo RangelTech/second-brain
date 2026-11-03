@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Second Brain</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="config.css">
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="lateral" id="lateral">
+    <div class="topo">
+      <div class="marca"><img class="logo-img" src="img/second-brain.svg" alt=""><span>Second Brain</span></div>
+      <button class="icone" id="recolher" title="Recolher a barra lateral" aria-label="Recolher a barra lateral">«</button>
+    </div>
+    <button class="novo" id="novo"><span>＋</span> Novo chat</button>
+    <input class="busca" id="busca" placeholder="Buscar conversas" aria-label="Buscar conversas">
+    <div class="rotulo">Conversas</div>
+    <nav class="lista" id="lista" aria-label="Conversas"></nav>
+    <div class="rodape">
+      <button class="item" id="abrir-config">⚙ Configurações</button>
+    </div>
+  </aside>
+  <main class="central">
+    <header class="barra">
+      <button class="icone mostrar" id="mostrar" title="Mostrar a barra lateral" aria-label="Mostrar a barra lateral">»</button>
+      <div class="titulo" id="titulo">Novo chat</div>
+      <div class="controles">
+        <label class="agente" title="Sem ferramentas: o modelo só conversa, sem ler arquivos nem rodar comandos"><input type="checkbox" id="so-conversa"> Só conversa</label>
+        <select id="alvo" aria-label="Modelo ou combo"></select>
+      </div>
+    </header>
+    <section class="conversa" id="conversa" aria-live="polite">
+      <div class="vazio" id="vazio">
+        <img class="logo-img grande" src="img/second-brain.svg" alt="">
+        <h1>Como posso ajudar?</h1>
+        <p>Converse com o Unlimited. Ele lê arquivos, roda comandos, cria sites e chama o Claude Code ou o Codex quando precisar.</p>
+      </div>
+    </section>
+    <footer class="entrada">
+      <div class="aviso-geral" id="aviso-geral" hidden></div>
+      <div class="anexos" id="anexos" hidden></div>
+      <div class="caixa">
+        <input type="file" id="arquivo-input" multiple hidden>
+        <button class="icone-caixa" id="anexar" aria-label="Anexar arquivo" title="Anexar arquivo (ou arraste para cá)">📎</button>
+        <textarea id="texto" rows="1" placeholder="Escreva uma mensagem… (Enter envia, Shift+Enter quebra a linha)" aria-label="Mensagem"></textarea>
+        <button class="icone-caixa" id="microfone" aria-label="Gravar áudio" title="Gravar áudio">🎙</button>
+        <button id="enviar" class="enviar" aria-label="Enviar">↑</button>
+      </div>
+      <div class="dica" id="dica">Pasta de trabalho: <span id="pasta"></span></div>
+    </footer>
+  </main>
+  <section class="config" id="config" hidden></section>
+</div>
+<script src="provider-catalog.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

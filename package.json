@@ -1,0 +1,86 @@
+{
+  "name": "second-brain",
+  "productName": "Second Brain",
+  "version": "0.2.0",
+  "description": "Second Brain by Rangel Tech: agente de IA no desktop com provedores e combos",
+  "main": "main.js",
+  "author": {
+    "name": "Rangel Tech",
+    "email": "contato@rangeltech.net"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "icones": "electron scripts/gerar-icones.js",
+    "router:build": "node scripts/baixar-router.mjs && npm --prefix router install --no-audit --no-fund && npm --prefix router run build && node scripts/pos-build-router.js",
+    "dist": "electron-builder --win nsis portable --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
+    "router:fetch": "node scripts/baixar-router.mjs"
+  },
+  "build": {
+    "appId": "net.rangeltech.secondbrain",
+    "productName": "Second Brain",
+    "icon": "build/icon.png",
+    "files": [
+      "main.js",
+      "preload.js",
+      "agent.js",
+      "embed-router.js",
+      "renderer/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "maintainer": "Rangel Tech <contato@rangeltech.net>",
+      "synopsis": "Agente de IA para desktop",
+      "description": "Second Brain: agente de IA com provedores, combos e a IA Unlimited"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "extraResources": [
+      {
+        "from": "router/.next/standalone",
+        "to": "router",
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!**/better-sqlite3/**"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "RangelTech",
+        "repo": "second-brain"
+      }
+    ],
+    "artifactName": "Second-Brain-${version}-${os}-${arch}.${ext}"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "homepage": "https://github.com/RangelTech/second-brain",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RangelTech/second-brain.git"
+  }
+}

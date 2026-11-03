@@ -1,0 +1,27 @@
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
+
+contextBridge.exposeInMainWorld('sb', {
+  cfg: () => ipcRenderer.invoke('cfg:get'),
+  salvarCfg: (c) => ipcRenderer.invoke('cfg:set', c),
+  chats: () => ipcRenderer.invoke('chats:get'),
+  salvarChats: (c) => ipcRenderer.invoke('chats:set', c),
+  escolherPasta: () => ipcRenderer.invoke('pasta:escolher'),
+  enviar: (p) => ipcRenderer.invoke('chat:enviar', p),
+  parar: (id) => ipcRenderer.invoke('chat:parar', id),
+  aoDelta: (fn) => ipcRenderer.on('chat:delta', (_e, d) => fn(d)),
+  aoFim: (fn) => ipcRenderer.on('chat:fim', (_e, d) => fn(d)),
+  routerEstado: () => ipcRenderer.invoke('router:estado'),
+  api: (metodo, rota, corpo) => ipcRenderer.invoke('router:api', { metodo, rota, corpo }),
+  modelos: () => ipcRenderer.invoke('modelos:listar'),
+  abrirExterno: (url) => ipcRenderer.invoke('externo:abrir', url),
+  anexar: (p) => ipcRenderer.invoke('anexo:salvar', p),
+  caminhoDe: (arquivo) => webUtils.getPathForFile(arquivo),
+  abrirArquivo: (p) => ipcRenderer.invoke('arquivo:abrir', p),
+  mostrarArquivo: (p) => ipcRenderer.invoke('arquivo:mostrar', p),
+  lerArquivo: (p) => ipcRenderer.invoke('arquivo:ler', p),
+  abrirLogs: () => ipcRenderer.invoke('logs:abrir'),
+  info: () => ipcRenderer.invoke('app:info'),
+  responderPermissao: (req, resposta) => ipcRenderer.invoke('chat:permissao-resp', { req, resposta }),
+  aoPermissao: (fn) => ipcRenderer.on('chat:permissao', (_e, d) => fn(d)),
+  aoErro: (fn) => ipcRenderer.on('chat:erro', (_e, d) => fn(d)),
+})

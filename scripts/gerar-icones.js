@@ -1,0 +1,15 @@
+// Renderiza o SVG do app em PNG 512 (build/icon.png); o electron-builder converte para .ico/.icns.
+const { app, BrowserWindow } = require('electron')
+const fs = require('fs')
+const path = require('path')
+const raiz = path.join(__dirname, '..')
+app.whenReady().then(async () => {
+  const svg = fs.readFileSync(path.join(raiz, 'renderer', 'img', 'second-brain.svg'), 'utf8')
+  const w = new BrowserWindow({ show: false, width: 512, height: 512, transparent: true, frame: false, webPreferences: { offscreen: true } })
+  await w.loadURL('data:text/html,' + encodeURIComponent(`<body style="margin:0;background:transparent"><div style="width:512px;height:512px">${svg.replace('<svg ', '<svg width="512" height="512" ')}</div></body>`))
+  await new Promise((r) => setTimeout(r, 400))
+  const img = await w.webContents.capturePage()
+  fs.mkdirSync(path.join(raiz, 'build'), { recursive: true })
+  fs.writeFileSync(path.join(raiz, 'build', 'icon.png'), img.toPNG())
+  app.quit()
+})

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.log
+.env
+*.env
+.next/
+router/.next/
+router/node_modules/
+router/
