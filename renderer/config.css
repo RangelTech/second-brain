@@ -165,3 +165,7 @@
   .kpis{grid-template-columns:1fr 1fr}
   .janela{padding:16px}
 }
+
+.janela input[type=text],.janela input[type=password]{background:var(--lat);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;outline:none;min-width:0;font:inherit}
+.janela input:focus{border-color:var(--ac)}
+.janela .campo{margin-bottom:10px;gap:5px}

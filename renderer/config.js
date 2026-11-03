@@ -715,6 +715,7 @@
       if (!raiz) montar()
       if (aba) S.aba = aba
       raiz.hidden = false
+      window.dispatchEvent(new Event('sb-config-abriu'))
       await carregarBase()
       desenharAba()
       // se o motor ainda estiver subindo, tenta de novo até ficar pronto
@@ -732,6 +733,7 @@
       if (!raiz) return
       clearInterval(S.timerCota)
       raiz.hidden = true
+      window.dispatchEvent(new Event('sb-config-fechou'))
       SBConfig.aoFechar?.()
     },
   }

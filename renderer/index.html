@@ -29,6 +29,7 @@
     <header class="barra">
       <button class="btn-ic mostrar" id="mostrar" aria-label="Mostrar a barra lateral"><i data-ic="panel"></i></button>
       <div class="titulo" id="titulo">Nova conversa</div>
+      <button class="chip-topo" id="abrir-nav" aria-label="Abrir ou fechar o navegador integrado" title="Navegador integrado"><i data-ic="globe"></i><span>Navegador</span></button>
     </header>
     <section class="conversa" id="conversa" aria-live="polite"></section>
     <div class="boas-vindas" id="boas-vindas" hidden>
@@ -49,6 +50,8 @@
           <button class="btn-ic" id="anexar" aria-label="Anexar arquivo" title="Anexar arquivo"><i data-ic="clip"></i></button>
           <button class="chip-modo" id="modo" aria-label="Modo do assistente"><i data-ic="sparkles"></i><span id="modo-nome">Agente</span></button>
           <button class="chip-modo" id="pensar" aria-label="Raciocínio do modelo"><i data-ic="bulb"></i><span id="pensar-nome">Pensar</span></button>
+          <button class="chip-modo" id="permissao" aria-label="Modo de permissão do agente" aria-haspopup="menu"><i data-ic="shield"></i><span id="permissao-nome">Manual</span></button>
+          <div class="menu-modelo menu-permissao" id="menu-permissao" role="menu" hidden></div>
           <span class="espaco"></span>
           <div class="seletor">
             <button class="chip-modelo" id="modelo" aria-haspopup="listbox" aria-expanded="false"><span class="mlogo" id="modelo-logo"></span><span class="mnome" id="modelo-nome">Escolher modelo</span><i data-ic="chevronDown"></i></button>
@@ -63,6 +66,17 @@
       </div>
     </footer>
   </main>
+  <aside class="nav" id="nav" hidden aria-label="Navegador integrado">
+    <div class="nav-barra">
+      <button class="btn-ic" id="nav-voltar" aria-label="Voltar" title="Voltar"><i data-ic="arrowLeft"></i></button>
+      <button class="btn-ic" id="nav-avancar" aria-label="Avançar" title="Avançar"><i data-ic="arrowRight"></i></button>
+      <button class="btn-ic" id="nav-recarregar" aria-label="Recarregar" title="Recarregar"><i data-ic="refresh"></i></button>
+      <form class="nav-url" id="nav-form"><input id="nav-url" type="text" spellcheck="false" placeholder="Digite um endereço ou peça ao agente para abrir" aria-label="Endereço"></form>
+      <span class="nav-ctl" id="nav-ctl" hidden><i class="ponto-ctl"></i>Agente</span>
+      <button class="btn-ic" id="nav-fechar" aria-label="Fechar o navegador" title="Fechar"><i data-ic="x"></i></button>
+    </div>
+    <div class="nav-host" id="nav-host"><div class="nav-vazio" id="nav-vazio">O navegador do agente aparece aqui.<br>Peça, por exemplo: "abra o site do G1 e me diga as manchetes".</div></div>
+  </aside>
   <section class="config" id="config" hidden></section>
 </div>
 <script src="icons.js"></script>

@@ -3,7 +3,9 @@ const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = req
 const embed = require('./embed-router')
 const { Sessao, prepararBase } = require('./agent')
 const skillsMod = require('./skills')
+const skillsRepoMod = require('./skills-repo')
 const unlimitedMod = require('./unlimited')
+const navegadorMod = require('./navegador')
 const path = require('path')
 const fs = require('fs')
 
@@ -22,6 +24,7 @@ const HOME = app.getPath('home')
 const PADRAO = {
   ativo: '',
   soConversa: false,
+  modoPermissao: 'manual', // manual | editar | auto | ignorar
   raciocinio: 'none',
   pasta: path.join(app.getPath('documents'), 'Segundo Cerebro'),
   hermesHome: path.join(HOME, 'hermes'),
@@ -121,13 +124,15 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 
 // ---------- resposta do chat ----------
 const sessoes = new Map()
+let navInfo = null // { url, token } do servidor local do navegador integrado
+let nav = null
 async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
   if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: est.origem + '/v1', modelo: alvo, chave: await chaveLocal(), raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao })
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: est.origem + '/v1', modelo: alvo, chave: await chaveLocal(), raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.historico = historico
@@ -151,7 +156,8 @@ async function responder(alvo, msgs, ctx) {
   sessao.emitir = ctx.onDelta // cada mensagem tem o seu canal de resposta e de permissão
   sessao.pedirPermissao = ctx.pedirPermissao
   ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
-  await sessao.perguntar(ultimo, ctx.anexos || [])
+  const r = await sessao.perguntar(ultimo, ctx.anexos || [])
+  ctx.uso = r?.usage || null
   return ''
 }
 
@@ -216,6 +222,18 @@ app.whenReady().then(() => {
   carregarCfg()
   session.defaultSession.setPermissionRequestHandler((_wc, permissao, cb) => cb(['media', 'clipboard-read'].includes(permissao)))
   criarJanela()
+  nav = navegadorMod.criar({
+    app,
+    janela: () => janela,
+    avisar: (e) => janela?.webContents.send('navegador:estado', e),
+    pedirPainel: () => janela?.webContents.send('navegador:abrir-painel'),
+  })
+  nav.iniciarServidor().then((i) => (navInfo = i))
+  ipcMain.handle('navegador:limites', (_e, l) => nav.definirLimites(l))
+  ipcMain.handle('navegador:mostrar', (_e, sim) => nav.mostrar(sim))
+  ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
+  ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
+  ipcMain.handle('navegador:estado', () => nav.estado())
   if (app.isPackaged) {
     try {
       const { autoUpdater } = require('electron-updater')
@@ -247,6 +265,11 @@ app.whenReady().then(() => {
       return { ok: false, erro: String(err.message || err) }
     }
   }
+  const skillsRepo = skillsRepoMod.criar({ app, raiz: skills.raiz })
+  ipcMain.handle('skillsrepo:estado', seguro(() => skillsRepo.estado()))
+  ipcMain.handle('skillsrepo:vincular', seguro((url, tok) => skillsRepo.vincular(url, tok)))
+  ipcMain.handle('skillsrepo:desvincular', seguro(() => skillsRepo.desvincular()))
+  ipcMain.handle('skillsrepo:sincronizar', seguro((o) => skillsRepo.sincronizar(o || {})))
   ipcMain.handle('skills:listar', seguro(() => skills.listar()))
   ipcMain.handle('skills:ler', seguro((r) => skills.ler(r)))
   ipcMain.handle('skills:gravar', seguro((r, c) => skills.gravar(r, c)))
@@ -304,7 +327,7 @@ app.whenReady().then(() => {
   }
   ipcMain.handle('cfg:get', () => publica())
   ipcMain.handle('cfg:set', (_e, parcial) => {
-    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
+    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
     salvarCfg()
     return publica()
   })
@@ -335,8 +358,9 @@ app.whenReady().then(() => {
         ac.signal.addEventListener('abort', () => permissoes.get(req)?.('negar'))
       })
     try {
-      const texto = await responder(alvo, mensagens, { chat: id, onDelta: enviar, sinal: ac.signal, anexos, pedirPermissao })
-      e.sender.send('chat:fim', { id, texto: texto || acumulado })
+      const ctxResp = { chat: id, onDelta: enviar, sinal: ac.signal, anexos, pedirPermissao }
+      const texto = await responder(alvo, mensagens, ctxResp)
+      e.sender.send('chat:fim', { id, texto: texto || acumulado, uso: ctxResp.uso || null })
     } catch (err) {
       e.sender.send('chat:erro', { id, erro: ac.signal.aborted ? 'Interrompido.' : String(err.message ?? err) })
     } finally {
@@ -346,7 +370,7 @@ app.whenReady().then(() => {
   ipcMain.handle('anexo:salvar', (_e, { chat, nome, bytes, caminho }) => {
     const dir = path.join(app.getPath('userData'), 'conversas', chat, 'anexos')
     fs.mkdirSync(dir, { recursive: true })
-    const limpo = String(nome || 'arquivo').replace(/[\/:*?"<>|]/g, '_')
+    const limpo = String(nome || 'arquivo').replace(/[\\/:*?"<>|]/g, '_')
     const destino = path.join(dir, Date.now().toString(36) + '-' + limpo)
     if (caminho) fs.copyFileSync(caminho, destino)
     else fs.writeFileSync(destino, Buffer.from(bytes))
@@ -373,6 +397,7 @@ app.whenReady().then(() => {
 })
 app.on('window-all-closed', () => {
   embed.parar()
+  nav?.fechar()
   for (const x of sessoes.values()) x.encerrar()
   if (process.platform !== 'darwin') app.quit()
 })

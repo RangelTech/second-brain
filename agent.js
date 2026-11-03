@@ -65,7 +65,34 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
   return home
 }
 
-function contextoDeSistema({ pasta, ferramentas }) {
+// Modos de permissão (o usuário escolhe no chat). Devolve 'permitir' (nem pergunta) ou 'perguntar'.
+const SO_LEITURA = new Set(['read', 'search', 'fetch', 'think'])
+const COMANDO_RISCO = /\b(rm|rmdir|del|erase|rd|mv|move|chmod|chown|sudo|su|kill|taskkill|shutdown|reboot|format|mkfs|dd|curl|wget|scp|rsync|ssh|pip|pip3|npm|npx|yarn|pnpm|apt|apt-get|brew|choco|winget|docker|kubectl|git\s+(push|reset|clean|checkout|rebase)|reg|netsh|powershell\s+.*(remove|delete)|Remove-Item)\b|>\s*[~/\\]|\|\s*(sh|bash)\b/i
+function caminhoDe(tc) {
+  const r = tc.rawInput?.arguments || tc.rawInput || {}
+  return tc.locations?.[0]?.path || tc.content?.find((c) => c.path)?.path || r.path || r.file_path || r.filepath || null
+}
+function textoDe(tc) {
+  const r = tc.rawInput?.arguments || tc.rawInput || {}
+  return String(r.command || r.cmd || r.code || tc.title || '')
+}
+function dentroDe(pasta, alvo) {
+  if (!alvo) return false
+  const rel = path.relative(path.resolve(pasta), path.resolve(alvo))
+  return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel)
+}
+function decidirPermissao(modo, tc, pasta) {
+  if (modo === 'ignorar') return 'permitir'
+  if (modo === 'manual') return 'perguntar'
+  const kind = tc.kind || 'other'
+  if (SO_LEITURA.has(kind)) return 'permitir'
+  if (kind === 'edit') return dentroDe(pasta, caminhoDe(tc)) ? 'permitir' : 'perguntar'
+  if (modo === 'editar') return 'perguntar' // comandos, apagar e mover continuam perguntando
+  if (modo === 'auto' && kind === 'execute') return COMANDO_RISCO.test(textoDe(tc)) ? 'perguntar' : 'permitir'
+  return 'perguntar'
+}
+
+function contextoDeSistema({ pasta, ferramentas, navegador }) {
   const agora = new Date()
   return [
     'Você é o Segundo Cérebro, o agente do aplicativo de desktop da Rangel Tech. Responda em português do Brasil, de forma direta.',
@@ -75,6 +102,7 @@ function contextoDeSistema({ pasta, ferramentas }) {
     'Você tem ferramentas reais: leia e escreva arquivos (inclusive extrair texto de PDF, Word e planilha), liste pastas, rode comandos, busque na web e abra arquivos. USE as ferramentas em vez de dizer que não consegue acessar a máquina do usuário.',
     'Antes de apagar arquivos, escrever fora da pasta de trabalho ou rodar comandos perigosos, peça confirmação. Quando criar um arquivo, diga o caminho completo.',
     'NUNCA diga que algo está pronto sem VERIFICAR. Depois de criar código ou uma página, confira que funciona: para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console, ou tire uma captura e olhe. Se houver erro, corrija e confira de novo. Só então responda, dizendo o que você verificou.',
+    navegador ? 'Você tem um NAVEGADOR INTEGRADO que o usuário vê na tela ao lado do chat. Para abrir sites, clicar, preencher formulários, ler páginas e tirar capturas de tela, use as ferramentas do servidor "navegador" (navegador_abrir, navegador_ler, navegador_clicar, navegador_digitar, navegador_rolar, navegador_print, navegador_voltar, navegador_esperar, navegador_js). Comece com navegador_abrir, depois navegador_ler para ver a página e os elementos clicáveis (cada um tem um id), e use navegador_print para VER a página de verdade (depois olhe a imagem com vision_analyze no caminho devolvido). Prefira essas ferramentas ao navegador próprio do Hermes.' : '',
     ferramentas ? `Skills e ferramentas: ${ferramentas}` : '',
   ]
     .filter(Boolean)
@@ -90,10 +118,12 @@ function registrar(app, linha) {
 }
 
 class Sessao {
-  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao }) {
+  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador }) {
     this.app = app
     this.id = id
     this.pasta = pasta
+    this.modo = modo || (() => 'manual') // 'manual' | 'editar' | 'auto' | 'ignorar'
+    this.navegador = navegador || null // { url, token }: servidor local das ferramentas do navegador integrado
     this.emitir = emitir
     this.pedirPermissao = pedirPermissao
     this.permitirSempre = false
@@ -153,7 +183,7 @@ class Sessao {
       } catch {
         continue
       }
-      registrar(this.app, '< ' + l.slice(0, 300))
+      registrar(this.app, '< ' + l.slice(0, j.method === 'session/request_permission' ? 2000 : 300))
       this.tratar(j)
     }
   }
@@ -170,6 +200,8 @@ class Sessao {
       const escolha = async () => {
         const permitir = op.find((o) => o.kind === 'allow_always') || op.find((o) => o.kind === 'allow_once') || op[0]
         if (this.permitirSempre) return permitir.optionId
+        // o modo de permissão escolhido pelo usuário decide se a pergunta nem chega a aparecer
+        if (decidirPermissao(this.modo(), j.params.toolCall || {}, this.pasta) === 'permitir') return (op.find((o) => o.kind === 'allow_once') || permitir).optionId
         const r = await this.pedirPermissao({ chat: this.id, titulo: j.params.toolCall?.title || 'Ação do agente', tipo: j.params.toolCall?.kind, opcoes: op })
         if (r === 'sempre') {
           this.permitirSempre = true
@@ -233,7 +265,7 @@ class Sessao {
       try {
         const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : tentativa === 1 ? 240000 : 90000
         await this.comPrazo(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }), prazo)
-        const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: [] }), prazo)
+        const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: this.servidoresMcp() }), prazo)
         this.sid = r.sessionId
         return
       } catch (e) {
@@ -250,6 +282,23 @@ class Sessao {
     }
     throw new Error('O agente não respondeu ao iniciar: ' + (ultimo?.message || 'sem detalhe'))
   }
+  // ferramentas do navegador integrado: um servidor MCP (stdio) que repassa as chamadas ao app
+  servidoresMcp() {
+    if (!this.navegador) return []
+    const shim = [path.join(process.resourcesPath || '', 'mcp-navegador.js'), path.join(__dirname, 'mcp-navegador.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-navegador.js')
+    return [
+      {
+        name: 'navegador',
+        command: process.execPath,
+        args: [shim],
+        env: [
+          { name: 'ELECTRON_RUN_AS_NODE', value: '1' },
+          { name: 'SB_NAV_URL', value: this.navegador.url },
+          { name: 'SB_NAV_TOKEN', value: this.navegador.token },
+        ],
+      },
+    ]
+  }
   async perguntar(texto, anexos = []) {
     clearTimeout(this.ocioso)
     this.limiteUso = false
@@ -258,7 +307,9 @@ class Sessao {
     let corpo = texto
     if (anexos.length) corpo += '\n\nArquivos anexados (use as ferramentas para ler):\n' + anexos.map((a) => `- ${a}`).join('\n')
     if (this.primeira) {
-      corpo = contextoDeSistema({ pasta: this.pasta }) + '\n\n---\n' + corpo
+      const nl = String.fromCharCode(10)
+      const hist = this.historico ? nl + nl + 'Conversa até aqui (continue dela):' + nl + this.historico : ''
+      corpo = contextoDeSistema({ pasta: this.pasta, navegador: !!this.navegador }) + hist + nl + nl + '---' + nl + corpo
       this.primeira = false
     }
     this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })

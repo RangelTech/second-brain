@@ -4,7 +4,7 @@
 const [porta, mensagem, seg = '600'] = process.argv.slice(2)
 ;(async () => {
   const lista = await (await fetch(`http://127.0.0.1:${porta}/json/list`)).json()
-  const ws = new WebSocket(lista.find((p) => p.type === 'page').webSocketDebuggerUrl)
+  const ws = new WebSocket((lista.find((p) => p.type === 'page' && /index.html/.test(p.url)) || lista.find((p) => p.type === 'page')).webSocketDebuggerUrl)
   await new Promise((r) => (ws.onopen = r))
   let n = 0
   const pend = new Map()

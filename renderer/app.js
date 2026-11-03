@@ -193,13 +193,39 @@
   }
 
   const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Segundo Cérebro`
+  // ---------- horário, tempo e tokens por resposta ----------
+  const hhmm = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const duracao = (ms) => {
+    const t = Math.max(1, Math.round(ms / 1000))
+    return t < 60 ? `${t} s` : `${Math.floor(t / 60)} min ${String(t % 60).padStart(2, '0')} s`
+  }
+  const nTokens = (n) => (n >= 10000 ? `${(n / 1000).toFixed(1).replace('.', ',')} mil` : new Intl.NumberFormat('pt-BR').format(Math.round(n)))
+  function resumoResposta(m) {
+    if (!m.inicio || !m.fim) return ''
+    const ms = m.fim - m.inicio
+    const u = m.uso || {}
+    const total = u.totalTokens || (u.inputTokens || 0) + (u.outputTokens || 0)
+    const nFerr = (m.partes || []).filter((p) => p.t === 'ferr').length
+    const titulo = ms < 4000 ? `Respondeu em ${duracao(ms)}` : `Trabalhou por ${duracao(ms)}`
+    const linha = [titulo, `${hhmm(m.inicio)} às ${hhmm(m.fim)}`, total ? `${nTokens(total)} tokens` : ''].filter(Boolean).join(' · ')
+    const det = [
+      ['Tempo', duracao(ms)],
+      ['Horário', `${hhmm(m.inicio)} às ${hhmm(m.fim)}`],
+      u.inputTokens != null ? ['Tokens lidos (contexto)', nTokens(u.inputTokens)] : null,
+      u.outputTokens != null ? ['Tokens escritos', nTokens(u.outputTokens)] : null,
+      u.thoughtTokens ? ['Tokens de raciocínio', nTokens(u.thoughtTokens)] : null,
+      nFerr ? ['Ferramentas usadas', String(nFerr)] : null,
+    ].filter(Boolean)
+    return `<details class="resumo-resp"><summary>${esc(linha)}</summary><div class="resumo-corpo">${det.map(([k, v]) => `<div class="linha-r"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></details>`
+  }
+
   function bolha(m) {
     const d = document.createElement('div')
     d.className = 'msg ' + m.role
     if (m.role === 'user') {
-      d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}`
+      d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
     } else {
-      d.innerHTML = `${QUEM}</div>${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}<div class="partes"></div>`
+      d.innerHTML = `${QUEM}</div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}<div class="partes"></div>`
       renderPartes(d.querySelector('.partes'), partesDe(m))
       for (const a of m.midias || []) d.appendChild(midia(a))
     }
@@ -372,7 +398,7 @@
     anexosPendentes = []
     desenharAnexos()
     const texto = t || 'Veja o(s) arquivo(s) anexado(s).'
-    c.msgs.push({ role: 'user', content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
+    c.msgs.push({ role: 'user', em: Date.now(), content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
     if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     $('texto').value = ''
@@ -393,7 +419,7 @@
     window.sb.enviar({ id: c.id, mensagens: c.msgs.map(({ role, content }) => ({ role, content })), alvo: cfg.ativo, anexos: anexos.map((a) => a.caminho) })
   }
 
-  function fim(texto, erro) {
+  function fim(texto, erro, uso) {
     if (!resposta) return
     clearInterval(resposta.timer)
     const c = chats.find((x) => x.id === resposta.id)
@@ -401,7 +427,7 @@
       const partes = resposta.partes.length ? resposta.partes : texto ? [{ t: 'texto', v: texto }] : []
       if (erro) partes.push({ t: 'texto', v: `⚠ ${erro}` })
       const conteudo = partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || '(sem resposta)'
-      c.msgs.push({ role: 'assistant', content: conteudo, partes, raciocinio: resposta.raz || undefined, midias: resposta.midias })
+      c.msgs.push({ role: 'assistant', content: conteudo, partes, raciocinio: resposta.raz || undefined, midias: resposta.midias, inicio: resposta.inicio, fim: Date.now(), uso: uso || undefined })
       c.em = Date.now()
       salvar()
     }
@@ -480,7 +506,7 @@
     renderPartes(resposta.el.querySelector('.partes'), resposta.partes)
     caixa.scrollTop = caixa.scrollHeight
   })
-  window.sb.aoFim((d) => fim(d.texto))
+  window.sb.aoFim((d) => fim(d.texto, '', d.uso))
   window.sb.aoErro((d) => fim('', d.erro))
 
   // permissões do agente (cartão na conversa)
@@ -512,6 +538,7 @@
       window.sb.abrirExterno(a.href)
     }
     if (!e.target.closest('.seletor')) fecharMenu()
+    if (!e.target.closest('#permissao') && !e.target.closest('#menu-permissao')) fecharMenuPerm()
   })
 
   // ---------- modelo, modo e pasta ----------
@@ -600,6 +627,82 @@
     }
   }
 
+  // ---------- modo de permissão do agente ----------
+  const MODOS = [
+    { id: 'manual', nome: 'Manual', curto: 'Manual', desc: 'Pergunta antes de escrever arquivos e de rodar comandos.' },
+    { id: 'editar', nome: 'Editar sozinho', curto: 'Editar', desc: 'Edita arquivos da pasta de trabalho sem perguntar. Comandos e o resto ainda perguntam.' },
+    { id: 'auto', nome: 'Automático', curto: 'Automático', desc: 'Aprova o que é seguro (ler, editar na pasta, comandos comuns) e pergunta nos arriscados: apagar, instalar, rede e sistema.' },
+    { id: 'ignorar', nome: 'Ignorar permissões', curto: 'Sem perguntas', desc: 'Nunca pergunta. O agente pode apagar e alterar qualquer coisa no computador.', perigo: true },
+  ]
+  const modoAtual = () => MODOS.find((m) => m.id === (cfg.modoPermissao || 'manual')) || MODOS[0]
+  function pintarPermissao() {
+    const m = modoAtual()
+    const b = $('permissao')
+    b.classList.toggle('perm-ignorar', m.id === 'ignorar')
+    $('permissao-nome').textContent = m.curto
+    b.title = `Permissões: ${m.nome}. ${m.desc}`
+  }
+  function fecharMenuPerm() {
+    $('menu-permissao').hidden = true
+  }
+  $('permissao').onclick = (e) => {
+    e.stopPropagation()
+    const menu = $('menu-permissao')
+    if (!menu.hidden) return fecharMenuPerm()
+    fecharMenu()
+    menu.innerHTML = '<div class="menu-grupo">Permissões do agente</div>' + MODOS.map((m) => `<button class="menu-item ${m.perigo ? 'perigo' : ''} ${m.id === modoAtual().id ? 'on' : ''}" role="menuitem" data-modo="${m.id}"><span class="mnome">${esc(m.nome)}<small>${esc(m.desc)}</small></span><span class="ok">${IC.check}</span></button>`).join('')
+    menu.hidden = false
+  }
+  $('menu-permissao').onclick = async (e) => {
+    const b = e.target.closest('[data-modo]')
+    if (!b) return
+    const id = b.dataset.modo
+    if (id === 'ignorar' && !window.confirm('Modo "Ignorar permissões": o agente deixa de pedir confirmação e pode apagar ou alterar qualquer arquivo e rodar qualquer comando no seu computador.\n\nLigar mesmo assim?')) return
+    cfg = await window.sb.salvarCfg({ modoPermissao: id })
+    pintarPermissao()
+    fecharMenuPerm()
+  }
+
+  // ---------- navegador integrado ----------
+  const NAV = window.sb.navegador
+  let navAberto = false
+  function navPos() {
+    if (!navAberto) return
+    const r = $('nav-host').getBoundingClientRect()
+    NAV.limites({ x: r.x, y: r.y, width: r.width, height: r.height })
+  }
+  async function navAbrir(sim) {
+    navAberto = !!sim
+    $('nav').hidden = !sim
+    $('app').classList.toggle('nav-aberto', !!sim)
+    $('abrir-nav').classList.toggle('on', !!sim)
+    await NAV.mostrar(!!sim)
+    if (sim) setTimeout(navPos, 80)
+  }
+  $('abrir-nav').onclick = () => navAbrir(!navAberto)
+  $('nav-fechar').onclick = () => navAbrir(false)
+  $('nav-voltar').onclick = () => NAV.acao('voltar')
+  $('nav-avancar').onclick = () => NAV.acao('avancar')
+  $('nav-recarregar').onclick = () => NAV.acao('recarregar')
+  $('nav-form').onsubmit = async (e) => {
+    e.preventDefault()
+    const r = await NAV.acao('ir', $('nav-url').value)
+    if (r && r.ok === false) aviso('Não consegui abrir: ' + r.erro)
+  }
+  NAV.aoEstado((e) => {
+    if (document.activeElement !== $('nav-url')) $('nav-url').value = e.url || ''
+    $('nav-voltar').disabled = !e.podeVoltar
+    $('nav-avancar').disabled = !e.podeAvancar
+    $('nav-ctl').hidden = !e.controlando
+    $('nav').classList.toggle('carregando', !!e.carregando)
+    $('nav-vazio').hidden = !!e.url
+  })
+  NAV.aoAbrirPainel(() => navAbrir(true))
+  new ResizeObserver(navPos).observe($('nav-host'))
+  window.addEventListener('resize', navPos)
+  window.addEventListener('sb-config-abriu', () => NAV.esconderTemp(true))
+  window.addEventListener('sb-config-fechou', () => NAV.esconderTemp(false))
+
   async function preencherAlvo() {
     modelos = await window.sb.modelos()
     if (!modelos.some((m) => m.id === cfg.ativo) && modelos.length) cfg = await window.sb.salvarCfg({ ativo: (modelos.find((m) => m.grupo === 'Combos') || modelos[0]).id })
@@ -650,6 +753,7 @@
     window.aplicarIcones()
     pintarPensar()
     pintarModo()
+    pintarPermissao()
     pintarPasta()
     alternarBotao(false)
     preencherAlvo()

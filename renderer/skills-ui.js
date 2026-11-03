@@ -11,7 +11,7 @@
     SK.itens = r.ok ? r.dado : []
     K.corpo().innerHTML = `
       <div class="cfg-cab"><div><h1>Skills</h1><p>O que o agente sabe fazer. Skills criadas pelo agente aparecem aqui na hora. As da Rangel Tech (rangeltech) são só leitura: copie para as suas para editar.</p></div>
-        <div class="cfg-acoes"><button class="btn-pri" id="sk-nova">＋ Nova skill</button></div></div>
+        <div class="cfg-acoes"><span id="sk-repo-selo"></span><button id="sk-repo">GitHub</button><button class="btn-pri" id="sk-nova">＋ Nova skill</button></div></div>
       <div class="sk-layout">
         <div class="sk-arvore"><input type="search" id="sk-busca" placeholder="Buscar em todas as skills" value="${esc(SK.busca)}"><div id="sk-lista"></div></div>
         <div class="sk-editor" id="sk-editor"></div>
@@ -19,6 +19,8 @@
     desenharArvore()
     desenharEditor()
     $('#sk-nova').onclick = novaSkill
+    $('#sk-repo').onclick = janelaRepo
+    pintarSelo()
     let t
     $('#sk-busca').oninput = (e) => {
       SK.busca = e.target.value
@@ -158,6 +160,77 @@
         $('#sk-texto').value = v.dado
         $('#sk-sujo').hidden = v.dado === SK.original
         j.fechar()
+      }
+    }
+  }
+
+  async function pintarSelo() {
+    const el = $('#sk-repo-selo')
+    if (!el) return
+    const r = await window.sb.skills.repo.estado()
+    const e = r.ok ? r.dado : { vinculado: false }
+    if (!e.vinculado) return (el.innerHTML = '')
+    const pend = e.alterado || e.adiante || e.atras
+    el.innerHTML = `<span class="selo ${pend ? '' : 'ok'}" title="${esc(e.url)}">${pend ? 'pendente de sincronizar' : 'sincronizado'}</span>`
+  }
+
+  async function janelaRepo() {
+    const r = await window.sb.skills.repo.estado()
+    const e = r.ok ? r.dado : { vinculado: false }
+    const quando = e.ultimaSync ? new Date(e.ultimaSync).toLocaleString('pt-BR') : 'nunca'
+    const corpo = e.vinculado
+      ? `<p>Vinculado a <b>${esc(e.url.replace('https://github.com/', '').replace('.git', ''))}</b>. Última sincronização: ${esc(quando)}.</p>
+         <p class="mut">${e.alterado ? 'Há alterações locais ainda não enviadas. ' : ''}${e.adiante ? `${e.adiante} versão(ões) para enviar. ` : ''}${e.atras ? `${e.atras} versão(ões) novas no repositório. ` : ''}As skills da Rangel Tech (rangeltech) não vão para o repositório.</p>
+         <div class="alerta" id="rp-msg" hidden></div>
+         <div class="rodape-j"><button class="btn-perigo" id="rp-desv">Desvincular</button><button id="rp-fechar">Fechar</button><button class="btn-pri" id="rp-sinc">Sincronizar agora</button></div>`
+      : `<p>Versione e compartilhe suas skills entre computadores usando um repositório do GitHub (de preferência privado). O Segundo Cérebro puxa as mudanças, mescla com as suas e envia as novas.</p>
+         <div class="campo"><label for="rp-url">Repositório</label><input type="text" id="rp-url" placeholder="https://github.com/voce/minhas-skills"></div>
+         <div class="campo"><label for="rp-tok">Token do GitHub</label><input type="password" id="rp-tok" placeholder="ghp_… ou github_pat_…" autocomplete="off"><small class="mut">Fica cifrado neste computador. Precisa de leitura e escrita no conteúdo do repositório.</small></div>
+         <div class="alerta" id="rp-msg" hidden></div>
+         <div class="rodape-j"><button id="rp-fechar">Cancelar</button><button class="btn-pri" id="rp-ok">Vincular</button></div>`
+    const j = janela(`<h3>Repositório das skills</h3>${corpo}`)
+    const msg = (t, m) => aviso(j.q('#rp-msg'), t, m)
+    j.q('#rp-fechar').onclick = j.fechar
+    const sincronizar = async (opcoes = {}) => {
+      msg('ok', 'Sincronizando…')
+      const s = await window.sb.skills.repo.sincronizar(opcoes)
+      if (!s.ok) return msg('err', s.erro)
+      const d = s.dado
+      if (d.conflito) {
+        j.q('#rp-msg').hidden = false
+        j.q('#rp-msg').className = 'alerta err'
+        j.q('#rp-msg').innerHTML = `Conflito em: <b>${d.conflito.map(esc).join(', ')}</b>. Escolha qual versão vale:<div style="margin-top:8px;display:flex;gap:8px"><button id="rp-minha">Manter a minha</button><button id="rp-remota">Usar a do repositório</button></div>`
+        j.q('#rp-minha').onclick = () => sincronizar({ estrategia: 'minha' })
+        j.q('#rp-remota').onclick = () => sincronizar({ estrategia: 'remota' })
+        return
+      }
+      if (d.segredos) {
+        j.q('#rp-msg').hidden = false
+        j.q('#rp-msg').className = 'alerta err'
+        j.q('#rp-msg').innerHTML = `Estes arquivos parecem conter chaves ou senhas: <b>${d.segredos.map(esc).join(', ')}</b>. Enviar mesmo assim?<div style="margin-top:8px"><button id="rp-env">Enviar mesmo assim</button></div>`
+        j.q('#rp-env').onclick = () => sincronizar({ ...opcoes, confirmarSegredos: true })
+        return
+      }
+      msg('ok', 'Sincronizado.')
+      pintarSelo()
+      desenharArvore()
+    }
+    if (e.vinculado) {
+      j.q('#rp-sinc').onclick = () => sincronizar()
+      j.q('#rp-desv').onclick = async () => {
+        if (!window.confirm('Desvincular? As skills continuam aqui; só para de sincronizar com o GitHub.')) return
+        await window.sb.skills.repo.desvincular()
+        j.fechar()
+        pintarSelo()
+      }
+    } else {
+      j.q('#rp-ok').onclick = async () => {
+        msg('ok', 'Conferindo o acesso…')
+        const v = await window.sb.skills.repo.vincular(j.q('#rp-url').value, j.q('#rp-tok').value)
+        if (!v.ok) return msg('err', v.erro)
+        j.fechar()
+        pintarSelo()
+        janelaRepo()
       }
     }
   }
