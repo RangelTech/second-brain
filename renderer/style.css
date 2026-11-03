@@ -131,3 +131,5 @@ html,body{overflow:hidden}
 .central{overflow:hidden;min-height:0}
 .conversa{min-height:0}
 .lateral{min-height:0;overflow:hidden}
+.boas-vindas{margin:0 16px 8px;background:#2f2520;border:1px solid var(--ac);border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.boas-vindas[hidden]{display:none}

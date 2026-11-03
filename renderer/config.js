@@ -615,9 +615,21 @@
       <h2>Dados e logs</h2>
       <p class="mut">Tudo fica neste computador: <code>${esc(i.dados)}</code>. Nada é enviado para fora, além das chamadas aos provedores que você conectou.</p>
       <div class="cfg-acoes"><button id="so-logs">Abrir pasta de dados e logs</button></div>
+      <h2>Seus dados</h2>
+      <p class="mut">Leve conversas, combos, skills suas e configurações (sem chaves) para outro computador. As chaves dos provedores você conecta de novo lá.</p>
+      <div class="cfg-acoes"><button id="so-exp">Exportar dados…</button><button id="so-imp">Importar dados…</button></div>
+      <div class="msg" id="so-msg" hidden style="margin-top:10px"></div>
       <h2>Licenças</h2>
       <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Second Brain é MIT.</p>`
     $('#so-logs').onclick = () => window.sb.abrirLogs()
+    $('#so-exp').onclick = async () => {
+      const r = await window.sb.exportarDados()
+      if (!r.cancelado) aviso($('#so-msg'), r.ok ? 'ok' : 'err', r.ok ? `Exportado: ${r.chats} conversas, ${r.skills} arquivos de skills, ${r.combos} combos.` : r.erro || 'Falhou.')
+    }
+    $('#so-imp').onclick = async () => {
+      const r = await window.sb.importarDados()
+      if (!r.cancelado) aviso($('#so-msg'), r.ok ? 'ok' : 'err', r.ok ? `Importado (${r.chats} conversas no arquivo). Reabra o app para ver tudo.` : r.erro || 'Falhou.')
+    }
   }
   // =====================================================================
   // casca
@@ -693,7 +705,9 @@
 
   const SBConfig = {
     registrarAba(aba) {
-      ABAS.push(aba)
+      const i = ABAS.findIndex((a) => a.id === 'agente')
+      if (i >= 0) ABAS.splice(i, 0, aba)
+      else ABAS.push(aba)
     },
     aoFechar: null,
     async abrir(aba) {

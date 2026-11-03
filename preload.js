@@ -36,5 +36,7 @@ contextBridge.exposeInMainWorld('sb', {
     versao: (r, h) => ipcRenderer.invoke('skills:versao', r, h),
     aoMudar: (fn) => ipcRenderer.on('skills:mudou', (_e, d) => fn(d)),
   },
+  exportarDados: () => ipcRenderer.invoke('dados:exportar'),
+  importarDados: () => ipcRenderer.invoke('dados:importar'),
   aoErro: (fn) => ipcRenderer.on('chat:erro', (_e, d) => fn(d)),
 })

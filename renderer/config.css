@@ -127,7 +127,10 @@
 
 @media (max-width:760px){
   .config{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-  .cfg-nav{flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:8px}
+  .cfg-nav{flex-direction:row;flex-wrap:nowrap;align-items:center;border-right:0;border-bottom:1px solid var(--bd);padding:6px 8px;overflow-x:auto;overflow-y:hidden;gap:2px}
+  .cfg-nav .cfg-aba,.cfg-nav .cfg-voltar{width:auto;flex:none;white-space:nowrap;padding:8px 10px}
+  .cfg-voltar{margin-bottom:0}
+  .cfg-corpo{min-height:0}
   .cfg-grupo{display:none}
   .cfg-corpo{padding:18px 16px 40px}
 }
@@ -151,3 +154,14 @@
 #sk-texto{width:100%;height:100%;resize:none;border:0;outline:none;background:var(--lat);color:var(--fg);font:13px/1.55 Consolas,ui-monospace,monospace;padding:12px;tab-size:2}
 .sk-previa{overflow:auto;padding:12px 16px;border-left:1px solid var(--bd)}
 @media (max-width:900px){.sk-layout{grid-template-columns:1fr;height:auto}.sk-arvore{max-height:220px}.sk-editor{height:60vh}.sk-corpo.dividido{grid-template-columns:1fr}}
+
+@media (max-width:560px){
+  .conex{flex-wrap:wrap}
+  .conex .col{flex:1 1 calc(100% - 70px)}
+  .destaque{flex-wrap:wrap}
+  .destaque .tx{flex:1 1 calc(100% - 80px)}
+  .destaque>button{width:100%}
+  .cfg-cab{align-items:flex-start}
+  .kpis{grid-template-columns:1fr 1fr}
+  .janela{padding:16px}
+}

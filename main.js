@@ -221,6 +221,35 @@ app.whenReady().then(() => {
   ipcMain.handle('skills:buscar', seguro((t) => skills.buscar(t)))
   ipcMain.handle('skills:historico', seguro((r) => skills.historico(r)))
   ipcMain.handle('skills:versao', seguro((r, h) => skills.versao(r, h)))
+  // exportar e importar dados (conversas, configuração sem chaves, skills do usuário, combos)
+  ipcMain.handle('dados:exportar', async () => {
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'second-brain-dados.json', filters: [{ name: 'Dados do Second Brain', extensions: ['json'] }] })
+    if (r.canceled) return { ok: false, cancelado: true }
+    const pacote = { versao: 1, em: new Date().toISOString(), chats: ler('chats.json', []), config: { ...cfg }, skills: {}, combos: [], estrategias: {} }
+    for (const it of skills.listar()) if (it.tipo === 'arquivo' && !it.somenteLeitura && it.tamanho < 300000) pacote.skills[it.caminho] = skills.ler(it.caminho)
+    try {
+      pacote.combos = ((await embed.api('GET', '/api/combos')).json?.combos ?? []).map((c) => ({ name: c.name, models: c.models, kind: c.kind }))
+      pacote.estrategias = (await embed.api('GET', '/api/settings')).json?.comboStrategies ?? {}
+    } catch {}
+    fs.writeFileSync(r.filePath, JSON.stringify(pacote, null, 1))
+    return { ok: true, caminho: r.filePath, chats: pacote.chats.length, skills: Object.keys(pacote.skills).length, combos: pacote.combos.length }
+  })
+  ipcMain.handle('dados:importar', async () => {
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Second Brain', extensions: ['json'] }] })
+    if (r.canceled) return { ok: false, cancelado: true }
+    const pacote = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'))
+    if (pacote.versao !== 1) return { ok: false, erro: 'Arquivo de outra versão.' }
+    const atuais = new Map(ler('chats.json', []).map((c) => [c.id, c]))
+    for (const c of pacote.chats || []) if (!atuais.has(c.id)) atuais.set(c.id, c)
+    gravar('chats.json', [...atuais.values()])
+    const nSkills = skills.gravarLote(pacote.skills || {})
+    const existentes = new Set(((await embed.api('GET', '/api/combos')).json?.combos ?? []).map((c) => c.name))
+    for (const c of pacote.combos || []) if (!existentes.has(c.name)) await embed.api('POST', '/api/combos', c)
+    if (pacote.estrategias && Object.keys(pacote.estrategias).length) await embed.api('PATCH', '/api/settings', { comboStrategies: pacote.estrategias })
+    for (const k of ['soConversa', 'raciocinio', 'pasta']) if (pacote.config?.[k] !== undefined) cfg[k] = pacote.config[k]
+    salvarCfg()
+    return { ok: true, chats: (pacote.chats || []).length, skills: nSkills }
+  })
   embed.iniciar().catch((e) => console.error('router', e))
   ipcMain.handle('router:estado', () => embed.estado())
   ipcMain.handle('router:api', async (_e, { metodo, rota, corpo }) => {

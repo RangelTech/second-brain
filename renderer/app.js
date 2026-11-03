@@ -384,6 +384,7 @@
     const lista = await window.sb.modelos()
     s.innerHTML = ''
     if (!lista.length) s.appendChild(new Option('Nenhum modelo: cadastre um provedor', ''))
+    $('boas-vindas').hidden = lista.length > 0
     for (const grupo of ['Combos', 'Modelos']) {
       const itens = lista.filter((m) => m.grupo === grupo)
       if (!itens.length) continue
@@ -417,6 +418,7 @@
     $('alvo').onchange = async () => (cfg = await window.sb.salvarCfg({ ativo: $('alvo').value }))
     $('so-conversa').onchange = async () => (cfg = await window.sb.salvarCfg({ soConversa: $('so-conversa').checked }))
     $('abrir-config').onclick = () => window.SBConfig.abrir()
+    $('bv-ir').onclick = () => window.SBConfig.abrir('prov')
     window.SBConfig.aoFechar = async () => {
       cfg = await window.sb.cfg()
       preencherAlvo()

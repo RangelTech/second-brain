@@ -113,6 +113,23 @@ function criar({ app, avisar }) {
       registrar(r, 'edição')
       return true
     },
+    // grava vários arquivos de uma vez (importação) com um único commit; ignora os iguais e os somente leitura
+    gravarLote(mapa) {
+      let n = 0
+      for (const [r, conteudo] of Object.entries(mapa)) {
+        if (somenteLeitura(r)) continue
+        const p = abs(r)
+        try {
+          if (fs.existsSync(p) && fs.readFileSync(p, 'utf8') === conteudo) continue
+        } catch {}
+        fs.mkdirSync(path.dirname(p), { recursive: true })
+        escritasDoApp.set(r, Date.now())
+        fs.writeFileSync(p, conteudo)
+        n++
+      }
+      if (n) registrar(`${n} arquivos`, 'importação')
+      return n
+    },
     criar(nome, categoria) {
       const slug = String(nome).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
       if (!slug) throw new Error('Dê um nome para a skill.')
