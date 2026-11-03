@@ -42,6 +42,7 @@
       .join('')
   }
 
+  window.SBmd = md
   const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   const salvar = () => window.sb.salvarChats(chats)
   const chatAtual = () => chats.find((c) => c.id === atual)

@@ -629,6 +629,8 @@
   async function desenharAba() {
     clearInterval(S.timerCota)
     raiz.querySelectorAll('.cfg-aba').forEach((b) => b.classList.toggle('ativa', b.dataset.aba === S.aba))
+    const extra = ABAS.find((a) => a.id === S.aba && a.desenhar)
+    if (extra) return extra.desenhar()
     if (S.aba === 'agente') return telaAgente()
     if (S.aba === 'sobre') return telaSobre()
     if (S.erroMotor) {
@@ -647,7 +649,7 @@
     let grupo = ''
     const nav = ABAS.map((a) => {
       const cab = a.grupo !== grupo ? `<div class="cfg-grupo">${(grupo = a.grupo)}</div>` : ''
-      return `${cab}<button class="cfg-aba" data-aba="${a.id}">${ICONES[a.id]}${a.nome}</button>`
+      return `${cab}<button class="cfg-aba" data-aba="${a.id}">${ICONES[a.id] || a.icone || ''}${a.nome}</button>`
     }).join('')
     raiz.innerHTML = `<nav class="cfg-nav" aria-label="Configurações"><button class="cfg-voltar" id="cfg-voltar">← Voltar ao chat</button>${nav}</nav><div class="cfg-corpo" tabindex="-1"></div>`
     $('#cfg-voltar').onclick = () => SBConfig.fechar()
@@ -690,6 +692,9 @@
   }
 
   const SBConfig = {
+    registrarAba(aba) {
+      ABAS.push(aba)
+    },
     aoFechar: null,
     async abrir(aba) {
       if (!raiz) montar()
@@ -716,4 +721,5 @@
     },
   }
   window.SBConfig = SBConfig
+  window.SBConfigInternos = { esc, janela, aviso, corpo: () => raiz.querySelector('.cfg-corpo'), aba: () => S.aba, fechado: () => !raiz || raiz.hidden }
 })()

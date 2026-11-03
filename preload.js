@@ -23,5 +23,18 @@ contextBridge.exposeInMainWorld('sb', {
   info: () => ipcRenderer.invoke('app:info'),
   responderPermissao: (req, resposta) => ipcRenderer.invoke('chat:permissao-resp', { req, resposta }),
   aoPermissao: (fn) => ipcRenderer.on('chat:permissao', (_e, d) => fn(d)),
+  skills: {
+    listar: () => ipcRenderer.invoke('skills:listar'),
+    ler: (r) => ipcRenderer.invoke('skills:ler', r),
+    gravar: (r, c) => ipcRenderer.invoke('skills:gravar', r, c),
+    criar: (n, c) => ipcRenderer.invoke('skills:criar', n, c),
+    apagar: (r) => ipcRenderer.invoke('skills:apagar', r),
+    renomear: (r, n) => ipcRenderer.invoke('skills:renomear', r, n),
+    copiar: (r) => ipcRenderer.invoke('skills:copiar', r),
+    buscar: (t) => ipcRenderer.invoke('skills:buscar', t),
+    historico: (r) => ipcRenderer.invoke('skills:historico', r),
+    versao: (r, h) => ipcRenderer.invoke('skills:versao', r, h),
+    aoMudar: (fn) => ipcRenderer.on('skills:mudou', (_e, d) => fn(d)),
+  },
   aoErro: (fn) => ipcRenderer.on('chat:erro', (_e, d) => fn(d)),
 })

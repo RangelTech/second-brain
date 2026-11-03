@@ -17,10 +17,11 @@ function localizarBinario(app) {
   return candidatos.find((c) => fs.existsSync(c)) || null
 }
 
-// HERMES_HOME próprio do app. Na primeira vez traz skills, memória e SOUL.md da instalação do piloto.
-function prepararHome(app, { base, modelo, pasta, raciocinio }) {
+// HERMES_HOME próprio do app. Na primeira vez traz skills, memória e SOUL.md da instalação do piloto;
+// a cada início atualiza as skills globais da Rangel Tech (somente leitura) dentro de skills/rangeltech.
+function prepararBase(app) {
   const home = path.join(app.getPath('userData'), 'hermes-home')
-  fs.mkdirSync(home, { recursive: true })
+  fs.mkdirSync(path.join(home, 'skills'), { recursive: true })
   const piloto = path.join(os.homedir(), 'hermes')
   const marca = path.join(home, '.migrado')
   if (!fs.existsSync(marca) && fs.existsSync(piloto)) {
@@ -31,6 +32,17 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
     }
     fs.writeFileSync(marca, new Date().toISOString())
   }
+  const globais = [path.join(process.resourcesPath || '', 'skills-globais', 'rangeltech'), path.join(__dirname, 'skills-globais', 'rangeltech')].find((p) => fs.existsSync(p))
+  if (globais) {
+    try {
+      fs.cpSync(globais, path.join(home, 'skills', 'rangeltech'), { recursive: true, force: true })
+    } catch {}
+  }
+  return home
+}
+
+function prepararHome(app, { base, modelo, pasta, raciocinio }) {
+  const home = prepararBase(app)
   // a configuração é escrita pelo app, nunca à mão: o modelo é o combo do motor local
   const yaml = [
     'model:',
@@ -215,4 +227,4 @@ class Sessao {
   }
 }
 
-module.exports = { Sessao, localizarBinario }
+module.exports = { Sessao, localizarBinario, prepararBase }

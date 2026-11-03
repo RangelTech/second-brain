@@ -1,7 +1,8 @@
 // Second Brain (Rangel Tech): janela de chat + roteador local de provedores e combos (estilo 9Router).
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = require('electron')
 const embed = require('./embed-router')
-const { Sessao } = require('./agent')
+const { Sessao, prepararBase } = require('./agent')
+const skillsMod = require('./skills')
 const path = require('path')
 const fs = require('fs')
 
@@ -200,6 +201,26 @@ app.whenReady().then(() => {
       autoUpdater.checkForUpdatesAndNotify().catch(() => {})
     } catch {}
   }
+  prepararBase(app)
+  const skills = skillsMod.criar({ app, avisar: (d) => janela?.webContents.send('skills:mudou', d) })
+  skills.observar()
+  const seguro = (fn) => async (_e, ...a) => {
+    try {
+      return { ok: true, dado: await fn(...a) }
+    } catch (err) {
+      return { ok: false, erro: String(err.message || err) }
+    }
+  }
+  ipcMain.handle('skills:listar', seguro(() => skills.listar()))
+  ipcMain.handle('skills:ler', seguro((r) => skills.ler(r)))
+  ipcMain.handle('skills:gravar', seguro((r, c) => skills.gravar(r, c)))
+  ipcMain.handle('skills:criar', seguro((n, c) => skills.criar(n, c)))
+  ipcMain.handle('skills:apagar', seguro((r) => skills.apagar(r)))
+  ipcMain.handle('skills:renomear', seguro((r, n) => skills.renomear(r, n)))
+  ipcMain.handle('skills:copiar', seguro((r) => skills.copiarParaMinhas(r)))
+  ipcMain.handle('skills:buscar', seguro((t) => skills.buscar(t)))
+  ipcMain.handle('skills:historico', seguro((r) => skills.historico(r)))
+  ipcMain.handle('skills:versao', seguro((r, h) => skills.versao(r, h)))
   embed.iniciar().catch((e) => console.error('router', e))
   ipcMain.handle('router:estado', () => embed.estado())
   ipcMain.handle('router:api', async (_e, { metodo, rota, corpo }) => {
