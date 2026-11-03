@@ -265,9 +265,13 @@ app.whenReady().then(() => {
       return { ok: false, erro: String(err.message || err) }
     }
   }
-  const skillsRepo = skillsRepoMod.criar({ app, raiz: skills.raiz })
+  const skillsRepo = skillsRepoMod.criar({ app, raiz: skills.raiz, abrirNavegador: (u) => shell.openExternal(u) })
   ipcMain.handle('skillsrepo:estado', seguro(() => skillsRepo.estado()))
   ipcMain.handle('skillsrepo:vincular', seguro((url, tok) => skillsRepo.vincular(url, tok)))
+  ipcMain.handle('skillsrepo:login-disponivel', () => skillsRepo.loginDisponivel())
+  ipcMain.handle('skillsrepo:login-iniciar', seguro(() => skillsRepo.loginIniciar()))
+  ipcMain.handle('skillsrepo:login-aguardar', seguro((o) => skillsRepo.loginAguardar(o)))
+  ipcMain.handle('skillsrepo:criar', seguro((n) => skillsRepo.criarRepositorio(n)))
   ipcMain.handle('skillsrepo:desvincular', seguro(() => skillsRepo.desvincular()))
   ipcMain.handle('skillsrepo:sincronizar', seguro((o) => skillsRepo.sincronizar(o || {})))
   ipcMain.handle('skills:listar', seguro(() => skills.listar()))

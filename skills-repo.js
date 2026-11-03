@@ -11,7 +11,11 @@ const PADROES_SEGREDO = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /xox[baprs]-[A-Za-z0-9-]{20,}/, /AIza[0-9A-Za-z_-]{35}/,
 ]
 
-function criar({ app, raiz }) {
+// Login com GitHub pelo "device flow": o app só precisa do client_id (público, sem segredo) de um OAuth App da Rangel Tech
+// com "Enable Device Flow" ligado. Pode ser trocado por SB_GITHUB_CLIENT_ID.
+const CLIENT_ID = process.env.SB_GITHUB_CLIENT_ID || ''
+
+function criar({ app, raiz, abrirNavegador }) {
   const arqCfg = path.join(app.getPath('userData'), 'skills-repo.json')
   const arqTok = path.join(app.getPath('userData'), 'skills-repo-token.bin')
   const ler = () => {
@@ -157,7 +161,48 @@ function criar({ app, raiz }) {
     return { ok: true, estado: await estado() }
   }
 
-  return { estado, vincular, desvincular, sincronizar }
+  const gh = async (url, corpo, tok) => {
+    const r = await fetch(url, { method: corpo ? 'POST' : 'GET', headers: { Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'segundo-cerebro', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: corpo ? JSON.stringify(corpo) : undefined })
+    return { status: r.status, json: await r.json().catch(() => ({})) }
+  }
+
+  async function loginIniciar() {
+    if (!CLIENT_ID) throw new Error('O login com GitHub ainda não foi configurado nesta versão. Use um token por enquanto.')
+    const r = await gh('https://github.com/login/device/code', { client_id: CLIENT_ID, scope: 'repo' })
+    if (!r.json.device_code) throw new Error(r.json.error_description || 'O GitHub não respondeu ao pedido de login.')
+    abrirNavegador?.(r.json.verification_uri)
+    return { codigo: r.json.user_code, url: r.json.verification_uri, deviceCode: r.json.device_code, intervalo: r.json.interval || 5, expira: r.json.expires_in || 900 }
+  }
+
+  async function loginAguardar({ deviceCode, intervalo, expira }) {
+    const fim = Date.now() + expira * 1000
+    let espera = intervalo
+    while (Date.now() < fim) {
+      await new Promise((r) => setTimeout(r, espera * 1000))
+      const r = await gh('https://github.com/login/oauth/access_token', { client_id: CLIENT_ID, device_code: deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' })
+      if (r.json.access_token) {
+        guardarToken(r.json.access_token)
+        const u = await gh('https://api.github.com/user', null, r.json.access_token)
+        return { usuario: u.json.login || '' }
+      }
+      if (r.json.error === 'slow_down') espera += 5
+      else if (r.json.error && r.json.error !== 'authorization_pending') throw new Error(r.json.error === 'access_denied' ? 'Login cancelado no GitHub.' : r.json.error_description || r.json.error)
+    }
+    throw new Error('O código expirou. Tente de novo.')
+  }
+
+  // com o token já salvo: acha ou cria o repositório privado das skills e vincula
+  async function criarRepositorio(nome = 'segundo-cerebro-skills') {
+    const tok = token()
+    if (!tok) throw new Error('Entre com o GitHub primeiro.')
+    const u = await gh('https://api.github.com/user', null, tok)
+    if (!u.json.login) throw new Error('O token não funcionou. Entre de novo com o GitHub.')
+    const r = await gh('https://api.github.com/user/repos', { name: nome, private: true, description: 'Skills do Segundo Cérebro' }, tok)
+    if (r.status !== 201 && r.status !== 422) throw new Error(r.json.message || 'Não consegui criar o repositório.')
+    return vincular(`${u.json.login}/${nome}`)
+  }
+
+  return { estado, vincular, desvincular, sincronizar, loginIniciar, loginAguardar, criarRepositorio, loginDisponivel: () => !!CLIENT_ID }
 }
 
 module.exports = { criar }

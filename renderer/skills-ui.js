@@ -177,13 +177,14 @@
   async function janelaRepo() {
     const r = await window.sb.skills.repo.estado()
     const e = r.ok ? r.dado : { vinculado: false }
+    const logando = (await window.sb.skills.repo.loginDisponivel()) === true
     const quando = e.ultimaSync ? new Date(e.ultimaSync).toLocaleString('pt-BR') : 'nunca'
     const corpo = e.vinculado
       ? `<p>Vinculado a <b>${esc(e.url.replace('https://github.com/', '').replace('.git', ''))}</b>. Última sincronização: ${esc(quando)}.</p>
          <p class="mut">${e.alterado ? 'Há alterações locais ainda não enviadas. ' : ''}${e.adiante ? `${e.adiante} versão(ões) para enviar. ` : ''}${e.atras ? `${e.atras} versão(ões) novas no repositório. ` : ''}As skills da Rangel Tech (rangeltech) não vão para o repositório.</p>
          <div class="alerta" id="rp-msg" hidden></div>
          <div class="rodape-j"><button class="btn-perigo" id="rp-desv">Desvincular</button><button id="rp-fechar">Fechar</button><button class="btn-pri" id="rp-sinc">Sincronizar agora</button></div>`
-      : `<p>Versione e compartilhe suas skills entre computadores usando um repositório do GitHub (de preferência privado). O Segundo Cérebro puxa as mudanças, mescla com as suas e envia as novas.</p>
+      : `${logando ? '<div class="campo"><button class="btn-pri" id="rp-gh">Entrar com GitHub</button><small class="mut">Abre o GitHub no navegador, você confirma um código e pronto. Cria um repositório privado só para as suas skills.</small></div><div class="mut" style="margin:6px 0">ou use um token:</div>' : ''}<p>Versione e compartilhe suas skills entre computadores usando um repositório do GitHub (de preferência privado). O Segundo Cérebro puxa as mudanças, mescla com as suas e envia as novas.</p>
          <div class="campo"><label for="rp-url">Repositório</label><input type="text" id="rp-url" placeholder="https://github.com/voce/minhas-skills"></div>
          <div class="campo"><label for="rp-tok">Token do GitHub</label><input type="password" id="rp-tok" placeholder="ghp_… ou github_pat_…" autocomplete="off"><small class="mut">Fica cifrado neste computador. Precisa de leitura e escrita no conteúdo do repositório.</small></div>
          <div class="alerta" id="rp-msg" hidden></div>
@@ -224,6 +225,23 @@
         pintarSelo()
       }
     } else {
+      if (logando)
+        j.q('#rp-gh').onclick = async () => {
+          msg('ok', 'Abrindo o GitHub…')
+          const i = await window.sb.skills.repo.loginIniciar()
+          if (!i.ok) return msg('err', i.erro)
+          j.q('#rp-msg').hidden = false
+          j.q('#rp-msg').className = 'alerta ok'
+          j.q('#rp-msg').innerHTML = `No GitHub, digite o código <b style="font-size:18px;letter-spacing:2px">${esc(i.dado.codigo)}</b> e autorize. Esperando…`
+          const a = await window.sb.skills.repo.loginAguardar(i.dado)
+          if (!a.ok) return msg('err', a.erro)
+          msg('ok', `Conectado como ${a.dado.usuario}. Criando o repositório…`)
+          const v = await window.sb.skills.repo.criar()
+          if (!v.ok) return msg('err', v.erro)
+          j.fechar()
+          pintarSelo()
+          janelaRepo()
+        }
       j.q('#rp-ok').onclick = async () => {
         msg('ok', 'Conferindo o acesso…')
         const v = await window.sb.skills.repo.vincular(j.q('#rp-url').value, j.q('#rp-tok').value)
