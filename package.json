@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Second Brain",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Second Brain by Rangel Tech: agente de IA no desktop com provedores e combos",
   "main": "main.js",
   "author": {
@@ -45,12 +45,14 @@
       "category": "Utility",
       "maintainer": "Rangel Tech <contato@rangeltech.net>",
       "synopsis": "Agente de IA para desktop",
-      "description": "Second Brain: agente de IA com provedores, combos e a IA Unlimited"
+      "description": "Second Brain: agente de IA com provedores, combos e a IA Unlimited",
+      "artifactName": "Second-Brain-${version}-linux-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Second-Brain-Setup-${version}.${ext}"
     },
     "extraResources": [
       {
@@ -74,7 +76,9 @@
         "repo": "second-brain"
       }
     ],
-    "artifactName": "Second-Brain-${version}-${os}-${arch}.${ext}"
+    "portable": {
+      "artifactName": "Second-Brain-Portable-${version}.${ext}"
+    }
   },
   "devDependencies": {
     "electron": "^33.0.0",
