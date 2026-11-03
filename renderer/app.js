@@ -498,12 +498,45 @@
   async function preencherAlvo() {
     modelos = await window.sb.modelos()
     if (!modelos.some((m) => m.id === cfg.ativo) && modelos.length) cfg = await window.sb.salvarCfg({ ativo: (modelos.find((m) => m.grupo === 'Combos') || modelos[0]).id })
-    $('boas-vindas').hidden = modelos.length > 0
+    $('boas-vindas').hidden = modelos.length > 0 || faseAnterior === 'pendente' || faseAnterior === 'erro'
     pintarSeletor()
     pintarModo()
     pintarPasta()
   }
   window.preencherAlvo = preencherAlvo
+
+  // ---------- acesso ao Unlimited (cadastro automático) ----------
+  let faseAnterior = ''
+  function pintarAcesso(e) {
+    const el = $('acesso')
+    const mostrar = e && (e.fase === 'pendente' || e.fase === 'erro' || (e.fase === 'ativo' && faseAnterior === 'pendente'))
+    el.hidden = !mostrar
+    el.className = 'acesso' + (e && e.fase === 'ativo' ? ' ok' : e && e.fase === 'erro' ? ' erro' : '')
+    if (mostrar) {
+      if (e.fase === 'pendente') {
+        $('acesso-tit').textContent = 'Falta liberar o seu acesso'
+        $('acesso-sub').textContent = 'Envie este código para a Rangel Tech. Quando liberarem, o app começa a funcionar sozinho.'
+      } else if (e.fase === 'ativo') {
+        $('acesso-tit').textContent = 'Acesso liberado!'
+        $('acesso-sub').textContent = 'O Unlimited já está pronto para usar.'
+        setTimeout(() => ($('acesso').hidden = true), 6000)
+      } else {
+        $('acesso-tit').textContent = 'Acesso com problema'
+        $('acesso-sub').textContent = e.detalhe || ''
+      }
+      $('acesso-cod').hidden = !e.codigo || e.fase === 'ativo'
+      $('acesso-codigo').textContent = e.codigo || ''
+    }
+    if (e && e.fase === 'ativo' && faseAnterior !== 'ativo') preencherAlvo()
+    if (e) faseAnterior = e.fase
+    if (e) $('boas-vindas').hidden = $('boas-vindas').hidden || e.fase === 'pendente' || e.fase === 'erro'
+  }
+  $('acesso-copiar').onclick = async () => {
+    await navigator.clipboard.writeText($('acesso-codigo').textContent).catch(() => {})
+    $('acesso-copiar').textContent = 'Copiado'
+    setTimeout(() => ($('acesso-copiar').textContent = 'Copiar código'), 1800)
+  }
+  window.sb.aoUnlimited(pintarAcesso)
 
   async function iniciar() {
     cfg = await window.sb.cfg()
@@ -513,6 +546,7 @@
     pintarPasta()
     alternarBotao(false)
     preencherAlvo()
+    window.sb.unlimitedEstado().then(pintarAcesso)
     setTimeout(preencherAlvo, 6000)
     listar()
     desenhar()

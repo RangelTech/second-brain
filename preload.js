@@ -38,5 +38,8 @@ contextBridge.exposeInMainWorld('sb', {
   },
   exportarDados: () => ipcRenderer.invoke('dados:exportar'),
   importarDados: () => ipcRenderer.invoke('dados:importar'),
+  unlimitedEstado: () => ipcRenderer.invoke('unlimited:estado'),
+  unlimitedRecusar: () => ipcRenderer.invoke('unlimited:recusar'),
+  aoUnlimited: (fn) => ipcRenderer.on('unlimited:estado', (_e, d) => fn(d)),
   aoErro: (fn) => ipcRenderer.on('chat:erro', (_e, d) => fn(d)),
 })

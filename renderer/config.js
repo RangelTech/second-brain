@@ -342,6 +342,7 @@
         if (atual) await api('DELETE', `/api/providers/${atual.id}`)
         const r = await api('POST', '/api/providers', { provider: no.id, apiKey: chave, name: UNLIMITED.nome, defaultModel: UNLIMITED.modelo })
         if (r.status >= 300) throw new Error(erroDe(r))
+        window.sb.unlimitedRecusar()
         j.fechar()
         await recarregar()
       } catch (e) {

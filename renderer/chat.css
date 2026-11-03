@@ -146,3 +146,12 @@
 .boas-vindas{flex-wrap:wrap}
 .boas-vindas>div{flex:1 1 300px}
 .boas-vindas .primario{flex:none}
+
+/* aviso de acesso (cadastro automático) */
+.acesso{margin:0 20px 8px;max-width:760px;align-self:center;width:calc(100% - 40px);display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#2f2520;border:1px solid var(--ac);border-radius:12px;padding:10px 14px}
+.acesso[hidden]{display:none}
+.acesso.ok{border-color:#3f5a3f;background:#232b21}
+.acesso.erro{border-color:#6a3d38;background:#322220}
+.acesso-txt{flex:1 1 260px;min-width:0}.acesso-txt b{display:block}.acesso-txt span{color:var(--mut);font-size:13px}
+.acesso-cod{display:flex;align-items:center;gap:8px}
+.acesso-cod code{font:700 20px/1 ui-monospace,Consolas,monospace;letter-spacing:.14em;background:var(--lat);border:1px solid var(--bd);border-radius:9px;padding:8px 12px}

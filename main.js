@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = req
 const embed = require('./embed-router')
 const { Sessao, prepararBase } = require('./agent')
 const skillsMod = require('./skills')
+const unlimitedMod = require('./unlimited')
 const path = require('path')
 const fs = require('fs')
 
@@ -10,7 +11,7 @@ const fs = require('fs')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 // pasta de dados sem acento (o Python do agente vive dentro dela)
-app.setPath('userData', path.join(app.getPath('appData'), 'SegundoCerebro'))
+app.setPath('userData', process.env.SB_DATA_DIR || path.join(app.getPath('appData'), 'SegundoCerebro'))
 const HOME = app.getPath('home')
 const PADRAO = {
   ativo: '',
@@ -205,6 +206,20 @@ app.whenReady().then(() => {
     } catch {}
   }
   prepararBase(app)
+  const unl = unlimitedMod.criar({
+    app,
+    cfgGet: () => cfg,
+    cfgSet: (p) => {
+      Object.assign(cfg, p)
+      salvarCfg()
+    },
+    cifrar,
+    decifrar,
+    embed,
+    avisar: (e) => janela?.webContents.send('unlimited:estado', e),
+  })
+  ipcMain.handle('unlimited:estado', () => unl.estado())
+  ipcMain.handle('unlimited:recusar', () => unl.recusar())
   const skills = skillsMod.criar({ app, avisar: (d) => janela?.webContents.send('skills:mudou', d) })
   skills.observar()
   const seguro = (fn) => async (_e, ...a) => {
@@ -228,7 +243,7 @@ app.whenReady().then(() => {
   ipcMain.handle('dados:exportar', async () => {
     const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'segundo-cerebro-dados.json', filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
-    const pacote = { versao: 1, em: new Date().toISOString(), chats: ler('chats.json', []), config: { ...cfg }, skills: {}, combos: [], estrategias: {} }
+    const pacote = { versao: 1, em: new Date().toISOString(), chats: ler('chats.json', []), config: { ...publica(), unlimitedCodigo: undefined, maquinaId: undefined, unlimitedLigado: undefined }, skills: {}, combos: [], estrategias: {} }
     for (const it of skills.listar()) if (it.tipo === 'arquivo' && !it.somenteLeitura && it.tamanho < 300000) pacote.skills[it.caminho] = skills.ler(it.caminho)
     try {
       pacote.combos = ((await embed.api('GET', '/api/combos')).json?.combos ?? []).map((c) => ({ name: c.name, models: c.models, kind: c.kind }))
@@ -253,7 +268,7 @@ app.whenReady().then(() => {
     salvarCfg()
     return { ok: true, chats: (pacote.chats || []).length, skills: nSkills }
   })
-  embed.iniciar().catch((e) => console.error('router', e))
+  embed.iniciar().catch((e) => console.error('router', e)).finally(() => unl.iniciar())
   ipcMain.handle('router:estado', () => embed.estado())
   ipcMain.handle('router:api', async (_e, { metodo, rota, corpo }) => {
     if (!ROTAS_PERMITIDAS.some((r) => r.test(rota))) return { status: 403, json: { error: 'Rota não permitida' } }
@@ -265,11 +280,15 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('modelos:listar', () => listarModelos().catch(() => []))
   ipcMain.handle('externo:abrir', (_e, url) => (/^https:\/\//.test(url) ? shell.openExternal(url) : false))
-  ipcMain.handle('cfg:get', () => cfg)
+  const publica = () => {
+    const { unlimitedChave, ...resto } = cfg
+    return resto
+  }
+  ipcMain.handle('cfg:get', () => publica())
   ipcMain.handle('cfg:set', (_e, parcial) => {
     for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
     salvarCfg()
-    return cfg
+    return publica()
   })
   ipcMain.handle('chats:get', () => ler('chats.json', []))
   ipcMain.handle('chats:set', (_e, chats) => {
