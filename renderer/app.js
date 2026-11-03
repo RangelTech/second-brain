@@ -795,6 +795,32 @@
     if (chats.length === 0) criarChat()
     else abrir([...chats].sort(ordem)[0].id)
   }
+  // ---------- controle remoto: ordens vindas do celular (spec 20) ----------
+  window.sb.remoto.aoComando((m) => {
+    const R = (o) => window.sb.remoto.responder({ para: m.de, ...o })
+    const resumo = () => chats.slice().sort((a, b) => (b.fixado ? 1 : 0) - (a.fixado ? 1 : 0) || b.em - a.em).slice(0, 80).map((c) => ({ id: c.id, titulo: tituloLimpo(c.titulo), fixado: !!c.fixado, em: c.em, ocupado: enviando === c.id }))
+    if (m.t === 'chats') return R({ t: 'chats', lista: resumo() })
+    if (m.t === 'abrir') {
+      const c = chats.find((x) => x.id === m.id)
+      return R({ t: 'historico', id: m.id, ocupado: enviando === m.id, msgs: c ? c.msgs.slice(-60).map((x) => ({ role: x.role, content: String(x.content || '').slice(0, 8000), em: x.em, inicio: x.inicio, fim: x.fim, uso: x.uso })) : [] })
+    }
+    if (m.t === 'novo') {
+      criarChat()
+      return R({ t: 'novo', id: atual, lista: resumo() })
+    }
+    if (m.t === 'enviar') {
+      const c = chats.find((x) => x.id === m.id)
+      const texto = String(m.texto || '').trim().slice(0, 8000)
+      if (!c || !texto) return R({ t: 'erro', id: m.id, texto: 'Conversa não encontrada.' })
+      if (enviando) return R({ t: 'erro', id: m.id, texto: 'O computador está respondendo outra mensagem. Espere terminar.' })
+      if (!cfg.ativo) return R({ t: 'erro', id: m.id, texto: 'Nenhum modelo escolhido no computador.' })
+      abrir(c.id)
+      $('texto').value = texto
+      enviar()
+      return R({ t: 'comecou', id: c.id })
+    }
+  })
+
   window.SB = { enviar: (txt) => (($('texto').value = txt), enviar()), anexos: () => anexosPendentes, chats: () => chats }
   iniciar()
 })()

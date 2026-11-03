@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = req
 const embed = require('./embed-router')
 const { Sessao, prepararBase } = require('./agent')
 const skillsMod = require('./skills')
+const remotoMod = require('./remoto')
 const skillsRepoMod = require('./skills-repo')
 const unlimitedMod = require('./unlimited')
 const navegadorMod = require('./navegador')
@@ -126,13 +127,14 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 const sessoes = new Map()
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
+let remoto = null // controle remoto pelo celular (spec 20)
 async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
   if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: est.origem + '/v1', modelo: alvo, chave: await chaveLocal(), raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo })
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: est.origem + '/v1', modelo: alvo, chave: await chaveLocal(), raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => ((cfg.modoPermissao || 'manual') === 'ignorar' && remoto?.origemRemota(id) ? 'auto' : cfg.modoPermissao || 'manual'), navegador: navInfo })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.historico = historico
@@ -345,6 +347,21 @@ app.whenReady().then(() => {
     return r.canceled ? null : r.filePaths[0]
   })
   const permissoes = new Map()
+  remoto = remotoMod.criar({
+    app,
+    janela: () => janela,
+    executar: (m) => {
+      if (m.t === 'permissao') return permissoes.get(m.req)?.(['permitir', 'sempre', 'negar'].includes(m.decisao) ? m.decisao : 'negar')
+      if (m.t === 'parar') return abortos.get(m.id)?.abort()
+      janela?.webContents.send('remoto:cmd', m)
+    },
+  })
+  ipcMain.handle('remoto:estado', () => remoto.estado())
+  ipcMain.handle('remoto:ativar', seguro((sim) => remoto.ativar(sim)))
+  ipcMain.handle('remoto:vincular', seguro(() => remoto.vincular()))
+  ipcMain.handle('remoto:revogar', seguro((id) => remoto.revogar(id)))
+  ipcMain.handle('remoto:responder', (_e, msg) => remoto.emitir(msg))
+  remoto.iniciar()
   ipcMain.handle('chat:permissao-resp', (_e, { req, resposta }) => permissoes.get(req)?.(resposta))
   ipcMain.handle('chat:enviar', async (e, { id, mensagens, alvo, anexos }) => {
     const ac = new AbortController()
@@ -353,22 +370,27 @@ app.whenReady().then(() => {
     const enviar = (d) => {
       if (d.texto) acumulado += d.texto
       e.sender.send('chat:delta', { id, ...d })
+      if (d.texto || d.ferramenta || d.aviso) remoto.emitir({ t: 'delta', id, texto: d.texto, aviso: d.aviso, ferramenta: d.ferramenta && { id: d.ferramenta.id, titulo: d.ferramenta.titulo, tipo: d.ferramenta.tipo, status: d.ferramenta.status } })
     }
     const pedirPermissao = (p) =>
       new Promise((resolve) => {
         const req = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
         permissoes.set(req, (r) => (permissoes.delete(req), resolve(r)))
         e.sender.send('chat:permissao', { id, req, titulo: p.titulo, tipo: p.tipo })
+        remoto.emitir({ t: 'pedir-permissao', id, req, titulo: p.titulo })
         ac.signal.addEventListener('abort', () => permissoes.get(req)?.('negar'))
       })
     try {
       const ctxResp = { chat: id, onDelta: enviar, sinal: ac.signal, anexos, pedirPermissao }
       const texto = await responder(alvo, mensagens, ctxResp)
       e.sender.send('chat:fim', { id, texto: texto || acumulado, uso: ctxResp.uso || null })
+      remoto.emitir({ t: 'fim', id, texto: texto || acumulado, uso: ctxResp.uso || null })
     } catch (err) {
       e.sender.send('chat:erro', { id, erro: ac.signal.aborted ? 'Interrompido.' : String(err.message ?? err) })
+      remoto.emitir({ t: 'erro', id, texto: ac.signal.aborted ? 'Interrompido.' : String(err.message ?? err) })
     } finally {
       abortos.delete(id)
+      remoto.liberarOrigem(id)
     }
   })
   ipcMain.handle('anexo:salvar', (_e, { chat, nome, bytes, caminho }) => {
@@ -402,6 +424,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   embed.parar()
   nav?.fechar()
+  remoto?.parar()
   for (const x of sessoes.values()) x.encerrar()
   if (process.platform !== 'darwin') app.quit()
 })

@@ -32,6 +32,7 @@
       "agent.js",
       "skills.js",
       "skills-repo.js",
+      "remoto.js",
       "embed-router.js",
       "renderer/**",
       "package.json"
@@ -116,7 +117,9 @@
     "electron-builder": "^25.0.0"
   },
   "dependencies": {
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.3.9",
+    "qrcode-generator": "^1.4.4",
+    "ws": "^8.18.0"
   },
   "homepage": "https://github.com/RangelTech/second-brain",
   "repository": {
