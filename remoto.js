@@ -13,6 +13,8 @@ function criar({ app, janela, executar }) {
   try {
     cfg = { ...cfg, ...JSON.parse(fs.readFileSync(arq, 'utf8')) }
   } catch {}
+  // as credenciais valem só para a ponte em que foram criadas; se a ponte mudar, registra de novo
+  if (cfg.url !== URL_PADRAO) cfg = { ...cfg, url: URL_PADRAO, computadorId: '', chave: '' }
   const salvar = () => fs.writeFileSync(arq, JSON.stringify(cfg))
   const cifrar = (t) => (safeStorage.isEncryptionAvailable() ? 'e:' + safeStorage.encryptString(t).toString('base64') : 'p:' + t)
   const decifrar = (v) => (String(v).startsWith('e:') ? safeStorage.decryptString(Buffer.from(String(v).slice(2), 'base64')) : String(v).slice(2))
