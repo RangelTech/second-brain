@@ -594,8 +594,8 @@
       <h2>Modo</h2>
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ag-so" ${c.soConversa ? 'checked' : ''}> Só conversa (sem ferramentas: o modelo não lê arquivos nem roda comandos)</label>
       <h2>Raciocínio</h2>
-      <div class="cfg-acoes"><select id="ag-rac">${[['minimal', 'Mínimo (mais rápido)'], ['low', 'Baixo (recomendado)'], ['medium', 'Médio'], ['high', 'Alto (mais lento)']].map(([v, n]) => `<option value="${v}" ${(c.raciocinio || 'low') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-      <p class="mut">Quanto o modelo pensa antes de agir. Alto melhora tarefas difíceis, mas demora mais.</p>
+      <div class="cfg-acoes"><select id="ag-rac">${[['none', 'Desligado (mais rápido, recomendado)'], ['low', 'Baixo'], ['medium', 'Médio'], ['high', 'Alto (pode demorar muito)']].map(([v, n]) => `<option value="${v}" ${(c.raciocinio || 'none') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <p class="mut">Quanto o modelo "pensa" antes de responder. Desligado é bem mais rápido e basta para a maioria das tarefas; níveis altos podem levar muitos minutos.</p>
       <h2>Permissões</h2>
       <p class="mut">O agente sempre pergunta antes de rodar comandos, escrever fora da pasta de trabalho ou apagar arquivos. Em cada pergunta você pode escolher "Permitir sempre nesta conversa".</p>`
     $('#ag-escolher').onclick = async () => {

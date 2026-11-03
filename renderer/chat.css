@@ -155,3 +155,39 @@
 .acesso-txt{flex:1 1 260px;min-width:0}.acesso-txt b{display:block}.acesso-txt span{color:var(--mut);font-size:13px}
 .acesso-cod{display:flex;align-items:center;gap:8px}
 .acesso-cod code{font:700 20px/1 ui-monospace,Consolas,monospace;letter-spacing:.14em;background:var(--lat);border:1px solid var(--bd);border-radius:9px;padding:8px 12px}
+
+/* barras de rolagem discretas (combinam com o tema) */
+*{scrollbar-width:thin;scrollbar-color:#4a463f transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#47433d;border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:#6b655b;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+.conversa{scrollbar-gutter:stable}
+.lista{padding-right:2px}
+.fcorpo pre::-webkit-scrollbar,.corpo pre::-webkit-scrollbar{height:8px;width:8px}
+
+/* botão pensar e indicador de atividade */
+#pensar.on{color:var(--ac2)}
+#pensar:not(.on) .ic{opacity:.7}
+.atividade{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin:2px 0 8px}
+.atividade .ponto-vivo{width:8px;height:8px;border-radius:50%;background:var(--ac);animation:pulsa 1.1s infinite;flex:none}
+.atividade .tempo{font-variant-numeric:tabular-nums;color:var(--fg)}
+.atividade.demora{color:#e0b36a}
+.atividade.demora .ponto-vivo{background:#e0b36a}
+.atividade button{padding:3px 10px;font-size:12px}
+.raciocinio[open] .rtxt{max-height:180px;overflow:auto;white-space:pre-wrap;font-size:12.5px;opacity:.9}
+.msg.assistant .pensando{display:none}
+
+/* conversas: fixar e renomear */
+.chat{position:relative}
+.chat .acoes{display:none;gap:0;flex:none}
+.chat:hover .acoes,.chat:focus-within .acoes{display:inline-flex}
+.chat .acoes .btn-ic{width:26px;height:26px}
+.chat .acoes .btn-ic .ic{width:15px;height:15px}
+.chat .apagar{opacity:1}
+.chat .pin-marca{display:inline-flex;color:var(--ac);flex:none;margin-right:6px}
+.chat .pin-marca .ic{width:13px;height:13px;transform:rotate(35deg)}
+.chat.fixado .fixar{color:var(--ac)}
+.chat input.renomear{flex:1;min-width:0;background:var(--lat);border:1px solid var(--ac);border-radius:7px;padding:4px 8px;color:var(--fg);outline:none;font:inherit}
+.corpo a{text-decoration:underline;text-underline-offset:2px;cursor:pointer}

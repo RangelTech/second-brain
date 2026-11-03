@@ -12,11 +12,17 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 // pasta de dados sem acento (o Python do agente vive dentro dela)
 app.setPath('userData', process.env.SB_DATA_DIR || path.join(app.getPath('appData'), 'SegundoCerebro'))
+// um erro inesperado em segundo plano vai para o log; não abre a caixa de erro do Electron
+process.on('uncaughtException', (e) => {
+  try {
+    require('fs').appendFileSync(path.join(app.getPath('userData'), 'erros.log'), new Date().toISOString() + ' ' + (e && e.stack || e) + '\n')
+  } catch {}
+})
 const HOME = app.getPath('home')
 const PADRAO = {
   ativo: '',
   soConversa: false,
-  raciocinio: 'low',
+  raciocinio: 'none',
   pasta: path.join(app.getPath('documents'), 'Segundo Cerebro'),
   hermesHome: path.join(HOME, 'hermes'),
 }
@@ -50,6 +56,10 @@ function carregarCfg() {
   delete cfg.providers
   delete cfg.combos
   delete cfg.agenteHermes
+  if (!cfg.raciocinioV2) {
+    cfg.raciocinio = 'none'
+    cfg.raciocinioV2 = true
+  }
   if (!cfg.pasta || cfg.pasta === HOME) cfg.pasta = PADRAO.pasta
   fs.mkdirSync(cfg.pasta, { recursive: true })
 }
@@ -111,7 +121,7 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 
 // ---------- resposta do chat ----------
 const sessoes = new Map()
-async function sessaoDoChat(id, alvo, contexto) {
+async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
   if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio) return existente
@@ -120,6 +130,7 @@ async function sessaoDoChat(id, alvo, contexto) {
   const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: est.origem + '/v1', modelo: alvo, chave: await chaveLocal(), raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
+  sessao.historico = historico
   sessoes.set(id, sessao)
   return sessao
 }
@@ -131,9 +142,15 @@ async function responder(alvo, msgs, ctx) {
     const chave = await chaveLocal()
     return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
   }
-  const sessao = await sessaoDoChat(ctx.chat, alvo, ctx)
-  ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
+  // se o agente precisar recomeçar (raciocínio ou modelo mudou), o novo recebe um resumo das últimas mensagens
   const ultimo = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
+  const anteriores = msgs.slice(0, -1).slice(-10)
+  const linhaHist = (m) => (m.role === 'user' ? 'Usuário' : 'Assistente') + ': ' + String(m.content).slice(0, 700)
+  const historico = anteriores.map(linhaHist).join(String.fromCharCode(10))
+  const sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
+  sessao.emitir = ctx.onDelta // cada mensagem tem o seu canal de resposta e de permissão
+  sessao.pedirPermissao = ctx.pedirPermissao
+  ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
   await sessao.perguntar(ultimo, ctx.anexos || [])
   return ''
 }
@@ -280,7 +297,7 @@ app.whenReady().then(() => {
     }
   })
   ipcMain.handle('modelos:listar', () => listarModelos().catch(() => []))
-  ipcMain.handle('externo:abrir', (_e, url) => (/^https:\/\//.test(url) ? shell.openExternal(url) : false))
+  ipcMain.handle('externo:abrir', (_e, url) => (/^https?:\/\//i.test(url) ? shell.openExternal(url) : false))
   const publica = () => {
     const { unlimitedChave, ...resto } = cfg
     return resto

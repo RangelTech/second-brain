@@ -74,7 +74,10 @@ async function iniciar() {
   estado = { porta, origem: `http://127.0.0.1:${porta}`, pronto: false, erro: '' }
   estado.pronto = await esperar(estado.origem)
   if (!estado.pronto) estado.erro = estado.erro || 'O 9Router não respondeu a tempo.'
-  else await entrar(senha)
+  else {
+    await entrar(senha)
+    await travarSaidas()
+  }
   return estado
 }
 
@@ -110,6 +113,15 @@ async function api(metodo, rota, corpo) {
     json = await r.json()
   } catch {}
   return { status: r.status, json }
+}
+
+// Nada deve sair para modelos de terceiros sem o usuário saber: o "capacity adapter" do 9Router desviaria pedidos com
+// imagem, PDF ou áudio para um modelo gratuito de outro provedor. Desligamos em toda partida.
+async function travarSaidas() {
+  try {
+    const off = { enabled: false, roundRobin: false, models: [] }
+    await api('PATCH', '/api/settings', { capacityAdapter: { vision: off, pdf: off, audioInput: off, videoInput: off }, cloudEnabled: false })
+  } catch {}
 }
 
 function parar() {

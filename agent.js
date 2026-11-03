@@ -52,7 +52,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
     `  base_url: ${JSON.stringify(base)}`,
     '  api_key: ${SB_LOCAL_KEY}',
     'agent:',
-    `  reasoning_effort: ${JSON.stringify(raciocinio || 'low')}`,
+    `  reasoning_effort: ${JSON.stringify(raciocinio || 'none')}`,
     'terminal:',
     '  backend: "local"',
     `  cwd: ${JSON.stringify(pasta.replace(/\\/g, '/'))}`,
@@ -74,6 +74,7 @@ function contextoDeSistema({ pasta, ferramentas }) {
     `Data e hora: ${agora.toLocaleString('pt-BR')}.`,
     'Você tem ferramentas reais: leia e escreva arquivos (inclusive extrair texto de PDF, Word e planilha), liste pastas, rode comandos, busque na web e abra arquivos. USE as ferramentas em vez de dizer que não consegue acessar a máquina do usuário.',
     'Antes de apagar arquivos, escrever fora da pasta de trabalho ou rodar comandos perigosos, peça confirmação. Quando criar um arquivo, diga o caminho completo.',
+    'NUNCA diga que algo está pronto sem VERIFICAR. Depois de criar código ou uma página, confira que funciona: para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console, ou tire uma captura e olhe. Se houver erro, corrija e confira de novo. Só então responda, dizendo o que você verificou.',
     ferramentas ? `Skills e ferramentas: ${ferramentas}` : '',
   ]
     .filter(Boolean)
@@ -185,7 +186,23 @@ class Sessao {
   }
   aoAtualizacao(u) {
     const tipo = u.sessionUpdate
-    if (tipo === 'agent_message_chunk' && u.content?.text) this.emitir({ texto: u.content.text })
+    if (tipo === 'agent_message_chunk' && u.content?.text) {
+      const t = u.content.text
+      // O servidor recusou por limite de uso, mas o Hermes só diz "conversa longa demais" ou "provedor indisponível".
+      // Mostramos a causa real, com o que o servidor informou (janela e quando renova).
+      const lim = /Limite de uso da janela (\w+) \((\d+) tokens\)[^"]*?(?:reabre em|renova em|A janela reabre em)\s*([0-9T:\-Z.]+)?/i.exec(t)
+      if (lim || /Limite de uso da janela/i.test(t)) {
+        this.limiteUso = true
+        const quando = lim && lim[3] ? ` Renova em ${new Date(lim[3]).toLocaleString('pt-BR')}.` : ''
+        if (!this.avisouLimite) {
+          this.avisouLimite = true
+          this.emitir({ texto: `⛔ O limite de uso do Unlimited acabou nesta janela${lim ? ` (${Number(lim[2]).toLocaleString('pt-BR')} tokens)` : ''}.${quando} Peça ao suporte para liberar mais ou aguarde a renovação. Nada foi perdido: assim que voltar, é só pedir de novo.` })
+        }
+        return
+      }
+      if (this.limiteUso && /grown too long|auto-?reset|compress/i.test(t)) return // eco enganoso do mesmo problema
+      this.emitir({ texto: t })
+    }
     else if (tipo === 'agent_thought_chunk' && u.content?.text) this.emitir({ raciocinio: u.content.text })
     else if (tipo === 'tool_call' || tipo === 'tool_call_update') {
       const conteudo = (u.content || [])
@@ -235,6 +252,8 @@ class Sessao {
   }
   async perguntar(texto, anexos = []) {
     clearTimeout(this.ocioso)
+    this.limiteUso = false
+    this.avisouLimite = false
     await this.pronta
     let corpo = texto
     if (anexos.length) corpo += '\n\nArquivos anexados (use as ferramentas para ler):\n' + anexos.map((a) => `- ${a}`).join('\n')

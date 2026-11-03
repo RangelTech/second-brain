@@ -40,7 +40,12 @@
           .join('')
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
-          .replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>')
+          .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)]+)/g, (m, rotulo, urlMd, urlSolta) => {
+            if (urlMd) return `<a href="${urlMd}" rel="noreferrer">${rotulo}</a>`
+            const pontuacao = /[.,;:!?]+$/.exec(urlSolta)
+            const url = pontuacao ? urlSolta.slice(0, -pontuacao[0].length) : urlSolta
+            return `<a href="${url}" rel="noreferrer">${url}</a>${pontuacao ? pontuacao[0] : ''}`
+          })
       })
       .join('')
   }
@@ -56,18 +61,60 @@
     $('app').classList.toggle('recolhido', sim)
   }
 
+  // fixadas primeiro, depois as mais recentes
+  const ordem = (a, b) => (b.fixado ? 1 : 0) - (a.fixado ? 1 : 0) || b.em - a.em
+
+  function renomear(c, el) {
+    const nome = el.querySelector('.nome')
+    const inp = document.createElement('input')
+    inp.className = 'renomear'
+    inp.value = c.titulo
+    inp.maxLength = 80
+    nome.replaceWith(inp)
+    inp.focus()
+    inp.select()
+    let feito = false
+    const fechar = (salvarTitulo) => {
+      if (feito) return
+      feito = true
+      const novo = inp.value.trim()
+      if (salvarTitulo && novo) {
+        c.titulo = novo
+        c.tituloManual = true
+        salvar()
+      }
+      listar()
+      if (c.id === atual) $('titulo').textContent = c.titulo
+    }
+    inp.onkeydown = (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') fechar(true)
+      if (e.key === 'Escape') fechar(false)
+    }
+    inp.onblur = () => fechar(true)
+    inp.onclick = (e) => e.stopPropagation()
+  }
+
   function listar() {
     const q = $('busca').value.trim().toLowerCase()
     const el = $('lista')
     el.innerHTML = ''
-    for (const c of chats.filter((c) => !q || c.titulo.toLowerCase().includes(q)).sort((a, b) => b.em - a.em)) {
+    for (const c of chats.filter((c) => !q || c.titulo.toLowerCase().includes(q)).sort(ordem)) {
       const b = document.createElement('div')
-      b.className = 'chat' + (c.id === atual ? ' ativo' : '')
+      b.className = 'chat' + (c.id === atual ? ' ativo' : '') + (c.fixado ? ' fixado' : '')
       b.tabIndex = 0
       b.setAttribute('role', 'button')
-      b.innerHTML = `<span class="nome">${esc(c.titulo)}</span><button class="apagar btn-ic" title="Apagar conversa" aria-label="Apagar conversa">${IC.x}</button>`
+      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
       b.onclick = (e) => {
+        if (e.target.closest('.fixar')) {
+          c.fixado = !c.fixado
+          salvar()
+          listar()
+          return
+        }
+        if (e.target.closest('.ren')) return renomear(c, b)
         if (e.target.closest('.apagar')) {
+          if (c.msgs.length && !window.confirm('Apagar esta conversa?')) return
           chats = chats.filter((x) => x.id !== c.id)
           if (atual === c.id) atual = null
           salvar()
@@ -78,7 +125,13 @@
         abrir(c.id)
         if (estreito()) recolher(true)
       }
-      b.onkeydown = (e) => e.key === 'Enter' && b.click()
+      b.ondblclick = (e) => {
+        if (!e.target.closest('.acoes')) renomear(c, b)
+      }
+      b.onkeydown = (e) => {
+        if (e.key === 'Enter' && e.target === b) b.click()
+        if (e.key === 'F2' && e.target === b) renomear(c, b)
+      }
       el.appendChild(b)
     }
   }
@@ -320,7 +373,7 @@
     desenharAnexos()
     const texto = t || 'Veja o(s) arquivo(s) anexado(s).'
     c.msgs.push({ role: 'user', content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
-    if (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat') c.titulo = texto.slice(0, 42)
+    if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     $('texto').value = ''
     $('texto').style.height = 'auto'
@@ -329,17 +382,20 @@
     const caixa = $('conversa')
     const d = document.createElement('div')
     d.className = 'msg assistant'
-    d.innerHTML = `${QUEM}<span class="pensando" id="pensando">trabalhando</span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
+    d.innerHTML = `${QUEM}</div><div class="atividade" id="atividade"><span class="ponto-vivo"></span><span class="atv-txt">Enviando…</span><span class="tempo">0 s</span><span class="atv-extra"></span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
     caixa.appendChild(d)
     caixa.scrollTop = caixa.scrollHeight
-    resposta = { id: c.id, el: d, partes: [], raz: '', midias: [] }
+    resposta = { id: c.id, el: d, partes: [], raz: '', midias: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Enviando…', timer: null }
+    resposta.timer = setInterval(tiquetaque, 1000)
     enviando = c.id
     alternarBotao(true)
+    resposta.fase = 'Aguardando o modelo…'
     window.sb.enviar({ id: c.id, mensagens: c.msgs.map(({ role, content }) => ({ role, content })), alvo: cfg.ativo, anexos: anexos.map((a) => a.caminho) })
   }
 
   function fim(texto, erro) {
     if (!resposta) return
+    clearInterval(resposta.timer)
     const c = chats.find((x) => x.id === resposta.id)
     if (c) {
       const partes = resposta.partes.length ? resposta.partes : texto ? [{ t: 'texto', v: texto }] : []
@@ -356,28 +412,66 @@
     listar()
   }
 
+  const fmtTempo = (ms) => {
+    const t = Math.floor(ms / 1000)
+    return t < 60 ? t + ' s' : Math.floor(t / 60) + ' min ' + String(t % 60).padStart(2, '0') + ' s'
+  }
+  // atualiza o relógio e avisa quando o modelo fica muito tempo sem dar sinal
+  function tiquetaque() {
+    if (!resposta) return
+    const at = resposta.el.querySelector('.atividade')
+    if (!at) return
+    const parado = Date.now() - resposta.ultimo
+    at.querySelector('.tempo').textContent = fmtTempo(Date.now() - resposta.inicio)
+    at.querySelector('.atv-txt').textContent = parado > 20000 && resposta.fase !== 'Executando ferramenta' ? resposta.fase.replace('…', '') + ' (sem novidades há ' + fmtTempo(parado) + ')' : resposta.fase
+    const demora = parado > 60000
+    at.classList.toggle('demora', demora)
+    const extra = at.querySelector('.atv-extra')
+    if (demora && !extra.firstChild) {
+      extra.innerHTML = 'O modelo está demorando. <button data-act="parar">Parar</button>' + (cfg.raciocinio && cfg.raciocinio !== 'none' ? ' <button data-act="desligar">Parar e desligar o raciocínio</button>' : '')
+    } else if (!demora && extra.firstChild) extra.innerHTML = ''
+  }
+  document.addEventListener('click', async (e) => {
+    const a = e.target.closest('[data-act]')
+    if (!a || !enviando) return
+    if (a.dataset.act === 'desligar') {
+      cfg = await window.sb.salvarCfg({ raciocinio: 'none' })
+      pintarPensar()
+    }
+    window.sb.parar(enviando)
+  })
+  function sinal(fase) {
+    if (!resposta) return
+    resposta.ultimo = Date.now()
+    if (fase) resposta.fase = fase
+  }
   const EXT_MIDIA = /\.(png|jpe?g|gif|webp|svg|mp3|wav|ogg|m4a|mp4|mov)$/i
   window.sb.aoDelta((d) => {
     if (!resposta || d.id !== resposta.id) return
     const caixa = $('conversa')
     if (d.raciocinio) {
       resposta.raz += d.raciocinio
+      sinal('Pensando… (' + Math.round(resposta.raz.length / 4) + ' palavras)')
       const det = resposta.el.querySelector('.raciocinio')
       det.hidden = false
+      det.open = true
       det.querySelector('.rtxt').textContent = resposta.raz
     }
     if (d.aviso) {
+      sinal()
       const a = resposta.el.querySelector('.aviso')
       a.hidden = false
       a.textContent = d.aviso
     }
     if (d.texto) {
+      sinal('Escrevendo a resposta…')
       const ult = resposta.partes[resposta.partes.length - 1]
       if (ult && ult.t === 'texto') ult.v += d.texto
       else resposta.partes.push({ t: 'texto', v: d.texto })
     }
     if (d.ferramenta) {
       const f = d.ferramenta
+      sinal(f.status === 'completed' || f.status === 'failed' ? 'Analisando o resultado…' : 'Executando ferramenta')
       const existente = resposta.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
       if (existente) Object.assign(existente.f, Object.fromEntries(Object.entries(f).filter(([, v]) => v !== null && v !== undefined && v !== '')))
       else resposta.partes.push({ t: 'ferr', f: { ...f } })
@@ -443,6 +537,13 @@
     b.innerHTML = `${agente ? IC.sparkles : IC.chat}<span id="modo-nome">${agente ? 'Agente' : 'Conversa'}</span>`
     b.title = agente ? 'Modo agente: lê arquivos, roda comandos e cria coisas. Clique para só conversar.' : 'Só conversa, sem ferramentas. Clique para ativar o agente.'
   }
+  function pintarPensar() {
+    const ligado = cfg.raciocinio && cfg.raciocinio !== 'none'
+    const b = $('pensar')
+    b.classList.toggle('on', !!ligado)
+    $('pensar-nome').textContent = ligado ? 'Pensando' : 'Pensar'
+    b.title = ligado ? 'Raciocínio ligado: respostas melhores em tarefas difíceis, porém mais lentas. Clique para desligar.' : 'Raciocínio desligado: respostas rápidas. Clique para ligar.'
+  }
   function pintarPasta() {
     const partes = String(cfg.pasta || '').split(/[\\/]/).filter(Boolean)
     $('pasta').textContent = partes.slice(-2).join('/') || 'Escolher pasta'
@@ -487,6 +588,10 @@
     cfg = await window.sb.salvarCfg({ soConversa: !cfg.soConversa })
     pintarModo()
   }
+  $('pensar').onclick = async () => {
+    cfg = await window.sb.salvarCfg({ raciocinio: cfg.raciocinio && cfg.raciocinio !== 'none' ? 'none' : 'medium' })
+    pintarPensar()
+  }
   $('pasta-chip').onclick = async () => {
     const p = await window.sb.escolherPasta()
     if (p) {
@@ -501,6 +606,7 @@
     $('boas-vindas').hidden = modelos.length > 0 || faseAnterior === 'pendente' || faseAnterior === 'erro'
     pintarSeletor()
     pintarModo()
+    pintarPensar()
     pintarPasta()
   }
   window.preencherAlvo = preencherAlvo
@@ -542,6 +648,7 @@
     cfg = await window.sb.cfg()
     chats = await window.sb.chats()
     window.aplicarIcones()
+    pintarPensar()
     pintarModo()
     pintarPasta()
     alternarBotao(false)
@@ -582,7 +689,7 @@
       t.style.height = Math.min(t.scrollHeight, 220) + 'px'
     })
     if (chats.length === 0) criarChat()
-    else abrir(chats.sort((a, b) => b.em - a.em)[0].id)
+    else abrir([...chats].sort(ordem)[0].id)
   }
   window.SB = { enviar: (txt) => (($('texto').value = txt), enviar()), anexos: () => anexosPendentes, chats: () => chats }
   iniciar()

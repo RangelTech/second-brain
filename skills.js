@@ -18,6 +18,13 @@ function criar({ app, avisar }) {
     diario = JSON.parse(fs.readFileSync(diarioArq, 'utf8'))
   } catch {}
   const salvarDiario = () => fs.writeFileSync(diarioArq, JSON.stringify(diario, null, 1))
+  // v2: o diário antigo marcava como "criada pelo Hermes" tudo que ele sincronizava ao iniciar; recomeça limpo uma vez
+  if (!diario.__v2) {
+    diario = { __v2: true }
+    try {
+      salvarDiario()
+    } catch {}
+  }
 
   const abs = (rel) => {
     const p = path.resolve(raiz, rel || '.')
@@ -78,20 +85,35 @@ function criar({ app, avisar }) {
   function observar() {
     iniciarGit()
     let temporizador = null
+    let rajada = []
     try {
-      fs.watch(raiz, { recursive: true }, (_ev, nome) => {
-        if (!nome) return
-        const r = String(nome).split(path.sep).join('/')
-        if (r.startsWith('.git') || r.includes('/.git')) return
-        const foiApp = Date.now() - (escritasDoApp.get(r) || 0) < 3000
-        if (!foiApp && fs.existsSync(path.join(raiz, r)) && fs.statSync(path.join(raiz, r)).isFile() && !somenteLeitura(r)) {
-          diario[r] = { quando: Date.now(), origem: 'agente' }
-          salvarDiario()
-          clearTimeout(temporizador)
-          temporizador = setTimeout(() => registrar(r, 'alteração do agente'), 1500)
-        }
-        avisar({ caminho: r })
+      const w = fs.watch(raiz, { recursive: true }, (_ev, nome) => {
+        // o Hermes cria e apaga arquivos temporários o tempo todo: qualquer falha aqui é ignorada, nunca derruba o app
+        try {
+          if (!nome) return
+          const r = String(nome).split(path.sep).join('/')
+          // arquivos e pastas ocultas são controle interno do Hermes (manifesto, uso, locks), não skills
+          if (r.split('/').some((seg) => seg.startsWith('.')) || /\.(tmp|lock|swp)$/i.test(r)) return
+          // sincronização em massa (o Hermes reescreve as skills embutidas ao iniciar) não é "criada pelo Hermes"
+          const agora = Date.now()
+          rajada = rajada.filter((t) => agora - t < 3000)
+          rajada.push(agora)
+          const emMassa = rajada.length > 15
+          const foiApp = Date.now() - (escritasDoApp.get(r) || 0) < 3000
+          let arquivo = false
+          try {
+            arquivo = fs.statSync(path.join(raiz, r)).isFile()
+          } catch {}
+          if (!foiApp && !emMassa && arquivo && !somenteLeitura(r)) {
+            diario[r] = { quando: Date.now(), origem: 'agente' }
+            salvarDiario()
+            clearTimeout(temporizador)
+            temporizador = setTimeout(() => registrar(r, 'alteração do agente'), 1500)
+          }
+          avisar({ caminho: r })
+        } catch {}
       })
+      w.on('error', () => {})
     } catch {}
   }
 
