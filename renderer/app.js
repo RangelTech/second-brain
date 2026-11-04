@@ -999,15 +999,76 @@
 
   // ---------- acesso ao Unlimited (cadastro automático) ----------
   let faseAnterior = ''
+  // login: a tela cheia aparece quando nao ha conta entrada; some sozinha quando o acesso fica ativo
+  const loginMsg = (txt, ok) => {
+    const m = $('login-msg')
+    m.hidden = !txt
+    m.textContent = txt || ''
+    m.classList.toggle('ok', !!ok)
+  }
+  $('login-form').onsubmit = async (ev) => {
+    ev.preventDefault()
+    const btn = $('login-entrar')
+    btn.disabled = true
+    btn.textContent = 'Entrando…'
+    loginMsg('')
+    const r = await window.sb.unlimitedEntrar($('login-email').value, $('login-senha').value)
+    btn.disabled = false
+    btn.textContent = 'Entrar'
+    if (r.ok) {
+      $('login-senha').value = ''
+      $('login').hidden = true
+      $('login-fechar').hidden = true
+      cfg = await window.sb.cfg()
+      pintarConta()
+    } else loginMsg(r.erro, false)
+  }
+  $('login-esqueci').onclick = async () => {
+    const email = $('login-email').value.trim()
+    if (!email) return loginMsg('Digite o seu e-mail acima e toque de novo em "Esqueci a senha".')
+    await window.sb.unlimitedEsqueci(email)
+    loginMsg('Se este e-mail tiver uma conta, enviamos o link para criar uma nova senha. Se não chegar, peça o link ao suporte.', true)
+  }
+  // botão Conta: sem conta entrada abre o login (com "Agora não"); com conta mostra quem está entrado e deixa sair
+  const pintarConta = () => {
+    const email = cfg?.unlimitedEmail
+    $('conta-rotulo').textContent = email ? email : 'Entrar na conta'
+  }
+  $('abrir-conta').onclick = async () => {
+    cfg = await window.sb.cfg()
+    if (cfg.unlimitedEmail) {
+      if (confirm(`Sair da conta ${cfg.unlimitedEmail}? O app deixa de usar o Unlimited neste computador até você entrar de novo.`)) {
+        await window.sb.unlimitedSair()
+        cfg = await window.sb.cfg()
+        pintarConta()
+      }
+      return
+    }
+    loginMsg('')
+    $('login-fechar').hidden = false
+    $('login').hidden = false
+    setTimeout(() => $('login-email').focus(), 50)
+  }
+  $('login-fechar').onclick = () => {
+    $('login').hidden = true
+    $('login-fechar').hidden = true
+  }
+  $('login-assinar').onclick = () => window.sb.abrirExterno('https://brain.rangeltech.net')
   function pintarAcesso(e) {
+    if (e) {
+      const mostrarLogin = e.fase === 'login'
+      $('login').hidden = !mostrarLogin
+      if (mostrarLogin && e.detalhe) loginMsg(e.detalhe, false)
+      if (mostrarLogin) setTimeout(() => $('login-email').focus(), 50)
+    }
     const el = $('acesso')
     const mostrar = e && (e.fase === 'pendente' || e.fase === 'erro' || (e.fase === 'ativo' && faseAnterior === 'pendente'))
     el.hidden = !mostrar
     el.className = 'acesso' + (e && e.fase === 'ativo' ? ' ok' : e && e.fase === 'erro' ? ' erro' : '')
     if (mostrar) {
       if (e.fase === 'pendente') {
-        $('acesso-tit').textContent = 'Falta liberar o seu acesso'
-        $('acesso-sub').textContent = 'Envie este código para a Rangel Tech. Quando liberarem, o app começa a funcionar sozinho.'
+        $('acesso-tit').textContent = 'Seu acesso está aguardando liberação'
+        $('acesso-sub').textContent = e.detalhe || 'Assim que for liberado, o app começa a funcionar sozinho.'
       } else if (e.fase === 'ativo') {
         $('acesso-tit').textContent = 'Acesso liberado!'
         $('acesso-sub').textContent = 'O Unlimited já está pronto para usar.'
@@ -1041,6 +1102,7 @@
     alternarBotao(false)
     preencherAlvo()
     window.sb.unlimitedEstado().then(pintarAcesso)
+    pintarConta()
     setTimeout(preencherAlvo, 6000)
     listar()
     desenhar()

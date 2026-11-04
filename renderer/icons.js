@@ -12,6 +12,7 @@
     star: s('<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>'),
     chevronDown: s('<path d="m6 9 6 6 6-6"/>'),
     plus: s('<path d="M5 12h14"/><path d="M12 5v14"/>'),
+    user: s('<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>'),
     search: s('<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>'),
     settings: s('<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>'),
     panel: s('<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>'),

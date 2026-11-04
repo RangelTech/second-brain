@@ -322,6 +322,9 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('unlimited:estado', () => unl.estado())
   ipcMain.handle('unlimited:recusar', () => unl.recusar())
+  ipcMain.handle('unlimited:entrar', (_e, { email, senha }) => unl.entrar(email, senha))
+  ipcMain.handle('unlimited:esqueci', (_e, email) => unl.esqueci(email))
+  ipcMain.handle('unlimited:sair', () => unl.sair())
   const skills = skillsMod.criar({ app, avisar: (d) => janela?.webContents.send('skills:mudou', d) })
   skills.observar()
   const seguro = (fn) => async (_e, ...a) => {

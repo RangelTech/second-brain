@@ -1,9 +1,7 @@
-// Cadastro automático do Unlimited: na primeira abertura o app pede uma chave ao servidor (POST /v1/enroll, sem senha).
-// A chave nasce SUSPENSA e vem com um código curto (formato de placa, ex. ABC1D23). O dono acha o código no painel
-// do servidor e libera. Enquanto isso o app guarda a chave cifrada e confere de tempos em tempos; ao liberar, ele liga
-// o provedor e cria o combo "principal" sozinho. Ninguém precisa colar chave.
+// Acesso ao Unlimited por LOGIN (e-mail e senha). Só assinante liberado entra: o servidor (POST /v1/auth/login) devolve uma chave
+// própria deste computador, que o app guarda cifrada; a senha nunca é guardada. Com a chave, o app confere de tempos em tempos e,
+// liberado, liga o provedor e cria o combo "principal" sozinho. Instalações antigas, que já têm chave, seguem como estavam.
 const os = require('os')
-const crypto = require('crypto')
 
 const BASE = () => (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
 const INTERVALO_MS = 30000
@@ -25,18 +23,6 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
       json = await r.json()
     } catch {}
     return { status: r.status, json }
-  }
-
-  async function cadastrar() {
-    const c = cfgGet()
-    const maquina = c.maquinaId || crypto.randomUUID()
-    if (!c.maquinaId) cfgSet({ maquinaId: maquina })
-    const r = await postar('/enroll', { machine_id: maquina, app: 'segundo-cerebro', version: app.getVersion(), host: os.hostname(), os: process.platform })
-    if (r.status === 404) throw Object.assign(new Error('Servidor ainda sem cadastro automático'), { semServidor: true })
-    if (r.status !== 200) throw new Error(r.json?.error?.message || `HTTP ${r.status}`)
-    cfgSet({ unlimitedCodigo: r.json.code })
-    if (r.json.api_key) cfgSet({ unlimitedChave: cifrar(r.json.api_key) })
-    return r.json
   }
 
   // 'ativo' (200), 'pendente' (403 suspensa), 'invalida' (401), 'offline'
@@ -81,16 +67,9 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
     clearTimeout(timer)
     try {
       const c = cfgGet()
-      // sem cadastro ainda: tenta cadastrar (só se o usuário não conectou outro provedor à mão)
-      if (!c.unlimitedChave && !c.unlimitedRecusado) {
-        const j = await cadastrar()
-        if (!j.api_key && !cfgGet().unlimitedChave) {
-          publicar({ fase: 'erro', codigo: j.code, detalhe: 'Esta instalação já tem um código (' + j.code + '), mas a chave se perdeu. Peça ao suporte para gerar outra.' })
-          return
-        }
-      }
+      // sem chave: o app pede o login (se o usuário não conectou outro provedor à mão)
+      if (!c.unlimitedChave) return publicar(c.unlimitedRecusado ? { fase: 'desligado' } : { fase: 'login' })
       const c2 = cfgGet()
-      if (!c2.unlimitedChave) return publicar({ fase: 'desligado' })
       const chave = decifrar(c2.unlimitedChave)
       const s = await conferir(chave)
       if (s === 'ativo') {
@@ -99,11 +78,15 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
         if (!cfgGet().unlimitedLigado) timer = setTimeout(ciclo, 5000) // motor ainda subindo
         return // liberado: para de conferir
       }
-      if (s === 'pendente') publicar({ fase: 'pendente', codigo: c2.unlimitedCodigo, detalhe: '' })
-      else if (s === 'invalida') publicar({ fase: 'erro', codigo: c2.unlimitedCodigo, detalhe: 'A chave deste computador foi revogada. Peça ao suporte para liberar de novo.' })
+      if (s === 'pendente') publicar({ fase: 'pendente', detalhe: 'O seu acesso está aguardando liberação ou foi bloqueado. Assim que for liberado, o app volta a funcionar sozinho.' })
+      else if (s === 'invalida') {
+        // a chave deste computador caiu (limite de computadores, assinatura encerrada ou troca de senha): pede o login de novo
+        cfgSet({ unlimitedChave: undefined, unlimitedLigado: false })
+        publicar({ fase: 'login', detalhe: 'Sua sessão neste computador terminou. Entre de novo.' })
+      }
       else publicar({ fase: 'offline', codigo: c2.unlimitedCodigo, detalhe: 'Sem conexão com o servidor. Tentando de novo…' })
     } catch (e) {
-      publicar(e.semServidor ? { fase: 'desligado', detalhe: '' } : { fase: 'offline', detalhe: String(e.message || e) })
+      publicar({ fase: 'offline', detalhe: String(e.message || e) })
     }
     timer = setTimeout(ciclo, INTERVALO_MS)
   }
@@ -119,6 +102,38 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
       publicar({ fase: 'desligado' })
     },
     reconferir: () => ciclo(),
+    // login: devolve {ok} ou {ok:false, codigo, erro} com texto pronto para mostrar
+    entrar: async (email, senha) => {
+      let r
+      try {
+        r = await postar('/auth/login', { email: String(email || '').trim(), password: String(senha || ''), device: os.hostname() })
+      } catch {
+        return { ok: false, codigo: 'offline', erro: 'Sem conexão com o servidor. Confira a internet e tente de novo.' }
+      }
+      if (r.status === 200 && r.json?.api_key) {
+        cfgSet({ unlimitedChave: cifrar(r.json.api_key), unlimitedEmail: r.json.account?.email, unlimitedPlano: r.json.plan?.name, unlimitedLigado: false, unlimitedRecusado: false })
+        clearTimeout(timer)
+        ciclo()
+        return { ok: true, plano: r.json.plan?.name }
+      }
+      const codigo = r.json?.error?.code
+      const texto = { invalid_credentials: 'E-mail ou senha incorretos.', awaiting_release: 'Sua conta ainda não foi liberada. Avisaremos assim que estiver pronta.',
+        subscription_inactive: 'Sua assinatura não está ativa. Renove para continuar.', account_blocked: 'Conta bloqueada. Fale com o suporte.', too_many_attempts: 'Muitas tentativas. Aguarde alguns minutos.' }
+      return { ok: false, codigo, erro: texto[codigo] || r.json?.error?.message || `Não consegui entrar (HTTP ${r.status}).` }
+    },
+    esqueci: async (email) => {
+      try {
+        await postar('/auth/forgot', { email: String(email || '').trim() })
+        return { ok: true }
+      } catch {
+        return { ok: false, erro: 'Sem conexão com o servidor.' }
+      }
+    },
+    sair: () => {
+      clearTimeout(timer)
+      cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined })
+      publicar({ fase: 'login', detalhe: '' })
+    },
   }
 }
 

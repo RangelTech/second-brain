@@ -62,6 +62,9 @@ contextBridge.exposeInMainWorld('sb', {
   importarDados: () => ipcRenderer.invoke('dados:importar'),
   unlimitedEstado: () => ipcRenderer.invoke('unlimited:estado'),
   unlimitedRecusar: () => ipcRenderer.invoke('unlimited:recusar'),
+  unlimitedEntrar: (email, senha) => ipcRenderer.invoke('unlimited:entrar', { email, senha }),
+  unlimitedEsqueci: (email) => ipcRenderer.invoke('unlimited:esqueci', email),
+  unlimitedSair: () => ipcRenderer.invoke('unlimited:sair'),
   aoUnlimited: (fn) => ipcRenderer.on('unlimited:estado', (_e, d) => fn(d)),
   ditadoModelo: () => ipcRenderer.invoke('ditado:modelo'),
   navegador: {
