@@ -28,7 +28,6 @@
     { id: 'combo', nome: 'Combos', grupo: 'Modelos' },
     { id: 'uso', nome: 'Uso', grupo: 'Consumo' },
     { id: 'cota', nome: 'Cota', grupo: 'Consumo' },
-    { id: 'agente', nome: 'Agente', grupo: 'Aplicativo' },
     { id: 'sobre', nome: 'Sobre', grupo: 'Aplicativo' },
   ]
 
@@ -488,31 +487,27 @@
   // USO
   // =====================================================================
   async function telaUso() {
-    const [st, ch] = await Promise.all([api('GET', `/api/usage/stats?period=${S.periodo}`), api('GET', `/api/usage/chart?period=${S.periodo}`)])
-    const d = st.json || {}
-    const dias = Array.isArray(ch.json) ? ch.json : []
-    const maxT = Math.max(1, ...dias.map((x) => x.tokens || 0))
-    const linhas = (obj, vazio) => {
-      const l = Object.entries(obj || {}).sort((a, b) => (b[1].promptTokens + b[1].completionTokens) - (a[1].promptTokens + a[1].completionTokens))
-      return l.length ? l.map(([k, v]) => `<tr><td>${esc(nomeChave(k, v))}</td><td class="n">${fmt(v.requests)}</td><td class="n">${fmt(v.promptTokens + v.completionTokens)}</td><td class="n">${brl(v.cost)}</td></tr>`).join('') : `<tr><td colspan="4" class="mut">${vazio}</td></tr>`
+    const r = await window.sb.contaUso()
+    const nt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' mi' : n >= 1e3 ? (n / 1e3).toFixed(1).replace('.', ',') + ' mil' : String(n ?? 0))
+    const reab = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : null)
+    const janela = (titulo, sub, w) => {
+      const lim = w && w.limit
+      const pct = lim ? Math.min(100, Math.round(((w.used || 0) / lim) * 100)) : 0
+      const cor = pct >= 90 ? '#e5484d' : pct >= 70 ? '#e0a030' : '#4caf7d'
+      return `<div class="kpi" style="grid-column:span 2"><span>${titulo} <small class="mut">${sub}</small></span>
+        <b>${lim ? pct + '% usado' : 'sem limite'}</b>
+        ${lim ? `<div style="height:8px;border-radius:6px;background:var(--bd);margin:10px 0 6px"><div style="height:8px;border-radius:6px;width:${pct}%;background:${cor}"></div></div>
+        <span class="mut">${nt(w.used)} de ${nt(lim)} tokens · restam ${nt(w.remaining)}</span>` : `<span class="mut">${nt(w && w.used)} tokens usados</span>`}
+        <div class="mut" style="margin-top:4px">${reab(w && w.resets_at) ? 'Zera em ' + reab(w.resets_at) : 'Janela fechada: abre no próximo pedido'}</div></div>`
     }
-    const nomeChave = (k, v) => (v.rawModel ? `${nomeModelo(`${(S.nodes.find((n) => n.name === v.provider)?.prefix) || ''}/${v.rawModel}`) || v.rawModel} · ${v.provider || ''}` : nomeProvedor(k))
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Uso</h1><p>Quanto o Segundo Cérebro consumiu por provedor e modelo. O custo é uma estimativa pela tabela de preços; contas de assinatura não cobram por token.</p></div>
-        <div class="cfg-acoes"><select id="periodo">${[['today', 'Hoje'], ['24h', '24 horas'], ['7d', '7 dias'], ['30d', '30 dias'], ['60d', '60 dias'], ['all', 'Tudo']].map(([v, n]) => `<option value="${v}" ${S.periodo === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div></div>
-      <div class="kpis">
-        <div class="kpi"><span>Pedidos</span><b>${fmt(d.totalRequests)}</b></div>
-        <div class="kpi"><span>Tokens enviados</span><b>${fmt(d.totalPromptTokens)}</b></div>
-        <div class="kpi"><span>Tokens recebidos</span><b>${fmt(d.totalCompletionTokens)}</b></div>
-        <div class="kpi"><span>Custo estimado</span><b>${brl(d.totalCost)}</b></div>
-      </div>
-      <div class="grafico"><span class="mut">Tokens por dia</span>
-        <div class="barras">${dias.map((x) => `<div class="barra-c" title="${esc(x.label)}: ${fmt(x.tokens)} tokens, ${fmt(x.requests)} pedidos"><div class="bar-uso" style="height:${x.tokens ? Math.max(4, Math.round((x.tokens / maxT) * 110)) : 2}px"></div><small>${esc(dias.length > 14 ? '' : x.label)}</small></div>`).join('') || '<span class="mut">Sem dados no período.</span>'}</div></div>
-      <div class="duas">
-        <div><h2>Por provedor</h2><table class="tabela"><thead><tr><th>Provedor</th><th class="n">Pedidos</th><th class="n">Tokens</th><th class="n">Custo</th></tr></thead><tbody>${linhas(d.byProvider, 'Nada usado ainda.')}</tbody></table></div>
-        <div><h2>Por modelo</h2><table class="tabela"><thead><tr><th>Modelo</th><th class="n">Pedidos</th><th class="n">Tokens</th><th class="n">Custo</th></tr></thead><tbody>${linhas(d.byModel, 'Nada usado ainda.')}</tbody></table></div>
-      </div>`
-    $('#periodo').onchange = (e) => ((S.periodo = e.target.value), telaUso())
+      <div class="cfg-cab"><div><h1>Uso</h1><p>O quanto da sua assinatura você já usou. A contagem é do servidor e vale para a sua conta, em todos os seus computadores.</p></div></div>
+      ${r.ok ? `<div class="kpis">
+        <div class="kpi"><span>Conta</span><b style="font-size:16px">${esc(r.email)}</b></div>
+        <div class="kpi"><span>Plano</span><b>${esc(r.plano || '—')}</b></div>
+        ${janela('Janela atual', '(5 horas)', r.session)}
+        ${janela('Semana', '(7 dias)', r.week)}
+      </div>` : `<p class="mut">${esc(r.erro || 'Não consegui ler o uso agora.')}</p>`}`
   }
 
   // =====================================================================

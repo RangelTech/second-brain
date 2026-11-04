@@ -170,6 +170,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   return sessao
 }
 async function responder(alvo, msgs, ctx) {
+  if (!cfg.unlimitedEmail) throw new Error('Entre na sua conta para usar o Segundo Cérebro.') // vale também para as ordens vindas do celular
   const est = embed.estado()
   if (!est.pronto) throw new Error(est.erro || 'O motor de provedores ainda está iniciando. Tente de novo em instantes.')
   if (!alvo) throw new Error('Escolha um modelo ou combo no topo do chat (cadastre um provedor em Configurações > Provedores).')
@@ -266,6 +267,41 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:estado', () => nav.estado())
   // Modelo de voz do ditado (Vosk, português, ~32 MB): baixa uma vez e fica em disco; depois funciona sem internet.
   const modeloEmbutido = () => [path.join(process.resourcesPath || '', 'app.asar.unpacked', 'renderer', 'vendor', 'vosk-model-pt.tar.gz'), path.join(__dirname, 'renderer', 'vendor', 'vosk-model-pt.tar.gz')].find((f) => fs.existsSync(f))
+  // Whisper (ditado preciso, no próprio computador): thread separada, um trecho por vez
+  const pastaWhisper = () => [path.join(process.resourcesPath || '', 'modelos'), path.join(__dirname, 'modelos')].find((d) => fs.existsSync(path.join(d, 'whisper-small', 'onnx')))
+  let wk = null
+  let wkSeq = 0
+  const wkPend = new Map()
+  const whisperWorker = () => {
+    if (wk) return wk
+    const { Worker } = require('worker_threads')
+    const arq = [path.join(process.resourcesPath || '', 'app.asar.unpacked', 'transcricao-worker.js'), path.join(__dirname, 'transcricao-worker.js')].find((f) => fs.existsSync(f))
+    wk = new Worker(arq, { workerData: { pasta: pastaWhisper(), modelo: 'whisper-small' } })
+    wk.on('message', (r) => {
+      const p = wkPend.get(r.id)
+      if (p) (wkPend.delete(r.id), p(r))
+    })
+    wk.on('error', (e) => {
+      for (const p of wkPend.values()) p({ ok: false, erro: String(e.message || e) })
+      wkPend.clear()
+      wk = null
+    })
+    wk.on('exit', () => (wk = null))
+    return wk
+  }
+  const whisperChamar = (m, transfer) => new Promise((res) => {
+    const id = ++wkSeq
+    wkPend.set(id, res)
+    setTimeout(() => wkPend.has(id) && (wkPend.delete(id), res({ ok: false, erro: 'prazo' })), 60000)
+    whisperWorker().postMessage({ ...m, id }, transfer || [])
+  })
+  ipcMain.handle('ditado:whisper-pronto', () => !!pastaWhisper())
+  ipcMain.handle('ditado:whisper-aquecer', () => (pastaWhisper() ? whisperChamar({ tipo: 'aquecer' }) : { ok: false }))
+  ipcMain.handle('ditado:whisper', async (_e, ab) => {
+    if (!pastaWhisper()) return { ok: false, erro: 'modelo ausente' }
+    const f = new Float32Array(ab.buffer ? ab.buffer.slice(ab.byteOffset, ab.byteOffset + ab.byteLength) : ab)
+    return whisperChamar({ pcm: f.buffer }, [f.buffer])
+  })
   ipcMain.handle('ditado:embutido', () => !!modeloEmbutido())
   ipcMain.handle('ditado:modelo', async () => {
     if (modeloEmbutido()) return fs.readFileSync(modeloEmbutido()) // já vem com o app: nada para baixar
@@ -329,6 +365,17 @@ app.whenReady().then(() => {
   ipcMain.handle('unlimited:entrar', (_e, { email, senha }) => unl.entrar(email, senha))
   ipcMain.handle('unlimited:esqueci', (_e, email) => unl.esqueci(email))
   ipcMain.handle('unlimited:sair', () => unl.sair())
+  // Uso da assinatura: janelas de 5 horas e da semana, medidas pelo servidor para a chave desta conta
+  ipcMain.handle('conta:uso', async () => {
+    try {
+      if (!cfg.unlimitedEmail || !cfg.unlimitedChave) return { ok: false, erro: 'Entre na sua conta.' }
+      const r = await fetch((process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '') + '/usage', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
+      if (!r.ok) return { ok: false, erro: `O servidor respondeu ${r.status}.` }
+      return { ok: true, email: cfg.unlimitedEmail, plano: cfg.unlimitedPlano || '', ...(await r.json()) }
+    } catch (e) {
+      return { ok: false, erro: 'Sem conexão com o servidor.' }
+    }
+  })
   const skills = skillsMod.criar({ app, avisar: (d) => janela?.webContents.send('skills:mudou', d) })
   skills.observar()
   const seguro = (fn) => async (_e, ...a) => {

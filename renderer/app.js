@@ -477,10 +477,22 @@
     }
     if (!window.Ditado?.suportado()) return gravarComoAnexo()
     const t = $('texto')
+    // Texto provisório (Vosk, na hora) + texto preciso (Whisper, a cada pausa na fala). O provisório some quando o preciso chega.
     let base = t.value // o que já estava escrito antes de começar (ou que o usuário editou no meio do ditado)
     let escrito = base
-    let ouvido = '' // tudo que o ditado já entendeu
-    let descartar = 0 // quanto de "ouvido" já faz parte de "base"
+    let confirmado = '' // trechos já corrigidos pelo Whisper
+    let palavras = [] // tudo que o Vosk já entendeu, em palavras
+    let offPal = 0 // quantas dessas palavras já foram substituídas pelo texto preciso
+    let cadeia = Promise.resolve()
+    const juntar = (...p) => p.map((x) => String(x || '').trim()).filter(Boolean).join(' ')
+    const desenhar = (provisorio) => {
+      escrito = juntar(base, confirmado, provisorio === false ? '' : palavras.slice(offPal).join(' '))
+      t.value = escrito
+      t.dispatchEvent(new Event('input'))
+      t.scrollTop = t.scrollHeight
+    }
+    const temWhisper = await window.sb.ditadoWhisperPronto().catch(() => false)
+    if (temWhisper) window.sb.ditadoWhisperAquecer() // carrega o modelo enquanto o microfone abre
     const cancelar = { cancelado: false, parar: async () => (cancelar.cancelado = true) }
     ditando = cancelar
     pintarMic('carregando')
@@ -493,15 +505,31 @@
       },
       aoTexto: (finais, parcial) => {
         if (t.value !== escrito) {
+          // o usuário mexeu no texto no meio do ditado: o que ele escreveu vira a base e o provisório recomeça daqui
           base = t.value
-          descartar = ouvido.length
+          confirmado = ''
+          offPal = palavras.length
         }
-        ouvido = finais
-        escrito = [base, finais.slice(descartar).trim(), parcial].filter(Boolean).join(' ')
-        t.value = escrito
-        t.dispatchEvent(new Event('input'))
-        t.scrollTop = t.scrollHeight
+        palavras = juntar(finais, parcial).split(/\s+/).filter(Boolean)
+        desenhar()
       },
+      aoSegmento: temWhisper
+        ? (pcm) => {
+            const ate = palavras.length // o que o Vosk já ouviu até o fim deste trecho
+            const de = offPal
+            cadeia = cadeia.then(async () => {
+              let texto = ''
+              try {
+                const r = await window.sb.ditadoWhisper(pcm)
+                if (r && r.ok) texto = r.texto
+              } catch {}
+              if (!texto) texto = palavras.slice(de, Math.max(de, ate)).join(' ') // Whisper falhou: fica o provisório
+              confirmado = juntar(confirmado, texto)
+              offPal = Math.max(offPal, ate)
+              desenhar()
+            })
+          }
+        : undefined,
       aoNivel: (n) => {
         const f = [0.55, 0.8, 1, 0.8, 0.55]
         barras().forEach((i, k) => (i.style.height = 4 + Math.round(n * f[k] * 16) + 'px'))
@@ -516,6 +544,13 @@
         }
       },
     })
+    const parar0 = d.parar
+    d.parar = async () => {
+      await parar0()
+      if (temWhisper) await Promise.race([cadeia, new Promise((r) => setTimeout(r, 25000))]) // espera o último trecho ser corrigido
+      offPal = palavras.length
+      desenhar(false)
+    }
     if (cancelar.cancelado) await d.parar()
     else if (ditando === cancelar) ditando = d
   }
@@ -1055,7 +1090,6 @@
     if (r.ok) {
       $('login-senha').value = ''
       $('login').hidden = true
-      $('login-fechar').hidden = true
       cfg = await window.sb.cfg()
       pintarConta()
     } else loginMsg(r.erro, false)
@@ -1081,14 +1115,8 @@
       }
       return
     }
-    loginMsg('')
-    $('login-fechar').hidden = false
     $('login').hidden = false
     setTimeout(() => $('login-email').focus(), 50)
-  }
-  $('login-fechar').onclick = () => {
-    $('login').hidden = true
-    $('login-fechar').hidden = true
   }
   $('login-assinar').onclick = () => window.sb.abrirExterno('https://brain.rangeltech.net')
   function pintarAcesso(e) {
@@ -1173,7 +1201,8 @@
     t.addEventListener('input', () => {
       if (respostas.has(atual)) alternarBotao(true)
       t.style.height = 'auto'
-      t.style.height = Math.min(t.scrollHeight, 220) + 'px'
+      t.style.height = Math.min(t.scrollHeight, Math.round(window.innerHeight * 0.45)) + 'px'
+      t.style.overflowY = t.scrollHeight > window.innerHeight * 0.45 ? 'auto' : 'hidden'
     })
     if (chats.length === 0) criarChat()
     else abrir([...chats].sort(ordem)[0].id)

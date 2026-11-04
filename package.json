@@ -18,7 +18,8 @@
     "dist:mac": "electron-builder --mac dmg zip --x64 --arm64 --publish never",
     "router:fetch": "node scripts/baixar-router.mjs",
     "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true",
-    "modelo:voz": "node scripts/baixar-modelo-voz.js"
+    "modelo:voz": "node scripts/baixar-modelo-voz.js",
+    "icone:dev": "node scripts/icone-dev.js"
   },
   "build": {
     "appId": "net.rangeltech.secondbrain",
@@ -26,6 +27,7 @@
     "icon": "build/icon.png",
     "files": [
       "mcp-navegador.js",
+      "transcricao-worker.js",
       "mcp-midia.js",
       "mcp-memoria.js",
       "navegador.js",
@@ -103,6 +105,13 @@
       {
         "from": "mcp-navegador.js",
         "to": "mcp-navegador.js"
+      },
+      {
+        "from": "modelos",
+        "to": "modelos",
+        "filter": [
+          "whisper-small/**/*"
+        ]
       }
     ],
     "publish": [
@@ -114,13 +123,21 @@
     ],
     "portable": {
       "artifactName": "Segundo-Cerebro-Portatil-${version}.${ext}"
-    }
+    },
+    "asarUnpack": [
+      "transcricao-worker.js",
+      "node_modules/onnxruntime-node/**",
+      "node_modules/@huggingface/**",
+      "node_modules/sharp/**",
+      "node_modules/@img/**"
+    ]
   },
   "devDependencies": {
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.2",
     "electron-updater": "^6.3.9",
     "qrcode-generator": "^1.4.4",
     "ws": "^8.18.0"

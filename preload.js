@@ -64,8 +64,12 @@ contextBridge.exposeInMainWorld('sb', {
   unlimitedRecusar: () => ipcRenderer.invoke('unlimited:recusar'),
   unlimitedEntrar: (email, senha) => ipcRenderer.invoke('unlimited:entrar', { email, senha }),
   unlimitedEsqueci: (email) => ipcRenderer.invoke('unlimited:esqueci', email),
+  contaUso: () => ipcRenderer.invoke('conta:uso'),
   unlimitedSair: () => ipcRenderer.invoke('unlimited:sair'),
   aoUnlimited: (fn) => ipcRenderer.on('unlimited:estado', (_e, d) => fn(d)),
+  ditadoWhisperPronto: () => ipcRenderer.invoke('ditado:whisper-pronto'),
+  ditadoWhisperAquecer: () => ipcRenderer.invoke('ditado:whisper-aquecer'),
+  ditadoWhisper: (pcm) => ipcRenderer.invoke('ditado:whisper', pcm),
   ditadoEmbutido: () => ipcRenderer.invoke('ditado:embutido'),
   ditadoModelo: () => ipcRenderer.invoke('ditado:modelo'),
   navegador: {

@@ -68,7 +68,8 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
     try {
       const c = cfgGet()
       // sem chave: o app pede o login (se o usuário não conectou outro provedor à mão)
-      if (!c.unlimitedChave) return publicar(c.unlimitedRecusado ? { fase: 'desligado' } : { fase: 'login' })
+      // sem conta entrada não há acesso (instalações antigas, com chave colada à mão, também precisam entrar)
+      if (!c.unlimitedEmail || !c.unlimitedChave) return publicar({ fase: 'login' })
       const c2 = cfgGet()
       const chave = decifrar(c2.unlimitedChave)
       const s = await conferir(chave)
@@ -81,7 +82,7 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
       if (s === 'pendente') publicar({ fase: 'pendente', detalhe: 'O seu acesso está aguardando liberação ou foi bloqueado. Assim que for liberado, o app volta a funcionar sozinho.' })
       else if (s === 'invalida') {
         // a chave deste computador caiu (limite de computadores, assinatura encerrada ou troca de senha): pede o login de novo
-        cfgSet({ unlimitedChave: undefined, unlimitedLigado: false })
+        cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined })
         publicar({ fase: 'login', detalhe: 'Sua sessão neste computador terminou. Entre de novo.' })
       }
       else publicar({ fase: 'offline', codigo: c2.unlimitedCodigo, detalhe: 'Sem conexão com o servidor. Tentando de novo…' })
