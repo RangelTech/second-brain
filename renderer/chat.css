@@ -92,7 +92,21 @@
 .enviar.parar{background:var(--fg);color:#1f1d1a}
 .enviar:disabled{opacity:.4}
 .btn-ic.gravando{background:#5a2420;color:#ffb3a8;animation:pulsa 1.2s infinite}
-.sob-compositor{max-width:760px;margin:6px auto 0;display:flex;justify-content:flex-start;padding-left:4px}
+.sob-compositor{max-width:760px;margin:6px auto 0;display:flex;justify-content:flex-start;align-items:center;padding-left:4px}
+.sob-compositor .espaco{flex:1}
+.ctx-medidor{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);padding-right:6px;cursor:default}
+.ctx-medidor circle{fill:none;stroke-width:3}
+.ctx-trilho{stroke:var(--bd)}
+.ctx-arco{stroke:#4caf7d;stroke-dasharray:50.27;stroke-dashoffset:50.27;transition:stroke-dashoffset .4s,stroke .4s}
+.ctx-medidor.medio .ctx-arco{stroke:#e0a030}
+.ctx-medidor.alto .ctx-arco{stroke:#e5484d}
+.atividade.compactando .ponto-vivo{background:#e0a030}
+.relogio-compactar{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-radius:50%;position:relative;margin-right:6px;vertical-align:-2px}
+.relogio-compactar::before,.relogio-compactar::after{content:"";position:absolute;left:50%;top:50%;width:2px;background:currentColor;transform-origin:50% 0;border-radius:1px}
+.relogio-compactar::before{height:4px;margin:-1px 0 0 -1px;animation:giro 60s linear infinite}
+.relogio-compactar::after{height:5px;margin:-1px 0 0 -1px;animation:giro 3s linear infinite;transform:rotate(180deg)}
+@keyframes giro{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.relogio-compactar::before,.relogio-compactar::after{animation:none}}
 .chip-pasta{height:28px;font-size:12.5px;max-width:100%}
 .chip-pasta .ic{width:14px;height:14px}
 .chip-pasta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -254,3 +268,6 @@
 .nav-fav-menu button:hover{background:rgba(255,255,255,.08)}
 .nav-fav-menu .fav-topo{border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:4px;padding-bottom:4px}
 .fav-vazio{padding:8px;opacity:.6;font-size:13px}
+.ditado-barras{display:inline-flex;align-items:center;gap:3px;height:22px;padding:0 8px}
+.ditado-barras i{display:block;width:3px;height:4px;border-radius:2px;background:#ffb3a8;transition:height .08s}
+.btn-ic.preparando{background:var(--card2);color:var(--fg);animation:pulsa 1.2s infinite}

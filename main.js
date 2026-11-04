@@ -1,7 +1,17 @@
 // Segundo Cérebro (Rangel Tech): janela de chat, agente e ponte para o motor de provedores.
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = require('electron')
+
+// Sem identidade própria o Windows agrupa o app com o Electron e mostra o ícone do .exe (o átomo) na barra de tarefas.
+// Com o AppUserModelID próprio e o .ico (vários tamanhos), a barra usa a logo do Segundo Cérebro, instalado ou em desenvolvimento.
+if (process.platform === 'win32') app.setAppUserModelId('net.rangeltech.secondbrain')
+function iconeDoApp() {
+  const fs = require('fs')
+  const nomes = process.platform === 'win32' ? ['icon.ico', 'icon.png'] : ['icon.png']
+  for (const base of [process.resourcesPath || '', path.join(__dirname, 'build')]) for (const n of nomes) if (base && fs.existsSync(path.join(base, n))) return path.join(base, n)
+  return undefined
+}
 const embed = require('./embed-router')
-const { Sessao, prepararBase } = require('./agent')
+const { Sessao, prepararBase, registrar: registrarAgente } = require('./agent')
 const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
 const skillsRepoMod = require('./skills-repo')
@@ -125,16 +135,33 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 
 // ---------- resposta do chat ----------
 const sessoes = new Map()
+// Ponte entre o Hermes e o roteador: repassa tudo e conta o que o modelo já gerou, para a tela mostrar progresso de verdade
+const ponteLLM = require('./ponte-llm').criar({
+  destino: () => embed.estado().origem,
+  aoProgresso: (chat, info) => sessoes.get(chat)?.emitir?.({ progresso: info }),
+  registrar: (linha) => registrarAgente(app, linha),
+})
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
 let remoto = null // controle remoto pelo celular (spec 20)
+// API de imagens do servidor (Unlimited): usa a mesma chave do chat; sem chave (cadastro pendente) a ferramenta some
+function midiaDoApp() {
+  try {
+    const c = cfg.unlimitedChave
+    if (!c || !cfg.unlimitedLigado) return null
+    return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: decifrar(c) }
+  } catch {
+    return null
+  }
+}
 async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
   if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: est.origem + '/v1', modelo: alvo, chave: await chaveLocal(), raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => ((cfg.modoPermissao || 'manual') === 'ignorar' && remoto?.origemRemota(id) ? 'auto' : cfg.modoPermissao || 'manual'), navegador: navInfo })
+  await ponteLLM.iniciar()
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => ((cfg.modoPermissao || 'manual') === 'ignorar' && remoto?.origemRemota(id) ? 'auto' : cfg.modoPermissao || 'manual'), navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') } })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.historico = historico
@@ -209,7 +236,7 @@ function criarJanela() {
     minHeight: 520,
     backgroundColor: '#1f1d1a',
     title: 'Segundo Cérebro',
-    icon: require('fs').existsSync(path.join(process.resourcesPath || '', 'icon.png')) ? path.join(process.resourcesPath, 'icon.png') : path.join(__dirname, 'build', 'icon.png'),
+    icon: iconeDoApp(),
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   })
@@ -236,6 +263,21 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
   ipcMain.handle('navegador:estado', () => nav.estado())
+  // Modelo de voz do ditado (Vosk, português, ~32 MB): baixa uma vez e fica em disco; depois funciona sem internet.
+  ipcMain.handle('ditado:modelo', async () => {
+    const dir = path.join(app.getPath('userData'), 'modelos')
+    const arq = path.join(dir, 'vosk-model-small-pt-0.3.tar.gz')
+    if (!fs.existsSync(arq)) {
+      fs.mkdirSync(dir, { recursive: true })
+      const r = await fetch('https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-pt-0.3.tar.gz', { signal: AbortSignal.timeout(300000) })
+      if (!r.ok) throw new Error('Não consegui baixar o modelo de voz (' + r.status + ').')
+      const bytes = Buffer.from(await r.arrayBuffer())
+      if (bytes.length < 20e6) throw new Error('O download do modelo de voz veio incompleto.')
+      fs.writeFileSync(arq + '.parte', bytes)
+      fs.renameSync(arq + '.parte', arq)
+    }
+    return fs.readFileSync(arq)
+  })
   ipcMain.handle('navegador:favoritos', () => ler('favoritos.json', []))
   ipcMain.handle('navegador:importar-favoritos', () => {
     const atuais = ler('favoritos.json', [])

@@ -172,10 +172,22 @@
   function atualizarCartao(d, f) {
     const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
-    const titulo = tituloLimpo(f.titulo)
+    let titulo = tituloLimpo(f.titulo)
+    let rotulo = ROTULO_FERR[tipo] || ''
+    let icone = IC[ICONE_FERR[tipo]] || IC.sparkles
+    // ferramentas próprias do app aparecem com nome de gente, não de função
+    const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
+    if (/memoria_(buscar|ler_conversa)/.test(f.titulo || '')) {
+      rotulo = 'Relembrando nas conversas'
+      titulo = arg.consulta || ''
+      icone = IC.search || icone
+    } else if (/midia_gerar_imagem/.test(f.titulo || '')) {
+      rotulo = 'Gerando imagem'
+      titulo = String(arg.prompt || '').slice(0, 70)
+    }
     const caminho = f.caminho
     d.className = 'ferr ' + (f.status || 'pending')
-    d.innerHTML = `<details ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${IC[ICONE_FERR[tipo]] || IC.sparkles}</span><span class="ft"><b>${esc(ROTULO_FERR[tipo] || '')}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
+    d.innerHTML = `<details ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${icone}</span><span class="ft"><b>${esc(rotulo)}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
       <div class="fcorpo">${f.entrada ? `<div class="mut">${esc(f.entrada)}</div>` : ''}${f.conteudo ? `<pre>${esc(f.conteudo)}</pre>` : ''}</div></details>
       ${caminho && f.status === 'completed' && tipo === 'edit' ? `<div class="facoes"><button data-abrir="${attr(caminho)}">${IC.file}Abrir ${esc(nomeArq(caminho))}</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>` : ''}`
   }
@@ -280,9 +292,28 @@
     return d
   }
 
+  // medidor de contexto: quanto da janela do modelo a conversa já ocupa (por conversa, só enquanto o app está aberto)
+  const ctxPorChat = new Map()
+  function pintarContexto() {
+    const m = $('ctx-medidor')
+    const x = ctxPorChat.get(atual)
+    if (!x || !x.tamanho) {
+      m.hidden = true
+      return
+    }
+    const pct = Math.min(100, Math.round((x.usado / x.tamanho) * 100))
+    m.hidden = false
+    m.classList.toggle('medio', pct >= 55)
+    m.classList.toggle('alto', pct >= 80)
+    $('ctx-arco').style.strokeDashoffset = String(50.27 * (1 - pct / 100))
+    $('ctx-txt').textContent = `${pct}%`
+    m.title = `Contexto: ${nTokens(x.usado)} de ${nTokens(x.tamanho)} tokens usados (${pct}%). Perto do limite o agente compacta a conversa sozinho.`
+    m.setAttribute('aria-label', m.title)
+  }
   function desenhar() {
     const el = $('conversa')
     const c = chatAtual()
+    pintarContexto()
     alternarBotao(respostas.has(atual))
     el.innerHTML = ''
     $('titulo').textContent = c && c.msgs.length ? c.titulo : 'Nova conversa'
@@ -358,7 +389,7 @@
   })
 
   const hora = () => new Date().toTimeString().slice(0, 8).replace(/:/g, '')
-  async function alternarGravacao() {
+  async function gravarComoAnexo() {
     const b = $('microfone')
     if (gravador) {
       gravador.stop()
@@ -386,6 +417,70 @@
     } catch (e) {
       aviso('Não consegui acessar o microfone: ' + (e.message || e))
     }
+  }
+  // Ditado: o áudio é entendido aqui mesmo, no computador, e só o texto vai para a caixa de mensagem (nada de anexo).
+  let ditando = null
+  const barras = () => [...document.querySelectorAll('#ditado-barras i')]
+  function pintarMic(estado) {
+    const b = $('microfone')
+    b.classList.toggle('gravando', estado === 'ouvindo')
+    b.classList.toggle('preparando', estado === 'carregando')
+    $('ditado-barras').hidden = estado !== 'ouvindo'
+    b.title = b.ariaLabel = estado ? 'Parar o ditado' : 'Ditar por voz'
+    if (!estado) barras().forEach((i) => (i.style.height = ''))
+  }
+  async function alternarGravacao() {
+    if (ditando) {
+      const d = ditando
+      ditando = null
+      pintarMic(null)
+      await d.parar()
+      $('texto').focus()
+      return
+    }
+    if (!window.Ditado?.suportado()) return gravarComoAnexo()
+    const t = $('texto')
+    let base = t.value // o que já estava escrito antes de começar (ou que o usuário editou no meio do ditado)
+    let escrito = base
+    let ouvido = '' // tudo que o ditado já entendeu
+    let descartar = 0 // quanto de "ouvido" já faz parte de "base"
+    const cancelar = { cancelado: false, parar: async () => (cancelar.cancelado = true) }
+    ditando = cancelar
+    pintarMic('carregando')
+    const d = await window.Ditado.iniciar({
+      urlModelo: async () => {
+        aviso('Preparando o ditado por voz (só na primeira vez, baixa ~32 MB)…')
+        const bytes = await window.sb.ditadoModelo()
+        $('aviso-geral').hidden = true
+        return URL.createObjectURL(new Blob([bytes], { type: 'application/gzip' }))
+      },
+      aoTexto: (finais, parcial) => {
+        if (t.value !== escrito) {
+          base = t.value
+          descartar = ouvido.length
+        }
+        ouvido = finais
+        escrito = [base, finais.slice(descartar).trim(), parcial].filter(Boolean).join(' ')
+        t.value = escrito
+        t.dispatchEvent(new Event('input'))
+        t.scrollTop = t.scrollHeight
+      },
+      aoNivel: (n) => {
+        const f = [0.55, 0.8, 1, 0.8, 0.55]
+        barras().forEach((i, k) => (i.style.height = 4 + Math.round(n * f[k] * 16) + 'px'))
+      },
+      aoEstado: (e, x) => {
+        if (ditando !== cancelar && !cancelar.cancelado) return
+        if (e === 'ouvindo' && !cancelar.cancelado) pintarMic('ouvindo')
+        if (e === 'erro') {
+          if (ditando === cancelar) ditando = null
+          pintarMic(null)
+          aviso('Não consegui ditar: ' + x)
+        }
+      },
+    })
+    if (cancelar.cancelado) await d.parar()
+    else if (ditando === cancelar) ditando = d
   }
   $('microfone').onclick = alternarGravacao
 
@@ -516,7 +611,7 @@
     if (c) {
       const partes = r.partes.length ? r.partes : texto ? [{ t: 'texto', v: texto }] : []
       if (erro) partes.push({ t: 'texto', v: `⚠ ${erro}` })
-      const conteudo = partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || '(sem resposta)'
+      const conteudo = partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || (r.paradoManual ? '(interrompido por você)' : '(sem resposta)')
       c.msgs.push({ role: 'assistant', content: conteudo, partes, raciocinio: r.raz || undefined, midias: r.midias, inicio: r.inicio, fim: Date.now(), uso: uso || undefined })
       c.em = Date.now()
       salvar()
@@ -542,6 +637,23 @@
   // atualiza o relógio e avisa quando o modelo fica muito tempo sem dar sinal
   function tiquetaque() {
     for (const r of respostas.values()) {
+      // compactar o contexto é demorado de propósito: enquanto estiver acontecendo não conta como "sem sinal" (até 10 min)
+      if (r.compactando && Date.now() - r.compactando < 600000) r.ultimo = Date.now()
+      if (r.esperaDesde && Date.now() - r.esperaDesde > 900000 && !r.travou && !r.paradoManual) {
+        r.travou = true // 15 min numa única chamada: algo está errado de verdade
+        window.sb.parar(r.id)
+      }
+      if (r.compactando && visivel(r)) {
+        const at = r.el.querySelector('.atividade')
+        if (at) {
+          at.classList.add('compactando')
+          at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
+          at.querySelector('.atv-txt').innerHTML = `<i class="relogio-compactar"></i>Compactando o contexto · ${fmtTempo(Date.now() - r.compactando)}`
+          at.querySelector('.atv-extra').innerHTML = ''
+        }
+        continue
+      }
+      if (visivel(r)) r.el.querySelector('.atividade')?.classList.remove('compactando')
       const parou = Date.now() - r.ultimo
       if (parou > LIMITE_SEM_SINAL_MS && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
         r.travou = true
@@ -552,13 +664,11 @@
       if (!at) continue
       const parado = Date.now() - r.ultimo
       at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
-      at.querySelector('.atv-txt').textContent = parado > 20000 && r.fase !== 'Executando ferramenta' ? (parado > 45000 ? 'O modelo está gerando uma ação longa (provavelmente um arquivo grande)' : r.fase.replace('…', '')) + ' · há ' + fmtTempo(parado) + ' sem sinal' : r.fase
-      const demora = parado > 60000
-      at.classList.toggle('demora', demora)
+      // nunca falamos de "sinal" ou "silêncio" ao cliente: etapa longa é etapa longa, e o relógio mostra que está andando
+      at.querySelector('.atv-txt').textContent = parado > 45000 && !/ação longa|Compactando/.test(r.fase) ? 'Trabalhando numa etapa longa…' : r.fase
+      at.classList.remove('demora')
       const extra = at.querySelector('.atv-extra')
-      if (demora && !extra.firstChild) {
-        extra.innerHTML = 'Sem novidades. O modelo pode estar escrevendo algo grande; se passar de alguns minutos, pare e peça de novo. <button data-act="parar">Parar</button>' + (cfg.raciocinio && cfg.raciocinio !== 'none' ? ' <button data-act="desligar">Parar e desligar o raciocínio</button>' : '')
-      } else if (!demora && extra.firstChild) extra.innerHTML = ''
+      if (extra.firstChild) extra.innerHTML = ''
     }
   }
   document.addEventListener('click', async (e) => {
@@ -588,6 +698,40 @@
         det.querySelector('.rtxt').textContent = r.raz
       }
     }
+    if (d.contexto) {
+      ctxPorChat.set(d.id, d.contexto)
+      if (d.id === atual) pintarContexto()
+    }
+    if (d.progresso) {
+      // bytes chegando do modelo (inclusive um arquivo grande sendo escrito numa só ação): é sinal de vida, não trava
+      const p = d.progresso
+      if (p.tipo === 'espera') {
+        // o servidor está escrevendo uma ação inteira (só aparece quando termina): sinal de vida com o tempo real de espera
+        r.esperaDesde = r.esperaDesde || Date.now() - p.seg * 1000
+        sinal(r, p.seg < 12 ? `Aguardando o modelo… ${p.seg} s` : `O modelo está escrevendo uma ação longa (um arquivo, por exemplo) · ${fmtTempo(p.seg * 1000)} · a tela só mostra quando ela termina`)
+        return
+      }
+      r.esperaDesde = 0
+      const oque = p.tipo === 'ferramenta' ? 'uma ação longa (provavelmente um arquivo)' : p.tipo === 'raciocinio' ? 'o raciocínio' : 'a resposta'
+      if (!r.compactando) sinal(r, `Escrevendo ${oque} · ${nTokens(p.tokens)} tokens${p.tps ? ' · ' + p.tps + ' tok/s' : ''}`)
+      else r.ultimo = Date.now()
+    }
+    if (d.compactando) {
+      if (d.compactando.fase === 'inicio') {
+        r.compactando = Date.now()
+        sinal(r, 'Compactando o contexto…')
+      } else {
+        const seg = r.compactando ? Math.round((Date.now() - r.compactando) / 1000) : 0
+        r.compactando = 0
+        sinal(r, 'Retomando…')
+        r.aviso = `Contexto compactado${seg ? ` em ${fmtTempo(seg * 1000)}` : ''}. A conversa continua de onde parou.`
+        if (visivel(r)) {
+          const a = r.el.querySelector('.aviso')
+          a.hidden = false
+          a.textContent = r.aviso
+        }
+      }
+    }
     if (d.aviso) {
       sinal(r)
       r.aviso = d.aviso
@@ -610,6 +754,11 @@
       if (existente) Object.assign(existente.f, Object.fromEntries(Object.entries(f).filter(([, v]) => v !== null && v !== undefined && v !== '')))
       else r.partes.push({ t: 'ferr', f: { ...f } })
       if (f.status === 'completed' && f.caminho && f.tipo === 'edit' && EXT_MIDIA.test(f.caminho) && !r.midias.includes(f.caminho)) r.midias.push(f.caminho)
+      // imagem gerada pela ferramenta de mídia: o caminho vem no texto do resultado ("caminho: C:\...\x.png")
+      if (f.status === 'completed' && /midia_gerar_imagem/.test(f.titulo || '')) {
+        const m = /caminho:\s*(.+?\.png)/i.exec(String(existente?.conteudo || f.conteudo || ''))
+        if (m && !r.midias.includes(m[1])) r.midias.push(m[1])
+      }
     }
     if (visivel(r)) {
       renderPartes(r.el.querySelector('.partes'), r.partes)

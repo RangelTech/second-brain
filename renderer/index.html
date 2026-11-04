@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data: blob:; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; worker-src blob:; connect-src 'self' blob:">
 <title>Segundo Cérebro</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="config.css">
@@ -58,12 +58,15 @@
             <button class="chip-modelo" id="modelo" aria-haspopup="listbox" aria-expanded="false"><span class="mlogo" id="modelo-logo"></span><span class="mnome" id="modelo-nome">Escolher modelo</span><i data-ic="chevronDown"></i></button>
             <div class="menu-modelo" id="menu-modelo" role="listbox" hidden></div>
           </div>
-          <button class="btn-ic" id="microfone" aria-label="Gravar áudio" title="Gravar áudio"><i data-ic="mic"></i></button>
+          <span class="ditado-barras" id="ditado-barras" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <button class="btn-ic" id="microfone" aria-label="Ditar por voz" title="Ditar por voz"><i data-ic="mic"></i></button>
           <button id="enviar" class="enviar" aria-label="Enviar"><i data-ic="arrowUp"></i></button>
         </div>
       </div>
       <div class="sob-compositor">
         <button class="chip-pasta" id="pasta-chip" aria-label="Pasta de trabalho"><i data-ic="folder"></i><span id="pasta">Documentos/Segundo Cerebro</span></button>
+        <span class="espaco"></span>
+        <div class="ctx-medidor" id="ctx-medidor" hidden role="img" aria-label="Contexto usado"><svg viewBox="0 0 20 20" width="16" height="16"><circle cx="10" cy="10" r="8" class="ctx-trilho"/><circle cx="10" cy="10" r="8" class="ctx-arco" id="ctx-arco" transform="rotate(-90 10 10)"/></svg><span id="ctx-txt"></span></div>
       </div>
     </footer>
   </main>
@@ -86,6 +89,8 @@
 <script src="provider-catalog.js"></script>
 <script src="config.js"></script>
 <script src="vendor/qrcode.js"></script>
+<script src="vendor/vosk.js"></script>
+<script src="ditado.js"></script>
   <script src="remoto-ui.js"></script>
   <script src="skills-ui.js"></script>
 <script src="app.js"></script>

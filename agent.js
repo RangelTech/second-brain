@@ -103,7 +103,7 @@ function decidirPermissao(modo, tc, pasta) {
   return 'perguntar'
 }
 
-function contextoDeSistema({ pasta, ferramentas, navegador }) {
+function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
   const agora = new Date()
   return [
     'Você é o Segundo Cérebro, o agente do aplicativo de desktop da Rangel Tech. Responda em português do Brasil, de forma direta.',
@@ -115,6 +115,8 @@ function contextoDeSistema({ pasta, ferramentas, navegador }) {
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR. Depois de criar código ou uma página, confira que funciona: para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console, ou tire uma captura e olhe. Se houver erro, corrija e confira de novo. Só então responda, dizendo o que você verificou.',
     navegador ? 'Você tem um NAVEGADOR INTEGRADO que o usuário vê na tela ao lado do chat. Para abrir sites, clicar, preencher formulários, ler páginas e tirar capturas de tela, use as ferramentas do servidor "navegador" (navegador_abrir, navegador_ler, navegador_clicar, navegador_digitar, navegador_rolar, navegador_print, navegador_voltar, navegador_esperar, navegador_js). Comece com navegador_abrir, depois navegador_ler para ver a página e os elementos clicáveis (cada um tem um id), e use navegador_print para VER a página de verdade (depois olhe a imagem com vision_analyze no caminho devolvido). Prefira essas ferramentas ao navegador próprio do Hermes.' : '',
+    midia ? 'Você pode GERAR IMAGENS de verdade com a ferramenta midia_gerar_imagem (roda numa GPU do servidor, leva de 10 a 30 segundos e salva um PNG na pasta Imagens da pasta de trabalho). Quando o usuário pedir uma imagem, ilustração, capa, avatar, propaganda ou caricatura, USE a ferramenta em vez de dizer que não consegue: escreva o prompt em inglês, bem detalhado (assunto, estilo, luz, enquadramento, cores), escolha o formato (quadrado, retrato, paisagem, story ou banner) e depois diga o caminho completo do arquivo. Texto escrito dentro da imagem costuma sair com letras erradas: gere a imagem sem texto e avise que o título pode ser aplicado depois.' : '',
+    memoria ? 'Você tem MEMÓRIA das conversas antigas com este usuário: a ferramenta memoria_buscar procura nelas pelos assuntos. Quando ele perguntar "você lembra de...", "aquilo que conversamos", "o que ficou combinado" ou citar algo que não está nesta conversa, USE memoria_buscar (com palavras-chave do assunto) antes de responder; se precisar de mais contexto de um trecho, memoria_ler_conversa. Nunca diga que não lembra sem ter buscado. Diga de qual conversa e data veio a informação.' : '',
     ferramentas ? `Skills e ferramentas: ${ferramentas}` : '',
   ]
     .filter(Boolean)
@@ -130,12 +132,14 @@ function registrar(app, linha) {
 }
 
 class Sessao {
-  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador }) {
+  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria }) {
     this.app = app
     this.id = id
     this.pasta = pasta
     this.modo = modo || (() => 'manual') // 'manual' | 'editar' | 'auto' | 'ignorar'
     this.navegador = navegador || null // { url, token }: servidor local das ferramentas do navegador integrado
+    this.memoria = memoria || null // { arquivo }: conversas do app, para a ferramenta de memória
+    this.midia = midia || null // { base, chave }: API de imagens do servidor (Unlimited); some se o app ainda não tem chave
     this.emitir = emitir
     this.pedirPermissao = pedirPermissao
     this.permitirSempre = false
@@ -154,6 +158,47 @@ class Sessao {
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1' }
     this.subir()
     this.pronta = this.iniciar()
+    this.vigiarCompressao()
+  }
+
+  // O Hermes não avisa pelo protocolo quando compacta o contexto (a chamada leva de segundos a minutos),
+  // só escreve no agent.log dele. Lemos o que entra nesse arquivo para a tela mostrar o relógio.
+  vigiarCompressao() {
+    const arq = path.join(this.env.HERMES_HOME, 'logs', 'agent.log')
+    let pos = 0
+    try {
+      pos = fs.statSync(arq).size
+    } catch {}
+    this.vigia = setInterval(() => {
+      try {
+        const tam = fs.statSync(arq).size
+        if (tam < pos) pos = 0 // arquivo girou
+        if (tam === pos) return
+        const ini = Math.max(pos, tam - 1048576)
+        const fd = fs.openSync(arq, 'r')
+        const buf = Buffer.alloc(tam - ini)
+        fs.readSync(fd, buf, 0, buf.length, ini)
+        fs.closeSync(fd)
+        pos = tam
+        for (const l of buf.toString('utf8').split('\n')) this.aoLogDoHermes(l)
+      } catch {}
+    }, 1000)
+    this.vigia.unref?.()
+  }
+  aoLogDoHermes(l) {
+    const m = /context compression (started|done): session=(\S+) .*?(?:messages=(\d+)(?:->(\d+))?)?\s.*?(?:rough_)?tokens=~([\d,]+)/.exec(l)
+    const falhou = /Context compression failed/.test(l) && l.includes(this.sid || '\u0000')
+    if (!m && !falhou) return
+    const sessao = m ? m[2] : this.sid
+    // o log é compartilhado por todos os agentes: só vale a compactação desta conversa (ou o auto-reset dela)
+    if (sessao !== this.sid && !(this.turno && !/^local-/.test(sessao))) return
+    if (falhou) return this.emitir({ compactando: { fase: 'fim' } })
+    const tokens = Number(m[5].replace(/,/g, ''))
+    if (m[1] === 'started') this.emitir({ compactando: { fase: 'inicio', tokens } })
+    else {
+      this.emitir({ compactando: { fase: 'fim', depois: tokens } })
+      this.emitir({ contexto: { usado: tokens, tamanho: CONTEXTO_REAL } })
+    }
   }
 
   // sobe (ou sobe de novo) o processo do Hermes
@@ -248,6 +293,7 @@ class Sessao {
       this.emitir({ texto: t })
     }
     else if (tipo === 'agent_thought_chunk' && u.content?.text) this.emitir({ raciocinio: u.content.text })
+    else if (tipo === 'usage_update' && u.used >= 0) this.emitir({ contexto: { usado: u.used, tamanho: u.size || CONTEXTO_REAL } })
     else if (tipo === 'tool_call' || tipo === 'tool_call_update') {
       const conteudo = (u.content || [])
         .map((c) => c.content?.text || c.text || (c.type === 'diff' ? `${c.path}\n${c.newText || ''}` : ''))
@@ -302,9 +348,38 @@ class Sessao {
   }
   // ferramentas do navegador integrado: um servidor MCP (stdio) que repassa as chamadas ao app
   servidoresMcp() {
-    if (!this.navegador) return []
+    const lista = []
+    if (this.memoria) {
+      const shimMem = [path.join(process.resourcesPath || '', 'mcp-memoria.js'), path.join(__dirname, 'mcp-memoria.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-memoria.js')
+      lista.push({
+        name: 'memoria',
+        command: process.execPath,
+        args: [shimMem],
+        env: [
+          { name: 'ELECTRON_RUN_AS_NODE', value: '1' },
+          { name: 'SB_MEMORIA_ARQ', value: this.memoria.arquivo },
+          { name: 'SB_MEMORIA_CHAT', value: this.id },
+        ],
+      })
+    }
+    if (this.midia) {
+      const shimM = [path.join(process.resourcesPath || '', 'mcp-midia.js'), path.join(__dirname, 'mcp-midia.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-midia.js')
+      lista.push({
+        name: 'midia',
+        command: process.execPath,
+        args: [shimM],
+        env: [
+          { name: 'ELECTRON_RUN_AS_NODE', value: '1' },
+          { name: 'SB_MIDIA_BASE', value: this.midia.base },
+          { name: 'SB_MIDIA_CHAVE', value: this.midia.chave },
+          { name: 'SB_MIDIA_PASTA', value: this.pasta },
+        ],
+      })
+    }
+    if (!this.navegador) return lista
     const shim = [path.join(process.resourcesPath || '', 'mcp-navegador.js'), path.join(__dirname, 'mcp-navegador.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-navegador.js')
     return [
+      ...lista,
       {
         name: 'navegador',
         command: process.execPath,
@@ -327,7 +402,7 @@ class Sessao {
     if (this.primeira) {
       const nl = String.fromCharCode(10)
       const hist = this.historico ? nl + nl + 'Conversa até aqui (continue dela):' + nl + this.historico : ''
-      corpo = contextoDeSistema({ pasta: this.pasta, navegador: !!this.navegador }) + hist + nl + nl + '---' + nl + corpo
+      corpo = contextoDeSistema({ pasta: this.pasta, navegador: !!this.navegador, midia: !!this.midia, memoria: !!this.memoria }) + hist + nl + nl + '---' + nl + corpo
       this.primeira = false
     }
     this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })
@@ -343,10 +418,11 @@ class Sessao {
   }
   encerrar() {
     clearTimeout(this.ocioso)
+    clearInterval(this.vigia)
     try {
       this.filho.kill()
     } catch {}
   }
 }
 
-module.exports = { Sessao, localizarBinario, prepararBase }
+module.exports = { Sessao, localizarBinario, prepararBase, registrar }
