@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('sb', {
   unlimitedEsqueci: (email) => ipcRenderer.invoke('unlimited:esqueci', email),
   unlimitedSair: () => ipcRenderer.invoke('unlimited:sair'),
   aoUnlimited: (fn) => ipcRenderer.on('unlimited:estado', (_e, d) => fn(d)),
+  ditadoEmbutido: () => ipcRenderer.invoke('ditado:embutido'),
   ditadoModelo: () => ipcRenderer.invoke('ditado:modelo'),
   navegador: {
     limites: (l) => ipcRenderer.invoke('navegador:limites', l),

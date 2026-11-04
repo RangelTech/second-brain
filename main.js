@@ -148,6 +148,7 @@ let remoto = null // controle remoto pelo celular (spec 20)
 function midiaDoApp() {
   try {
     const c = cfg.unlimitedChave
+    if (process.env.SB_MIDIA_CHAVE) return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: process.env.SB_MIDIA_CHAVE } // so para teste
     if (!c || !cfg.unlimitedLigado) return null
     return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: decifrar(c) }
   } catch {
@@ -264,7 +265,10 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
   ipcMain.handle('navegador:estado', () => nav.estado())
   // Modelo de voz do ditado (Vosk, português, ~32 MB): baixa uma vez e fica em disco; depois funciona sem internet.
+  const modeloEmbutido = () => [path.join(process.resourcesPath || '', 'app.asar.unpacked', 'renderer', 'vendor', 'vosk-model-pt.tar.gz'), path.join(__dirname, 'renderer', 'vendor', 'vosk-model-pt.tar.gz')].find((f) => fs.existsSync(f))
+  ipcMain.handle('ditado:embutido', () => !!modeloEmbutido())
   ipcMain.handle('ditado:modelo', async () => {
+    if (modeloEmbutido()) return fs.readFileSync(modeloEmbutido()) // já vem com o app: nada para baixar
     const dir = path.join(app.getPath('userData'), 'modelos')
     const arq = path.join(dir, 'vosk-model-small-pt-0.3.tar.gz')
     if (!fs.existsSync(arq)) {

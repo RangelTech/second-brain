@@ -17,7 +17,8 @@
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
     "dist:mac": "electron-builder --mac dmg zip --x64 --arm64 --publish never",
     "router:fetch": "node scripts/baixar-router.mjs",
-    "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true"
+    "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true",
+    "modelo:voz": "node scripts/baixar-modelo-voz.js"
   },
   "build": {
     "appId": "net.rangeltech.secondbrain",

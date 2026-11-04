@@ -7,3 +7,5 @@ dist/
 router/.next/
 router/node_modules/
 router/
+
+renderer/vendor/vosk-model-pt.tar.gz
