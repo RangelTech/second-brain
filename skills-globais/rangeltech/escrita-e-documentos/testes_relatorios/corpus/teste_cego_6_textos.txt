@@ -1,0 +1,184 @@
+==============================================================================
+TESTE DE DETECTOR DE IA - 6 TEXTOS SOBRE O MESMO ASSUNTO
+==============================================================================
+
+Todos os seis textos falam de aprendizado de maquina, no mesmo registro
+explicativo e com comprimento parecido (cerca de 450 palavras). O tema e o
+tamanho sao iguais de proposito: assim a unica coisa que varia entre eles e
+o estilo, que e o que o detector deveria estar medindo.
+
+Sao tres condicoes, em duas linguas:
+  - texto humano, de antes dos LLMs
+  - texto de IA escrito do jeito padrao
+  - texto de IA passado pela skill humanize
+
+COMO USAR
+  1. Cole um texto por vez no site, do bloco TEXTO A ate o TEXTO F.
+  2. Anote o resultado de cada um ANTES de olhar o gabarito.
+  3. O gabarito e as minhas previsoes estao no fim do arquivo.
+
+Os rotulos sao neutros e a ordem esta embaralhada para o teste poder ser
+feito as cegas. Rolar ate o fim antes de testar estraga o teste.
+
+
+==============================================================================
+TEXTO A
+==============================================================================
+
+Machine learning represents one of the most transformative areas of modern computing. It is a field that enables systems to identify patterns in data and improve their performance through experience, without every rule needing to be explicitly programmed.
+
+The core idea is relatively straightforward. Rather than writing detailed instructions for every possible situation, the developer supplies examples to the algorithm and lets it infer the rules on its own. This paradigm shift — from explicit programming to learning from data — has opened up possibilities that would be unfeasible through traditional approaches.
+
+**The three main paradigms.** Supervised learning uses labeled data, in which each example comes accompanied by the correct answer, and is widely applied in classification and regression. Unsupervised learning works with unlabeled data, seeking latent structures through clustering and dimensionality reduction. Reinforcement learning, meanwhile, involves an agent that interacts with an environment, receiving rewards or penalties and adjusting its decision policy over time.
+
+It is worth noting that data quality is crucial to the success of any model. Biased data produces biased models, and this remains one of the most significant challenges currently facing the field. Additionally, the quantity of available data frequently determines which techniques are viable.
+
+The training process consists of adjusting the model's internal parameters to minimize a loss function, which measures the discrepancy between predictions and actual values. This adjustment is typically performed through gradient-based optimization algorithms, which iteratively traverse the parameter space in search of progressively better solutions.
+
+One of the most recurrent problems is overfitting, a situation in which the model memorizes particularities of the training set rather than learning generalizable patterns. Conversely, underfitting occurs when the model is too simple to capture the underlying structure. Finding the balance between the two is fundamental, and numerous techniques have been developed for this purpose, including regularization, cross-validation, and early stopping.
+
+In recent decades, deep learning has emerged as a particularly powerful approach, leveraging neural networks with multiple layers to learn hierarchical representations. This technique has revolutionized areas such as computer vision, natural language processing, and speech recognition, establishing new performance benchmarks.
+
+In conclusion, machine learning has consolidated itself as an indispensable tool in an increasingly data-driven landscape. Challenges related to interpretability, bias, and computational requirements remain relevant, but the future of the field looks promising. It is undoubtedly a domain that will continue to shape how we interact with technology in the years ahead.
+
+
+==============================================================================
+TEXTO B
+==============================================================================
+
+Machine learning (ML) is the study of computer algorithms that improve automatically through experience and by the use of data. It is seen as a part of artificial intelligence. Machine learning algorithms build a model based on sample data, known as "training data", in order to make predictions or decisions without being explicitly programmed to do so.}} Machine learning algorithms are used in a wide variety of applications, such as in medicine, email filtering, and computer vision, where it is difficult or unfeasible to develop conventional algorithms to perform the needed tasks.
+
+A subset of machine learning is closely related to computational statistics, which focuses on making predictions using computers; but not all machine learning is statistical learning. The study of mathematical optimization delivers methods, theory and application domains to the field of machine learning. Data mining is a related field of study, focusing on exploratory data analysis through unsupervised learning.}} In its application across business problems, machine learning is also referred to as predictive analytics.
+
+Machine learning involves computers discovering how they can perform tasks without being explicitly programmed to do so. It involves computers learning from data provided so that they carry out certain tasks. For simple tasks assigned to computers, it is possible to program algorithms telling the machine how to execute all steps required to solve the problem at hand; on the computer's part, no learning is needed. For more advanced tasks, it can be challenging for a human to manually create the needed algorithms. In practice, it can turn out to be more effective to help the machine develop its own algorithm, rather than having human programmers specify every needed step.
+
+The discipline of machine learning employs various approaches to teach computers to accomplish tasks where no fully satisfactory algorithm is available. In cases where vast numbers of potential answers exist, one approach is to label some of the correct answers as valid. This can then be used as training data for the computer to improve the algorithm(s) it uses to determine correct answers. For example, to train a system for the task of digital character recognition, the MNIST dataset of handwritten digits has often been used. A representative book of the machine learning research during the 1960s was the Nilsson's book on Learning Machines, dealing mostly with machine learning for pattern classification. Interest related to pattern recognition continued into the 1970s, as described by Duda and Hart in 1973. In 1981 a report was given on using teaching strategies so that a neural network learns to recognize 40 characters (26 letters, 10 digits, and 4 special symbols) from a computer terminal.
+
+
+==============================================================================
+TEXTO C
+==============================================================================
+
+Machine learning is the set of techniques that let a system get better at a task from examples, instead of following rules somebody wrote by hand.
+
+A concrete case makes the difference clear. To separate legitimate mail from spam the traditional way, someone has to enumerate the conditions: unknown sender, certain words in the subject line, a suspicious attachment. The list is never finished, because the people sending spam adapt to it. The other approach hands the algorithm ten thousand messages that are already sorted and lets it work out for itself what separates one pile from the other. The rules it finds are often not the ones a person would have written.
+
+There are three ways to learn, and they differ in what the algorithm is given.
+
+In supervised learning every example arrives with its answer attached. You show the photo and say it is a cat. It covers classification and prediction of values, and it is by far the most used in industry, because a company usually already has the labels sitting around as a byproduct of running the business.
+
+In unsupervised learning there is no answer. The algorithm gets the raw data and looks for structure: which customers resemble each other, which variables carry redundant information. It is useful when nobody knows in advance what to look for, and it is harder to evaluate for exactly that reason, since there is no key to check against.
+
+In reinforcement learning an agent acts in an environment, collects reward or punishment, and adjusts. This is what trained the systems that play chess and Go above human level, and it stays the most expensive of the three in compute.
+
+Training itself is optimization. The model has internal parameters, a function measures how wrong it is, and the algorithm pushes the parameters in whatever direction reduces that error, repeating until it stops improving.
+
+This is where the field's most common failure lives. A model with too much capacity memorizes the training set rather than learning what generalizes. It gets almost everything right on what it has already seen and fails on anything new, and the nasty part is that the training metric looks excellent while this happens, so nobody notices until it reaches production. The opposite exists too: a model too simple for the structure of the problem, wrong in the same way on both sets.
+
+Deep learning names a family of models with many layers that build representations in stages. The first layers of a vision system pick up edges, later ones assemble texture, the last ones recognize objects. That family is what moved the ceiling on computer vision and language processing over the past decade.
+
+The practical limit is rarely the algorithm. It is the data. A model trained on a biased set reproduces the bias, and it usually reproduces it wearing the appearance of objectivity, which is what makes the problem hard to catch.
+
+
+==============================================================================
+TEXTO D
+==============================================================================
+
+Aprendizado de máquina é o conjunto de técnicas que fazem um sistema melhorar seu desempenho a partir de exemplos, em vez de seguir regras que alguém escreveu à mão.
+
+A diferença fica clara num caso concreto. Para separar e-mail legítimo de spam pela via tradicional, alguém precisa listar as condições: remetente desconhecido, certas palavras no assunto, anexo suspeito. A lista nunca fica pronta, porque quem envia spam adapta. Na outra abordagem você entrega ao algoritmo dez mil mensagens já classificadas e deixa que ele descubra sozinho o que separa um grupo do outro. As regras que ele encontra frequentemente não são as que uma pessoa teria escrito.
+
+Há três formas de aprender, e elas diferem no que o algoritmo recebe.
+
+No aprendizado supervisionado cada exemplo vem com a resposta certa. Você mostra a foto e diz que é um gato. Serve para classificar e para prever valores, e é de longe o mais usado na indústria, porque é onde a empresa costuma já ter o dado rotulado como subproduto da operação.
+
+No não supervisionado não há resposta. O algoritmo recebe os dados crus e procura estrutura: quais clientes se parecem, quais variáveis carregam informação redundante. É útil quando ninguém sabe de antemão o que procurar, e é mais difícil de avaliar justamente por isso, já que não existe gabarito contra o qual conferir.
+
+No aprendizado por reforço um agente age num ambiente, recebe recompensa ou punição, e vai ajustando o comportamento. É a forma que treinou os sistemas que jogam xadrez e Go acima do nível humano, e continua sendo a mais cara das três em tempo de computação.
+
+O treinamento em si é otimização. O modelo tem parâmetros internos, uma função mede o quanto ele erra, e o algoritmo empurra os parâmetros na direção que reduz esse erro, repetindo até parar de melhorar.
+
+Aqui mora o problema mais comum da área. Um modelo com capacidade demais decora o conjunto de treino em vez de aprender o que generaliza. Ele acerta quase tudo no que já viu e erra no que é novo, e o pior é que a métrica de treino fica ótima enquanto isso acontece, então o erro passa despercebido até chegar em produção. O caminho oposto também existe: modelo simples demais para a estrutura do problema, que erra de forma consistente nos dois conjuntos.
+
+Aprendizado profundo é o nome de uma família de modelos com muitas camadas, capazes de construir representações em níveis. As primeiras camadas de um sistema de visão detectam borda, as seguintes formam textura, as últimas reconhecem objeto. Foi essa família que mudou o patamar de visão computacional e de processamento de linguagem na última década.
+
+A limitação prática raramente é o algoritmo. É o dado. Modelo treinado em base enviesada reproduz o viés, e costuma reproduzi-lo com aparência de objetividade, que é o que torna o problema difícil de perceber.
+
+
+==============================================================================
+TEXTO E
+==============================================================================
+
+O aprendizado de máquina representa uma das áreas mais transformadoras da computação contemporânea. Trata-se de um campo que permite aos sistemas identificar padrões em dados e aprimorar seu desempenho com a experiência, sem que cada regra precise ser programada explicitamente.
+
+A ideia central é relativamente simples. Em vez de escrever instruções detalhadas para cada situação possível, o desenvolvedor fornece exemplos ao algoritmo e deixa que ele infira as regras por conta própria. Essa mudança de paradigma — da programação explícita para o aprendizado a partir de dados — abriu possibilidades que seriam inviáveis pela abordagem tradicional.
+
+**Os três paradigmas principais.** O aprendizado supervisionado utiliza dados rotulados, nos quais cada exemplo vem acompanhado da resposta correta, sendo amplamente aplicado em classificação e regressão. O aprendizado não supervisionado trabalha com dados sem rótulo, buscando estruturas latentes por meio de agrupamento e redução de dimensionalidade. Já o aprendizado por reforço envolve um agente que interage com um ambiente, recebendo recompensas ou penalidades e ajustando sua política de decisão ao longo do tempo.
+
+É importante ressaltar que a qualidade dos dados é crucial para o sucesso de qualquer modelo. Dados enviesados produzem modelos enviesados, e esse é um dos desafios mais significativos enfrentados pela área atualmente. Além disso, a quantidade de dados disponível frequentemente determina quais técnicas são viáveis.
+
+O processo de treinamento consiste em ajustar os parâmetros internos do modelo para minimizar uma função de perda, que mensura a discrepância entre as previsões e os valores reais. Esse ajuste é tipicamente realizado por meio de algoritmos de otimização baseados em gradiente, que percorrem iterativamente o espaço de parâmetros em busca de soluções cada vez melhores.
+
+Um dos problemas mais recorrentes é o sobreajuste, situação em que o modelo memoriza particularidades do conjunto de treinamento em vez de aprender padrões generalizáveis. Por outro lado, o subajuste ocorre quando o modelo é simples demais para capturar a estrutura subjacente. Encontrar o equilíbrio entre ambos é fundamental, e diversas técnicas foram desenvolvidas para esse fim, incluindo regularização, validação cruzada e interrupção antecipada.
+
+Nas últimas décadas, o aprendizado profundo emergiu como uma abordagem particularmente poderosa, alavancando redes neurais com múltiplas camadas para aprender representações hierárquicas. Essa técnica revolucionou áreas como visão computacional, processamento de linguagem natural e reconhecimento de fala, estabelecendo novos patamares de desempenho.
+
+Em suma, o aprendizado de máquina consolidou-se como uma ferramenta indispensável em um cenário cada vez mais orientado por dados. Os desafios relacionados a interpretabilidade, viés e requisitos computacionais permanecem relevantes, mas o futuro da área é promissor. Trata-se, sem dúvida, de um campo que continuará moldando a forma como interagimos com a tecnologia nos próximos anos.
+
+
+==============================================================================
+TEXTO F
+==============================================================================
+
+O  ou também (em inglês: machine learning) é um subcampo da Engenharia e da ciência da computação que evoluiu do estudo de reconhecimento de padrões e da teoria do aprendizado computacional em inteligência artificial. Em 1959, Arthur Samuel definiu aprendizado de máquina como o "campo de estudo que dá aos computadores a habilidade de aprender sem serem explicitamente programados"(livre tradução). O aprendizado automático explora o estudo e construção de algoritmos que podem aprender de seus erros e fazer previsões sobre dados. Tais algoritmos operam construindo um modelo a partir de inputs amostrais a fim de fazer previsões ou decisões guiadas pelos dados ao invés de simplesmente seguindo inflexíveis e estáticas instruções programadas. Enquanto que na inteligência artificial existem dois tipos de raciocínio (o indutivo, que extrai regras e padrões de grandes conjuntos de dados, e o dedutivo), o aprendizado de máquina só se preocupa com o indutivo.
+
+Algumas partes do aprendizado automático estão intimamente ligadas (e muitas vezes sobrepostas) à estatística computacional; uma disciplina que foca em como fazer previsões através do uso de computadores, com pesquisas focando nas propriedades dos métodos estatísticos e sua complexidade computacional. Ela tem fortes laços com a otimização matemática, que produz métodos, teoria e domínios de aplicação para este campo. O aprendizado automático é usado em uma variedade de tarefas computacionais onde criar e programar algoritmos explícitos é impraticável. Exemplos de aplicações incluem filtragem de spam, reconhecimento ótico de caracteres (OCR), processamento de linguagem natural, motores de busca, diagnósticos médicos, bioinformática, reconhecimento de fala, reconhecimento de escrita, visão computacional e locomoção de robôs. O aprendizado de máquinas é às vezes confundido com mineração de dados, que é um sub-campo que foca mais em análise exploratória de dados e é conhecido como aprendizado não supervisionado. No campo da análise de dados, o aprendizado de máquinas é um método usado para planejar modelos complexos e algoritmos que prestam-se para fazer predições- no uso comercial, isso é conhecido como análise preditiva. Esses modelos analíticos permitem que pesquisadores, cientistas de dados, engenheiros, e analistas possam "produzir decisões e resultados confiáveis e repetitíveis" e descobrir os "insights escondidos" através do aprendizado das relações e tendências históricas nos dados.
+
+Tom M. Mitchell forneceu uma definição mais formal amplamente citada: "Diz-se que um programa de computador aprende pela experiência E, com respeito a algum tipo de tarefa T e performance P, se sua performance P nas tarefas em T, na forma medida por P, melhoram com a experiência E." Esta definição das tarefas envolvidas no aprendizado de máquina é dada de forma fundamentalmente operacional, ao invés de cognitiva, seguindo a proposta de Alan Turing em seu artigo "Computadores e inteligência", em que a pergunta "As máquinas são capazes de pensar?" seja substituída pela pergunta "As máquinas são capazes de fazer o que (nós como entidades pensantes) podemos fazer?"
+
+
+==============================================================================
+GABARITO E PREVISOES - nao leia antes de testar
+==============================================================================
+
+  texto | lingua    | condicao                        | desklib local | ritmo dp/cv
+  ------+-----------+---------------------------------+---------------+----------------
+    A   | ingles    | IA sem humanize                 |        100,0% | 5,4 / 0,28  PLANO
+    B   | ingles    | humano (Wikipedia 31/05/2021)   |          3,3% | 11,4 / 0,47  ok
+    C   | ingles    | IA com humanize                 |          0,5% | 9,3 / 0,52  ok
+    D   | portugues | IA com humanize                 |         0,1%* | 9,0 / 0,51  ok
+    E   | portugues | IA sem humanize                 |        70,4%* | 5,7 / 0,28  PLANO
+    F   | portugues | humano (Wikipedia 07/05/2021)   |         0,3%* | 22,3 / 0,67  ok
+
+  (*) O desklib e treinado so em ingles. Os numeros dos textos em portugues
+      estao ali por curiosidade e NAO tem validade metodologica.
+
+O QUE EU ESPERO QUE O SITE MOSTRE
+
+  Ingles, onde minha medida tem base:
+    A (IA padrao)      -> acusado com folga
+    B (humano)         -> limpo
+    C (com humanize)   -> limpo, e possivelmente mais limpo que B
+
+  Portugues, onde eu NAO tenho como prever:
+    E deveria ser o mais acusado dos tres, mas depende inteiramente de o site
+    ter modelo treinado em portugues. Se ele acusar F, que e Wikipedia humana
+    de maio de 2021, o detector nao serve para portugues e o resultado dos
+    outros dois nao significa nada.
+
+O QUE PRESTAR ATENCAO
+
+  1. F e B sao o controle. Sao texto humano de verdade, anteriores ao ChatGPT
+     (que abriu em 30/11/2022). Se o site acusar qualquer um dos dois, ele tem
+     falso positivo, e ai o veredito dele sobre os outros perde peso.
+
+  2. Se C sair mais "humano" que B, isso NAO quer dizer que C e mais humano.
+     Quer dizer que C esta fora da distribuicao em que o detector foi treinado.
+     Passar no teste e ter a propriedade que o teste mede sao coisas diferentes.
+
+  3. O interessante e a DISTANCIA entre A e C, nao o valor absoluto de nenhum.
+
+  4. Se der muito diferente do que eu previ em ingles, me manda os numeros: os
+     limiares da regua saem de um corpus de 15 textos escritos por mim, e
+     resultado externo e exatamente o tipo de dado que serve para recalibrar.
+==============================================================================

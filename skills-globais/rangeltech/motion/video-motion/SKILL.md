@@ -6,7 +6,7 @@ description: |
   vertical com gravação do rosto embaixo + animações sincronizadas com a fala + legenda
   palavra a palavra. Também cobre baixar e assistir reel do Instagram a partir do link
   (yt-dlp + plugin claude-video-vision). Use quando o usuário pedir "animação com o
-  Claude", "motion graphics", "reel como o do Matheus", "Remotion", "HyperFrames",
+  Claude", "motion graphics", "reel com legenda animada", "Remotion", "HyperFrames",
   "legenda animada", "plano de cenas", ou mandar link de reel/Instagram para assistir.
 ---
 
@@ -39,9 +39,9 @@ Depois `video_watch` no .mp4 (frames + transcrição Whisper local).
 | Licença | grátis até 3 pessoas; 4+ pessoas/empresa exige licença paga | Apache 2.0 |
 | Requisitos | Node | Node 22+ e FFmpeg |
 
-Padrão: Remotion quando houver gravação + legenda + muitas cenas (o reel do Matheus usa isso).
+Padrão: Remotion quando houver gravação + legenda + muitas cenas (esse tipo de reel usa isso).
 HyperFrames quando for motion puro e simples, ou se a licença do Remotion for problema
-(confirmar em remotion.pro/license antes de uso comercial da Rangel Tech).
+(confirmar em remotion.pro/license antes de uso comercial).
 
 ### Remotion
 ```bash
@@ -79,10 +79,10 @@ Layout 1080x1920: animação em cima (50%), gravação embaixo (50%), legenda po
 É uma composição só; a gravação vira camada, nada é desenhado "depois".
 
 Fluxo:
-1. Lucas grava o vídeo (mp4).
+1. O usuário grava o vídeo (mp4).
 2. Whisper gera JSON com palavra + início + fim (o plugin de vídeo já tem Whisper local).
 3. Claude lê a transcrição e os frames e escreve `scenes.json`: trecho da fala, timestamp, descrição visual.
-4. **Mostrar o plano e esperar aprovação do Lucas antes de gerar código ou renderizar.** Evita gastar token e tempo numa animação descartada.
+4. **Mostrar o plano e esperar aprovação do usuário antes de gerar código ou renderizar.** Evita gastar token e tempo numa animação descartada.
 5. Claude gera um componente React por cena (`interpolate`/`spring` dentro).
 6. Render único junta tudo.
 

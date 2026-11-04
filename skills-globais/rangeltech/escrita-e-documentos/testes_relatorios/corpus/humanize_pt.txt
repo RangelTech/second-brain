@@ -1,0 +1,19 @@
+Aprendizado de máquina é o conjunto de técnicas que fazem um sistema melhorar seu desempenho a partir de exemplos, em vez de seguir regras que alguém escreveu à mão.
+
+A diferença fica clara num caso concreto. Para separar e-mail legítimo de spam pela via tradicional, alguém precisa listar as condições: remetente desconhecido, certas palavras no assunto, anexo suspeito. A lista nunca fica pronta, porque quem envia spam adapta. Na outra abordagem você entrega ao algoritmo dez mil mensagens já classificadas e deixa que ele descubra sozinho o que separa um grupo do outro. As regras que ele encontra frequentemente não são as que uma pessoa teria escrito.
+
+Há três formas de aprender, e elas diferem no que o algoritmo recebe.
+
+No aprendizado supervisionado cada exemplo vem com a resposta certa. Você mostra a foto e diz que é um gato. Serve para classificar e para prever valores, e é de longe o mais usado na indústria, porque é onde a empresa costuma já ter o dado rotulado como subproduto da operação.
+
+No não supervisionado não há resposta. O algoritmo recebe os dados crus e procura estrutura: quais clientes se parecem, quais variáveis carregam informação redundante. É útil quando ninguém sabe de antemão o que procurar, e é mais difícil de avaliar justamente por isso, já que não existe gabarito contra o qual conferir.
+
+No aprendizado por reforço um agente age num ambiente, recebe recompensa ou punição, e vai ajustando o comportamento. É a forma que treinou os sistemas que jogam xadrez e Go acima do nível humano, e continua sendo a mais cara das três em tempo de computação.
+
+O treinamento em si é otimização. O modelo tem parâmetros internos, uma função mede o quanto ele erra, e o algoritmo empurra os parâmetros na direção que reduz esse erro, repetindo até parar de melhorar.
+
+Aqui mora o problema mais comum da área. Um modelo com capacidade demais decora o conjunto de treino em vez de aprender o que generaliza. Ele acerta quase tudo no que já viu e erra no que é novo, e o pior é que a métrica de treino fica ótima enquanto isso acontece, então o erro passa despercebido até chegar em produção. O caminho oposto também existe: modelo simples demais para a estrutura do problema, que erra de forma consistente nos dois conjuntos.
+
+Aprendizado profundo é o nome de uma família de modelos com muitas camadas, capazes de construir representações em níveis. As primeiras camadas de um sistema de visão detectam borda, as seguintes formam textura, as últimas reconhecem objeto. Foi essa família que mudou o patamar de visão computacional e de processamento de linguagem na última década.
+
+A limitação prática raramente é o algoritmo. É o dado. Modelo treinado em base enviesada reproduz o viés, e costuma reproduzi-lo com aparência de objetividade, que é o que torna o problema difícil de perceber.

@@ -26,4 +26,4 @@ A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo car
 
 
 ## Fonte
-Skill `projetos` (campanha de benchmark da Rangel Tech). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
