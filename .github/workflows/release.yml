@@ -12,10 +12,13 @@ jobs:
         include:
           - os: windows-latest
             alvo: dist:ci
+            podar: darwin linux
           - os: ubuntu-latest
             alvo: dist:linux
+            podar: darwin win32
           - os: macos-latest
             alvo: dist:mac
+            podar: win32 linux
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -30,6 +33,10 @@ jobs:
       - run: npm ci
       - run: npm run router:build
       - run: npm run modelo:voz
+      # tira do pacote os binários do Whisper (onnxruntime) de outros sistemas: deixa o instalador menor
+      - name: Podar binários de outros sistemas
+        shell: bash
+        run: for d in ${{ matrix.podar }}; do rm -rf node_modules/onnxruntime-node/bin/napi-v6/$d; done
       # Assinatura do Windows: desligada até existir certificado (segredos WIN_CSC_LINK e WIN_CSC_KEY_PASSWORD).
       - run: npm run ${{ matrix.alvo }}
       - uses: softprops/action-gh-release@v2

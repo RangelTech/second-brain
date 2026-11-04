@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
@@ -49,11 +49,7 @@
         "portable"
       ],
       "signAndEditExecutable": false,
-      "icon": "build/icon.ico",
-      "files": [
-        "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**",
-        "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
-      ]
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": [
@@ -65,11 +61,7 @@
       "synopsis": "Agente de IA para desktop",
       "description": "Segundo Cérebro: agente de IA com provedores, combos e a IA Unlimited",
       "artifactName": "Segundo-Cerebro-Linux.${ext}",
-      "icon": "build/icon.png",
-      "files": [
-        "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**",
-        "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
-      ]
+      "icon": "build/icon.png"
     },
     "mac": {
       "category": "public.app-category.productivity",
@@ -77,11 +69,7 @@
       "artifactName": "Segundo-Cerebro-macOS-${arch}.${ext}",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "identity": null,
-      "files": [
-        "!node_modules/onnxruntime-node/bin/napi-v6/win32/**",
-        "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
-      ]
+      "identity": null
     },
     "dmg": {
       "title": "Segundo Cérebro ${version}"
