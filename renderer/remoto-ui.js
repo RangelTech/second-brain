@@ -51,6 +51,7 @@
       <div class="cartao-rem">
         <div class="linha-rem"><div><b>Acesso remoto</b><div class="mut" id="rem-status"></div></div><label class="interruptor"><input type="checkbox" id="rem-ativo"><span></span></label></div>
         <div class="alerta" id="rem-msg" hidden></div>
+        <div class="linha-rem"><div><b>Código do computador</b><div class="mut">Alternativa ao QR: no celular, abra <b>remoto.rangeltech.net/app</b> e digite este código. É o ID deste computador e vale até você trocar.</div></div><div style="display:flex;gap:8px;align-items:center"><code id="rem-placa" style="font:600 20px ui-monospace,Consolas,monospace;letter-spacing:.12em">…</code><button id="rem-placa-copiar">Copiar</button><button id="rem-placa-nova" class="btn-perigo" title="Gera outro código; celulares já vinculados continuam funcionando">Trocar</button></div></div>
         <div class="linha-rem"><div><b>Sincronizar celular</b><div class="mut">Abre um QR code de uso único, válido por 2 minutos.</div></div><button class="btn-pri" id="rem-qr">Mostrar QR code</button></div>
       </div>
       <h3 style="margin:22px 0 8px">Celulares vinculados</h3>
@@ -63,11 +64,22 @@
       if (!r.ok) aviso($('#rem-msg'), 'err', r.erro)
     }
     $('#rem-qr').onclick = mostrarQr
+    const mostrarPlaca = async () => {
+      const r = await window.sb.remoto.placa()
+      if ($('#rem-placa')) $('#rem-placa').textContent = r.ok ? r.dado : 'indisponível'
+    }
+    mostrarPlaca()
+    $('#rem-placa-copiar').onclick = () => navigator.clipboard.writeText($('#rem-placa').textContent)
+    $('#rem-placa-nova').onclick = async () => {
+      if (!window.confirm('Trocar o código? O código antigo deixa de funcionar para novos vínculos. Celulares já vinculados continuam funcionando.')) return
+      const r = await window.sb.remoto.placaNova()
+      if ($('#rem-placa')) $('#rem-placa').textContent = r.ok ? r.dado : 'erro'
+    }
     pintar()
     carregarEventos()
   }
 
-  const ROTULO = { 'celular-vinculado': 'Celular vinculado', 'celular-revogado': 'Celular desconectado', 'arquivo-enviado': 'Arquivo enviado pelo celular', 'arquivo-entregue': 'Arquivo recebido neste computador', 'computador-registrado': 'Este computador foi registrado' }
+  const ROTULO = { 'celular-vinculado': 'Celular vinculado', 'celular-revogado': 'Celular desconectado', 'placa-trocada': 'Código do computador trocado', 'arquivo-enviado': 'Arquivo enviado pelo celular', 'arquivo-entregue': 'Arquivo recebido neste computador', 'computador-registrado': 'Este computador foi registrado' }
   async function carregarEventos() {
     const el = $('#rem-eventos')
     if (!el) return

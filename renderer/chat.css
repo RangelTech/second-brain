@@ -199,7 +199,7 @@
 .chip-topo .ic{width:15px;height:15px}
 .app.nav-aberto{grid-template-columns:272px minmax(0,1fr) minmax(380px,46%)}
 .app.nav-aberto.recolhido{grid-template-columns:minmax(0,1fr) minmax(380px,46%)}
-.nav{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--bd);background:var(--lat)}
+.nav{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--bd);background:var(--lat)}
 .nav[hidden]{display:none}
 .nav-barra{display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--bd)}
 .nav-url{flex:1;min-width:0;margin:0 4px}
@@ -243,3 +243,14 @@
 .app.nav-aberto .chip-modo{padding:5px 8px}
 .app.nav-aberto .chip-modelo{max-width:104px;padding:5px 6px}.app.nav-aberto .chip-modelo .mnome{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .app.nav-aberto .espaco{flex:1 1 0;min-width:0}
+
+.fila{display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px 0}
+.chip-fila{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 8px;border-radius:999px;background:var(--bg-2,#2a2723);color:inherit;font-size:12px;opacity:.9}
+.chip-fila b{opacity:.6}
+.chip-fila button{border:0;background:none;color:inherit;cursor:pointer;display:inline-flex;padding:0}
+
+.nav-fav-menu{position:absolute;top:44px;right:8px;z-index:20;width:320px;max-height:60vh;overflow:auto;background:var(--bg-2,#2a2723);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.nav-fav-menu button{display:block;width:100%;text-align:left;border:0;background:none;color:inherit;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-fav-menu button:hover{background:rgba(255,255,255,.08)}
+.nav-fav-menu .fav-topo{border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:4px;padding-bottom:4px}
+.fav-vazio{padding:8px;opacity:.6;font-size:13px}

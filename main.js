@@ -236,6 +236,28 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
   ipcMain.handle('navegador:estado', () => nav.estado())
+  ipcMain.handle('navegador:favoritos', () => ler('favoritos.json', []))
+  ipcMain.handle('navegador:importar-favoritos', () => {
+    const atuais = ler('favoritos.json', [])
+    const vistos = new Set(atuais.map((f) => f.url))
+    let novos = 0
+    for (const f of navegadorMod.lerMarcadoresDoNavegador()) {
+      if (vistos.has(f.url)) continue
+      vistos.add(f.url)
+      atuais.push(f)
+      novos++
+    }
+    gravar('favoritos.json', atuais)
+    return { total: atuais.length, novos }
+  })
+  ipcMain.handle('navegador:favoritar', (_e, f) => {
+    const atuais = ler('favoritos.json', [])
+    const i = atuais.findIndex((x) => x.url === f.url)
+    if (i >= 0) atuais.splice(i, 1)
+    else if (/^https?:/i.test(f.url)) atuais.unshift({ titulo: f.titulo || f.url, url: f.url, pasta: '', origem: 'Segundo Cérebro' })
+    gravar('favoritos.json', atuais)
+    return atuais
+  })
   if (app.isPackaged) {
     try {
       const { autoUpdater } = require('electron-updater')
@@ -359,6 +381,8 @@ app.whenReady().then(() => {
   ipcMain.handle('remoto:estado', () => remoto.estado())
   ipcMain.handle('remoto:ativar', seguro((sim) => remoto.ativar(sim)))
   ipcMain.handle('remoto:vincular', seguro(() => remoto.vincular()))
+  ipcMain.handle('remoto:placa', seguro(() => remoto.placa()))
+  ipcMain.handle('remoto:placa-nova', seguro(() => remoto.placaNova()))
   ipcMain.handle('remoto:eventos', seguro(() => remoto.eventos()))
   ipcMain.handle('remoto:revogar', seguro((id) => remoto.revogar(id)))
   ipcMain.handle('remoto:responder', (_e, msg) => remoto.emitir(msg))
@@ -383,7 +407,18 @@ app.whenReady().then(() => {
       })
     try {
       const ctxResp = { chat: id, onDelta: enviar, sinal: ac.signal, anexos, pedirPermissao }
-      const texto = await responder(alvo, mensagens, ctxResp)
+      // se o agente não confirmar o cancelamento em 4 s (modelo preso numa chamada longa), encerra a sessão e libera o chat
+      const travou = new Promise((_, rej) =>
+        ac.signal.addEventListener('abort', () =>
+          setTimeout(() => {
+            if (abortos.get(id) !== ac) return
+            sessoes.get(id)?.encerrar()
+            sessoes.delete(id)
+            rej(new Error('Interrompido.'))
+          }, 4000)
+        )
+      )
+      const texto = await Promise.race([responder(alvo, mensagens, ctxResp), travou])
       e.sender.send('chat:fim', { id, texto: texto || acumulado, uso: ctxResp.uso || null })
       remoto.emitir({ t: 'fim', id, texto: texto || acumulado, uso: ctxResp.uso || null })
     } catch (err) {

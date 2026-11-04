@@ -6,6 +6,9 @@
   let atual = null
   const respostas = new Map() // id do chat -> resposta em curso (várias conversas respondem ao mesmo tempo)
   let relogio = null
+  const fila = new Map() // id do chat -> mensagens esperando a resposta atual terminar
+  const MAX_RETOMADAS = 2
+  const LIMITE_SEM_SINAL_MS = 150000 // sem nenhum evento do agente por 2,5 min: interrompe e retoma sozinho
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null
   let modelos = []
@@ -291,10 +294,17 @@
     const viva = respostas.get(c.id)
     if (viva) el.appendChild(montarVivo(viva))
     el.scrollTop = el.scrollHeight
+    desenharFila()
   }
 
   function alternarBotao(parar) {
     const b = $('enviar')
+    if (parar && ($('texto').value.trim() || anexosPendentes.length)) {
+      b.innerHTML = IC.arrowUp
+      b.classList.remove('parar')
+      b.setAttribute('aria-label', 'Enviar para a fila')
+      return
+    }
     b.innerHTML = parar ? IC.stop : IC.arrowUp
     b.classList.toggle('parar', parar)
     b.setAttribute('aria-label', parar ? 'Parar' : 'Enviar')
@@ -424,12 +434,12 @@
   const visivel = (r) => r.el && r.el.isConnected && r.id === atual
 
   // manda uma mensagem a uma conversa (a que está na tela ou outra, como no controle remoto)
-  function enviarMensagem(c, texto, anexos) {
+  function enviarMensagem(c, texto, anexos, retomadas = 0) {
     c.msgs.push({ role: 'user', em: Date.now(), content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
     if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     salvar()
-    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…' })
+    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', retomadas })
     if (!relogio) relogio = setInterval(tiquetaque, 1000)
     if (c.id === atual) desenhar()
     alternarBotao(respostas.has(atual))
@@ -438,11 +448,27 @@
   }
 
   async function enviar() {
+    const t = $('texto').value.trim()
     if (respostas.has(atual)) {
-      window.sb.parar(atual)
+      if (!t && !anexosPendentes.length) {
+        const rr = respostas.get(atual)
+        rr.paradoManual = true
+        fila.delete(atual)
+        desenharFila()
+        window.sb.parar(atual)
+        return
+      }
+      const anexosF = anexosPendentes
+      anexosPendentes = []
+      desenharAnexos()
+      $('texto').value = ''
+      $('texto').style.height = 'auto'
+      if (!fila.has(atual)) fila.set(atual, [])
+      fila.get(atual).push({ texto: t || 'Veja o(s) arquivo(s) anexado(s).', anexos: anexosF })
+      desenharFila()
+      alternarBotao(true)
       return
     }
-    const t = $('texto').value.trim()
     if (!t && !anexosPendentes.length) return
     if (!cfg.ativo) return aviso('Escolha um modelo antes de enviar (ou conecte um provedor em Configurações).')
     if (!chatAtual()) criarChat()
@@ -453,6 +479,29 @@
     $('texto').value = ''
     $('texto').style.height = 'auto'
     enviarMensagem(c, t || 'Veja o(s) arquivo(s) anexado(s).', anexos)
+  }
+
+  function desenharFila() {
+    const el = $('fila')
+    const itens = fila.get(atual) || []
+    el.hidden = itens.length === 0
+    el.innerHTML = itens.map((m, i) => `<span class="chip-fila" title="${esc(m.texto)}"><b>${i + 1}</b>${esc(m.texto.slice(0, 60))}<button data-fq="${i}" aria-label="Tirar da fila">${IC.x}</button></span>`).join('')
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-fq]')
+    if (!b) return
+    fila.get(atual)?.splice(+b.dataset.fq, 1)
+    desenharFila()
+  })
+  function proximaDaFila(id) {
+    const itens = fila.get(id)
+    if (!itens || !itens.length || respostas.has(id)) return
+    const c = chats.find((x) => x.id === id)
+    if (!c) return fila.delete(id)
+    const m = itens.shift()
+    if (!itens.length) fila.delete(id)
+    desenharFila()
+    enviarMensagem(c, m.texto, m.anexos || [])
   }
 
   function fim(id, texto, erro, uso) {
@@ -475,6 +524,13 @@
     if (id === atual) desenhar()
     alternarBotao(respostas.has(atual))
     listar()
+    if (r.paradoManual) return
+    // o app parou sozinho por falta de sinal: retoma em partes menores, sem o usuário precisar pedir de novo
+    if (r.travou && c && (r.retomadas || 0) < MAX_RETOMADAS) {
+      enviarMensagem(c, 'A sua última chamada demorou demais e foi interrompida. Continue exatamente de onde parou, mas agora em passos pequenos: no máximo 80 linhas por chamada de ferramenta, e escreva uma frase curta entre os passos.', [], (r.retomadas || 0) + 1)
+      return
+    }
+    proximaDaFila(id)
   }
 
   const fmtTempo = (ms) => {
@@ -484,17 +540,22 @@
   // atualiza o relógio e avisa quando o modelo fica muito tempo sem dar sinal
   function tiquetaque() {
     for (const r of respostas.values()) {
+      const parou = Date.now() - r.ultimo
+      if (parou > LIMITE_SEM_SINAL_MS && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
+        r.travou = true
+        window.sb.parar(r.id)
+      }
       if (!visivel(r)) continue
       const at = r.el.querySelector('.atividade')
       if (!at) continue
       const parado = Date.now() - r.ultimo
       at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
-      at.querySelector('.atv-txt').textContent = parado > 20000 && r.fase !== 'Executando ferramenta' ? r.fase.replace('…', '') + ' (sem novidades há ' + fmtTempo(parado) + ')' : r.fase
+      at.querySelector('.atv-txt').textContent = parado > 20000 && r.fase !== 'Executando ferramenta' ? (parado > 45000 ? 'O modelo está gerando uma ação longa (provavelmente um arquivo grande)' : r.fase.replace('…', '')) + ' · há ' + fmtTempo(parado) + ' sem sinal' : r.fase
       const demora = parado > 60000
       at.classList.toggle('demora', demora)
       const extra = at.querySelector('.atv-extra')
       if (demora && !extra.firstChild) {
-        extra.innerHTML = 'O modelo está demorando. <button data-act="parar">Parar</button>' + (cfg.raciocinio && cfg.raciocinio !== 'none' ? ' <button data-act="desligar">Parar e desligar o raciocínio</button>' : '')
+        extra.innerHTML = 'Sem novidades. O modelo pode estar escrevendo algo grande; se passar de alguns minutos, pare e peça de novo. <button data-act="parar">Parar</button>' + (cfg.raciocinio && cfg.raciocinio !== 'none' ? ' <button data-act="desligar">Parar e desligar o raciocínio</button>' : '')
       } else if (!demora && extra.firstChild) extra.innerHTML = ''
     }
   }
@@ -730,7 +791,37 @@
     const r = await NAV.acao('ir', $('nav-url').value)
     if (r && r.ok === false) aviso('Não consegui abrir: ' + r.erro)
   }
+  // favoritos: estrela salva/remove a página atual; o menu lista e importa dos marcadores do Chrome/Edge/Brave
+  let navUrlAtual = { url: '', titulo: '' }
+  async function desenharFavoritos() {
+    const m = $('nav-fav-menu')
+    const favs = await NAV.favoritos()
+    const ja = favs.some((f) => f.url === navUrlAtual.url)
+    m.innerHTML = `<div class="fav-topo"><button data-fav="toggle">${ja ? 'Remover esta página' : 'Favoritar esta página'}</button><button data-fav="importar">Importar do Chrome/Edge</button></div>` +
+      (favs.length ? favs.slice(0, 300).map((f) => `<button class="fav-item" data-fav-url="${esc(f.url)}" title="${esc(f.url)}">${esc(f.titulo)}</button>`).join('') : '<div class="fav-vazio">Nenhum favorito ainda.</div>')
+  }
+  $('nav-fav').onclick = async () => {
+    const m = $('nav-fav-menu')
+    m.hidden = !m.hidden
+    NAV.esconderTemp(!m.hidden)
+    if (!m.hidden) await desenharFavoritos()
+  }
+  $('nav-fav-menu').onclick = async (e) => {
+    const b = e.target.closest('button')
+    if (!b) return
+    if (b.dataset.fav === 'toggle' && navUrlAtual.url) await NAV.favoritar(navUrlAtual)
+    else if (b.dataset.fav === 'importar') {
+      const r = await NAV.importarFavoritos()
+      aviso(r.novos ? `${r.novos} favoritos importados.` : 'Nenhum favorito novo encontrado.')
+    } else if (b.dataset.favUrl) {
+      $('nav-fav-menu').hidden = true
+      NAV.esconderTemp(false)
+      return NAV.acao('ir', b.dataset.favUrl)
+    }
+    await desenharFavoritos()
+  }
   NAV.aoEstado((e) => {
+    navUrlAtual = { url: e.url || '', titulo: e.titulo || '' }
     if (document.activeElement !== $('nav-url')) $('nav-url').value = e.url || ''
     $('nav-voltar').disabled = !e.podeVoltar
     $('nav-avancar').disabled = !e.podeAvancar
@@ -830,6 +921,7 @@
       }
     })
     t.addEventListener('input', () => {
+      if (respostas.has(atual)) alternarBotao(true)
       t.style.height = 'auto'
       t.style.height = Math.min(t.scrollHeight, 220) + 'px'
     })

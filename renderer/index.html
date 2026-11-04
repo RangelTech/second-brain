@@ -43,6 +43,7 @@
     <footer class="entrada">
       <div class="aviso-geral" id="aviso-geral" hidden></div>
       <div class="compositor" id="compositor">
+        <div class="fila" id="fila" hidden></div>
         <div class="anexos" id="anexos" hidden></div>
         <textarea id="texto" rows="1" placeholder="Escreva uma mensagem, anexe um arquivo ou grave um áudio" aria-label="Mensagem"></textarea>
         <div class="ferramentas">
@@ -71,10 +72,12 @@
       <button class="btn-ic" id="nav-voltar" aria-label="Voltar" title="Voltar"><i data-ic="arrowLeft"></i></button>
       <button class="btn-ic" id="nav-avancar" aria-label="Avançar" title="Avançar"><i data-ic="arrowRight"></i></button>
       <button class="btn-ic" id="nav-recarregar" aria-label="Recarregar" title="Recarregar"><i data-ic="refresh"></i></button>
-      <form class="nav-url" id="nav-form"><input id="nav-url" type="text" spellcheck="false" placeholder="Digite um endereço ou peça ao agente para abrir" aria-label="Endereço"></form>
+      <form class="nav-url" id="nav-form"><input id="nav-url" type="text" spellcheck="false" placeholder="Pesquise no Google ou digite um endereço" aria-label="Endereço"></form>
+      <button class="btn-ic" id="nav-fav" aria-label="Favoritos" title="Favoritos"><i data-ic="star"></i></button>
       <span class="nav-ctl" id="nav-ctl" hidden><i class="ponto-ctl"></i>Agente</span>
       <button class="btn-ic" id="nav-fechar" aria-label="Fechar o navegador" title="Fechar"><i data-ic="x"></i></button>
     </div>
+    <div class="nav-fav-menu" id="nav-fav-menu" hidden></div>
     <div class="nav-host" id="nav-host"><div class="nav-vazio" id="nav-vazio">O navegador do agente aparece aqui.<br>Peça, por exemplo: "abra o site do G1 e me diga as manchetes".</div></div>
   </aside>
   <section class="config" id="config" hidden></section>

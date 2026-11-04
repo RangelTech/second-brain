@@ -3,6 +3,17 @@
 // Sessão própria (partition "persist:navegador"): não compartilha cookies nem dados com o resto do app.
 const { WebContentsView } = require('electron')
 const http = require('http')
+
+const PAGINA_INICIAL = 'https://www.google.com/?hl=pt-BR'
+// o que o usuário digita na barra: endereço vira endereço; qualquer outra coisa vira busca no Google
+function resolverEntrada(entrada) {
+  const u = String(entrada || '').trim()
+  if (/^https?:\/\//i.test(u)) return u
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u) && !/^[^\s:]+:\d+(\/|$)/.test(u)) return u // outro esquema (file:, javascript:...) é recusado adiante
+  const pareceEndereco = !/\s/.test(u) && (/^localhost(:\d+)?(\/|$)/i.test(u) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(u) || /^[^\s/]+\.[a-z]{2,}(:\d+)?([/?#].*)?$/i.test(u))
+  if (pareceEndereco) return (/^localhost|^\d/.test(u) ? 'http://' : 'https://') + u
+  return 'https://www.google.com/search?q=' + encodeURIComponent(u)
+}
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
@@ -39,6 +50,7 @@ function criar({ app, janela, avisar, pedirPainel }) {
     if (vista) return vista
     vista = new WebContentsView({ webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false } })
     const wc = vista.webContents
+    wc.loadURL(PAGINA_INICIAL).catch(() => {})
     wc.setWindowOpenHandler(({ url }) => {
       wc.loadURL(url).catch(() => {})
       return { action: 'deny' }
@@ -106,7 +118,7 @@ function criar({ app, janela, avisar, pedirPainel }) {
     const wc = vista.webContents
     let u = String(url || '').trim()
     if (!u) throw new Error('Informe a URL.')
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u
+    u = resolverEntrada(u)
     if (!/^https?:/i.test(u)) throw new Error('Só aceito endereços http e https.')
     await Promise.race([wc.loadURL(u).catch((e) => {
       if (!/ERR_ABORTED/.test(String(e))) throw e
@@ -274,4 +286,35 @@ function criar({ app, janela, avisar, pedirPainel }) {
   }
 }
 
-module.exports = { criar }
+// ---------- favoritos (importados do navegador principal; só marcadores, nunca senhas nem cookies) ----------
+function achatar(no, pasta, saida) {
+  if (!no) return
+  if (no.type === 'url' && /^https?:/i.test(no.url || '')) saida.push({ titulo: no.name || no.url, url: no.url, pasta })
+  for (const f of no.children || []) achatar(f, no.type === 'folder' && no.name ? (pasta ? pasta + ' / ' : '') + no.name : pasta, saida)
+}
+function lerMarcadoresDoNavegador() {
+  const local = process.env.LOCALAPPDATA || ''
+  const origens = [
+    ['Chrome', path.join(local, 'Google', 'Chrome', 'User Data')],
+    ['Edge', path.join(local, 'Microsoft', 'Edge', 'User Data')],
+    ['Brave', path.join(local, 'BraveSoftware', 'Brave-Browser', 'User Data')],
+  ]
+  const saida = []
+  for (const [nome, raiz] of origens) {
+    let perfis = []
+    try {
+      perfis = fs.readdirSync(raiz).filter((d) => d === 'Default' || /^Profile \d+$/.test(d))
+    } catch {}
+    for (const perfil of perfis) {
+      try {
+        const j = JSON.parse(fs.readFileSync(path.join(raiz, perfil, 'Bookmarks'), 'utf8'))
+        const lista = []
+        for (const r of Object.values(j.roots || {})) achatar(r, '', lista)
+        for (const f of lista) saida.push({ ...f, origem: nome })
+      } catch {}
+    }
+  }
+  return saida
+}
+
+module.exports = { criar, lerMarcadoresDoNavegador, resolverEntrada, PAGINA_INICIAL }

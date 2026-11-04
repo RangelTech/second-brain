@@ -32,9 +32,16 @@ function criar({ app, janela, executar }) {
   const http = (url) => url.replace(/^ws/, 'http')
   const wsUrl = (url) => url.replace(/^http/, 'ws')
 
-  async function api(metodo, caminho) {
+  async function api(metodo, caminho, repetiu = false) {
     const r = await fetch(cfg.url + caminho, { method: metodo, headers: { Authorization: `Bearer ${cfg.computadorId}.${decifrar(cfg.chave)}` } })
     const j = await r.json().catch(() => ({}))
+    // a ponte não reconhece mais este computador (banco recriado): registra de novo e repete uma vez
+    if (r.status === 401 && !repetiu) {
+      cfg.computadorId = ''
+      cfg.chave = ''
+      await registrar()
+      return api(metodo, caminho, true)
+    }
     if (!r.ok) throw new Error(j.erro || `Erro ${r.status} na ponte.`)
     return j
   }
@@ -177,6 +184,15 @@ function criar({ app, janela, executar }) {
       await registrar()
       const j = await api('POST', '/api/vinculo')
       return { url: `${cfg.url}/v/${j.codigo}`, expiraEm: j.expiraEm }
+    },
+    async placa() {
+      if (!cfg.ativo) await this.ativar(true)
+      await registrar()
+      return (await api('GET', '/api/placa')).placa
+    },
+    async placaNova() {
+      await registrar()
+      return (await api('POST', '/api/placa/nova')).placa
     },
     async eventos() {
       return (await api('GET', '/api/eventos')).lista
