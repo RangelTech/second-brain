@@ -434,12 +434,12 @@
   const visivel = (r) => r.el && r.el.isConnected && r.id === atual
 
   // manda uma mensagem a uma conversa (a que está na tela ou outra, como no controle remoto)
-  function enviarMensagem(c, texto, anexos, retomadas = 0) {
-    c.msgs.push({ role: 'user', em: Date.now(), content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
+  function enviarMensagem(c, texto, anexos, retomadas = 0, reenvio = false) {
+    if (!reenvio) c.msgs.push({ role: 'user', em: Date.now(), content: texto, anexos: anexos.map((a) => ({ nome: a.nome, caminho: a.caminho })) })
     if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     salvar()
-    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', retomadas })
+    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', retomadas, texto, anexosEnviados: anexos })
     if (!relogio) relogio = setInterval(tiquetaque, 1000)
     if (c.id === atual) desenhar()
     alternarBotao(respostas.has(atual))
@@ -527,7 +527,9 @@
     if (r.paradoManual) return
     // o app parou sozinho por falta de sinal: retoma em partes menores, sem o usuário precisar pedir de novo
     if (r.travou && c && (r.retomadas || 0) < MAX_RETOMADAS) {
-      enviarMensagem(c, 'A sua última chamada demorou demais e foi interrompida. Continue exatamente de onde parou, mas agora em passos pequenos: no máximo 80 linhas por chamada de ferramenta, e escreva uma frase curta entre os passos.', [], (r.retomadas || 0) + 1)
+      // nada aconteceu ainda (agente não chegou a responder): reenvia o pedido original; se já havia trabalho feito, retoma em passos pequenos
+      if (!r.partes.length) enviarMensagem(c, r.texto, r.anexosEnviados || [], (r.retomadas || 0) + 1, true)
+      else enviarMensagem(c, 'A sua última chamada demorou demais e foi interrompida. Continue exatamente de onde parou, mas agora em passos pequenos: no máximo 80 linhas por chamada de ferramenta, e escreva uma frase curta entre os passos.', [], (r.retomadas || 0) + 1)
       return
     }
     proximaDaFila(id)
