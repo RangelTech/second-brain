@@ -10,6 +10,14 @@ function iconeDoApp() {
   for (const base of [process.resourcesPath || '', path.join(__dirname, 'build')]) for (const n of nomes) if (base && fs.existsSync(path.join(base, n))) return path.join(base, n)
   return undefined
 }
+// registro dos handlers: o acesso web chama os mesmos canais da interface instalada
+const handlersIpc = new Map()
+{
+  const handleOriginal = ipcMain.handle.bind(ipcMain)
+  ipcMain.handle = (canal, fn) => (handlersIpc.set(canal, fn), handleOriginal(canal, fn))
+}
+// modo servidor (VM sem tela): janela escondida, acesso web ligado, sem depender de monitor
+const MODO_SERVIDOR = process.argv.includes('--servidor') || process.env.SB_SERVIDOR === '1'
 const embed = require('./embed-router')
 const { Sessao, prepararBase, registrar: registrarAgente } = require('./agent')
 const skillsMod = require('./skills')
@@ -143,7 +151,7 @@ const ponteLLM = require('./ponte-llm').criar({
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
-let remoto = null // controle remoto pelo celular (spec 20)
+let remoto = null // acesso web remoto (spec 21 §12)
 // API de imagens do servidor (Unlimited): usa a mesma chave do chat; sem chave (cadastro pendente) a ferramenta some
 function midiaDoApp() {
   try {
@@ -162,7 +170,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
   await ponteLLM.iniciar()
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => ((cfg.modoPermissao || 'manual') === 'ignorar' && remoto?.origemRemota(id) ? 'auto' : cfg.modoPermissao || 'manual'), navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') } })
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') } })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.historico = historico
@@ -238,19 +246,30 @@ function criarJanela() {
     minHeight: 520,
     backgroundColor: '#1f1d1a',
     title: 'Segundo Cérebro',
+    show: !MODO_SERVIDOR,
     icon: iconeDoApp(),
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   })
   janela.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  // eventos de estado do app também vão para quem está na versão web
+  const enviarOriginal = janela.webContents.send.bind(janela.webContents)
+  janela.webContents.send = (canal, ...a) => (remoto?.espelhar(canal, a[0]), enviarOriginal(canal, ...a))
   janela.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
 }
 
+if (MODO_SERVIDOR) app.disableHardwareAcceleration()
 app.whenReady().then(() => {
   carregarCfg()
+  // VM provisionada pela automação: a conta chega por variável de ambiente (a chave é cifrada e a variável pode ser apagada depois)
+  if (MODO_SERVIDOR && process.env.SB_CONTA_EMAIL && process.env.SB_CONTA_CHAVE && !cfg.unlimitedChave) {
+    cfg.unlimitedEmail = process.env.SB_CONTA_EMAIL
+    cfg.unlimitedChave = cifrar(process.env.SB_CONTA_CHAVE)
+    salvarCfg()
+  }
   session.defaultSession.setPermissionRequestHandler((_wc, permissao, cb) => cb(['media', 'clipboard-read'].includes(permissao)))
   criarJanela()
   nav = navegadorMod.criar({
@@ -358,7 +377,10 @@ app.whenReady().then(() => {
     cifrar,
     decifrar,
     embed,
-    avisar: (e) => janela?.webContents.send('unlimited:estado', e),
+    avisar: (e) => {
+      janela?.webContents.send('unlimited:estado', e)
+      if (e.fase === 'ativo') remoto?.religar()
+    },
   })
   ipcMain.handle('unlimited:estado', () => unl.estado())
   ipcMain.handle('unlimited:recusar', () => unl.recusar())
@@ -468,21 +490,19 @@ app.whenReady().then(() => {
   remoto = remotoMod.criar({
     app,
     janela: () => janela,
-    executar: (m) => {
-      if (m.t === 'permissao') return permissoes.get(m.req)?.(['permitir', 'sempre', 'negar'].includes(m.decisao) ? m.decisao : 'negar')
-      if (m.t === 'parar') return abortos.get(m.id)?.abort()
-      janela?.webContents.send('remoto:cmd', m)
+    tipo: MODO_SERVIDOR ? 'vm' : 'desktop',
+    chave: () => (cfg.unlimitedChave ? decifrar(cfg.unlimitedChave) : ''),
+    invocar: (canal, args, sender) => {
+      const fn = handlersIpc.get(canal)
+      if (!fn) throw new Error('Ação não disponível.')
+      return fn({ sender }, ...args)
     },
   })
-  ipcMain.handle('remoto:estado', () => remoto.estado())
-  ipcMain.handle('remoto:ativar', seguro((sim) => remoto.ativar(sim)))
-  ipcMain.handle('remoto:vincular', seguro(() => remoto.vincular()))
-  ipcMain.handle('remoto:placa', seguro(() => remoto.placa()))
-  ipcMain.handle('remoto:placa-nova', seguro(() => remoto.placaNova()))
-  ipcMain.handle('remoto:eventos', seguro(() => remoto.eventos()))
-  ipcMain.handle('remoto:revogar', seguro((id) => remoto.revogar(id)))
-  ipcMain.handle('remoto:responder', (_e, msg) => remoto.emitir(msg))
-  remoto.iniciar()
+  ipcMain.handle('acessoweb:estado', () => remoto.estado())
+  ipcMain.handle('acessoweb:ativar', (_e, sim) => remoto.ativar(sim))
+  ipcMain.handle('acessoweb:renomear', (_e, nome) => remoto.renomear(nome))
+  if (MODO_SERVIDOR) remoto.ativar(true)
+  else remoto.iniciar()
   ipcMain.handle('chat:permissao-resp', (_e, { req, resposta }) => permissoes.get(req)?.(resposta))
   ipcMain.handle('chat:enviar', async (e, { id, mensagens, alvo, anexos }) => {
     const ac = new AbortController()
@@ -491,14 +511,12 @@ app.whenReady().then(() => {
     const enviar = (d) => {
       if (d.texto) acumulado += d.texto
       e.sender.send('chat:delta', { id, ...d })
-      if (d.texto || d.ferramenta || d.aviso) remoto.emitir({ t: 'delta', id, texto: d.texto, aviso: d.aviso, ferramenta: d.ferramenta && { id: d.ferramenta.id, titulo: d.ferramenta.titulo, tipo: d.ferramenta.tipo, status: d.ferramenta.status } })
     }
     const pedirPermissao = (p) =>
       new Promise((resolve) => {
         const req = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
         permissoes.set(req, (r) => (permissoes.delete(req), resolve(r)))
         e.sender.send('chat:permissao', { id, req, titulo: p.titulo, tipo: p.tipo })
-        remoto.emitir({ t: 'pedir-permissao', id, req, titulo: p.titulo })
         ac.signal.addEventListener('abort', () => permissoes.get(req)?.('negar'))
       })
     try {
@@ -516,13 +534,10 @@ app.whenReady().then(() => {
       )
       const texto = await Promise.race([responder(alvo, mensagens, ctxResp), travou])
       e.sender.send('chat:fim', { id, texto: texto || acumulado, uso: ctxResp.uso || null })
-      remoto.emitir({ t: 'fim', id, texto: texto || acumulado, uso: ctxResp.uso || null })
     } catch (err) {
       e.sender.send('chat:erro', { id, erro: ac.signal.aborted ? 'Interrompido.' : String(err.message ?? err) })
-      remoto.emitir({ t: 'erro', id, texto: ac.signal.aborted ? 'Interrompido.' : String(err.message ?? err) })
     } finally {
       abortos.delete(id)
-      remoto.liberarOrigem(id)
     }
   })
   ipcMain.handle('anexo:salvar', (_e, { chat, nome, bytes, caminho }) => {

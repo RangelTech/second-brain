@@ -1211,33 +1211,6 @@
     if (chats.length === 0) criarChat()
     else abrir([...chats].sort(ordem)[0].id)
   }
-  // ---------- controle remoto: ordens vindas do celular (spec 20) ----------
-  window.sb.remoto.aoComando((m) => {
-    const R = (o) => window.sb.remoto.responder({ para: m.de, ...o })
-    const resumo = () => chats.slice().sort((a, b) => (b.fixado ? 1 : 0) - (a.fixado ? 1 : 0) || b.em - a.em).slice(0, 80).map((c) => ({ id: c.id, titulo: tituloLimpo(c.titulo), fixado: !!c.fixado, em: c.em, ocupado: respostas.has(c.id) }))
-    if (m.t === 'chats') return R({ t: 'chats', lista: resumo() })
-    if (m.t === 'abrir') {
-      const c = chats.find((x) => x.id === m.id)
-      const r = respostas.get(m.id)
-      const parcial = r ? r.partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') : ''
-      return R({ t: 'historico', id: m.id, ocupado: !!r, parcial, ferramentas: r ? r.partes.filter((p) => p.t === 'ferr').map((p) => ({ id: p.f.id, titulo: p.f.titulo, status: p.f.status })) : [], msgs: c ? c.msgs.slice(-60).map((x) => ({ role: x.role, content: String(x.content || '').slice(0, 8000), em: x.em, inicio: x.inicio, fim: x.fim, uso: x.uso, anexos: (x.anexos || []).map((a) => a.nome) })) : [] })
-    }
-    if (m.t === 'novo') {
-      criarChat()
-      return R({ t: 'novo', id: atual, lista: resumo() })
-    }
-    if (m.t === 'enviar') {
-      const c = chats.find((x) => x.id === m.id)
-      const texto = String(m.texto || '').trim().slice(0, 8000)
-      const anexos = Array.isArray(m.anexos) ? m.anexos : []
-      if (!c || (!texto && !anexos.length)) return R({ t: 'erro', id: m.id, texto: 'Conversa não encontrada.' })
-      if (respostas.has(c.id)) return R({ t: 'erro', id: m.id, texto: 'Esta conversa ainda está respondendo. Espere terminar ou toque em parar.' })
-      if (!cfg.ativo) return R({ t: 'erro', id: m.id, texto: 'Nenhum modelo escolhido no computador.' })
-      enviarMensagem(c, texto || 'Veja o(s) arquivo(s) anexado(s).', anexos)
-      return R({ t: 'comecou', id: c.id })
-    }
-  })
-
   window.SB = { enviar: (txt) => (($('texto').value = txt), enviar()), anexos: () => anexosPendentes, chats: () => chats }
   iniciar()
 })()
