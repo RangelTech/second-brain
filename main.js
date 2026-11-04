@@ -19,9 +19,10 @@ const handlersIpc = new Map()
 // modo servidor (VM sem tela): janela escondida, acesso web ligado, sem depender de monitor
 const MODO_SERVIDOR = process.argv.includes('--servidor') || process.env.SB_SERVIDOR === '1'
 const embed = require('./embed-router')
-const { Sessao, prepararBase, registrar: registrarAgente } = require('./agent')
+const { Sessao, prepararBase, localizarBinario, registrar: registrarAgente } = require('./agent')
 const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
+const hermesInstalarMod = require('./hermes-instalar')
 const skillsRepoMod = require('./skills-repo')
 const unlimitedMod = require('./unlimited')
 const navegadorMod = require('./navegador')
@@ -152,6 +153,7 @@ const ponteLLM = require('./ponte-llm').criar({
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
 let remoto = null // acesso web remoto (spec 21 §12)
+const hermesInstalar = hermesInstalarMod.criar({ app, localizar: () => localizarBinario(app) })
 // API de imagens do servidor (Unlimited): usa a mesma chave do chat; sem chave (cadastro pendente) a ferramenta some
 function midiaDoApp() {
   try {
@@ -186,6 +188,8 @@ async function responder(alvo, msgs, ctx) {
     const chave = await chaveLocal()
     return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
   }
+  // o Hermes não vem no instalador: na primeira conversa o app o instala (uma vez) e mostra o andamento
+  await hermesInstalar.garantir((aviso) => ctx.onDelta?.({ aviso }))
   // se o agente precisar recomeçar (raciocínio ou modelo mudou), o novo recebe um resumo das últimas mensagens
   const ultimo = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
   const anteriores = msgs.slice(0, -1).slice(-10)
@@ -503,6 +507,8 @@ app.whenReady().then(() => {
   ipcMain.handle('acessoweb:renomear', (_e, nome) => remoto.renomear(nome))
   if (MODO_SERVIDOR) remoto.ativar(true)
   else remoto.iniciar()
+  // VM: o agente é instalado no primeiro boot, sem esperar a primeira conversa
+  if (MODO_SERVIDOR) hermesInstalar.garantir().catch((e) => console.error('[hermes]', e.message))
   ipcMain.handle('chat:permissao-resp', (_e, { req, resposta }) => permissoes.get(req)?.(resposta))
   ipcMain.handle('chat:enviar', async (e, { id, mensagens, alvo, anexos }) => {
     const ac = new AbortController()

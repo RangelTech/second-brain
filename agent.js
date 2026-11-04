@@ -14,6 +14,7 @@ function localizarBinario(app) {
   const candidatos = [
     process.env.SECOND_BRAIN_HERMES_BIN,
     path.join(app.getPath('userData'), 'hermes', 'bin', process.platform === 'win32' ? 'hermes-acp.exe' : 'hermes-acp'),
+    path.join(app.getPath('userData'), 'hermes', 'hermes-agent', '.hermes', 'bin', process.platform === 'win32' ? 'hermes-acp.exe' : 'hermes-acp'), // onde o instalador oficial grava no Linux/macOS
     path.join(os.homedir(), 'hermes', 'bin', process.platform === 'win32' ? 'hermes-acp.exe' : 'hermes-acp'),
     path.join(os.homedir(), '.local', 'bin', 'hermes-acp'),
   ].filter(Boolean)
