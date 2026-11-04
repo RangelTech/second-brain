@@ -12,7 +12,19 @@ const ESPERA_MAX_MS = 5 * 60 * 1000
 
 const obj = (props, req = []) => ({ type: 'object', properties: props, required: req })
 const FORMATOS = { quadrado: '1024x1024', retrato: '832x1216', paisagem: '1216x832', story: '720x1280', banner: '1344x768' }
+const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
+  {
+    nome: 'gerar_video',
+    desc: 'Gera um VÍDEO curto (2 a 6 segundos, sem áudio) a partir de uma descrição, numa GPU do servidor. Leva de 1 a vários minutos; o app mostra o andamento. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
+    schema: obj({
+      prompt: { type: 'string', description: 'Cena e movimento, em inglês, detalhado.' },
+      formato: { type: 'string', enum: FORMATOS_VIDEO, description: 'paisagem (768x512), retrato (512x768) ou quadrado. Padrão: paisagem.' },
+      segundos: { type: 'number', description: 'Duração de 2 a 6 segundos. Padrão: 4.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+      seed: { type: 'number', description: 'Semente para repetir ou variar um resultado (opcional).' },
+    }, ['prompt']),
+  },
   {
     nome: 'gerar_imagem',
     desc: 'Gera uma imagem a partir de uma descrição, numa GPU do servidor (cerca de 10 a 30 segundos). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Para arte de marketing com texto (título, slogan), prefira gerar a imagem SEM texto e avisar o usuário que o texto pode ser colocado depois: o modelo de imagem erra acentos e letras.',
@@ -68,6 +80,36 @@ async function gerarImagem({ prompt, formato, nome, seed }) {
   return { caminho: arq, segundos: j.seconds ?? Math.round((Date.now() - t0) / 100) / 10, tamanho: j.size }
 }
 
+async function gerarVideo({ prompt, formato, segundos, nome, seed }) {
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  const corpo = { prompt: String(prompt || '').slice(0, 3500), formato: FORMATOS_VIDEO.includes(formato) ? formato : 'paisagem', seconds: Math.max(2, Math.min(6, Number(segundos) || 4)) }
+  if (seed != null) corpo.seed = Number(seed)
+  const t0 = Date.now()
+  const r = await api('/videos/generations', { method: 'POST', body: JSON.stringify(corpo) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok && r.status !== 202) {
+    const msg = j.error?.message || `HTTP ${r.status}`
+    throw new Error(r.status === 429 ? 'A fila de vídeos está cheia. Tente de novo em instantes.' : r.status === 503 ? 'A máquina de vídeo está indisponível agora: ' + msg : 'Não consegui gerar: ' + msg)
+  }
+  const id = j.id
+  const LIMITE = 20 * 60 * 1000
+  while (Date.now() - t0 < LIMITE) {
+    await pausa(4000)
+    const s = await (await api('/jobs/' + id)).json().catch(() => ({}))
+    if (s.state === 'failed') throw new Error(s.error || 'A geração do vídeo falhou.')
+    if (s.state === 'done') {
+      const f = await api('/jobs/' + id + '/file')
+      const dir = path.join(PASTA, 'Videos')
+      fs.mkdirSync(dir, { recursive: true })
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{6})$/, '$1-$2')
+      const arq = path.join(dir, `${limpo(nome)}-${stamp}.mp4`)
+      fs.writeFileSync(arq, Buffer.from(await f.arrayBuffer()))
+      return { caminho: arq, segundos: s.seconds ?? Math.round((Date.now() - t0) / 1000), tamanho: s.size }
+    }
+  }
+  throw new Error('O vídeo demorou demais (mais de 20 min). Tente de novo em instantes.')
+}
+
 async function tratar(msg) {
   const { id, method, params } = msg
   if (method === 'initialize') return enviar({ jsonrpc: '2.0', id, result: { protocolVersion: params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'midia', version: '1.0.0' } } })
@@ -77,6 +119,10 @@ async function tratar(msg) {
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^midia_/, '')
     try {
+      if (nome === 'gerar_video') {
+        const v = await gerarVideo(params?.arguments || {})
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
+      }
       if (nome !== 'gerar_imagem') throw new Error('ferramenta desconhecida')
       const r = await gerarImagem(params?.arguments || {})
       return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Imagem criada em ${r.segundos} s (${r.tamanho}). caminho: ${r.caminho}` }] } })
@@ -99,4 +145,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { gerarImagem, FORMATOS }
+module.exports = { gerarImagem, gerarVideo, FORMATOS }

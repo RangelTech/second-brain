@@ -171,23 +171,24 @@
   }
   // Imagem sendo criada: grade de pontos que pulsa e porcentagem estimada (o servidor leva ~10 s); ao terminar, a imagem aparece na hora
   function criandoImagem(d, f) {
+    const video = /midia_gerar_video/.test(f.titulo || '')
     d.className = 'ferr img-ferr ' + (f.status || 'pending')
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
     if (f.status === 'completed') {
-      const m = /caminho:\s*(.+?\.png)/i.exec(String(f.conteudo || ''))
+      const m = (video ? /caminho:\s*(.+?\.mp4)/i : /caminho:\s*(.+?\.png)/i).exec(String(f.conteudo || ''))
       if (!m) {
         d.hidden = true // etapa de apoio da ferramenta (sem o arquivo): o cartão que mostra a imagem é o outro
         return true
       }
       d.hidden = false
-      d.innerHTML = `<div class="img-pronta"><div class="img-leg">Imagem criada</div><div class="img-slot"></div></div>`
+      d.innerHTML = `<div class="img-pronta"><div class="img-leg">${video ? 'Vídeo criado' : 'Imagem criada'}</div><div class="img-slot"></div></div>`
       const caminho = m[1]
       window.sb.lerArquivo(caminho).then((r) => {
         if (!r.ok) return
-        const src = `data:image/png;base64,${r.base64}`
+        const src = `data:${video ? 'video/mp4' : 'image/png'};base64,${r.base64}`
         const slot = d.querySelector('.img-slot')
         if (!slot) return
-        slot.innerHTML = `<img class="img-final" src="${src}" alt="${attr(arg.prompt || 'Imagem gerada')}"><div class="facoes" style="padding:0"><a class="baixar" href="${src}" download="${attr(nomeArq(caminho))}">Baixar</a><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>`
+        slot.innerHTML = `${video ? `<video class="img-final" src="${src}" controls loop playsinline></video>` : `<img class="img-final" src="${src}" alt="${attr(arg.prompt || 'Imagem gerada')}">`}<div class="facoes" style="padding:0"><a class="baixar" href="${src}" download="${attr(nomeArq(caminho))}">Baixar</a><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>`
       })
       return true
     }
@@ -196,17 +197,17 @@
     const n = 17
     let pts = ''
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) pts += `<i style="--d:${(Math.hypot(x - n / 2, y - n / 2) * 0.09).toFixed(2)}s"></i>`
-    d.innerHTML = `<div class="img-espera"><div class="img-leg">Criando imagem</div><div class="img-grade" style="--n:${n}">${pts}<span class="img-pct">1%</span></div></div>`
+    d.innerHTML = `<div class="img-espera"><div class="img-leg">${video ? 'Criando vídeo' : 'Criando imagem'}</div><div class="img-grade" style="--n:${n}">${pts}<span class="img-pct">1%</span></div></div>`
     const pct = d.querySelector('.img-pct')
     const t = setInterval(() => {
       if (!d.isConnected || !pct.isConnected) return clearInterval(t)
       const seg = (Date.now() - f.t0) / 1000
-      pct.textContent = Math.max(1, Math.min(96, Math.round(100 * (1 - Math.exp(-seg / 5.5))))) + '%'
+      pct.textContent = Math.max(1, Math.min(96, Math.round(100 * (1 - Math.exp(-seg / (video ? 70 : 5.5)))))) + '%' // vídeo leva minutos
     }, 250)
     return true
   }
   function atualizarCartao(d, f) {
-    if (/midia_gerar_imagem/.test(f.titulo || '') && criandoImagem(d, f)) return
+    if (/midia_gerar_(imagem|video)/.test(f.titulo || '') && criandoImagem(d, f)) return
     const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
     let titulo = tituloLimpo(f.titulo)
@@ -220,6 +221,9 @@
       icone = IC.search || icone
     } else if (/midia_gerar_imagem/.test(f.titulo || '')) {
       rotulo = 'Gerando imagem'
+      titulo = String(arg.prompt || '').slice(0, 70)
+    } else if (/midia_gerar_video/.test(f.titulo || '')) {
+      rotulo = 'Gerando vídeo'
       titulo = String(arg.prompt || '').slice(0, 70)
     }
     const caminho = f.caminho
@@ -827,8 +831,8 @@
       else r.partes.push({ t: 'ferr', f: { ...f } })
       if (f.status === 'completed' && f.caminho && f.tipo === 'edit' && EXT_MIDIA.test(f.caminho) && !r.midias.includes(f.caminho)) r.midias.push(f.caminho)
       // imagem gerada pela ferramenta de mídia: o caminho vem no texto do resultado ("caminho: C:\...\x.png")
-      if (f.status === 'completed' && /midia_gerar_imagem/.test(f.titulo || '')) {
-        const m = /caminho:\s*(.+?\.png)/i.exec(String(existente?.conteudo || f.conteudo || ''))
+      if (f.status === 'completed' && /midia_gerar_(imagem|video)/.test(f.titulo || '')) {
+        const m = /caminho:\s*(.+?\.(?:png|mp4))/i.exec(String(existente?.conteudo || f.conteudo || ''))
         if (m && !r.midias.includes(m[1])) r.midias.push(m[1])
       }
     }
