@@ -15,7 +15,20 @@
   var aviso = document.createElement('div')
   aviso.setAttribute('role', 'status')
   aviso.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:99999;background:#2a1f14;color:#f3ece4;border:1px solid #5a4630;border-radius:999px;padding:8px 16px;font:14px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);display:none;max-width:90vw;text-align:center'
-  document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(aviso) })
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.appendChild(aviso)
+    // só na versão web: voltar à lista de computadores e sair da conta
+    var rodape = document.querySelector('.lateral .rodape')
+    if (!rodape) return
+    function item(id, rotulo, ir) {
+      var b = document.createElement('button')
+      b.className = 'item'; b.id = id; b.type = 'button'
+      var sp = document.createElement('span'); sp.textContent = rotulo
+      b.appendChild(sp); b.onclick = ir; rodape.appendChild(b)
+    }
+    item('web-trocar', 'Trocar de computador', function () { location.href = '/?lista=1' })
+    item('web-sair', 'Sair', function () { fetch('/api/sair', { method: 'POST' }).then(function () { location.href = '/' }) })
+  })
   function mostrar(texto) {
     aviso.textContent = texto || ''
     aviso.style.display = texto ? 'block' : 'none'
