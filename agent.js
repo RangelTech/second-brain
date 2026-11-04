@@ -273,17 +273,23 @@ class Sessao {
   }
   async iniciar() {
     let ultimo
-    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    // ambiente já montado: o normal é responder em segundos, então tentativas curtas (reinicia o processo e tenta de novo)
+    const montado = fs.existsSync(path.join(this.env.HERMES_HOME, 'installs'))
+    const TENTATIVAS = montado ? 5 : 3
+    for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
       try {
-        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : tentativa === 1 ? 240000 : 90000
+        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : montado ? 35000 : tentativa === 1 ? 240000 : 90000
+        const t0 = Date.now()
         await this.comPrazo(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }), prazo)
         const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: this.servidoresMcp() }), prazo)
         this.sid = r.sessionId
+        registrar(this.app, `agente pronto em ${((Date.now() - t0) / 1000).toFixed(1)} s (tentativa ${tentativa})`)
         return
       } catch (e) {
         ultimo = e
         registrar(this.app, `iniciar falhou (tentativa ${tentativa}): ${e.message}`)
         if (e.message !== 'prazo') throw e
+        if (tentativa < TENTATIVAS) this.emitir({ aviso: `O agente demorou para iniciar. Tentando de novo (${tentativa + 1} de ${TENTATIVAS})…` })
         const antigo = this.filho
         this.pendentes.clear()
         this.subir()
