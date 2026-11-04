@@ -31,6 +31,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node scripts/checar-pacote.js
       - run: npm run router:build
       - run: npm run modelo:voz
       # tira do pacote os binários do Whisper (onnxruntime) de outros sistemas: deixa o instalador menor
