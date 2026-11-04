@@ -13,7 +13,7 @@ const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 // o que a tela web NÃO pode pedir ao app (abre janela, pasta ou programa no computador, ou mexe no próprio acesso web)
 const BLOQUEADOS = new Set(['pasta:escolher', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado'])
 // eventos do app que a tela web também recebe (o resto vai só para quem fez a chamada)
-const EVENTOS_ESPELHADOS = new Set(['skills:mudou', 'unlimited:estado', 'navegador:estado', 'navegador:abrir-painel'])
+const EVENTOS_ESPELHADOS = new Set(['chats:mudou', 'skills:mudou', 'unlimited:estado', 'navegador:estado', 'navegador:abrir-painel'])
 
 // bytes viajam como { $b64 } dentro do JSON
 const reviver = (v) => {

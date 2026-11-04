@@ -482,8 +482,27 @@ app.whenReady().then(() => {
     return publica()
   })
   ipcMain.handle('chats:get', () => ler('chats.json', []))
-  ipcMain.handle('chats:set', (_e, chats) => {
-    gravar('chats.json', chats)
+  // Várias pessoas (ou o app e a web) usam as mesmas conversas: junta por conversa (vence a alteração mais recente)
+  // e guarda as apagadas para não ressuscitarem; as outras telas recebem só o que mudou (chats:mudou).
+  ipcMain.handle('chats:set', (_e, recebidas, apagados) => {
+    const lista = Array.isArray(recebidas) ? recebidas : []
+    const novosMortos = (Array.isArray(apagados) ? apagados : []).map(String).slice(0, 200)
+    const mapa = new Map(ler('chats.json', []).map((c) => [c.id, c]))
+    const mortos = new Set([...ler('chats-apagados.json', []), ...novosMortos])
+    const quando = (c) => c?.mod || c?.em || 0
+    const mudadas = []
+    for (const c of lista) {
+      if (!c || !c.id || mortos.has(c.id)) continue
+      const a = mapa.get(c.id)
+      if (!a || quando(c) >= quando(a)) {
+        mapa.set(c.id, c)
+        if (!a || quando(c) !== quando(a)) mudadas.push(c)
+      }
+    }
+    for (const id of mortos) mapa.delete(id)
+    gravar('chats.json', [...mapa.values()])
+    if (novosMortos.length) gravar('chats-apagados.json', [...mortos].slice(-1000))
+    if (mudadas.length || novosMortos.length) janela?.webContents.send('chats:mudou', { chats: mudadas, apagados: novosMortos })
     return true
   })
   ipcMain.handle('pasta:escolher', async () => {

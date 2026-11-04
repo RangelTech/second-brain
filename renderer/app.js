@@ -55,7 +55,27 @@
   window.SBmd = md
 
   const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-  const salvar = () => window.sb.salvarChats(chats)
+  // Conversas compartilhadas (app + web, ou várias pessoas no mesmo login): cada alteração leva o carimbo `mod`, as apagadas
+  // viajam junto e o servidor junta tudo; o que os outros mudam chega por chats:mudou.
+  const assinatura = new Map()
+  const apagadasPend = new Set()
+  const assinar = (c) => {
+    const { mod, ...resto } = c
+    return JSON.stringify(resto)
+  }
+  const salvar = () => {
+    const agora = Date.now()
+    for (const c of chats) {
+      const a = assinar(c)
+      if (assinatura.get(c.id) !== a) {
+        c.mod = agora
+        assinatura.set(c.id, a)
+      }
+    }
+    const ap = [...apagadasPend]
+    apagadasPend.clear()
+    return window.sb.salvarChats(chats, ap)
+  }
   const chatAtual = () => chats.find((c) => c.id === atual)
   const estreito = () => window.matchMedia('(max-width:820px)').matches
 
@@ -119,6 +139,7 @@
         if (e.target.closest('.apagar')) {
           if (c.msgs.length && !window.confirm('Apagar esta conversa?')) return
           chats = chats.filter((x) => x.id !== c.id)
+          apagadasPend.add(c.id)
           if (atual === c.id) atual = null
           salvar()
           listar()
@@ -1163,6 +1184,7 @@
   async function iniciar() {
     cfg = await window.sb.cfg()
     chats = await window.sb.chats()
+    for (const c of chats) assinatura.set(c.id, assinar(c))
     window.aplicarIcones()
     pintarPensar()
     pintarModo()
@@ -1211,6 +1233,38 @@
     if (chats.length === 0) criarChat()
     else abrir([...chats].sort(ordem)[0].id)
   }
+  // alterações feitas por outra tela (outro computador, a web ou outra pessoa do mesmo login)
+  window.sb.aoChatsMudou((d) => {
+    let mudou = false
+    let atualMudou = false
+    for (const r of d.chats || []) {
+      const l = chats.find((x) => x.id === r.id)
+      if (!l) {
+        chats.push(r)
+        assinatura.set(r.id, assinar(r))
+        mudou = true
+      } else if ((r.mod || r.em || 0) > (l.mod || l.em || 0) && !respostas.has(l.id)) {
+        Object.assign(l, r)
+        assinatura.set(l.id, assinar(l))
+        mudou = true
+        if (l.id === atual) atualMudou = true
+      }
+    }
+    const antes = chats.length
+    const mortos = new Set(d.apagados || [])
+    chats = chats.filter((c) => !mortos.has(c.id) || respostas.has(c.id))
+    if (chats.length !== antes) {
+      mudou = true
+      if (atual && !chats.some((c) => c.id === atual)) {
+        atual = null
+        atualMudou = true
+      }
+    }
+    if (!mudou) return
+    listar()
+    if (atualMudou) atual ? abrir(atual) : desenhar()
+  })
+
   window.SB = { enviar: (txt) => (($('texto').value = txt), enviar()), anexos: () => anexosPendentes, chats: () => chats }
   iniciar()
 })()
