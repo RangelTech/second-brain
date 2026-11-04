@@ -6,6 +6,9 @@ const os = require('os')
 const path = require('path')
 
 const OCIOSO_MS = 10 * 60 * 1000
+const CONTEXTO_REAL = 131072
+const COMPRIMIR_EM = 72000
+const PODAR_EM = 48000
 
 function localizarBinario(app) {
   const candidatos = [
@@ -51,6 +54,14 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
     '  provider: "custom"',
     `  base_url: ${JSON.stringify(base)}`,
     '  api_key: ${SB_LOCAL_KEY}',
+    // o servidor Unlimited só aceita 131072 tokens por pedido; sem isto o Hermes acha que são 262144, estoura e
+    // gasta minutos numa compressão de emergência com o usuário olhando para a tela parada
+    `  context_length: ${CONTEXTO_REAL}`,
+    'compression:',
+    '  enabled: true',
+    `  threshold_tokens: ${COMPRIMIR_EM}`, // comprime cedo: o resumo fica pequeno e rápido
+    `  proactive_prune_tokens: ${PODAR_EM}`, // antes disso, só poda resultados velhos de ferramenta (não chama o modelo)
+    '  target_ratio: 0.15',
     'agent:',
     `  reasoning_effort: ${JSON.stringify(raciocinio || 'none')}`,
     'terminal:',
