@@ -8,7 +8,7 @@
   let relogio = null
   const fila = new Map() // id do chat -> mensagens esperando a resposta atual terminar
   const MAX_RETOMADAS = 2
-  const LIMITE_SEM_SINAL_MS = 150000 // sem nenhum evento do agente por 2,5 min: interrompe e retoma sozinho
+  const LIMITE_SEM_SINAL_MS = 240000 // sem nenhum evento do agente por 4 min: interrompe e retoma sozinho (a 29 tok/s, 4096 tokens de saída levam 2,5 min)
   const LIMITE_ACAO_LONGA_MS = 420000 // enquanto o agente escreve uma ação longa (arquivo grande): 7 min
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null

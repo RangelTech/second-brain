@@ -33,6 +33,7 @@ Tarefa: diagrama do fluxo "cliente no WhatsApp, Evolution API, webhook, agente d
 
 Como fazer melhor (receita):
 
+0. **Escreva em pedaços pequenos.** Cada chamada de escrita deve ter no máximo cerca de 80 linhas (uns 2.000 tokens). Uma chamada que tenta gravar o arquivo inteiro bate no teto de 4.096 tokens de saída, sai cortada (o servidor registra "cut") e leva mais de 2,5 minutos; o app interrompe e o agente entra num ciclo de tentativas sem produzir nada (visto no teste: 3 interrupções seguidas). Separe o script em módulos: `estilo.py` (cores e fontes), `forma.py` (funções `caixa` e `seta`) e `diagrama.py` (os nós), e rode um de cada vez.
 1. **Gere o SVG por um script (Python ou Node) com uma função `caixa(x, y, w, h, titulo, subtitulo)` e uma função `seta(de, para, rotulo)`**, em vez de editar o arquivo em pedaços. Mudar uma posição vira mudar um número, e o diagrama inteiro é refeito em segundos.
 2. Calcule a largura do texto antes de desenhar (fonte e tamanho fixos) e aumente a caixa se não couber; nunca confie no olho.
 3. Ponha o rótulo da seta **ao lado** da linha, com fundo da cor da página (um retângulo atrás do texto), ou no ponto médio de um trecho reto.
