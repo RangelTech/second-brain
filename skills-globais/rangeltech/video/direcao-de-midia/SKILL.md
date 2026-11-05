@@ -36,7 +36,7 @@ O modelo de imagem e de vídeo só devolve o que o prompt descreve. Pedido curto
 - **Realista vs ilustração**: realista = "photorealistic, natural lighting, high detail"; ilustração = "clean digital illustration, flat colors, soft shading".
 
 ## Perguntar ou gerar?
-Gere direto quando der para inferir. Pergunte UMA coisa curta só se for essencial e ambíguo (ex.: "logo de qual nome?" quando o nome é parte do pedido).
+Pedido simples ("um vídeo de um balão", "um logo para loja de carros", "foto de produto: tênis branco"): GERE NA HORA, sem perguntar e sem listar opções ou briefings no texto; o briefing é só o prompt que você manda à ferramenta. Gere direto quando der para inferir. Pergunte UMA coisa curta só se for essencial e ambíguo (ex.: "logo de qual nome?" quando o nome é parte do pedido).
 
 ## Depois de gerar
 Olhe o resultado (imagem: vision_analyze; vídeo: um quadro do meio). Se estiver "nada a ver", ajuste o briefing e gere de novo UMA vez, mudando o que falhou. A tela mostra fila, percentual e resultado: responda em uma frase.
