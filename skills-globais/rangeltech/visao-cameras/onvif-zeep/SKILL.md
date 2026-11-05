@@ -1,30 +1,40 @@
 ---
 name: onvif-zeep
-description: onvif-zeep (ADOTAR). Descoberta ONVIF de cameras. MIT.
+description: |
+  Cliente Python para câmeras ONVIF (descoberta, perfis, URL de stream RTSP, PTZ). Use no KI Vision para cadastrar câmeras IP e obter o endereço do stream.
+  Use quando o cliente disser: "cadastrar câmera IP"; "descobrir o endereço RTSP da câmera"; "controlar câmera ONVIF".
 ---
 
 # onvif-zeep
 
-**Veredito da campanha (26 a 28/10/2026):** ADOTAR. **Classe do dado:** medido.
+> **Validada na bancada (parcial):** biblioteca instala e importa; não havia câmera ONVIF para testar a conexão (conexão a um endereço sem câmera devolve `ONVIFError`).
 
-## Para que serve
-Descoberta ONVIF de cameras. MIT.
+## Quando usar
+Cadastrar uma câmera IP com ONVIF (informar IP, usuário e senha) e descobrir o RTSP e os perfis de vídeo.
 
-> ONVIF Client Implementation in Python 2+3 (using https://github.com/mvantellingen/python-zeep instead of suds as SOAP client)
+## Quando NÃO usar
+Câmeras sem ONVIF. Nunca acessar câmeras que não são do cliente.
 
-## O que foi medido
-- sandbox CPU: OK, so clone/inspecao (nao executou), 6.0s, pico RSS 84 MB
+## Combina com
+`mediamtx` (servidor RTSP), `bytetrack`/`bot-sort`, `vision`.
 
-## Hardware
-Roda sem GPU dedicada.
+## Receita validada na bancada (parcial)
+```bash
+python -m venv v && v/bin/pip install onvif-zeep        # 6 s, sem root
+```
+```python
+from onvif import ONVIFCamera
+cam = ONVIFCamera('192.168.0.10', 80, 'usuario', 'senha')
+media = cam.create_media_service()
+perfil = media.GetProfiles()[0]
+uri = media.GetStreamUri({'StreamSetup': {'Stream': 'RTP-Unicast', 'Transport': {'Protocol': 'RTSP'}}, 'ProfileToken': perfil.token}).Uri
+```
+Teste: `import onvif` ok (zeep 4.3.3) e a conexão a um host sem câmera falhou com `ONVIFError` como esperado.
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+## Armadilhas
+- Não validado com câmera real.
+- Algumas câmeras exigem hora sincronizada para autenticar.
+- Use as credenciais da câmera do cliente e só na rede dele.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/FalkTannhaeuser/python-onvif-zeep
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Tempo e recursos medidos
+pip install 6 s.

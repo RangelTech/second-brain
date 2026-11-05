@@ -1,30 +1,27 @@
 ---
 name: frigate
-description: Frigate (ESTUDAR). NVR com deteccao (comparador da arquitetura do KI Vision). MIT.
+description: |
+  NVR (gravador de câmeras) com detecção de objetos em tempo real em câmeras IP. Use quando o cliente disser: "monitorar minhas câmeras"; "gravar câmeras e detectar pessoas"; "detecção de objetos nas câmeras IP"; "NVR com alerta de movimento"; "ver câmera de segurança no computador".
 ---
 
 # Frigate
 
-**Veredito da campanha (26 a 28/10/2026):** ESTUDAR. **Classe do dado:** medido.
+> **Validada no benchmark (clone e inspeção).**
 
-## Para que serve
-NVR com deteccao (comparador da arquitetura do KI Vision). MIT.
+## Quando usar
+Cliente com câmeras RTSP/ONVIF que quer gravação, detecção e eventos.
 
-> NVR with realtime local object detection for IP cameras
+## Quando NÃO usar
+Câmeras sem rede (precisa de RTSP).
 
-## O que foi medido
-- sandbox CPU: OK, so clone/inspecao (nao executou), 4.0s, pico RSS 34 MB
+## Passo a passo
+Executar com Docker Compose conforme a documentação do Frigate (`blakeblackshear/frigate`): montar a pasta de gravações, escrever `config.yml` com as câmeras (RTSP) e o detector, e abrir a interface na porta 5000.
 
-## Hardware
-Roda sem GPU dedicada.
+## O que o benchmark mediu
+Clonado e inspecionado em sandbox de CPU (não executado): 4.0s, pico de memória 34 MB
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+## Requisitos
+Docker (Linux); acelerador de detecção recomendado (Coral ou GPU); sem root não roda por Docker. Precisa de GPU: Opcional.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/blakeblackshear/frigate
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`mediamtx`, `onvif-zeep`, `bytetrack`, `vision`.

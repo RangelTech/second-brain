@@ -1,30 +1,37 @@
 ---
 name: yoinks
-description: yoinks (DESCARTAR). Baixa video pelo terminal. Direitos autorais: nao usar em produto.
+description: |
+  Baixa vídeo pelo terminal a partir de um link. Use quando o cliente disser: "baixe esse vídeo para mim"; "salvar vídeo de um link"; "baixar vídeo pelo terminal".
 ---
 
 # yoinks
 
-**Veredito da campanha (26 a 28/10/2026):** DESCARTAR. **Classe do dado:** não testado.
+> **Baseada na documentação oficial (fora da bateria do benchmark).**
 
-## Para que serve
-Baixa video pelo terminal. Direitos autorais: nao usar em produto.
+## Quando usar
+Baixar um vídeo para usar como referência.
 
-> yoink any video from your terminal. no shady ads.
+## Quando NÃO usar
+Quando `yt-dlp` (já na skill `video-motion`) basta.
 
-## O que foi medido
-Esta ferramenta não entrou na bateria de testes. Não a apresente como funcionando: valide antes de depender dela.
+## Passo a passo
+Comandos e exemplos do README oficial:
 
-## Hardware
-Roda sem GPU dedicada.
+```
+npm install -g yoinks
+```
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+```
+$ yoinks https://youtu.be/dQw4w9WgXcQ    # straight to the format picker
+$ yoinks                                 # prompts for a url
+$ yoinks --theme light                   # force the light palette
+```
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/pablostanley/yoinks
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
+## O que o benchmark mediu
+Não entrou na bateria de medição do benchmark; skill baseada na documentação oficial.
 
+## Requisitos
+Node; sem root. Sem GPU.
 
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`video-motion`, `get-brolls`.

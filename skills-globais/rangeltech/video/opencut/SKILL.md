@@ -1,30 +1,27 @@
 ---
 name: opencut
-description: OpenCut (ESTUDAR). Alternativa open source ao CapCut (editor de video). Cliente final poderia usar; pesado de integrar.
+description: |
+  Editor de vídeo open source no navegador (alternativa ao CapCut). Use quando o cliente disser: "editor de vídeo no navegador"; "alternativa ao CapCut"; "cortar e legendar vídeo no site".
 ---
 
 # OpenCut
 
-**Veredito da campanha (26 a 28/10/2026):** ESTUDAR. **Classe do dado:** medido.
+> **Validada no benchmark (clone e inspeção).**
 
-## Para que serve
-Alternativa open source ao CapCut (editor de video). Cliente final poderia usar; pesado de integrar.
+## Quando usar
+Cliente que quer editar vídeo sem instalar nada.
 
-> The open-source CapCut alternative
+## Quando NÃO usar
+Edição automática por agente (use `video-motion`).
 
-## O que foi medido
-- sandbox CPU: OK, so clone/inspecao (nao executou), 1.5s, pico RSS 37 MB
+## Passo a passo
+Seguir o README de `OpenCut-app/OpenCut` (aplicação web).
 
-## Hardware
-Roda sem GPU dedicada.
+## O que o benchmark mediu
+Clonado e inspecionado em sandbox de CPU (não executado): 1.5s, pico de memória 37 MB
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+## Requisitos
+Node/Bun e navegador; pesado. Sem GPU.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/OpenCut-app/OpenCut
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`video-motion`.

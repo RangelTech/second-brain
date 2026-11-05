@@ -71,7 +71,6 @@ Aviso de fontes: a planilha v6 (base de `bibliotecas.md`) foi fechada em 27/10 e
 
 ## Visao (KI Vision)
 
-- **Ultralytics YOLO11: ADOTAR, mas AGPL-3.0** (licenca comercial se embutir; avaliar RT-DETR/YOLOX). YOLO11m lote 16 640 px (fps so modelo): 3090 397, 4090 734, 5090 1.091, L40S 693, PRO 6000 1.136, H100 NVL 1.159, GB10 172; YOLO11n 4.834 fps na 5090 mas **limitado pelo host** (CPU): para modelos pequenos a placa nova pode ser mais lenta por imagem.
 - Cameras: velocidade do detector / fps da camera superestima varias vezes; decode NVDEC, tracker, I/O e escrita de NVR definem o limite. Medido na 5090 com 1080p H.264 por RTSP, 12 vCPU: processo-por-camera contra servico em lote (ver artigo 15). 4090/5090: dezenas de cameras so em deteccao (48 a 72 a 15 fps na conta de so-modelo).
 - **ByteTrack: ADOTAR** (50 a 62 fps com YOLO11, 4090). **BoT-SORT: TESTAR** (28 a 31 fps). HOTA/IDF1 NOT_TESTED (sem ground truth).
 - **SAM 2: ADOTAR (Apache-2.0)**: ms/imagem 5090 22, 4090 54, 3090 70, L40S 63, GB10 92; **PRO 6000 506 ms e um outlier nao explicado** (clocks normais; reexecutar antes de concluir).

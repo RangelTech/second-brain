@@ -19,13 +19,10 @@ Avatar animado com voz, visao e memoria local. Base para atendente com rosto; li
 ## Hardware
 Precisa de GPU. Siga a skill `gpu-barata` para escolher e alugar (ligar, usar e desligar para não pagar parado).
 
-## Licença
-licenca propria (ver LICENSE) (propria/verificar). Confira a licença do código e a dos pesos antes de usar em produto.
-
 ## Instalação e uso
 Siga o README do repositório: https://github.com/Open-LLM-VTuber/Open-LLM-VTuber
 A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
 
 undefined
 ## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+Skill `projetos` (campanha de benchmark da Rangel Tech). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.

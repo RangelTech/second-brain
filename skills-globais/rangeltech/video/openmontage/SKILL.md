@@ -1,30 +1,27 @@
 ---
 name: openmontage
-description: OpenMontage (OK para quem instala (licença restritiva)). Producao de video por agente (12 pipelines). AGPL: so ferramenta interna da agencia.
+description: |
+  Sistema agêntico de produção de vídeo com 12 pipelines, mais de 100 ferramentas e centenas de skills de produção. Use quando o cliente disser: "faça um vídeo parecido com esse short, sobre outro assunto"; "produzir vídeo completo com roteiro, cenas e edição"; "pipeline de produção de vídeo por agente".
 ---
 
 # OpenMontage
 
-**Veredito da campanha (26 a 28/10/2026):** OK para quem instala (licença restritiva). **Classe do dado:** medido.
+> **Validada no benchmark (clone e inspeção).**
 
-## Para que serve
-Producao de video por agente (12 pipelines). AGPL: so ferramenta interna da agencia.
+## Quando usar
+Produção de vídeo em etapas pela agência.
 
-> World's first open-source, agentic video production system. 12 production pipelines, 100+ tools, 700+ agent skill and production-knowledge f
+## Quando NÃO usar
+Título animado simples (use `video-motion`).
 
-## O que foi medido
-- sandbox CPU: OK, so clone/inspecao (nao executou), 3.5s, pico RSS 51 MB
+## Passo a passo
+O fluxo é dar ao agente um vídeo de referência e o tema, por exemplo: _"Aqui está um YouTube Short que eu gosto. Faça algo parecido, mas sobre computação quântica."_ Instalação e pré-requisitos no README de `calesthio/OpenMontage`.
 
-## Hardware
-Roda sem GPU dedicada.
+## O que o benchmark mediu
+Clonado e inspecionado em sandbox de CPU (não executado): 3.5s, pico de memória 51 MB
 
-## Licença
-AGPL-3.0 (copyleft forte (rede): cuidado em SaaS). Confira a licença do código e a dos pesos antes de usar em produto.
+## Requisitos
+Python/Node, FFmpeg; algumas etapas usam APIs de geração de mídia (chaves). Precisa de GPU: Opcional.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/calesthio/OpenMontage
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`video-motion`, `get-brolls`, `direcao-de-midia`.

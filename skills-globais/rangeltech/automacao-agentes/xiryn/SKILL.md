@@ -1,30 +1,38 @@
 ---
 name: xiryn
-description: Xiryn (ESTUDAR). Equipe de agentes, cada um com desktop Linux em Docker e controle por Telegram. Inspiracao para sandbox visual do Hermes; nao adotar.
+description: |
+  Equipe de agentes, cada um com um desktop Linux em Docker e controle por Telegram. Use quando o cliente disser: "quero uma equipe de agentes cada um com seu computador"; "controlar agentes pelo Telegram"; "sandbox visual para agentes".
 ---
 
 # Xiryn
 
-**Veredito da campanha (26 a 28/10/2026):** ESTUDAR. **Classe do dado:** medido.
+> **Validada no benchmark (clone e inspeção).**
 
-## Para que serve
-Equipe de agentes, cada um com desktop Linux em Docker e controle por Telegram. Inspiracao para sandbox visual do Hermes; nao adotar.
+## Quando usar
+Ideia de sandbox visual por agente.
 
-> Xiryn — the open-source personal agent. Does everything Muse, Grok Bot and Dots do, on your own computer: each agent gets its own Linux desk
+## Quando NÃO usar
+Máquina sem Docker.
 
-## O que foi medido
-- sandbox CPU: OK, so clone/inspecao (nao executou), 1.5s, pico RSS 34 MB
+## Passo a passo
+Comandos e exemplos do README oficial:
 
-## Hardware
-Roda sem GPU dedicada.
+```
+cd xiryn
+npm run dev                    # or: npm run build && npm start
+```
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+```
+npm run background              # starts Xiryn with no terminal or browser needed
+npm run background -- login     # …and whenever you log in to this computer
+npm run background -- stop      # stop it (status, restart and no-login work too)
+```
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/SouravBeraAkaSpeed/xiryn
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
+## O que o benchmark mediu
+Clonado e inspecionado em sandbox de CPU (não executado): 1.5s, pico de memória 34 MB
 
+## Requisitos
+Docker; bot de Telegram. Sem GPU.
 
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`playwright`.

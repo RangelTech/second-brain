@@ -18,13 +18,10 @@ Modelos pequenos de decisao sobre bases Qwen (0.8B a 27B). Repo nao confirmado; 
 ## Hardware
 Roda sem GPU dedicada.
 
-## Licença
-Apache-2.0 (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
-
 ## Instalação e uso
 Siga o README do repositório: https://github.com/aleskxyz/kev-onnx
 A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
 
 
 ## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+Skill `projetos` (campanha de benchmark da Rangel Tech). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.

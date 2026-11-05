@@ -1,30 +1,41 @@
 ---
 name: baocut
-description: BaoCut (OK para quem instala (licença restritiva)). Editor de video por agente. Licenca source-available: proibe revender o proprio BaoCut. Uso interno da agencia.
+description: |
+  Editor de vídeo conduzido por agente. Use quando o cliente disser: "edite meu vídeo com agente"; "cortar vídeo automaticamente"; "editor de vídeo por IA".
 ---
 
 # BaoCut
 
-**Veredito da campanha (26 a 28/10/2026):** OK para quem instala (licença restritiva). **Classe do dado:** medido.
+> **Validada no benchmark.**
 
-## Para que serve
-Editor de video por agente. Licenca source-available: proibe revender o proprio BaoCut. Uso interno da agencia.
+## Quando usar
+Edição de vídeo assistida por agente na agência.
 
-> BaoCut: an AI video agent with an editable timeline. Transcribe, subtitle, translate, dub, cut and animate.
+## Quando NÃO usar
+Título simples (use `video-motion`).
 
-## O que foi medido
-- sandbox CPU: OK, executou, 10.5s, pico RSS 93 MB
+## Passo a passo
+Comandos e exemplos do README oficial:
 
-## Hardware
-Roda sem GPU dedicada.
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+. "$HOME/.cargo/env"
+rustup default stable
+rustup target add wasm32-unknown-unknown
+```
 
-## Licença
-BaoCut Community License (source-available) (propria/verificar). Confira a licença do código e a dos pesos antes de usar em produto.
+```
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+xcrun --find metal
+# If Metal is missing from the selected Xcode:
+xcodebuild -downloadComponent MetalToolchain
+```
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/JimLiu/baocut
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
+## O que o benchmark mediu
+Rodou em sandbox de CPU: 10.5s, pico de memória 93 MB
 
+## Requisitos
+Aplicativo de desktop com Rust; Windows/macOS/Linux. Sem GPU.
 
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`video-motion`, `get-brolls`.

@@ -18,13 +18,10 @@ Imagem/edicao 4K em ~8 GB via ComfyUI. Licenca flux-kommunity: ler antes de uso 
 ## Hardware
 Precisa de GPU. Siga a skill `gpu-barata` para escolher e alugar (ligar, usar e desligar para não pagar parado).
 
-## Licença
-flux-kommunity-license (propria/verificar). Confira a licença do código e a dos pesos antes de usar em produto.
-
 ## Instalação e uso
 Siga o README do repositório: https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy
 A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
 
 
 ## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+Skill `projetos` (campanha de benchmark da Rangel Tech). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.

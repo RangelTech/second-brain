@@ -1,30 +1,30 @@
 ---
 name: reelmimic
-description: ReelMimic (ESTUDAR). Analisa um video de referencia e produz outro no mesmo estilo via agentes. Conteudo da agencia.
+description: |
+  Analisa um vídeo de referência e produz outro no mesmo estilo, com agentes que planejam, montam e revisam. Use quando o cliente disser: "quero um vídeo igual a esse reel, mas sobre outro assunto"; "copiar o estilo de um vídeo de referência"; "refazer esse reels com meu tema".
 ---
 
 # ReelMimic
 
-**Veredito da campanha (26 a 28/10/2026):** ESTUDAR. **Classe do dado:** medido.
+> **Validada no benchmark.**
 
-## Para que serve
-Analisa um video de referencia e produz outro no mesmo estilo via agentes. Conteudo da agencia.
+## Quando usar
+Agência que quer replicar o estilo de um reel em conteúdo novo.
 
-> Show it a video you love. Get a new video in the same style. An AI crew (Claude Code or Codex) plans, builds and reviews it with you.
+## Quando NÃO usar
+Cena real gerada por IA (use a geração de vídeo).
 
-## O que foi medido
-- sandbox CPU: OK, executou, 3.0s, pico RSS 33 MB; files=93; md_files=19; skill_md=0; md_kchars=135
+## Passo a passo
+```bash
+git clone https://github.com/edenfunf/reelmimic.git && cd reelmimic
+```
+Depois siga o README: passe o vídeo de referência e o tema.
 
-## Hardware
-Roda sem GPU dedicada.
+## O que o benchmark mediu
+Rodou em sandbox de CPU: 3.0s, pico de memória 33 MB; files=93; md_files=19; skill_md=0; md_kchars=135
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+## Requisitos
+Node, FFmpeg e Chrome; sem GPU. Sem GPU.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/edenfunf/reelmimic
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`video-motion` (baixar e assistir o reel com yt-dlp), `motionmaxxing`.

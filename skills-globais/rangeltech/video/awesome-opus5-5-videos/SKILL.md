@@ -1,30 +1,27 @@
 ---
 name: awesome-opus5-5-videos
-description: awesome-opus5-5-videos (DESCARTAR). Colecao de videos/prompts. Inspiracao.
+description: |
+  Coleção de vídeos virais feitos com Opus 5.5 e os prompts por trás deles. Use quando o cliente disser: "me dê ideias de vídeo"; "quero ver prompts de vídeos virais"; "inspiração de vídeo feito por IA".
 ---
 
 # awesome-opus5-5-videos
 
-**Veredito da campanha (26 a 28/10/2026):** DESCARTAR. **Classe do dado:** não testado.
+> **Baseada na documentação oficial (fora da bateria do benchmark).**
 
-## Para que serve
-Colecao de videos/prompts. Inspiracao.
+## Quando usar
+Buscar inspiração e prompts de vídeo.
 
-> A growing collection of viral videos made with Claude Opus 5.5 and the prompts behind them. Watch each original next to a live remake on Ski
+## Quando NÃO usar
+Receita técnica: é uma lista.
 
-## O que foi medido
-Esta ferramenta não entrou na bateria de testes. Não a apresente como funcionando: valide antes de depender dela.
+## Passo a passo
+Abrir o repositório `yihui-dev/awesome-opus5-5-videos` e copiar o prompt do vídeo de referência para o agente.
 
-## Hardware
-Roda sem GPU dedicada.
+## O que o benchmark mediu
+Não entrou na bateria de medição do benchmark; skill baseada na documentação oficial.
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+## Requisitos
+Qualquer lugar; só leitura. Sem GPU.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/yihui-dev/awesome-opus5-5-videos
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Combina com
+`lemo-opuscar`, `video-motion`, `direcao-de-midia`.

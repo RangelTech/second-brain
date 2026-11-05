@@ -18,13 +18,10 @@ Deteccao por texto (open vocabulary). 45 ms na 5090. Apache-2.0.
 ## Hardware
 Precisa de GPU. Siga a skill `gpu-barata` para escolher e alugar (ligar, usar e desligar para não pagar parado).
 
-## Licença
-Apache-2.0 (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
-
 ## Instalação e uso
 Siga o README do repositório: https://github.com/IDEA-Research/GroundingDINO
 A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
 
 
 ## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+Skill `projetos` (campanha de benchmark da Rangel Tech). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.

@@ -37,12 +37,52 @@ function prepararBase(app) {
     fs.writeFileSync(marca, new Date().toISOString())
   }
   const globais = [path.join(process.resourcesPath || '', 'skills-globais', 'rangeltech'), path.join(__dirname, 'skills-globais', 'rangeltech')].find((p) => fs.existsSync(p))
-  if (globais) {
-    try {
-      fs.cpSync(globais, path.join(home, 'skills', 'rangeltech'), { recursive: true, force: true })
-    } catch {}
-  }
+  if (globais) sincronizarSkillsGlobais(globais, path.join(home, 'skills', 'rangeltech'))
   return home
+}
+
+// As skills globais vão na instalação e depois são do usuário: o Hermes pode editar, criar e apagar à vontade (autoevolução).
+// A sincronização só traz o que é novo ou o que o usuário não mexeu: arquivo editado fica como está, arquivo apagado não volta.
+// O manifesto guarda o hash de cada arquivo como foi entregue da última vez.
+function sincronizarSkillsGlobais(origem, destino) {
+  const crypto = require('crypto')
+  const hash = (f) => crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex')
+  const arqManifesto = path.join(destino, '.entregue.json')
+  let antes = {}
+  try {
+    antes = JSON.parse(fs.readFileSync(arqManifesto, 'utf8'))
+  } catch {}
+  const agora = {}
+  const andar = (d, rel) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const r = rel ? rel + '/' + e.name : e.name
+      if (e.isDirectory()) andar(path.join(d, e.name), r)
+      else {
+        try {
+          const src = path.join(d, e.name)
+          const dst = path.join(destino, r)
+          const h = hash(src)
+          agora[r] = h
+          if (!fs.existsSync(dst)) {
+            if (antes[r]) continue // estava instalado e o usuário (ou o Hermes) apagou: não volta
+            fs.mkdirSync(path.dirname(dst), { recursive: true })
+            fs.copyFileSync(src, dst)
+          } else if (antes[r] && hash(dst) === antes[r] && antes[r] !== h) {
+            fs.copyFileSync(src, dst) // não foi editado: recebe a versão nova
+          } else if (!antes[r]) {
+            agora[r] = hash(dst) // já existia sem registro (instalação antiga): fica como está
+          } else if (hash(dst) !== antes[r]) {
+            agora[r] = antes[r] // editado pelo usuário: mantém a edição e o registro antigo
+          }
+        } catch {}
+      }
+    }
+  }
+  try {
+    fs.mkdirSync(destino, { recursive: true })
+    andar(origem, '')
+    fs.writeFileSync(arqManifesto, JSON.stringify(agora))
+  } catch {}
 }
 
 // Regra de segurança por conta (nível do painel): vai no SOUL.md do perfil, regravada a cada sessão, e o usuário não vê.

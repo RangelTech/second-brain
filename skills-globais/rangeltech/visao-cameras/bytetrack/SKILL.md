@@ -1,30 +1,38 @@
 ---
 name: bytetrack
-description: ByteTrack (ADOTAR). Tracker. 50-62 fps (YOLO11 + ByteTrack, 4090). MIT.
+description: |
+  Rastreamento de objetos entre quadros de vídeo (mantém o mesmo id para cada objeto). Use depois de um detector (YOLO) para contar pessoas/veículos e seguir trajetos.
+  Use quando o cliente disser: "contar pessoas que passam na câmera"; "seguir veículos no vídeo"; "manter o mesmo número em cada objeto entre quadros".
 ---
 
 # ByteTrack
 
-**Veredito da campanha (26 a 28/10/2026):** ADOTAR. **Classe do dado:** medido.
+> **Validada na bancada (parcial):** testado com o pacote `trackers` (reimplementação em Python limpo do ByteTrack) em caixas sintéticas; o repositório original (FoundationVision, exige YOLOX/PyTorch) não foi instalado.
 
-## Para que serve
-Tracker. 50-62 fps (YOLO11 + ByteTrack, 4090). MIT.
+## Quando usar
+Contagem e seguimento de pessoas ou veículos em câmeras (KI Vision), depois de um detector devolver caixas por quadro.
 
-> [ECCV 2022] ByteTrack: Multi-Object Tracking by Associating Every Detection Box
+## Quando NÃO usar
+Sem detector (precisa de caixas por quadro). Não identifica quem é a pessoa, só segue o objeto entre quadros.
 
-## O que foi medido
-- YOLO11n+ByteTrack 62,6 fps; m 49,8 fps (4090)
+## Combina com
+`ultralytics-yolo` (detector, GPU), `mediamtx`/`onvif-zeep` (entrada de vídeo), `vision`.
 
-## Hardware
-Roda sem GPU dedicada.
+## Receita validada na bancada (parcial)
+```bash
+python -m venv v && v/bin/pip install supervision trackers      # 37 s no PC de teste, sem GPU
+```
+```python
+import supervision as sv, trackers
+tr = trackers.ByteTrackTracker()
+saida = tr.update(sv.Detections(xyxy=caixas, confidence=conf, class_id=cls))   # saida.tracker_id
+```
+Teste: 3 objetos em 90 quadros (um some por 10 quadros e volta): ids estáveis [0, 1, 2] e cerca de 2.400 quadros/s só do rastreador, em CPU.
 
-## Licença
-MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
+## Armadilhas
+- O repositório original exige YOLOX; use `trackers` + detector Ultralytics.
+- `supervision.ByteTrack` não existe mais nas versões novas (0.31); a classe é `trackers.ByteTrackTracker`.
+- O teste foi com caixas sintéticas: o desempenho real depende do detector.
 
-## Instalação e uso
-Siga o README do repositório: https://github.com/FoundationVision/ByteTrack
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
-
-
-## Fonte
-Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.
+## Tempo e recursos medidos
+instalar 37 s; rastreador 2.400 quadros/s em CPU (sintético).

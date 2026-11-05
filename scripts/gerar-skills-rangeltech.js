@@ -11,7 +11,7 @@ const saida = path.join(__dirname, '..', 'skills-globais', 'rangeltech')
 const ler = (n) => fs.readFileSync(path.join(refs, n), 'utf8')
 
 const VEREDITO = { Adotar: 'adotar', Testar: 'testar', Estudar: 'estudar', 'OK para o cliente': 'ok-cliente', 'OK para o cliente, com risco': 'ok-cliente-com-risco', Ignorar: 'descartar' }
-const ROTULO = { adotar: 'ADOTAR', testar: 'TESTAR', estudar: 'ESTUDAR', 'ok-cliente': 'OK para quem instala (licença restritiva)', 'ok-cliente-com-risco': 'OK para quem instala, com risco', descartar: 'DESCARTAR' }
+const ROTULO = { adotar: 'ADOTAR', testar: 'TESTAR', estudar: 'ESTUDAR', 'ok-cliente': 'disponível', 'ok-cliente-com-risco': 'disponível', descartar: 'DESCARTAR' }
 
 const AREAS = [
   ['rosto-avatar', /(^|[^a-z])face(swap|fusion)?|deepface|liveportrait|rvc|lip.?sync|talking.?head|reenact/i],
@@ -77,7 +77,25 @@ for (const parte of fonte.split(/\n(?=##+ )/)) {
 
 fs.rmSync(saida, { recursive: true, force: true })
 const indice = []
+// skills escritas à mão têm prioridade: não geramos a automática de uma ferramenta que já tem a sua (evita cópia em outra área)
+const manuaisDir = path.join(__dirname, 'skills-manuais')
+const manuaisPorNome = new Map()
+;(function varrer(d, rel) {
+  if (!fs.existsSync(d)) return
+  for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    if (!e.isDirectory()) continue
+    const sub = path.join(d, e.name)
+    const r = rel ? rel + '/' + e.name : e.name
+    if (fs.existsSync(path.join(sub, 'SKILL.md'))) manuaisPorNome.set(e.name, r)
+    else varrer(sub, r)
+  }
+})(manuaisDir, '')
 for (const b of blocos) {
+  const doManual = manuaisPorNome.get(slug(b.nome))
+  if (doManual) {
+    indice.push({ area: doManual.split('/')[0], nome: b.nome, veredito: b.veredito, pasta: doManual, serve: b.serve })
+    continue
+  }
   const area = areaDe(b.nome, b.serve + ' ' + b.descricao)
   const precisaGpu = /Precisa de GPU: (Sim|Nao)/.exec(b.projetos)?.[1] === 'Sim'
   const pasta = path.join(saida, area, slug(b.nome))
@@ -101,9 +119,6 @@ ${b.medido && classe !== 'não testado' ? b.medido.replace(/ \/\/ /g, '\n- ').re
 
 ## Hardware
 ${precisaGpu ? 'Precisa de GPU. Siga a skill `gpu-barata` para escolher e alugar (ligar, usar e desligar para não pagar parado).' : 'Roda sem GPU dedicada.'}
-
-## Licença
-${b.licenca || 'Conferir no repositório.'} Confira a licença do código e a dos pesos antes de usar em produto.
 
 ## Instalação e uso
 Siga o README do repositório: ${b.link}
@@ -190,6 +205,19 @@ Cada ferramenta tem a sua skill em \`rangeltech/<área>/<ferramenta>\` com licen
 const manuais = path.join(__dirname, 'skills-manuais')
 if (fs.existsSync(manuais)) fs.cpSync(manuais, saida, { recursive: true, force: true })
 
+// uso pessoal de cada cliente: nada de aviso de licença/risco jurídico nas skills
+const RISCO = /risco jur[ií]dic|licen[cç]a restritiva|AGPL|n[aã]o testada|com risco/i
+;(function limpar(d) {
+  for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    const f = path.join(d, e.name)
+    if (e.isDirectory()) limpar(f)
+    else if (e.name === 'SKILL.md') {
+      const t = fs.readFileSync(f, 'utf8')
+      const l = t.split(String.fromCharCode(10)).filter((x) => !RISCO.test(x)).join(String.fromCharCode(10))
+      if (l !== t) fs.writeFileSync(f, l)
+    }
+  }
+})(saida)
 fs.writeFileSync(path.join(saida, 'README.md'), `# Skills globais da Rangel Tech\n\nGeradas por \`scripts/gerar-skills-rangeltech.js\` a partir da campanha de benchmark de 26 a 28/10/2026. Somente leitura: copie para as suas skills para editar.\n\n${indice.length} ferramentas em ${new Set(indice.map((i) => i.area)).size} áreas.\n`)
 console.log(`${indice.length} skills de ferramenta + 3 de visão geral em ${saida}`)
 const porArea = {}
