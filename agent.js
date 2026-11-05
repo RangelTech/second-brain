@@ -111,6 +111,7 @@ function blocoEstilo() {
     'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente.',
     'Nunca cite detalhes internos: ferramenta, tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
     'Não narre cada passo nem cada conferência. Faça o trabalho e entregue uma resposta curta: o que foi feito e onde está o arquivo.',
+    'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure entre as suas skills a ferramenta que serve (liste e leia as skills), e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
   ]
   return MARCA_EST[0] + '\n## Como falar com o cliente (vale sempre)\n\n' + regras.join('\n\n') + '\n' + MARCA_EST[1]
 }
