@@ -10,6 +10,12 @@ description: |
   "legenda animada", "plano de cenas", ou mandar link de reel/Instagram para assistir.
 ---
 
+> **Quando NÃO usar esta skill:** pedido de "vídeo de [cena, objeto, pessoa, animal, produto]" (conteúdo visual real, como "um vídeo de um balão subindo no céu") NÃO é motion graphics.
+> Esse pedido vai SEMPRE para a ferramenta de geração de vídeo por IA, `midia_gerar_video` (mcp-midia). Esta skill só serve para animação gráfica com texto, títulos, legendas,
+> gráficos e vinhetas, e apenas quando o usuário pedir isso explicitamente. Se a geração de vídeo por IA estiver indisponível, não improvise com esta skill: avise, em português
+> simples, que o vídeo não pôde ser gerado agora e ofereça tentar de novo.
+
+
 # video-motion
 
 Técnica: o vídeo é uma função do número do frame. Sem relógio, sem `Math.random`.

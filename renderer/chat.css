@@ -302,3 +302,39 @@
 .img-slot{display:flex;flex-direction:column;gap:10px;min-height:60px}
 .facoes .baixar{display:inline-flex;align-items:center;padding:7px 12px;border-radius:8px;background:var(--ac);color:#1f1d1a;font-weight:600;text-decoration:none;font-size:13px}
 @media (prefers-reduced-motion:reduce){.img-grade i::after{animation:none}}
+
+/* cartão de imagem e vídeo: fila, gerando (percentual), pronto, falha */
+.mc{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px 18px 18px;width:min(560px,100%);display:flex;flex-direction:column;gap:14px}
+.mc-topo{display:flex;align-items:center;gap:18px}
+.mc .img-grade{width:112px;flex:none;padding:2px;margin-bottom:10px}
+.mc .img-pct{right:50%;bottom:-12px;transform:translateX(50%);min-width:46px;text-align:center}
+.mc-textos{min-width:0}
+.mc-tit{font-size:16px;font-weight:600;line-height:1.35}
+.mc-sub{font-size:13.5px;color:var(--mut);margin-top:4px;line-height:1.45}
+.mc-barra{height:8px;border-radius:999px;background:var(--card2);overflow:hidden}
+.mc-barra>i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#4c8dff,#8fb8ff,#4c8dff);background-size:200% 100%;animation:mc-brilho 1.6s linear infinite;transition:width .5s ease}
+.mc-ferr[data-fase="queued"] .mc-barra>i{width:34%!important;opacity:.45;animation:mc-vai 1.8s ease-in-out infinite,mc-brilho 1.6s linear infinite}
+.mc-ferr[data-fase="queued"] .img-grade i::after{animation-duration:3.4s}
+@keyframes mc-brilho{to{background-position:-200% 0}}
+@keyframes mc-vai{0%,100%{transform:translateX(-60%)}50%{transform:translateX(170%)}}
+.mc-falha{align-items:flex-start;border-color:#6a3d38;background:#2d2422}
+.mc-retry{background:var(--ac);color:#1f1d1a;border:0;border-radius:10px;font-weight:600;padding:9px 18px;min-height:40px}
+.mc-retry:hover{background:var(--ac2)}
+.mc-retry:focus-visible,.facoes button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.mc-ok{display:inline-flex;width:18px;height:18px;margin-right:8px;color:var(--ok);vertical-align:-3px}
+.pronto .img-leg{font-size:15px;font-weight:600;color:var(--fg);display:flex;align-items:center}
+@media (max-width:520px){.mc{padding:14px}.mc-topo{gap:14px}.mc .img-grade{width:84px}}
+@media (prefers-reduced-motion:reduce){.mc-barra>i,.mc-ferr[data-fase="queued"] .mc-barra>i{animation:none}}
+.mc .img-grade i::after{width:4px;height:4px}
+
+/* passos de ferramenta numa linha so, recolhida; briefing do resultado */
+.grupo-ferr{margin:6px 0;border:0;font-size:13.5px;color:var(--mut)}
+.grupo-ferr>summary{cursor:pointer;display:flex;align-items:center;gap:8px;list-style:none;padding:4px 0}
+.grupo-ferr>summary::-webkit-details-marker{display:none}
+.grupo-ferr>summary::after{content:"\25B8";font-size:11px;margin-left:2px;transition:transform .15s}
+.grupo-ferr[open]>summary::after{transform:rotate(90deg)}
+.gf-ic{display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;color:var(--ok)}
+.gf-lista{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px 22px}
+.briefing{margin-top:8px;font-size:13px;color:var(--mut)}
+.briefing summary{cursor:pointer}
+.briefing pre{white-space:pre-wrap;margin:6px 0 0;padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--bd);font:12.5px/1.5 var(--sans);color:var(--fg)}

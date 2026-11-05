@@ -160,7 +160,7 @@ function midiaDoApp() {
     const c = cfg.unlimitedChave
     if (process.env.SB_MIDIA_CHAVE) return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: process.env.SB_MIDIA_CHAVE } // so para teste
     if (!c || !cfg.unlimitedLigado) return null
-    return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: decifrar(c) }
+    return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: decifrar(c), prefs: cfg.midia || {} }
   } catch {
     return null
   }

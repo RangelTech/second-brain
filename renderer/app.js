@@ -179,6 +179,15 @@
   const ICONE_FERR = { read: 'file', edit: 'pencil', delete: 'trash', move: 'move', search: 'search', execute: 'terminal', think: 'sparkles', fetch: 'globe', other: 'sparkles' }
   const ROTULO_FERR = { read: 'Lendo', edit: 'Escrevendo', delete: 'Apagando', move: 'Movendo', search: 'Buscando', execute: 'Executando', think: 'Pensando', fetch: 'Acessando a web', other: 'Usando ferramenta' }
   const nomeArq = (p) => String(p || '').split(/[\\/]/).pop()
+  // nome de ferramenta -> rótulo de gente; etapas internas do agente não aparecem
+  const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
+  const ehMidia = (f) => /midia_gerar_(imagem|video)/.test((f && f.titulo) || '')
+  const ROTULOS = [
+    [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
+    [/navegador_|browser|web_?search|search_web/i, 'Pesquisando na web'], [/vision_analyze/, 'Olhando a imagem'],
+    [/read_file|^read\b/i, 'Lendo arquivo'], [/write_file|patch|edit/i, 'Escrevendo arquivo'], [/terminal|execute|shell/i, 'Executando'],
+  ]
+  const rotuloFerr = (f) => { const t = (f && f.titulo) || ''; const r = ROTULOS.find(([re]) => re.test(t)); return r ? r[1] : (ROTULO_FERR[(f && f.tipo) || 'other'] || 'Trabalhando') }
 
   function cartaoFerramenta(f) {
     const d = document.createElement('div')
@@ -192,49 +201,146 @@
     if (/^[A-Za-z]:[\\/]/.test(x) || x.startsWith('/')) x = x.split(/[\\/]/).pop()
     return x.replace(/^[0-9a-z]{6,9}-(?=.+\.\w+$)/i, '')
   }
-  // Imagem sendo criada: grade de pontos que pulsa e porcentagem estimada (o servidor leva ~10 s); ao terminar, a imagem aparece na hora
+  // ---------- cartão de imagem e vídeo: na fila -> gerando (percentual) -> pronto, ou "não consegui" com tentar de novo ----------
+  // O servidor de mídia (mcp-midia.js) grava o andamento em <pasta de trabalho>/.midia/<tipo>-<hash do prompt>.json
+  // { status: queued|running|done|failed, position, eta_s, progress 0..100 }; aqui lemos de 1,5 em 1,5 s. Sem esse arquivo, o percentual é estimado.
+  const jobsMidia = new Map() // id da ferramenta -> { t0, st, pct, timer }
+  const hashMidia = (s) => {
+    let h = 0x811c9dc5
+    const t = String(s || '')
+    for (let i = 0; i < t.length; i++) {
+      h ^= t.charCodeAt(i)
+      h = Math.imul(h, 0x01000193) >>> 0
+    }
+    return h.toString(16).padStart(8, '0')
+  }
+  const arqAndamento = (tipo, prompt) => {
+    const sep = String(cfg.pasta || '').includes('\\') ? '\\' : '/'
+    return `${cfg.pasta}${sep}.midia${sep}${tipo}-${hashMidia(String(prompt || '').slice(0, 3500))}.json`
+  }
+  const utf8 = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
+  function estadoMidia(j, video) {
+    const seg = (Date.now() - j.t0) / 1000
+    const st = j.st
+    let status = st?.status
+    if (!status) status = video && seg < 3 ? 'queued' : 'running'
+    if (status === 'done') status = 'running' // o cartão vira o resultado quando a ferramenta termina
+    const estimado = Math.max(1, Math.min(96, Math.round(100 * (1 - Math.exp(-seg / (video ? 70 : 5.5))))))
+    const real = typeof st?.progress === 'number' && status === 'running' ? Math.max(1, Math.min(99, Math.round(st.progress))) : null
+    return { status, alvo: status === 'queued' ? 0 : real ?? estimado, real: real != null, pos: st?.position ?? null, eta: st?.eta_s ?? null }
+  }
+  const textoEta = (s) => (s == null || s <= 0 ? '' : s >= 90 ? `cerca de ${Math.ceil(s / 60)} min` : `cerca de ${Math.max(5, Math.round(s / 5) * 5)} s`)
+  function pintarMidia(d, j, video) {
+    const e = estadoMidia(j, video)
+    const objeto = video ? 'vídeo' : 'imagem'
+    const tit = d.querySelector('.mc-tit')
+    const sub = d.querySelector('.mc-sub')
+    if (!tit || !d.querySelector('.img-pct')) return
+    const novoTit = e.status === 'queued' ? `${video ? 'Seu vídeo está' : 'Sua imagem está'} na fila para ser ${video ? 'gerado' : 'gerada'}` : `Gerando ${video ? 'o seu vídeo' : 'a sua imagem'}...`
+    if (tit.textContent !== novoTit) tit.textContent = novoTit // região "status": só anuncia quando a fase muda
+    const partes = []
+    if (e.status === 'queued') {
+      partes.push(e.pos === 1 ? 'Você é o próximo' : e.pos > 1 ? `Você é o ${e.pos}º da fila` : 'Estamos organizando o seu pedido')
+      if (textoEta(e.eta)) partes.push(`tempo estimado: ${textoEta(e.eta)}`)
+    } else {
+      partes.push(video ? 'Vídeos levam alguns minutos. Você pode continuar usando o app.' : 'Estamos criando a sua imagem.')
+      if (textoEta(e.eta)) partes.push(`faltam ${textoEta(e.eta)}`)
+    }
+    sub.textContent = partes.join(' · ')
+    d.dataset.fase = e.status
+    // o número sobe suavemente e nunca volta
+    j.pct = e.status === 'queued' ? 0 : Math.max(j.pct || 0, Math.min(e.alvo, (j.pct || 0) + Math.max(1, (e.alvo - (j.pct || 0)) * 0.35)))
+    const pct = Math.round(j.pct)
+    d.querySelector('.img-pct').textContent = e.status === 'queued' ? '···' : pct + '%'
+    const barra = d.querySelector('.mc-barra')
+    barra.setAttribute('aria-valuenow', String(pct))
+    barra.firstElementChild.style.width = pct + '%'
+  }
+  function acompanharMidia(f, video, prompt) {
+    let j = jobsMidia.get(f.id)
+    if (j) return j
+    j = { t0: Date.now(), st: null, pct: 0, fim: 0 }
+    jobsMidia.set(f.id, j)
+    const arq = arqAndamento(video ? 'video' : 'imagem', prompt)
+    const ler = async () => {
+      if (j.fim || Date.now() - j.t0 > 25 * 60 * 1000) return
+      try {
+        const r = await window.sb.lerArquivo(arq)
+        if (r.ok) {
+          const st = JSON.parse(utf8(r.base64))
+          if (j.visto === undefined) j.visto = true && (j.velho = ['done', 'failed'].includes(st.status) ? st.t : null) // sobra de um pedido igual anterior: ignora até o servidor regravar
+          if (!j.velho || st.t !== j.velho) j.st = st
+        }
+      } catch {
+        /* sem arquivo: segue com a estimativa */
+      }
+      for (const d of document.querySelectorAll('.mc-ferr[data-id="' + CSS.escape(String(f.id)) + '"]')) pintarMidia(d, j, video)
+      j.timer = setTimeout(ler, 1500)
+    }
+    ler()
+    j.suave = setInterval(() => {
+      if (j.fim) return clearInterval(j.suave)
+      for (const d of document.querySelectorAll('.mc-ferr[data-id="' + CSS.escape(String(f.id)) + '"]')) pintarMidia(d, j, video)
+    }, 400)
+    return j
+  }
   function criandoImagem(d, f) {
     const video = /midia_gerar_video/.test(f.titulo || '')
-    d.className = 'ferr img-ferr ' + (f.status || 'pending')
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
+    const prox = video ? 'o vídeo' : 'a imagem'
+    if (f.status === 'completed' || f.status === 'failed') {
+      const j = jobsMidia.get(f.id)
+      if (j) { j.fim = Date.now(); clearTimeout(j.timer) }
+    }
     if (f.status === 'completed') {
       const m = (video ? /caminho:\s*(.+?\.mp4)/i : /caminho:\s*(.+?\.png)/i).exec(String(f.conteudo || ''))
       if (!m) {
-        d.hidden = true // etapa de apoio da ferramenta (sem o arquivo): o cartão que mostra a imagem é o outro
+        d.className = 'ferr img-ferr'
+        d.hidden = true // etapa de apoio da ferramenta (sem o arquivo): o cartão que mostra o resultado é o outro
         return true
       }
       d.hidden = false
-      d.innerHTML = `<div class="img-pronta"><div class="img-leg">${video ? 'Vídeo criado' : 'Imagem criada'}</div><div class="img-slot"></div></div>`
+      d.className = 'ferr img-ferr mc-ferr pronto'
+      d.innerHTML = `<div class="img-pronta"><div class="img-leg" role="status"><span class="mc-ok">${IC.check}</span>Pronto! ${video ? 'Seu vídeo' : 'Sua imagem'} está ${video ? 'pronto' : 'pronta'}.</div><div class="img-slot"></div></div>`
       const caminho = m[1]
       window.sb.lerArquivo(caminho).then((r) => {
         if (!r.ok) return
-        const src = `data:${video ? 'video/mp4' : 'image/png'};base64,${r.base64}`
+        // o tipo vem do CONTEÚDO do arquivo (assinatura), não só do nome: um vídeo nunca aparece como foto
+        const ini = atob(r.base64.slice(0, 24))
+        const ehVideo = /ftyp|webm|\x1aE\xdf\xa3/.test(ini.slice(0, 16)) || (video && !/^(\x89PNG|\xff\xd8|GIF8|RIFF)/.test(ini))
+        const mime = ehVideo ? 'video/mp4' : /^\xff\xd8/.test(ini) ? 'image/jpeg' : 'image/png'
+        const src = `data:${mime};base64,${r.base64}`
         const slot = d.querySelector('.img-slot')
         if (!slot) return
-        slot.innerHTML = `${video ? `<video class="img-final" src="${src}" controls loop playsinline></video>` : `<img class="img-final" src="${src}" alt="${attr(arg.prompt || 'Imagem gerada')}">`}<div class="facoes" style="padding:0"><a class="baixar" href="${src}" download="${attr(nomeArq(caminho))}">Baixar</a><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>`
+        const brief = [arg.prompt && 'Descrição: ' + arg.prompt, arg.negative_prompt && 'Evitar: ' + arg.negative_prompt, arg.formato && 'Formato: ' + arg.formato, arg.segundos && 'Duração: ' + arg.segundos + ' s', arg.qualidade && 'Qualidade: ' + arg.qualidade, arg.seed != null && 'Semente: ' + arg.seed].filter(Boolean).join('\n')
+        slot.innerHTML = `${ehVideo ? `<video class="img-final" src="${src}" controls loop playsinline preload="metadata"></video>` : `<img class="img-final" src="${src}" alt="${attr(arg.prompt || 'Imagem gerada')}">`}<div class="facoes" style="padding:0"><a class="baixar" href="${src}" download="${attr(nomeArq(caminho))}">Baixar</a><button data-variacao="${ehVideo ? 'video' : 'imagem'}">Variação</button><button data-ajustar="${ehVideo ? 'video' : 'imagem'}">Refazer com ajuste</button><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>${brief ? `<details class="briefing"><summary>Ver o briefing usado</summary><pre>${esc(brief)}</pre></details>` : ''}`
       })
       return true
     }
-    if (f.status === 'failed') return false
-    f.t0 = f.t0 || Date.now()
-    const n = 17
+    if (f.status === 'failed') {
+      d.hidden = false
+      d.className = 'ferr img-ferr mc-ferr falha'
+      d.innerHTML = `<div class="mc mc-falha"><div class="mc-tit" role="status">Não consegui gerar agora, tente de novo em instantes.</div><div class="mc-sub">Seu pedido não foi perdido: é só tentar de novo.</div><button type="button" class="mc-retry" data-tentar-midia="${video ? 'video' : 'imagem'}">Tentar de novo</button></div>`
+      return true
+    }
+    d.hidden = false
+    d.className = 'ferr img-ferr mc-ferr ' + (f.status || 'pending')
+    const j = acompanharMidia(f, video, arg.prompt)
+    const n = 9
     let pts = ''
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) pts += `<i style="--d:${(Math.hypot(x - n / 2, y - n / 2) * 0.09).toFixed(2)}s"></i>`
-    d.innerHTML = `<div class="img-espera"><div class="img-leg">${video ? 'Criando vídeo' : 'Criando imagem'}</div><div class="img-grade" style="--n:${n}">${pts}<span class="img-pct">1%</span></div></div>`
-    const pct = d.querySelector('.img-pct')
-    const t = setInterval(() => {
-      if (!d.isConnected || !pct.isConnected) return clearInterval(t)
-      const seg = (Date.now() - f.t0) / 1000
-      pct.textContent = Math.max(1, Math.min(96, Math.round(100 * (1 - Math.exp(-seg / (video ? 70 : 5.5)))))) + '%' // vídeo leva minutos
-    }, 250)
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) pts += `<i style="--d:${(Math.hypot(x - n / 2, y - n / 2) * 0.16).toFixed(2)}s"></i>`
+    d.innerHTML = `<div class="mc"><div class="mc-topo"><div class="img-grade" style="--n:${n}" aria-hidden="true">${pts}<span class="img-pct">1%</span></div><div class="mc-textos"><div class="mc-tit" role="status" aria-live="polite"></div><div class="mc-sub"></div></div></div><div class="mc-barra" role="progressbar" aria-label="Andamento d${prox}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div></div>`
+    pintarMidia(d, j, video)
     return true
   }
   function atualizarCartao(d, f) {
+    d.hidden = INTERNA.test(f.titulo || '') // etapa interna do agente, sem significado para quem usa
+    if (d.hidden) return
     if (/midia_gerar_(imagem|video)/.test(f.titulo || '') && criandoImagem(d, f)) return
     const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
     let titulo = tituloLimpo(f.titulo)
-    let rotulo = ROTULO_FERR[tipo] || ''
+    let rotulo = rotuloFerr(f)
     let icone = IC[ICONE_FERR[tipo]] || IC.sparkles
     // ferramentas próprias do app aparecem com nome de gente, não de função
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
@@ -261,14 +367,50 @@
   }
   function renderPartes(el, partes) {
     el.innerHTML = ''
+    let grupo = null
+    let ultimaFalha = null
+    const fechaGrupo = () => {
+      if (!grupo) return
+      const itens = grupo.itens.filter((x) => !INTERNA.test(x.f.titulo || ''))
+      if (itens.length) {
+        const erro = itens.filter((x) => x.f.status === 'failed').length
+        const rodando = itens.some((x) => x.f.status !== 'completed' && x.f.status !== 'failed')
+        const det = document.createElement('details')
+        det.className = 'grupo-ferr' + (rodando ? ' rodando' : '')
+        det.innerHTML = `<summary><span class="gf-ic">${rodando ? '<span class="rodando"></span>' : IC.check}</span><span>${rodando ? 'Trabalhando...' : 'Concluído'} · ${itens.length} ${itens.length === 1 ? 'passo' : 'passos'}${erro && !rodando ? ` · ${erro} sem sucesso` : ''}</span></summary><div class="gf-lista"></div>`
+        const lista = det.querySelector('.gf-lista')
+        for (const x of itens) lista.appendChild(cartaoFerramenta(x.f))
+        el.appendChild(det)
+      }
+      grupo = null
+    }
     for (const p of partes) {
       if (p.t === 'texto') {
+        fechaGrupo()
         const c = document.createElement('div')
         c.className = 'corpo'
         c.innerHTML = md(p.v)
         el.appendChild(c)
-      } else if (p.t === 'ferr') el.appendChild(cartaoFerramenta(p.f))
+      } else if (p.t === 'ferr') {
+        if (ehMidia(p.f)) {
+          const card = cartaoFerramenta(p.f)
+          if (p.f.status === 'failed' && ultimaFalha && ultimaFalha.tipo === (/video/.test(p.f.titulo) ? 'video' : 'imagem')) {
+            ultimaFalha.n++ // tentativas repetidas viram um só cartão de falha, com contador discreto
+            const c = ultimaFalha.el.querySelector('.mc-sub')
+            if (c) c.textContent = `Tentamos ${ultimaFalha.n} vezes. Seu pedido não foi perdido: é só tentar de novo.`
+            continue
+          }
+          if (card.hidden) continue
+          fechaGrupo()
+          el.appendChild(card)
+          ultimaFalha = p.f.status === 'failed' ? { el: card, n: 1, tipo: /video/.test(p.f.titulo) ? 'video' : 'imagem' } : null
+        } else {
+          if (!grupo) grupo = { itens: [] }
+          grupo.itens.push(p)
+        }
+      }
     }
+    fechaGrupo()
   }
 
   const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Segundo Cérebro`
@@ -286,7 +428,7 @@
     const total = u.totalTokens || (u.inputTokens || 0) + (u.outputTokens || 0)
     const nFerr = (m.partes || []).filter((p) => p.t === 'ferr').length
     const titulo = ms < 4000 ? `Respondeu em ${duracao(ms)}` : `Trabalhou por ${duracao(ms)}`
-    const linha = [titulo, `${hhmm(m.inicio)} às ${hhmm(m.fim)}`, total ? `${nTokens(total)} tokens` : ''].filter(Boolean).join(' · ')
+    const linha = titulo // horário e tokens ficam dentro do detalhe
     const det = [
       ['Tempo', duracao(ms)],
       ['Horário', `${hhmm(m.inicio)} às ${hhmm(m.fim)}`],
@@ -929,6 +1071,24 @@
 
   // ações dos cartões e mídia
   document.addEventListener('click', (e) => {
+    const va = e.target.closest('[data-variacao]')
+    if (va) {
+      const c = chats.find((x) => x.id === atual)
+      if (c && !respostas.has(c.id)) enviarMensagem(c, `Faça uma variação ${va.dataset.variacao === 'video' ? 'deste vídeo' : 'desta imagem'}: mesmo pedido, outra semente.`, [])
+      return
+    }
+    const aj = e.target.closest('[data-ajustar]')
+    if (aj) {
+      $('texto').value = `Refaça ${aj.dataset.ajustar === 'video' ? 'o vídeo' : 'a imagem'} com este ajuste: `
+      $('texto').focus()
+      return
+    }
+    const tm = e.target.closest('[data-tentar-midia]')
+    if (tm) {
+      const c = chats.find((x) => x.id === atual)
+      if (c && !respostas.has(c.id)) enviarMensagem(c, tm.dataset.tentarMidia === 'video' ? 'Tente gerar o vídeo de novo, por favor.' : 'Tente gerar a imagem de novo, por favor.', [])
+      return
+    }
     const ab = e.target.closest('[data-abrir]')
     if (ab) return window.sb.abrirArquivo(ab.dataset.abrir)
     const mo = e.target.closest('[data-mostrar]')
