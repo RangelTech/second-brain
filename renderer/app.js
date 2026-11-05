@@ -1056,6 +1056,19 @@
     }
   })
   window.sb.aoFim((d) => fim(d.id, d.texto, '', d.uso))
+  // primeira abertura: o agente está sendo preparado em segundo plano; aviso discreto, some sozinho quando termina
+  window.sb.aoPreparando?.((t) => {
+    let p = document.getElementById('sb-preparando')
+    if (!t) return p?.remove()
+    if (!p) {
+      p = document.createElement('div')
+      p.id = 'sb-preparando'
+      p.setAttribute('role', 'status')
+      p.style.cssText = 'position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:9999;background:#2a1f14;color:#f3ece4;border:1px solid #5a4630;border-radius:999px;padding:8px 16px;font:13px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:90vw;text-align:center;pointer-events:none'
+      document.body.appendChild(p)
+    }
+    p.textContent = t
+  })
   // versão web: a conexão caiu e voltou (a máquina pode ter reiniciado e perdido a conversa em andamento).
   // Quem não der sinal em 10 s é dado como perdido: a tela fecha a resposta e refaz o pedido sozinha, sem o cliente precisar pedir de novo.
   window.sb.aoRetomar?.(() => {

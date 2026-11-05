@@ -283,6 +283,36 @@ function criarJanela() {
 
 if (MODO_SERVIDOR) app.disableHardwareAcceleration()
 app.whenReady().then(() => {
+  // modo do instalador: baixa e prepara o agente (Hermes) sem abrir janela e sai. O instalador do Windows chama isto no fim da
+  // instalação, então depois de instalar o cliente só conversa. O progresso vai para um arquivo de log na pasta de dados.
+  if (process.argv.includes('--preparar-agente')) {
+    const logArq = path.join(app.getPath('userData'), 'preparo.log')
+    const anotar = (t) => {
+      try {
+        fs.mkdirSync(app.getPath('userData'), { recursive: true })
+        fs.appendFileSync(logArq, new Date().toISOString() + ' ' + t + '\n')
+      } catch {}
+    }
+    anotar('iniciando o preparo do agente')
+    hermesInstalar
+      .garantir((t) => anotar(t))
+      .then(async () => {
+        // aquece o agente: a primeira abertura monta o ambiente dele (minutos) e grava pronto.ok; fazendo aqui, o cliente já abre pronto
+        anotar('montando o ambiente do agente (primeira abertura)')
+        const pasta = path.join(app.getPath('documents'), 'Segundo Cerebro')
+        fs.mkdirSync(pasta, { recursive: true })
+        const s = new Sessao({ app, id: 'preparo', pasta, base: 'http://127.0.0.1:9/v1', modelo: 'principal', chave: 'preparo', raciocinio: 'none', emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => 'manual', nivel: 1 })
+        await s.iniciar()
+        s.encerrar()
+        anotar('agente pronto')
+        app.exit(0)
+      })
+      .catch((e) => {
+        anotar('falhou: ' + e.message)
+        app.exit(1)
+      })
+    return
+  }
   carregarCfg()
   // VM provisionada pela automação: a conta chega por variável de ambiente (a chave é cifrada e a variável pode ser apagada depois)
   if (MODO_SERVIDOR && process.env.SB_CONTA_EMAIL && process.env.SB_CONTA_CHAVE && !cfg.unlimitedChave) {
@@ -547,8 +577,20 @@ app.whenReady().then(() => {
   ipcMain.handle('acessoweb:renomear', (_e, nome) => remoto.renomear(nome))
   if (MODO_SERVIDOR) remoto.ativar(true)
   else remoto.iniciar()
-  // VM: o agente é instalado no primeiro boot, sem esperar a primeira conversa
-  if (MODO_SERVIDOR) hermesInstalar.garantir().catch((e) => console.error('[hermes]', e.message))
+  // o agente é preparado assim que o app abre pela primeira vez (VM e desktop), sem esperar a primeira conversa:
+  // depois de instalar, o cliente só conversa. A tela mostra um aviso discreto enquanto prepara.
+  const avisarPreparo = (t) => {
+    try {
+      janela?.webContents.send('hermes:preparando', t)
+    } catch {}
+  }
+  hermesInstalar
+    .garantir(MODO_SERVIDOR ? undefined : avisarPreparo)
+    .then(() => avisarPreparo(''))
+    .catch((e) => {
+      console.error('[hermes]', e.message)
+      avisarPreparo('')
+    })
   ipcMain.handle('chat:permissao-resp', (_e, { req, resposta }) => permissoes.get(req)?.(resposta))
   ipcMain.handle('chat:enviar', async (e, { id, mensagens, alvo, anexos }) => {
     const ac = new AbortController()

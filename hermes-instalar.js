@@ -58,14 +58,17 @@ function criar({ app, localizar }) {
     // devolve quando o agente existe; `aviso(texto)` recebe a etapa para mostrar na conversa
     async garantir(aviso) {
       if (localizar()) return
-      const ouvir = (t) => aviso?.(`Preparando o agente pela primeira vez (${t}). Leva alguns minutos e acontece uma vez só…`)
+      const msg = (t) => (t ? `Preparando o agente pela primeira vez (${t}). Leva alguns minutos e acontece uma vez só…` : 'Preparando o agente pela primeira vez. Leva alguns minutos e acontece uma vez só…')
+      const ouvir = (t) => aviso?.(msg(t))
       ouvintes.add(ouvir)
-      if (etapa) ouvir(etapa)
-      else aviso?.('Preparando o agente pela primeira vez. Leva alguns minutos e acontece uma vez só…')
+      aviso?.(msg(etapa))
+      // batimento: etapa longa (baixar dependências) não pode parecer travada nem ser cortada pelo vigia de "sem sinal"
+      const batida = setInterval(() => aviso?.(msg(etapa)), 15000)
       try {
         andamento ||= instalar().finally(() => (andamento = null))
         await andamento
       } finally {
+        clearInterval(batida)
         ouvintes.delete(ouvir)
       }
     },
