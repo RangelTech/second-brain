@@ -102,7 +102,7 @@ NOVA="$(curl -fsSL --retry 3 "https://api.github.com/repos/$REPO/releases/latest
 if [ "$NOVA" = "$ATUAL" ]; then echo "já está na versão $ATUAL"; exit 0; fi
 echo "atualizando $ATUAL -> $NOVA"
 DEB="$(mktemp --suffix=.deb)"; trap 'rm -f "$DEB"' EXIT
-curl -fL --retry 3 -o "$DEB" "https://github.com/$REPO/releases/download/v$NOVA/Segundo-Cerebro-Linux.deb"
+curl -fsSL --retry 3 -o "$DEB" "https://github.com/$REPO/releases/download/v$NOVA/Segundo-Cerebro-Linux.deb"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$DEB" >/dev/null
 systemctl restart segundo-cerebro.service
 echo "atualizado para $NOVA"
