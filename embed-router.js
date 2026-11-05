@@ -120,7 +120,8 @@ async function api(metodo, rota, corpo) {
 async function travarSaidas() {
   try {
     const off = { enabled: false, roundRobin: false, models: [] }
-    await api('PATCH', '/api/settings', { capacityAdapter: { vision: off, pdf: off, audioInput: off, videoInput: off }, cloudEnabled: false })
+    // o roteador só escuta em 127.0.0.1; no app empacotado ele recusava a própria chave local (gera e valida com ids de máquina diferentes), então a exigência de chave fica desligada aqui
+    await api('PATCH', '/api/settings', { capacityAdapter: { vision: off, pdf: off, audioInput: off, videoInput: off }, cloudEnabled: false, requireApiKey: false })
   } catch {}
 }
 

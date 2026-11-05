@@ -895,7 +895,7 @@
 
   // mensagens técnicas do motor (em inglês, com HTTP, chave, "hermes setup"...) nunca chegam ao cliente: o app tenta de novo
   // em silêncio e, se continuar falhando, mostra uma frase simples
-  const ERRO_TECNICO = /rejected your API key|Invalid API key|HTTP [45]\d\d|Provider said|hermes setup|Stream stalled|Traceback|Your request was not processed|model can't be reached/i
+  const ERRO_TECNICO = /rejected your API key|Invalid API key|HTTP [45]\d\d|Provider said|hermes setup|Stream stalled|admitted_turn_failed|Internal error|Traceback|Your request was not processed|model can't be reached/i
   // só vale para texto curto (as mensagens de erro reais são curtas); uma explicação longa sobre HTTP 404 não é trocada
   const eErroTecnico = (t) => !!t && t.length < 500 && ERRO_TECNICO.test(t)
   const FRASE_FALHA = 'Não consegui responder agora. Tente enviar de novo em instantes.'
