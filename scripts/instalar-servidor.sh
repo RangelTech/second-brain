@@ -30,7 +30,7 @@ apt-get update -qq
 apt-get install -y -qq ca-certificates curl xvfb xauth >/dev/null
 # bibliotecas que o Electron precisa e que uma Ubuntu/Debian mínima não traz (no Ubuntu 24.04 alguns nomes ganham o sufixo t64)
 LISTA=""
-for pacote in libatomic1 git build-essential libasound2 libgtk-3-0 libnss3 libgbm1 libxss1 libxtst6 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libxfixes3 libpango-1.0-0 libcairo2 libx11-xcb1 libxcb-dri3-0 fonts-liberation; do
+for pacote in libatomic1 git build-essential libasound2 libgtk-3-0 libnss3 libgbm1 libxss1 libxtst6 libatk-bridge2.0-0 libatk1.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libxfixes3 libpango-1.0-0 libcairo2 libx11-xcb1 libxcb-dri3-0 fonts-liberation fonts-noto-core fonts-noto-color-emoji fonts-noto-cjk; do
   if apt-cache show "${pacote}t64" >/dev/null 2>&1; then LISTA="$LISTA ${pacote}t64"; else LISTA="$LISTA $pacote"; fi
 done
 # uma só chamada do apt (muito mais rápido que um por pacote)
