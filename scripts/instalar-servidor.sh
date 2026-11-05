@@ -91,8 +91,43 @@ NoNewPrivileges=true
 [Install]
 WantedBy=multi-user.target
 UNIT
+# atualizador diário: se houver versão nova publicada, baixa o .deb, instala e reinicia o serviço (a VM do cliente nunca fica para trás)
+cat > /usr/local/bin/segundo-cerebro-atualizar <<'ATU'
+#!/usr/bin/env bash
+set -euo pipefail
+REPO="RangelTech/second-brain"
+ATUAL="${SB_ATUAL_FORCADA:-$(dpkg-query -W -f='${Version}' second-brain 2>/dev/null || echo 0)}"
+NOVA="$(curl -fsSL --retry 3 "https://api.github.com/repos/$REPO/releases/latest" | python3 -c 'import sys,json;print(json.load(sys.stdin)["tag_name"].lstrip("v"))')"
+[ -n "$NOVA" ] || exit 1
+if [ "$NOVA" = "$ATUAL" ]; then echo "já está na versão $ATUAL"; exit 0; fi
+echo "atualizando $ATUAL -> $NOVA"
+DEB="$(mktemp --suffix=.deb)"; trap 'rm -f "$DEB"' EXIT
+curl -fL --retry 3 -o "$DEB" "https://github.com/$REPO/releases/download/v$NOVA/Segundo-Cerebro-Linux.deb"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$DEB" >/dev/null
+systemctl restart segundo-cerebro.service
+echo "atualizado para $NOVA"
+ATU
+chmod 755 /usr/local/bin/segundo-cerebro-atualizar
+cat > /etc/systemd/system/segundo-cerebro-atualizar.service <<UNIT2
+[Unit]
+Description=Atualiza o Segundo Cérebro (servidor)
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/segundo-cerebro-atualizar
+UNIT2
+cat > /etc/systemd/system/segundo-cerebro-atualizar.timer <<UNIT3
+[Unit]
+Description=Procura versão nova do Segundo Cérebro todo dia
+[Timer]
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=1h
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT3
 systemctl daemon-reload
 systemctl enable --now segundo-cerebro.service
+systemctl enable --now segundo-cerebro-atualizar.timer
 sleep 6
 if systemctl is-active --quiet segundo-cerebro.service; then
   LOG "Pronto. O servidor está rodando e aparece em https://remoto.rangeltech.net (entre com a sua conta)."
