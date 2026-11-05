@@ -268,6 +268,40 @@ function criar({ app, janela, avisar, pedirPainel }) {
     mostrar,
     esconderTemporario,
     atender,
+    // painel da versão web: captura leve (JPEG) da página e entradas diretas do usuário (não marca "controle do agente")
+    async captura() {
+      garantir()
+      const wc = vista.webContents
+      let img = await wc.capturePage()
+      if (img.isEmpty()) return null
+      const real = img.getSize()
+      if (real.width > 1280) img = img.resize({ width: 1280 })
+      const t = img.getSize()
+      return { base64: img.toJPEG(72).toString('base64'), largura: real.width, altura: real.height, w: t.width, h: t.height, url: wc.getURL() }
+    },
+    clicarPonto(x, y) {
+      garantir()
+      const wc = vista.webContents
+      const px = Math.round(Number(x) || 0)
+      const py = Math.round(Number(y) || 0)
+      wc.sendInputEvent({ type: 'mouseMove', x: px, y: py })
+      wc.sendInputEvent({ type: 'mouseDown', x: px, y: py, button: 'left', clickCount: 1 })
+      wc.sendInputEvent({ type: 'mouseUp', x: px, y: py, button: 'left', clickCount: 1 })
+    },
+    async digitarTexto(texto) {
+      garantir()
+      await vista.webContents.insertText(String(texto ?? '').slice(0, 2000))
+    },
+    teclaEspecial(codigo) {
+      garantir()
+      if (!/^(Enter|Backspace|Tab|Escape|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Delete|Home|End|PageUp|PageDown)$/.test(codigo)) return
+      const kc = codigo === 'Enter' ? 'Return' : codigo.startsWith('Arrow') ? codigo.slice(5) : codigo
+      for (const tipo of codigo === 'Enter' ? ['keyDown', 'char', 'keyUp'] : ['keyDown', 'keyUp']) vista.webContents.sendInputEvent({ type: tipo, keyCode: kc })
+    },
+    rolarPonto(dy, x, y) {
+      garantir()
+      vista.webContents.sendInputEvent({ type: 'mouseWheel', x: Math.round(Number(x) || 200), y: Math.round(Number(y) || 200), deltaX: 0, deltaY: -Math.round(Number(dy) || 0) })
+    },
     acao: async (acao, url) => {
       garantir()
       const wc = vista.webContents

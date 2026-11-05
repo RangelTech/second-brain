@@ -80,7 +80,7 @@
     ws.onmessage = function (e) {
       var m
       try { m = JSON.parse(e.data) } catch (_) { return }
-      if (m.t === 'estado') return mostrar(m.online === false ? 'Seu computador está desconectado. Reconectando…' : '')
+      if (m.t === 'estado') return mostrar(m.online === false ? 'Seu computador (ou máquina virtual) está desconectado. Reconectando… Se a máquina foi desligada por atraso no pagamento, regularize e ela volta sozinha.' : '')
       if (m.t === 'ret') {
         var p = pendentes[m.id]
         if (!p) return

@@ -288,6 +288,11 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
   ipcMain.handle('navegador:estado', () => nav.estado())
+  ipcMain.handle('navegador:captura', () => nav.captura().catch(() => null))
+  ipcMain.handle('navegador:clique', (_e, x, y) => (nav.clicarPonto(x, y), true))
+  ipcMain.handle('navegador:digitar-texto', (_e, t) => nav.digitarTexto(t).then(() => true))
+  ipcMain.handle('navegador:tecla', (_e, k) => (nav.teclaEspecial(String(k)), true))
+  ipcMain.handle('navegador:rolar-ponto', (_e, dy, x, y) => (nav.rolarPonto(dy, x, y), true))
   // Modelo de voz do ditado (Vosk, português, ~32 MB): baixa uma vez e fica em disco; depois funciona sem internet.
   const modeloEmbutido = () => [path.join(process.resourcesPath || '', 'app.asar.unpacked', 'renderer', 'vendor', 'vosk-model-pt.tar.gz'), path.join(__dirname, 'renderer', 'vendor', 'vosk-model-pt.tar.gz')].find((f) => fs.existsSync(f))
   // Whisper (ditado preciso, no próprio computador): thread separada, um trecho por vez

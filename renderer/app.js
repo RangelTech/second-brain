@@ -1081,6 +1081,59 @@
     $('abrir-nav').classList.toggle('on', !!sim)
     await NAV.mostrar(!!sim)
     if (sim) setTimeout(navPos, 80)
+    if (window.__sbWeb) webNavLigar(!!sim)
+  }
+  // Versão web: a página roda na máquina (computador ou VM); aqui aparece uma captura ao vivo, e clique, rolagem e teclado
+  // do usuário viram entradas na página de lá.
+  let webNavTimer = null
+  let webNavImg = null
+  let webNavDim = { largura: 1, altura: 1 }
+  function webNavLigar(sim) {
+    clearInterval(webNavTimer)
+    if (!sim) return
+    const host = $('nav-host')
+    if (!webNavImg) {
+      host.style.position = 'relative'
+      host.innerHTML = '<img id="nav-web-img" alt="Página do navegador da máquina" tabindex="0" draggable="false" style="width:100%;height:100%;object-fit:contain;object-position:top left;display:block;outline:none;cursor:pointer;background:#fff"><form id="nav-web-teclado" style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:8px;background:rgba(20,16,12,.92)"><input id="nav-web-texto" placeholder="Digitar na página (clique antes no campo)" autocomplete="off" style="flex:1;min-width:0"><button type="submit" class="primario">Digitar</button><button type="button" id="nav-web-enter">Enter</button></form>'
+      webNavImg = $('nav-web-img')
+      webNavImg.addEventListener('click', (e) => {
+        const r = webNavImg.getBoundingClientRect()
+        const esc = Math.min(r.width / webNavDim.w, r.height / webNavDim.h)
+        const x = ((e.clientX - r.left) / esc) * (webNavDim.largura / webNavDim.w)
+        const y = ((e.clientY - r.top) / esc) * (webNavDim.altura / webNavDim.h)
+        NAV.clique(x, y)
+        webNavImg.focus()
+      })
+      webNavImg.addEventListener('wheel', (e) => {
+        e.preventDefault()
+        NAV.rolarPonto(e.deltaY > 0 ? -300 : 300, 200, 200)
+      }, { passive: false })
+      webNavImg.addEventListener('keydown', (e) => {
+        if (/^(Enter|Backspace|Tab|Escape|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Delete|Home|End|PageUp|PageDown)$/.test(e.key)) {
+          e.preventDefault()
+          NAV.tecla(e.key)
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          NAV.digitarTexto(e.key)
+        }
+      })
+      $('nav-web-teclado').onsubmit = (e) => {
+        e.preventDefault()
+        const t = $('nav-web-texto')
+        if (t.value) NAV.digitarTexto(t.value)
+        t.value = ''
+      }
+      $('nav-web-enter').onclick = () => NAV.tecla('Enter')
+    }
+    const atualizar = async () => {
+      if (!navAberto || document.hidden) return
+      const c = await NAV.captura().catch(() => null)
+      if (!c) return
+      webNavDim = { largura: c.largura, altura: c.altura, w: c.w, h: c.h }
+      webNavImg.src = 'data:image/jpeg;base64,' + c.base64
+    }
+    atualizar()
+    webNavTimer = setInterval(atualizar, 1500)
   }
   $('abrir-nav').onclick = () => navAbrir(!navAberto)
   $('nav-fechar').onclick = () => navAbrir(false)
