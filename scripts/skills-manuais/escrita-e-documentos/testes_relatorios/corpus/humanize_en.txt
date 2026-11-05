@@ -1,0 +1,19 @@
+Machine learning is the set of techniques that let a system get better at a task from examples, instead of following rules somebody wrote by hand.
+
+A concrete case makes the difference clear. To separate legitimate mail from spam the traditional way, someone has to enumerate the conditions: unknown sender, certain words in the subject line, a suspicious attachment. The list is never finished, because the people sending spam adapt to it. The other approach hands the algorithm ten thousand messages that are already sorted and lets it work out for itself what separates one pile from the other. The rules it finds are often not the ones a person would have written.
+
+There are three ways to learn, and they differ in what the algorithm is given.
+
+In supervised learning every example arrives with its answer attached. You show the photo and say it is a cat. It covers classification and prediction of values, and it is by far the most used in industry, because a company usually already has the labels sitting around as a byproduct of running the business.
+
+In unsupervised learning there is no answer. The algorithm gets the raw data and looks for structure: which customers resemble each other, which variables carry redundant information. It is useful when nobody knows in advance what to look for, and it is harder to evaluate for exactly that reason, since there is no key to check against.
+
+In reinforcement learning an agent acts in an environment, collects reward or punishment, and adjusts. This is what trained the systems that play chess and Go above human level, and it stays the most expensive of the three in compute.
+
+Training itself is optimization. The model has internal parameters, a function measures how wrong it is, and the algorithm pushes the parameters in whatever direction reduces that error, repeating until it stops improving.
+
+This is where the field's most common failure lives. A model with too much capacity memorizes the training set rather than learning what generalizes. It gets almost everything right on what it has already seen and fails on anything new, and the nasty part is that the training metric looks excellent while this happens, so nobody notices until it reaches production. The opposite exists too: a model too simple for the structure of the problem, wrong in the same way on both sets.
+
+Deep learning names a family of models with many layers that build representations in stages. The first layers of a vision system pick up edges, later ones assemble texture, the last ones recognize objects. That family is what moved the ceiling on computer vision and language processing over the past decade.
+
+The practical limit is rarely the algorithm. It is the data. A model trained on a biased set reproduces the bias, and it usually reproduces it wearing the appearance of objectivity, which is what makes the problem hard to catch.

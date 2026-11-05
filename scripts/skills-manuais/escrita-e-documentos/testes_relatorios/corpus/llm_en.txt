@@ -1,0 +1,15 @@
+Machine learning represents one of the most transformative areas of modern computing. It is a field that enables systems to identify patterns in data and improve their performance through experience, without every rule needing to be explicitly programmed.
+
+The core idea is relatively straightforward. Rather than writing detailed instructions for every possible situation, the developer supplies examples to the algorithm and lets it infer the rules on its own. This paradigm shift — from explicit programming to learning from data — has opened up possibilities that would be unfeasible through traditional approaches.
+
+**The three main paradigms.** Supervised learning uses labeled data, in which each example comes accompanied by the correct answer, and is widely applied in classification and regression. Unsupervised learning works with unlabeled data, seeking latent structures through clustering and dimensionality reduction. Reinforcement learning, meanwhile, involves an agent that interacts with an environment, receiving rewards or penalties and adjusting its decision policy over time.
+
+It is worth noting that data quality is crucial to the success of any model. Biased data produces biased models, and this remains one of the most significant challenges currently facing the field. Additionally, the quantity of available data frequently determines which techniques are viable.
+
+The training process consists of adjusting the model's internal parameters to minimize a loss function, which measures the discrepancy between predictions and actual values. This adjustment is typically performed through gradient-based optimization algorithms, which iteratively traverse the parameter space in search of progressively better solutions.
+
+One of the most recurrent problems is overfitting, a situation in which the model memorizes particularities of the training set rather than learning generalizable patterns. Conversely, underfitting occurs when the model is too simple to capture the underlying structure. Finding the balance between the two is fundamental, and numerous techniques have been developed for this purpose, including regularization, cross-validation, and early stopping.
+
+In recent decades, deep learning has emerged as a particularly powerful approach, leveraging neural networks with multiple layers to learn hierarchical representations. This technique has revolutionized areas such as computer vision, natural language processing, and speech recognition, establishing new performance benchmarks.
+
+In conclusion, machine learning has consolidated itself as an indispensable tool in an increasingly data-driven landscape. Challenges related to interpretability, bias, and computational requirements remain relevant, but the future of the field looks promising. It is undoubtedly a domain that will continue to shape how we interact with technology in the years ahead.

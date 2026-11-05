@@ -30,6 +30,29 @@ Depois `video_watch` no .mp4 (frames + transcrição Whisper local).
 - A saída do `video_watch` estoura o limite (~25k tokens) em vídeo de mais de 1 min: a transcrição vem inteira, os frames vêm cortados. Para ver um trecho, usar `start_time`/`end_time` ou `view_sample`.
 - Baixar para o scratchpad da sessão, nunca para dentro do projeto.
 
+## 0.5. Caminho curto sem Node nem Remotion (use primeiro para título, subtítulo e legenda)
+
+Para um vídeo de **título animado + subtítulo + legenda palavra por palavra** (reel, vinheta, story), use o script desta skill, que só precisa de Python com Pillow e FFmpeg. Não precisa de Node, Remotion nem GPU:
+
+```
+python <pasta-da-skill>/scripts/titulo_animado.py --titulo "FEIRÃO JUCA" --subtitulo "Ofertas de fim de ano"   --legenda "Condições especiais só até dezembro" --duracao 8 --formato 9x16 --saida video.mp4
+```
+
+Formatos: `9x16` (1080x1920), `16x9` (1920x1080), `1x1` (1080x1080). Cores: `--fundo-topo`, `--fundo-base`, `--destaque`. Os quadros vão direto ao FFmpeg (sem pasta de frames). Salve o MP4 em `Videos/` da pasta de trabalho e diga o caminho e a duração real (`ffprobe`).
+
+### Receita testada (VM Linux de cliente, 05/11/2026)
+
+Pedido: reel 9:16, 8 s, fundo azul-marinho com degradê, título "FEIRAO JUCA" com fade e subida, subtítulo e legenda palavra por palavra. O agente entregou certo (H.264, 1080x1920, 30 fps, 8,000 s, 194 KB; conferido por quadros em 0,5 s, 1,5 s, 3 s, 5 s e 7,5 s), mas escrevendo tudo do zero levou **24 min e 550 mil tokens**. O script acima nasceu desse resultado e gera o mesmo vídeo em segundos.
+
+- **Onde está o FFmpeg.** Na VM não há `ffmpeg` no PATH. O Hermes traz um em `<dados>/hermes/tools/ffmpeg-<versão>-linux-x64/bin/ffmpeg` (no Windows, em `%APPDATA%/SegundoCerebro/hermes/tools/`); o script já procura ali. Sem root, não tente `apt install`.
+- **Acentos.** O pedido veio "FEIRAO" e o agente grafou "FEIRÃO" (corrigiu para o português certo). Se o cliente exige a grafia exata, siga o pedido literal e avise.
+- **Fonte.** Use uma fonte Bold do sistema (Liberation ou DejaVu no Linux, Arial no Windows). Fonte inexistente é o primeiro erro ao renderizar texto com Pillow.
+- **Texto que não cabe.** O script reduz o título se passar de 92 % da largura. Em 9:16 mantenha o texto no terço central; a interface do Instagram cobre o topo e a base.
+- **Confira de verdade.** Extraia quadros do MP4 final (`ffmpeg -ss 1.5 -i video.mp4 -frames:v 1 q.png`) e olhe; não declare pronto só porque o arquivo existe.
+- **Peso do render.** 240 quadros em Pillow no CPU da VM de 4 vCPU gastam alguns minutos no agente escrevendo código, mas segundos de CPU de render.
+
+Ainda não testado: Remotion e HyperFrames na VM (exigem Node e Chrome; o `node` não está no PATH da VM), vídeo com áudio e com a gravação do rosto (receita B).
+
 ## 1. Escolha da ferramenta
 
 | | Remotion | HyperFrames (HeyGen) |

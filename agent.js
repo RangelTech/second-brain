@@ -45,7 +45,7 @@ function prepararBase(app) {
   return home
 }
 
-function prepararHome(app, { base, modelo, pasta, raciocinio }) {
+function prepararHome(app, { base, modelo, pasta, raciocinio, visao }) {
   const home = prepararBase(app)
   // a configuração é escrita pelo app, nunca à mão: o modelo é o combo do motor local
   const yaml = [
@@ -65,6 +65,9 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
     '  target_ratio: 0.15',
     'agent:',
     `  reasoning_effort: ${JSON.stringify(raciocinio || 'none')}`,
+    // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
+    // com a conta do Unlimited, a visão vai direto a ele. Sem a conta, o Hermes decide sozinho.
+    ...(visao ? ['auxiliary:', '  vision:', '    provider: "custom"', `    model: ${JSON.stringify(visao.modelo)}`, `    base_url: ${JSON.stringify(visao.base)}`, '    api_key_env: "SB_VISAO_CHAVE"'] : []),
     'terminal:',
     '  backend: "local"',
     `  cwd: ${JSON.stringify(pasta.replace(/\\/g, '/'))}`,
@@ -74,6 +77,13 @@ function prepararHome(app, { base, modelo, pasta, raciocinio }) {
     '',
   ].join('\n')
   fs.writeFileSync(path.join(home, 'config.yaml'), yaml)
+  // a chave da visão vai no .env do perfil (é onde o Hermes lê segredos; variável de ambiente solta não chega à tarefa auxiliar)
+  const envArq = path.join(home, '.env')
+  try {
+    if (visao && visao.chave) fs.writeFileSync(envArq, `SB_VISAO_CHAVE=${visao.chave}
+`, { mode: 0o600 })
+    else fs.rmSync(envArq, { force: true })
+  } catch {}
   return home
 }
 
@@ -116,7 +126,7 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR. Depois de criar código ou uma página, confira que funciona: para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console, ou tire uma captura e olhe. Se houver erro, corrija e confira de novo. Só então responda, dizendo o que você verificou.',
     navegador ? 'Você tem um NAVEGADOR INTEGRADO que o usuário vê na tela ao lado do chat. Para abrir sites, clicar, preencher formulários, ler páginas e tirar capturas de tela, use as ferramentas do servidor "navegador" (navegador_abrir, navegador_ler, navegador_clicar, navegador_digitar, navegador_rolar, navegador_print, navegador_voltar, navegador_esperar, navegador_js). Comece com navegador_abrir, depois navegador_ler para ver a página e os elementos clicáveis (cada um tem um id), e use navegador_print para VER a página de verdade (depois olhe a imagem com vision_analyze no caminho devolvido). Prefira essas ferramentas ao navegador próprio do Hermes.' : '',
-    midia ? 'Você pode GERAR IMAGENS de verdade com a ferramenta midia_gerar_imagem (roda numa GPU do servidor, leva de 10 a 30 segundos e salva um PNG na pasta Imagens da pasta de trabalho). Quando o usuário pedir uma imagem, ilustração, capa, avatar, propaganda ou caricatura, USE a ferramenta em vez de dizer que não consegue: escreva o prompt em inglês, bem detalhado (assunto, estilo, luz, enquadramento, cores), escolha o formato (quadrado, retrato, paisagem, story ou banner) e depois diga o caminho completo do arquivo. Texto escrito dentro da imagem costuma sair com letras erradas: gere a imagem sem texto e avise que o título pode ser aplicado depois. Você também pode GERAR VÍDEOS curtos (2 a 6 s, sem áudio) com midia_gerar_video, numa GPU do servidor (leva alguns minutos; salva um MP4 na pasta Videos). Use midia_gerar_video para cenas realistas (produto, comida, comercial, natureza, pessoas). Para animações gráficas (títulos, legendas, gráficos, vinhetas, reels com texto) use a skill video-motion, que roda no computador sem GPU. Escreva o prompt do vídeo em inglês e descreva o movimento e a câmera.' : '',
+    midia ? 'Você pode GERAR IMAGENS de verdade com a ferramenta midia_gerar_imagem (roda numa GPU do servidor, leva de 10 a 30 segundos e salva um PNG na pasta Imagens da pasta de trabalho). Quando o usuário pedir uma imagem, ilustração, capa, avatar, propaganda ou caricatura, USE a ferramenta em vez de dizer que não consegue: escreva o prompt em inglês, bem detalhado (assunto, estilo, luz, enquadramento, cores), escolha o formato (quadrado, retrato, paisagem, story ou banner) e depois diga o caminho completo do arquivo. Título curto dentro da imagem (1 a 3 palavras, em caixa alta, entre aspas no prompt) sai legível; frase longa e letra acentuada saem erradas, e nesses casos gere a imagem sem texto e aplique o título depois. Peça a contagem exata de pessoas no prompt (por exemplo exactly two people) e confira o resultado olhando a imagem. Você também pode GERAR VÍDEOS curtos (2 a 6 s, sem áudio) com midia_gerar_video, numa GPU do servidor (leva alguns minutos; salva um MP4 na pasta Videos). Use midia_gerar_video para cenas realistas (produto, comida, comercial, natureza, pessoas). Para animações gráficas (títulos, legendas, gráficos, vinhetas, reels com texto) use a skill video-motion, que roda no computador sem GPU. Escreva o prompt do vídeo em inglês e descreva o movimento e a câmera.' : '',
     memoria ? 'Você tem MEMÓRIA das conversas antigas com este usuário: a ferramenta memoria_buscar procura nelas pelos assuntos. Quando ele perguntar "você lembra de...", "aquilo que conversamos", "o que ficou combinado" ou citar algo que não está nesta conversa, USE memoria_buscar (com palavras-chave do assunto) antes de responder; se precisar de mais contexto de um trecho, memoria_ler_conversa. Nunca diga que não lembra sem ter buscado. Diga de qual conversa e data veio a informação.' : '',
     ferramentas ? `Skills e ferramentas: ${ferramentas}` : '',
   ]
@@ -153,10 +163,10 @@ class Sessao {
     this.ocioso = null
     const bin = localizarBinario(app)
     if (!bin) throw new Error('Não encontrei o Hermes (hermes-acp). Instale o Hermes ou defina SECOND_BRAIN_HERMES_BIN.')
-    const home = prepararHome(app, { base, modelo, pasta, raciocinio })
+    const home = prepararHome(app, { base, modelo, pasta, raciocinio, visao: midia ? { base: midia.base, modelo: 'qwen-abliterated', chave: midia.chave } : null })
     if (!fs.existsSync(path.join(home, 'installs'))) emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
     this.bin = bin
-    this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1' }
+    this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }
     this.subir()
     this.pronta = this.iniciar()
     this.vigiarCompressao()

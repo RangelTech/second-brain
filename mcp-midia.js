@@ -27,7 +27,7 @@ const FERRAMENTAS = [
   },
   {
     nome: 'gerar_imagem',
-    desc: 'Gera uma imagem a partir de uma descrição, numa GPU do servidor (cerca de 10 a 30 segundos). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Para arte de marketing com texto (título, slogan), prefira gerar a imagem SEM texto e avisar o usuário que o texto pode ser colocado depois: o modelo de imagem erra acentos e letras.',
+    desc: 'Gera uma imagem a partir de uma descrição, numa GPU do servidor (cerca de 10 a 30 segundos). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Título curto (1 a 3 palavras, caixa alta, entre aspas no prompt) sai legível. Para frase longa ou texto com acento (ÃO, É, Ç), gere a imagem SEM texto e avise que o texto pode ser colocado depois: o modelo erra acentos e letras. Para pessoas, peça a contagem exata no prompt (exactly two people).',
     schema: obj({
       prompt: { type: 'string', description: 'Descrição da imagem, em inglês e detalhada.' },
       formato: { type: 'string', enum: Object.keys(FORMATOS), description: 'quadrado (1024x1024), retrato, paisagem, story (vertical 9:16) ou banner. Padrão: quadrado.' },
