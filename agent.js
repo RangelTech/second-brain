@@ -197,6 +197,8 @@ class Sessao {
     this.vigia.unref?.()
   }
   aoLogDoHermes(l) {
+    // o Hermes às vezes só diz "conversa longa demais"; a causa real (cota esgotada) só aparece no log dele
+    if (/Limite de uso da janela/.test(l) && this.sid && l.includes(this.sid) && this.tratarLimiteDeUso(l)) return
     const m = /context compression (started|done): session=(\S+) .*?(?:messages=(\d+)(?:->(\d+))?)?\s.*?(?:rough_)?tokens=~([\d,]+)/.exec(l)
     const falhou = /Context compression failed/.test(l) && l.includes(this.sid || '\u0000')
     if (!m && !falhou) return
@@ -284,22 +286,27 @@ class Sessao {
     // pedidos do agente que o app não implementa: resposta vazia de erro para não travar
     if (j.id !== undefined && j.method) this.enviar({ jsonrpc: '2.0', id: j.id, error: { code: -32601, message: 'não suportado' } })
   }
+  // O servidor recusou por limite de uso; mostra a causa real (janela e quando renova). Devolve true se tratou.
+  tratarLimiteDeUso(t) {
+    const lim = /Limite de uso da janela (\w+) \((\d+) tokens\)[^"]*?(?:reabre em|renova em|A janela reabre em)\s*([0-9T:\-Z.]+)?/i.exec(t)
+    if (lim || /Limite de uso da janela/i.test(t)) {
+      this.limiteUso = true
+      const quando = lim && lim[3] ? ` Renova em ${new Date(lim[3]).toLocaleString('pt-BR')}.` : ''
+      if (!this.avisouLimite) {
+        this.avisouLimite = true
+        this.emitir({ texto: `⛔ O limite de uso do Unlimited acabou nesta janela${lim ? ` (${Number(lim[2]).toLocaleString('pt-BR')} tokens)` : ''}.${quando} Peça ao suporte para liberar mais ou aguarde a renovação. Nada foi perdido: assim que voltar, é só pedir de novo.` })
+      }
+      return true
+    }
+    return false
+  }
   aoAtualizacao(u) {
     const tipo = u.sessionUpdate
     if (tipo === 'agent_message_chunk' && u.content?.text) {
       const t = u.content.text
       // O servidor recusou por limite de uso, mas o Hermes só diz "conversa longa demais" ou "provedor indisponível".
       // Mostramos a causa real, com o que o servidor informou (janela e quando renova).
-      const lim = /Limite de uso da janela (\w+) \((\d+) tokens\)[^"]*?(?:reabre em|renova em|A janela reabre em)\s*([0-9T:\-Z.]+)?/i.exec(t)
-      if (lim || /Limite de uso da janela/i.test(t)) {
-        this.limiteUso = true
-        const quando = lim && lim[3] ? ` Renova em ${new Date(lim[3]).toLocaleString('pt-BR')}.` : ''
-        if (!this.avisouLimite) {
-          this.avisouLimite = true
-          this.emitir({ texto: `⛔ O limite de uso do Unlimited acabou nesta janela${lim ? ` (${Number(lim[2]).toLocaleString('pt-BR')} tokens)` : ''}.${quando} Peça ao suporte para liberar mais ou aguarde a renovação. Nada foi perdido: assim que voltar, é só pedir de novo.` })
-        }
-        return
-      }
+      if (this.tratarLimiteDeUso(t)) return
       if (this.limiteUso && /grown too long|auto-?reset|compress/i.test(t)) return // eco enganoso do mesmo problema
       this.emitir({ texto: t })
     }

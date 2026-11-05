@@ -22,9 +22,17 @@ Roda sem GPU dedicada.
 MIT (permissiva). Confira a licença do código e a dos pesos antes de usar em produto.
 
 ## Instalação e uso
-Siga o README do repositório: https://github.com/trailhq/Trail-Code
-A campanha não padroniza comandos para esta ferramenta. Antes de rodar algo caro, faça um teste curto e confira a saída.
 
+### Receita testada (Windows, Node 22+, 05/11/2026)
+
+O Graft hoje se chama **Trail-Code** (pacote npm `@trailhq/trail-code`, comando `trail`). O comando `trail init` mapeia o repositório uma vez e não precisa de chave de API. Tarefa: mapear `segundo-cerebro-remoto` (3 arquivos JS) e responder "onde o servidor valida a chave" e "qual rota serve a interface" sem reexplorar a pasta. Respondeu certo, com arquivo e linha, e o mapa levou **1 segundo** (39 nós).
+
+- **Não instale globalmente no Windows.** `npm install -g @trailhq/trail-code` tenta compilar `tree-sitter-kotlin` com node-gyp (exige Visual Studio) e deixa o pacote quebrado: sem `dist/bin/trail.js`. O que funcionou: instalar numa pasta própria sem rodar scripts de instalação, `npm install @trailhq/trail-code --ignore-scripts` (por exemplo em `%LOCALAPPDATA%/Temp/graft-cli`), e chamar `node_modules/.bin/trail` apontando para o repositório.
+- Rode `trail init` dentro do repositório que quer mapear; o mapa fica numa pasta do projeto. Depois consulte o mapa antes de abrir arquivos: é a economia de tokens que a ferramenta promete.
+- Linguagens sem gramática compilada (Kotlin, por exemplo) não entram no mapa quando se usa `--ignore-scripts`; para repositórios em JS e TS funciona.
+- O agente gastou 679 mil tokens e 7 min, em parte lendo o README e se recuperando da instalação global quebrada. Com esta receita a tarefa é rápida.
+
+Ainda não testado: repositório grande e o ganho real de tokens numa segunda pergunta.
 
 ## Fonte
 Fonte: campanha de benchmark de ferramentas (out/2026). Números que mudam com o tempo (preço de GPU) valem na data da medição: confira o preço do dia.

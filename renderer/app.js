@@ -9,6 +9,7 @@
   const fila = new Map() // id do chat -> mensagens esperando a resposta atual terminar
   const MAX_RETOMADAS = 2
   const LIMITE_SEM_SINAL_MS = 150000 // sem nenhum evento do agente por 2,5 min: interrompe e retoma sozinho
+  const LIMITE_ACAO_LONGA_MS = 420000 // enquanto o agente escreve uma ação longa (arquivo grande): 7 min
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null
   let modelos = []
@@ -805,7 +806,9 @@
       }
       if (visivel(r)) r.el.querySelector('.atividade')?.classList.remove('compactando')
       const parou = Date.now() - r.ultimo
-      if (parou > LIMITE_SEM_SINAL_MS && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
+      // escrever um arquivo grande (ação longa) com a GPU dividida entre vários usuários passa fácil de 2,5 min sem evento: dá mais prazo
+      const limite = /ação longa/.test(r.fase || '') ? LIMITE_ACAO_LONGA_MS : LIMITE_SEM_SINAL_MS
+      if (parou > limite && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
         r.travou = true
         window.sb.parar(r.id)
       }
