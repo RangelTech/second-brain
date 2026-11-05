@@ -491,6 +491,54 @@
     b.title = b.ariaLabel = estado ? 'Parar o ditado' : 'Ditar por voz'
     if (!estado) barras().forEach((i) => (i.style.height = ''))
   }
+  function ditarComNavegador(SR) {
+    const t = $('texto')
+    const base = t.value
+    let final = ''
+    let ativo = true
+    const r = new SR()
+    r.lang = 'pt-BR'
+    r.continuous = true
+    r.interimResults = true
+    r.onresult = (e) => {
+      let prov = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const x = e.results[i]
+        if (x.isFinal) final = (final + ' ' + x[0].transcript).trim()
+        else prov += x[0].transcript
+      }
+      t.value = [base, final, prov].map((s) => s.trim()).filter(Boolean).join(' ')
+      t.dispatchEvent(new Event('input'))
+      t.scrollTop = t.scrollHeight
+    }
+    const parar = async () => {
+      ativo = false
+      ditando = null
+      pintarMic(null)
+      try {
+        r.stop()
+      } catch {}
+    }
+    r.onerror = (e) => {
+      if (e.error === 'no-speech' || e.error === 'aborted') return
+      aviso('Não consegui ditar: ' + (e.error === 'not-allowed' ? 'permita o microfone no navegador.' : e.error === 'network' ? 'sem conexão com o reconhecimento de voz do navegador.' : e.error))
+      parar()
+    }
+    r.onend = () => {
+      if (ativo) {
+        try {
+          r.start() // o navegador encerra sozinho após um silêncio: religa enquanto o ditado estiver ligado
+        } catch {}
+      }
+    }
+    try {
+      r.start()
+    } catch (e) {
+      return aviso('Não consegui iniciar o ditado: ' + (e.message || e))
+    }
+    ditando = { parar }
+    pintarMic('ouvindo')
+  }
   async function alternarGravacao() {
     if (ditando) {
       const d = ditando
@@ -499,6 +547,11 @@
       await d.parar()
       $('texto').focus()
       return
+    }
+    if (window.__sbWeb) {
+      // versão web: o reconhecimento de voz é o do próprio navegador (roda no aparelho de quem usa; não pesa a máquina nem a GPU)
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+      return SR ? ditarComNavegador(SR) : gravarComoAnexo()
     }
     if (!window.Ditado?.suportado()) return gravarComoAnexo()
     const t = $('texto')
