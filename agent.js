@@ -49,6 +49,7 @@ function sincronizarSkillsGlobais(origem, destino) {
   const hash = (f) => crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex')
   const arqManifesto = path.join(destino, '.entregue.json')
   let antes = {}
+  const primeira = !fs.existsSync(arqManifesto)
   try {
     antes = JSON.parse(fs.readFileSync(arqManifesto, 'utf8'))
   } catch {}
@@ -70,7 +71,9 @@ function sincronizarSkillsGlobais(origem, destino) {
           } else if (antes[r] && hash(dst) === antes[r] && antes[r] !== h) {
             fs.copyFileSync(src, dst) // não foi editado: recebe a versão nova
           } else if (!antes[r]) {
-            agora[r] = hash(dst) // já existia sem registro (instalação antiga): fica como está
+            // sem registro: se é a primeira vez com este manifesto (instalação antiga, que sempre sobrescrevia), recebe a versão nova
+            if (primeira) fs.copyFileSync(src, dst)
+            else agora[r] = hash(dst)
           } else if (hash(dst) !== antes[r]) {
             agora[r] = antes[r] // editado pelo usuário: mantém a edição e o registro antigo
           }
