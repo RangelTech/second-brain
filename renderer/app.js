@@ -8,8 +8,9 @@
   let relogio = null
   const fila = new Map() // id do chat -> mensagens esperando a resposta atual terminar
   const MAX_RETOMADAS = 2
-  const LIMITE_SEM_SINAL_MS = 240000 // sem nenhum evento do agente por 4 min: interrompe e retoma sozinho (a 29 tok/s, 4096 tokens de saída levam 2,5 min)
-  const LIMITE_ACAO_LONGA_MS = 420000 // enquanto o agente escreve uma ação longa (arquivo grande): 7 min
+  // Único controle por tempo: o modelo ficar 5 min sem dar NENHUM sinal (nem o primeiro token, nem qualquer evento depois). A atividade
+  // em si (muitas chamadas, ferramentas longas, horas de trabalho) nunca é interrompida por demorar.
+  const LIMITE_SEM_SINAL_MS = 300000
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null
   let modelos = []
@@ -775,7 +776,7 @@
     if (r.travou && c && (r.retomadas || 0) < MAX_RETOMADAS) {
       // nada aconteceu ainda (agente não chegou a responder): reenvia o pedido original; se já havia trabalho feito, retoma em passos pequenos
       if (!r.partes.length) enviarMensagem(c, r.texto, r.anexosEnviados || [], (r.retomadas || 0) + 1, true)
-      else enviarMensagem(c, 'A sua última chamada demorou demais e foi interrompida. Continue exatamente de onde parou, mas agora em passos pequenos: no máximo 80 linhas por chamada de ferramenta, e escreva uma frase curta entre os passos.', [], (r.retomadas || 0) + 1)
+      else enviarMensagem(c, 'Continue exatamente de onde parou.', [], (r.retomadas || 0) + 1)
       return
     }
     proximaDaFila(id)
@@ -790,10 +791,6 @@
     for (const r of respostas.values()) {
       // compactar o contexto é demorado de propósito: enquanto estiver acontecendo não conta como "sem sinal" (até 10 min)
       if (r.compactando && Date.now() - r.compactando < 600000) r.ultimo = Date.now()
-      if (r.esperaDesde && Date.now() - r.esperaDesde > 900000 && !r.travou && !r.paradoManual) {
-        r.travou = true // 15 min numa única chamada: algo está errado de verdade
-        window.sb.parar(r.id)
-      }
       if (r.compactando && visivel(r)) {
         const at = r.el.querySelector('.atividade')
         if (at) {
@@ -806,9 +803,7 @@
       }
       if (visivel(r)) r.el.querySelector('.atividade')?.classList.remove('compactando')
       const parou = Date.now() - r.ultimo
-      // escrever um arquivo grande (ação longa) com a GPU dividida entre vários usuários passa fácil de 2,5 min sem evento: dá mais prazo
-      const limite = /ação longa/.test(r.fase || '') ? LIMITE_ACAO_LONGA_MS : LIMITE_SEM_SINAL_MS
-      if (parou > limite && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
+      if (parou > LIMITE_SEM_SINAL_MS && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
         r.travou = true
         window.sb.parar(r.id)
       }
