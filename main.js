@@ -169,11 +169,11 @@ function midiaDoApp() {
 // (cache de 60 s); se falhar, usa o último nível conhecido, e sem nenhum, 2 (conservador). Sem conta do Unlimited, vale 1.
 let nivelSeg = { valor: null, em: 0 }
 async function nivelDeSeguranca() {
-  const m = midiaDoApp()
-  if (!m || !m.chave) return 1
+  if (!cfg.unlimitedChave) return 1
   if (nivelSeg.valor && Date.now() - nivelSeg.em < 60000) return nivelSeg.valor
   try {
-    const r = await fetch(m.base + '/auth/whoami', { headers: { Authorization: 'Bearer ' + m.chave }, signal: AbortSignal.timeout(5000) })
+    const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+    const r = await fetch(base + '/auth/whoami', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(5000) })
     const j = await r.json()
     if (r.ok && [1, 2, 3].includes(j.safety_level)) nivelSeg = { valor: j.safety_level, em: Date.now() }
   } catch {}
