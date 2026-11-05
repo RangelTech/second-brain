@@ -180,6 +180,12 @@ async function nivelDeSeguranca() {
   return nivelSeg.valor || 2
 }
 async function sessaoDoChat(id, alvo, contexto, historico) {
+  // logo depois de entrar na conta, o app leva alguns segundos para ligá-la ao motor interno: a primeira mensagem espera
+  // (em vez de sair com a chave ainda não aplicada e voltar "chave inválida")
+  if (cfg.unlimitedChave && !cfg.unlimitedLigado) {
+    contexto.onDelta?.({ aviso: 'Conectando à sua conta…' })
+    for (let i = 0; i < 80 && !cfg.unlimitedLigado; i++) await new Promise((r) => setTimeout(r, 500))
+  }
   const est = embed.estado()
   const existente = sessoes.get(id)
   const nivel = await nivelDeSeguranca()

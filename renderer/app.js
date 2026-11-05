@@ -893,6 +893,12 @@
     enviarMensagem(c, m.texto, m.anexos || [])
   }
 
+  // mensagens técnicas do motor (em inglês, com HTTP, chave, "hermes setup"...) nunca chegam ao cliente: o app tenta de novo
+  // em silêncio e, se continuar falhando, mostra uma frase simples
+  const ERRO_TECNICO = /rejected your API key|Invalid API key|HTTP [45]\d\d|Provider said|hermes setup|Stream stalled|Traceback|Your request was not processed|model can't be reached/i
+  // só vale para texto curto (as mensagens de erro reais são curtas); uma explicação longa sobre HTTP 404 não é trocada
+  const eErroTecnico = (t) => !!t && t.length < 500 && ERRO_TECNICO.test(t)
+  const FRASE_FALHA = 'Não consegui responder agora. Tente enviar de novo em instantes.'
   function fim(id, texto, erro, uso) {
     const r = respostas.get(id)
     if (!r) return
@@ -902,9 +908,17 @@
       relogio = null
     }
     const c = chats.find((x) => x.id === id)
+    const textoFinal = (r.partes.length ? r.partes.filter((p) => p.t === 'texto').map((p) => p.v).join(' ') : texto) || ''
+    const sohErroTecnico = eErroTecnico(textoFinal) && !r.partes.some((p) => p.t === 'ferr')
+    if (c && sohErroTecnico && !r.paradoManual && (r.retomadas || 0) < MAX_RETOMADAS) {
+      enviarMensagem(c, r.texto, r.anexosEnviados || [], (r.retomadas || 0) + 1, true)
+      if (id === atual) desenhar()
+      alternarBotao(respostas.has(atual))
+      return
+    }
     if (c) {
-      const partes = r.partes.length ? r.partes : texto ? [{ t: 'texto', v: texto }] : []
-      if (erro) partes.push({ t: 'texto', v: `⚠ ${erro}` })
+      const partes = (r.partes.length ? r.partes : texto ? [{ t: 'texto', v: texto }] : []).map((p) => (p.t === 'texto' && eErroTecnico(p.v) ? { ...p, v: FRASE_FALHA } : p))
+      if (erro) partes.push({ t: 'texto', v: eErroTecnico(erro) ? FRASE_FALHA : `⚠ ${erro}` })
       const conteudo = partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || (r.paradoManual ? '(interrompido por você)' : '(sem resposta)')
       c.msgs.push({ role: 'assistant', content: conteudo, partes, raciocinio: r.raz || undefined, midias: r.midias, inicio: r.inicio, fim: Date.now(), uso: uso || undefined })
       c.em = Date.now()
