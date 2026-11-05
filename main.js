@@ -165,16 +165,32 @@ function midiaDoApp() {
     return null
   }
 }
+// Nível de segurança da conta, definido no painel (1 sem trava, 2 classificador 1, 3 classificadores 1 e 2). Consulta o servidor
+// (cache de 60 s); se falhar, usa o último nível conhecido, e sem nenhum, 2 (conservador). Sem conta do Unlimited, vale 1.
+let nivelSeg = { valor: null, em: 0 }
+async function nivelDeSeguranca() {
+  const m = midiaDoApp()
+  if (!m || !m.chave) return 1
+  if (nivelSeg.valor && Date.now() - nivelSeg.em < 60000) return nivelSeg.valor
+  try {
+    const r = await fetch(m.base + '/auth/whoami', { headers: { Authorization: 'Bearer ' + m.chave }, signal: AbortSignal.timeout(5000) })
+    const j = await r.json()
+    if (r.ok && [1, 2, 3].includes(j.safety_level)) nivelSeg = { valor: j.safety_level, em: Date.now() }
+  } catch {}
+  return nivelSeg.valor || 2
+}
 async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
-  if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio) return existente
+  const nivel = await nivelDeSeguranca()
+  if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
   await ponteLLM.iniciar()
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') } })
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') } })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
+  sessao.nivel = nivel
   sessao.historico = historico
   sessoes.set(id, sessao)
   return sessao
