@@ -9,6 +9,7 @@
   var seq = 0
   var ws = null
   var tentativas = 0
+  var jaConectou = false
   var aguarde = []
 
   // aviso de conexão (nunca mostra erro técnico de API ao cliente)
@@ -76,6 +77,9 @@
       tentativas = 0
       mostrar('')
       aguarde.splice(0).forEach(function (m) { ws.send(m) })
+      // voltou depois de uma queda (a máquina pode ter reiniciado e perdido a conversa em andamento): a tela refaz o que ficou preso
+      if (jaConectou) (ouvintes['conexao:retomada'] || []).forEach(function (fn) { try { fn({}) } catch (_) {} })
+      jaConectou = true
     }
     ws.onmessage = function (e) {
       var m

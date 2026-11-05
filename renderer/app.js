@@ -1056,6 +1056,18 @@
     }
   })
   window.sb.aoFim((d) => fim(d.id, d.texto, '', d.uso))
+  // versão web: a conexão caiu e voltou (a máquina pode ter reiniciado e perdido a conversa em andamento).
+  // Quem não der sinal em 10 s é dado como perdido: a tela fecha a resposta e refaz o pedido sozinha, sem o cliente precisar pedir de novo.
+  window.sb.aoRetomar?.(() => {
+    const desde = Date.now()
+    setTimeout(() => {
+      for (const [id, r] of [...respostas]) {
+        if (r.ultimo > desde || r.paradoManual) continue
+        r.travou = true
+        fim(id, '', '')
+      }
+    }, 10000)
+  })
   window.sb.aoErro((d) => fim(d.id, '', d.erro))
 
   // permissões do agente (cartão na conversa)
