@@ -13,7 +13,7 @@
       <div class="cartao-rem">
         <div class="linha-rem"><div><b>Permitir acesso pela web</b><div class="mut" id="aw-status"></div></div><label class="interruptor"><input type="checkbox" id="aw-ativo"><span></span></label></div>
         <div class="alerta" id="aw-msg" hidden></div>
-        <div class="linha-rem"><div><b>Nome deste computador</b><div class="mut">Como ele aparece na lista ao entrar pelo site.</div></div><div class="linha-nome"><input id="aw-nome" maxlength="60" aria-label="Nome deste computador"><button class="btn-pri" id="aw-salvar">Salvar</button></div></div>
+        <div class="linha-rem"><div><b>Nome deste computador</b><div class="mut">Como ele aparece na lista ao entrar pelo site.</div></div><div class="linha-nome"><input id="aw-nome" type="text" maxlength="60" aria-label="Nome deste computador"><button class="btn-pri" id="aw-salvar">Salvar</button></div></div>
         <div class="linha-rem"><div><b>Endereço</b><div class="mut">Abra no navegador do celular ou de outro computador e entre com a sua conta.</div></div><a class="btn-pri" id="aw-abrir" href="#" target="_blank" rel="noopener">Abrir o site</a></div>
       </div>`
     $('#aw-ativo').onchange = async (e) => {
