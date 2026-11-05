@@ -13,7 +13,7 @@ const PADROES_SEGREDO = [
 
 // Login com GitHub pelo "device flow": o app só precisa do client_id (público, sem segredo) de um OAuth App da Rangel Tech
 // com "Enable Device Flow" ligado. Pode ser trocado por SB_GITHUB_CLIENT_ID.
-const CLIENT_ID = process.env.SB_GITHUB_CLIENT_ID || ''
+const CLIENT_ID = process.env.SB_GITHUB_CLIENT_ID || 'Ov23liyEazvZL9lxJk44' // OAuth App 'Segundo Cérebro' da organização RangelTech (Device Flow ligado)
 
 function criar({ app, raiz, abrirNavegador }) {
   const arqCfg = path.join(app.getPath('userData'), 'skills-repo.json')
