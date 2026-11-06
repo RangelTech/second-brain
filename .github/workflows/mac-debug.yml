@@ -19,8 +19,17 @@ jobs:
           export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
           for v in "" "--no-sandbox" "--no-sandbox --disable-gpu" "--no-sandbox --disable-gpu --disable-software-rasterizer"; do
             echo "=== variante: [$v]"
-            ELECTRON_ENABLE_LOGGING=1 perl -e "alarm 40; exec @ARGV" "$bin" $v --preparar-agente > out.txt 2>&1; echo "rc=$?"; head -c 1500 out.txt
+            ELECTRON_ENABLE_LOGGING=1 perl -e "alarm 40; exec @ARGV" "$bin" $v --preparar-agente > out.txt 2>&1 || true; echo "rc=$?"; head -c 1500 out.txt
             cat "$SB_DATA_DIR/preparo.log" 2>/dev/null | head -3
           done
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
-          ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)"; echo rc=$?
+          ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
+          echo "=== relatorios de queda"
+          ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
+          r=$(ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -1); [ -n "$r" ] && grep -E 'exception|termination|"asi"|crashed|Electron Framework|NSWindow|corner' "$r" | head -25 || true
+          echo "=== electron minimo, versoes"
+          mkdir -p ../mini && cd ../mini && echo '{"name":"m","main":"m.js","version":"1.0.0"}' > package.json && echo "const {app}=require('electron');app.whenReady().then(()=>{console.log('ready',process.versions.electron);app.exit(0)})" > m.js
+          for ver in 33.4.11 36.9.3 37.8.0 38.5.0; do
+            echo "--- electron $ver"; rm -rf node_modules; npm i --silent --no-audit --no-fund electron@$ver >/dev/null 2>&1 || echo "npm falhou"
+            perl -e 'alarm 40; exec @ARGV' npx electron . 2>&1 | tail -3 || echo "queda"
+          done
