@@ -35,6 +35,7 @@ button:hover{background:var(--card2)}
 .ir-pro-fim:hover{background:var(--bd,#3a332b)}
 .ir-pro-fim svg{width:18px;height:18px}
 .rodape-atividade{position:absolute;left:16px;bottom:100%;margin-bottom:8px;display:flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--bg2,#2a1f14);border:1px solid var(--bd,#3a332b);border-radius:50%;box-shadow:0 4px 14px rgba(0,0,0,.35);z-index:4}
+.ir-pro-fim[hidden],.rodape-atividade[hidden]{display:none}
 .barra{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bd)}
 .mostrar{display:none}
 .app.recolhido .mostrar{display:inline-block}
