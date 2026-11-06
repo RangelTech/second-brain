@@ -9,6 +9,7 @@ jobs:
       - name: Baixar o app do release e tentar abrir
         shell: bash
         run: |
+          set +e +o pipefail
           mkdir -p w && cd w
           gh release download v0.6.15 --repo RangelTech/second-brain -p 'Segundo-Cerebro-macOS-arm64.zip'
           unzip -q Segundo-Cerebro-macOS-arm64.zip
