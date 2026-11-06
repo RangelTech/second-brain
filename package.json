@@ -15,7 +15,7 @@
     "router:build": "node scripts/baixar-router.mjs && npm --prefix router install --no-audit --no-fund && npm --prefix router run build && node scripts/pos-build-router.js",
     "dist": "electron-builder --win nsis portable --publish never",
     "dist:linux": "electron-builder --linux AppImage deb --publish never",
-    "dist:mac": "electron-builder --mac dmg zip --x64 --arm64 --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --x64 --arm64 --publish never -c.productName=SegundoCerebro",
     "router:fetch": "node scripts/baixar-router.mjs",
     "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true",
     "modelo:voz": "node scripts/baixar-modelo-voz.js",
@@ -70,6 +70,9 @@
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
       "artifactName": "Segundo-Cerebro-macOS-${arch}.${ext}",
+      "extendInfo": {
+        "CFBundleDisplayName": "Segundo Cérebro"
+      },
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": null
