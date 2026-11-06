@@ -15,10 +15,39 @@
   let gravador = null
   let modelos = []
 
+  // na versão web o arquivo gerado fica no computador (ou na VM) do cliente: "abrir" vira baixar pelo navegador
+  const ehWeb = !!window.__sbWeb
+  async function baixarArquivo(caminho, el) {
+    const nome = String(caminho).split(/[\\/]/).pop() || 'arquivo'
+    const antes = el && el.innerHTML
+    if (el) el.textContent = 'Preparando…'
+    try {
+      const r = await window.sb.lerArquivo(caminho)
+      if (!r || !r.ok) throw new Error('nao-achei')
+      const bin = atob(r.base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const url = URL.createObjectURL(new Blob([bytes]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = nome
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch {
+      aviso('Não consegui baixar este arquivo agora. Tente de novo em instantes.')
+    } finally {
+      if (el) el.innerHTML = antes
+    }
+  }
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
   const attr = (s) => esc(s).replace(/'/g, '&#39;')
   const CAT = Object.fromEntries(((window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []).map((p) => [p.id, p]))
 
+  // caminho completo de um arquivo gerado pelo agente (C:\...\a.xlsx ou /home/.../a.pdf): vira link (abre no app, baixa na web)
+  const EXT_ARQ = 'xlsx?|xlsm|docx?|pptx?|pdf|csv|zip|txt|md|json|png|jpe?g|gif|webp|svg|mp3|wav|mp4|mov|html?'
+  const CAMINHO_ARQ = new RegExp('(?:[A-Za-z]:\\\\[^<>"\'`|*?\\n]{1,180}?|(?<![\\w:./-])/(?:home|root|var|opt|tmp|Users|srv|mnt)/[^<>"\'`|*?\\n]{1,180}?)\\.(?:' + EXT_ARQ + ')(?![\\w])', 'gi')
   // markdown mínimo: blocos de código, código em linha, negrito, títulos, listas, links http(s)
   function md(t) {
     return String(t)
@@ -29,7 +58,26 @@
         const linhas = esc(p).split('\n')
         const saida = []
         let lista = false
-        for (const l of linhas) {
+        const ehLinhaTab = (x) => /^\s*\|.*\|\s*$/.test(x)
+        const ehSeparador = (x) => x.includes('|') && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(x)
+        const celulas = (x) => x.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+        for (let k = 0; k < linhas.length; k++) {
+          const l = linhas[k]
+          // tabela: linha de cabeçalho + linha de separação (|---|---|) + linhas de dados
+          if (ehLinhaTab(l) && k + 1 < linhas.length && ehSeparador(linhas[k + 1])) {
+            if (lista) saida.push('</ul>'), (lista = false)
+            const cab = celulas(l)
+            let h = '<div class="tabela-md"><table><thead><tr>' + cab.map((c) => `<th>${c}</th>`).join('') + '</tr></thead><tbody>'
+            k += 2
+            while (k < linhas.length && ehLinhaTab(linhas[k])) {
+              const cs = celulas(linhas[k])
+              h += '<tr>' + cab.map((_, j) => `<td>${cs[j] ?? ''}</td>`).join('') + '</tr>'
+              k++
+            }
+            k--
+            saida.push(h + '</tbody></table></div>')
+            continue
+          }
           const li = /^\s*[-*]\s+(.*)$/.exec(l)
           if (li) {
             if (!lista) saida.push('<ul>'), (lista = true)
@@ -38,11 +86,12 @@
           }
           if (lista) saida.push('</ul>'), (lista = false)
           const h = /^(#{1,3})\s+(.*)$/.exec(l)
-          saida.push(h ? `<h${h[1].length + 2}>${h[2]}</h${h[1].length + 2}>` : l.trim() === '' ? (saida.length && !/<br>$/.test(saida[saida.length - 1]) ? '<br>' : '') : l + '<br>')
+          saida.push(h ? `<h${h[1].length + 2}>${h[2]}</h${h[1].length + 2}>` : l.trim() === '' ? (saida.length && !/(<br>|<\/div>)$/.test(saida[saida.length - 1]) ? '<br>' : '') : l + '<br>')
         }
         if (lista) saida.push('</ul>')
         return saida
           .join('')
+          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>`)
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
           .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)]+)/g, (m, rotulo, urlMd, urlSolta) => {
@@ -359,7 +408,7 @@
     d.className = 'ferr ' + (f.status || 'pending')
     d.innerHTML = `<details ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${icone}</span><span class="ft"><b>${esc(rotulo)}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
       <div class="fcorpo">${f.entrada ? `<div class="mut">${esc(f.entrada)}</div>` : ''}${f.conteudo ? `<pre>${esc(f.conteudo)}</pre>` : ''}</div></details>
-      ${caminho && f.status === 'completed' && tipo === 'edit' ? `<div class="facoes"><button data-abrir="${attr(caminho)}">${IC.file}Abrir ${esc(nomeArq(caminho))}</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>` : ''}`
+      ${caminho && f.status === 'completed' && tipo === 'edit' ? `<div class="facoes"><button data-abrir="${attr(caminho)}">${IC.file}${ehWeb ? 'Baixar' : 'Abrir'} ${esc(nomeArq(caminho))}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>` : ''}`
   }
 
   function partesDe(m) {
@@ -459,7 +508,7 @@
     d.className = 'midia'
     const ext = (caminho.split('.').pop() || '').toLowerCase()
     const tipo = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext) ? 'img' : ['mp3', 'wav', 'ogg', 'webm', 'm4a'].includes(ext) ? 'audio' : ['mp4', 'mov'].includes(ext) ? 'video' : 'arq'
-    const acoes = `<div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>`
+    const acoes = `<div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${ehWeb ? 'Baixar' : 'Abrir'}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>`
     if (tipo === 'arq') d.innerHTML = `<div class="anexo-msg">${IC.file}${esc(nomeArq(caminho))}</div>${acoes}`
     else {
       d.innerHTML = `<div class="mut">${esc(nomeArq(caminho))}</div>${acoes}`
@@ -1208,8 +1257,13 @@
       if (c && !respostas.has(c.id)) enviarMensagem(c, tm.dataset.tentarMidia === 'video' ? 'Tente gerar o vídeo de novo, por favor.' : 'Tente gerar a imagem de novo, por favor.', [])
       return
     }
+    const lk = e.target.closest('[data-arq]')
+    if (lk) {
+      e.preventDefault()
+      return ehWeb ? baixarArquivo(lk.dataset.arq, lk) : window.sb.abrirArquivo(lk.dataset.arq)
+    }
     const ab = e.target.closest('[data-abrir]')
-    if (ab) return window.sb.abrirArquivo(ab.dataset.abrir)
+    if (ab) return ehWeb ? baixarArquivo(ab.dataset.abrir, ab) : window.sb.abrirArquivo(ab.dataset.abrir)
     const mo = e.target.closest('[data-mostrar]')
     if (mo) return window.sb.mostrarArquivo(mo.dataset.mostrar)
     const a = e.target.closest('a[href^="http"]')

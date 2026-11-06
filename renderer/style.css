@@ -133,3 +133,9 @@ html,body{overflow:hidden}
 .lateral{min-height:0;overflow:hidden}
 .boas-vindas{margin:0 16px 8px;background:#2f2520;border:1px solid var(--ac);border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .boas-vindas[hidden]{display:none}
+.tabela-md{overflow-x:auto;margin:8px 0}
+.tabela-md table{border-collapse:collapse;font-size:13.5px;min-width:50%}
+.tabela-md th,.tabela-md td{border:1px solid var(--bd);padding:6px 10px;text-align:left;vertical-align:top}
+.tabela-md th{background:rgba(255,255,255,.05);font-weight:600}
+.tabela-md tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+a.arq-link{color:var(--ac);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
