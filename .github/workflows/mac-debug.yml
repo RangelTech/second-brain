@@ -18,24 +18,10 @@ jobs:
           file "$bin"; codesign -dv "$app" 2>&1 | head -5 || true
           uname -m; sw_vers; launchctl managername || true
           export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
-          echo "=== lldb"
-          lldb -b -o "process launch -e out.txt -- --preparar-agente" -o "bt 25" -o "quit" -- "$bin" 2>&1 | tail -60
-          echo "=== sem argumentos"; ELECTRON_ENABLE_LOGGING=1 perl -e "alarm 20; exec @ARGV" "$bin" 2>&1 | tail -5
-          echo "=== dtruss-less: asar"
-          npm i --silent --no-audit --no-fund @electron/asar >/dev/null 2>&1; npx asar extract "$app/Contents/Resources/app.asar" ../ex && ls ../ex | head -30
-          echo "=== app extraido via electron minimo 33"
-          mkdir -p ../mini2 && cd ../mini2 && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1
-          cp -r ../ex/. . ; ls node_modules 2>/dev/null | head -3
-          SB_DATA_DIR="$RUNNER_TEMP/d2" perl -e 'alarm 25; exec @ARGV' npx electron . --preparar-agente 2>&1 | tail -15
-          cd ../w
+          codesign --verify --deep --strict "$app" 2>&1 | head -5
+          echo "=== assinando ad-hoc (--deep) e abrindo"
+          codesign --force --deep -s - "$app" 2>&1 | tail -3
+          codesign --verify --deep --strict "$app" 2>&1 | head -3
+          SB_DATA_DIR="$RUNNER_TEMP/d3" ELECTRON_ENABLE_LOGGING=1 perl -e 'alarm 30; exec @ARGV' "$bin" --preparar-agente > out.txt 2>&1; echo "rc=$?"; head -c 800 out.txt; cat "$RUNNER_TEMP/d3/preparo.log" 2>/dev/null | head -3
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
-          echo "=== relatorios de queda"
-          ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
-          r=$(ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -1); [ -n "$r" ] && grep -E 'exception|termination|"asi"|crashed|Electron Framework|NSWindow|corner' "$r" | head -25 || true
-          echo "=== electron minimo, versoes"
-          mkdir -p ../mini && cd ../mini && echo '{"name":"m","main":"m.js","version":"1.0.0"}' > package.json && echo "const {app}=require('electron');app.whenReady().then(()=>{console.log('ready',process.versions.electron);app.exit(0)})" > m.js
-          for ver in 33.4.11 36.9.3 37.8.0 38.5.0; do
-            echo "--- electron $ver"; rm -rf node_modules; npm i --silent --no-audit --no-fund electron@$ver >/dev/null 2>&1 || echo "npm falhou"
-            perl -e 'alarm 40; exec @ARGV' npx electron . 2>&1 | tail -3 || echo "queda"
-          done
