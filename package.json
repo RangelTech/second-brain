@@ -36,6 +36,7 @@
       "preload.js",
       "agent.js",
       "ponte-llm.js",
+      "roteador.js",
       "skills.js",
       "skills-repo.js",
       "remoto.js",
