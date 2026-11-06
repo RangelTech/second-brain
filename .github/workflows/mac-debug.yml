@@ -21,14 +21,16 @@ jobs:
           t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 200 o.txt; }
           W=$PWD
           mkdir -p ../of && cd ../of && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1; OF=$PWD/node_modules/electron/dist/Electron.app; cd $W
-          echo "=== A: oficial + Info.plist do pacote"
-          rm -rf A.app; cp -R "$OF" A.app; cp "$app/Contents/Info.plist" A.app/Contents/Info.plist; mv A.app/Contents/MacOS/Electron "A.app/Contents/MacOS/Segundo Cérebro"; t "A.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== B: pacote + Info.plist oficial"
-          rm -rf B.app; cp -R "$app" B.app; cp "$OF/Contents/Info.plist" B.app/Contents/Info.plist; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable 'Segundo Cérebro'" B.app/Contents/Info.plist; t "B.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== C: pacote com Electron Framework oficial"
-          rm -rf C.app; cp -R "$app" C.app; rm -rf "C.app/Contents/Frameworks/Electron Framework.framework"; cp -R "$OF/Contents/Frameworks/Electron Framework.framework" "C.app/Contents/Frameworks/"; t "C.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== D: pacote com executavel oficial"
-          rm -rf D.app; cp -R "$app" D.app; cp "$OF/Contents/MacOS/Electron" "D.app/Contents/MacOS/Segundo Cérebro"; t "D.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== hashes"; shasum -a 256 "$app/Contents/MacOS/Segundo Cérebro" "$OF/Contents/MacOS/Electron"; shasum -a 256 "$app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework" "$OF/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework"
+          echo "=== G: pacote com Resources oficial"
+          rm -rf G.app; cp -R "$app" G.app; rm -rf G.app/Contents/Resources; cp -R "$OF/Contents/Resources" G.app/Contents/Resources; t "G.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== H: pacote com Frameworks oficial (espera erro de helper, nao queda muda)"
+          rm -rf H.app; cp -R "$app" H.app; rm -rf H.app/Contents/Frameworks; cp -R "$OF/Contents/Frameworks" H.app/Contents/Frameworks; t "H.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== I: oficial com Resources do pacote + plist do pacote"
+          rm -rf I.app; cp -R "$OF" I.app; cp "$app/Contents/Info.plist" I.app/Contents/Info.plist; rm -rf I.app/Contents/Resources; cp -R "$app/Contents/Resources" I.app/Contents/Resources; mv I.app/Contents/MacOS/Electron "I.app/Contents/MacOS/Segundo Cérebro"; t "I.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== J: pacote sem _CodeSignature"
+          rm -rf J.app; cp -R "$app" J.app; rm -rf J.app/Contents/_CodeSignature; t "J.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== K: pacote, so o helper (Renderer) trocado pelo oficial renomeado"
+          ls "$app/Contents/Frameworks"; ls "$OF/Contents/Frameworks"
+          echo "=== conteudo de Contents"; ls -la "$app/Contents"
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
