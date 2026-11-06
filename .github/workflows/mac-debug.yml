@@ -18,10 +18,18 @@ jobs:
           file "$bin"; codesign -dv "$app" 2>&1 | head -5 || true
           uname -m; sw_vers; launchctl managername || true
           export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
-          codesign --verify --deep --strict "$app" 2>&1 | head -5
-          echo "=== assinando ad-hoc (--deep) e abrindo"
-          codesign --force --deep -s - "$app" 2>&1 | tail -3
-          codesign --verify --deep --strict "$app" 2>&1 | head -3
-          SB_DATA_DIR="$RUNNER_TEMP/d3" ELECTRON_ENABLE_LOGGING=1 perl -e 'alarm 30; exec @ARGV' "$bin" --preparar-agente > out.txt 2>&1; echo "rc=$?"; head -c 800 out.txt; cat "$RUNNER_TEMP/d3/preparo.log" 2>/dev/null | head -3
+          echo "=== Info.plist"; plutil -p "$app/Contents/Info.plist" | head -60
+          echo "=== fuses"; npx --yes @electron/fuses read --app "$app" 2>&1 | tail -15
+          ls "$app/Contents/Resources" | head -30; ls "$app/Contents/Frameworks" | head
+          echo "=== run: --version"; "$bin" --version 2>&1 | tail -3; echo rc=$?
+          echo "=== run com app.asar renomeado (sem JS do app)"
+          mv "$app/Contents/Resources/app.asar" "$app/Contents/Resources/app.asar.x"
+          perl -e 'alarm 10; exec @ARGV' "$bin" 2>&1 | tail -3; echo "rc=$?"
+          mv "$app/Contents/Resources/app.asar.x" "$app/Contents/Resources/app.asar"
+          echo "=== run com --disable-features / --in-process-gpu"
+          perl -e 'alarm 10; exec @ARGV' "$bin" --no-sandbox --in-process-gpu --disable-gpu --use-mock-keychain 2>&1 | tail -3; echo "rc=$?"
+          echo "=== run com caminho do app extraido (electron do bundle)"
+          mkdir -p ../ex2 && npx asar extract "$app/Contents/Resources/app.asar" ../ex2 2>/dev/null || (npm i --silent @electron/asar >/dev/null 2>&1; npx asar extract "$app/Contents/Resources/app.asar" ../ex2)
+          SB_DATA_DIR="$RUNNER_TEMP/d4" perl -e 'alarm 25; exec @ARGV' "$bin" ../ex2 --preparar-agente 2>&1 | tail -5; echo "rc=$?"; cat "$RUNNER_TEMP/d4/preparo.log" 2>/dev/null | head -3
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
