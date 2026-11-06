@@ -376,7 +376,7 @@
         const erro = itens.filter((x) => x.f.status === 'failed').length
         const rodando = itens.some((x) => x.f.status !== 'completed' && x.f.status !== 'failed')
         const det = document.createElement('details')
-        det.className = 'grupo-ferr' + (rodando ? ' rodando' : '')
+        det.className = 'grupo-ferr' + (rodando ? ' em-andamento' : '') // não usar 'rodando': é a classe da rodinha e faria o bloco inteiro girar
         det.innerHTML = `<summary><span class="gf-ic">${rodando ? '<span class="rodando"></span>' : IC.check}</span><span>${rodando ? 'Trabalhando...' : 'Concluído'} · ${itens.length} ${itens.length === 1 ? 'passo' : 'passos'}${erro && !rodando ? ` · ${erro} sem sucesso` : ''}</span></summary><div class="gf-lista"></div>`
         const lista = det.querySelector('.gf-lista')
         for (const x of itens) lista.appendChild(cartaoFerramenta(x.f))
