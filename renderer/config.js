@@ -608,6 +608,10 @@
     $('.cfg-corpo').innerHTML = `
       <div class="cfg-cab"><div><h1>Sobre</h1><p>Segundo Cérebro, da Rangel Tech.</p></div></div>
       <div class="kpis"><div class="kpi"><span>Versão</span><b>${esc(i.versao)}</b></div><div class="kpi"><span>Sistema</span><b>${esc(i.so)}</b></div><div class="kpi"><span>Electron</span><b>${esc(i.electron)}</b></div></div>
+      <h2>Atualizações</h2>
+      <p class="mut" id="at-txt">Verificando…</p>
+      <label class="cfg-linha" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="at-auto"> Atualizar automaticamente</label>
+      <div class="cfg-acoes"><button id="at-conf">Verificar agora</button><button id="at-baixar" hidden>Atualizar</button></div>
       <h2>Dados e logs</h2>
       <p class="mut">Tudo fica neste computador: <code>${esc(i.dados)}</code>. Nada é enviado para fora, além das chamadas aos provedores que você conectou.</p>
       <div class="cfg-acoes"><button id="so-logs">Abrir pasta de dados e logs</button></div>
@@ -617,6 +621,30 @@
       <div class="alerta" id="so-msg" hidden style="margin-top:10px"></div>
       <h2>Licenças</h2>
       <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Segundo Cérebro é MIT.</p>`
+    const at = window.sb.atualizacao
+    if (!window.__sbRaw || !at) {
+      $('#at-txt').parentElement.querySelectorAll('#at-txt,#at-auto,#at-conf,#at-baixar').forEach((x) => (x.closest('label') || x).remove())
+      document.querySelectorAll('.cfg-corpo h2').forEach((h) => h.textContent === 'Atualizações' && h.remove())
+    } else {
+      const c = await window.sb.cfg()
+      $('#at-auto').checked = !!c.atualizarAuto
+      $('#at-auto').onchange = (e) => window.sb.salvarCfg({ atualizarAuto: e.target.checked })
+      const pintar = (e) => {
+        const t = { nenhuma: 'Você está na versão mais recente.', disponivel: 'Nova versão ' + e.versao + ' disponível.', baixando: 'Baixando a nova versão…', pronta: 'Nova versão pronta. Reinicie para usar.' }[e.fase] || ''
+        $('#at-txt').textContent = t + (e.erro && e.fase === 'nenhuma' ? ' (Não consegui verificar agora.)' : '')
+        $('#at-auto').disabled = !e.automatica
+        $('#at-auto').parentElement.title = e.automatica ? '' : 'Neste sistema a troca é feita por você: o botão Atualizar abre a página de download.'
+        $('#at-baixar').hidden = !['disponivel', 'pronta'].includes(e.fase)
+        $('#at-baixar').textContent = e.fase === 'pronta' ? 'Reiniciar agora' : 'Atualizar'
+        $('#at-baixar').onclick = () => (e.fase === 'pronta' ? at.instalar() : at.baixar())
+      }
+      at.estado().then(pintar)
+      at.aoMudar((e) => $('#at-txt') && pintar(e))
+      $('#at-conf').onclick = async () => {
+        $('#at-txt').textContent = 'Verificando…'
+        pintar(await at.conferir())
+      }
+    }
     $('#so-logs').onclick = () => window.sb.abrirLogs()
     $('#so-exp').onclick = async () => {
       const r = await window.sb.exportarDados()

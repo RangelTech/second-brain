@@ -1083,6 +1083,37 @@
     }
     p.textContent = t
   })
+  // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)
+  if (window.__sbRaw && window.sb.atualizacao) {
+    const desenharAtualizacao = (e) => {
+      let b = document.getElementById('sb-atualizacao')
+      if (!e || !['disponivel', 'baixando', 'pronta'].includes(e.fase) || window.__sbAtualizacaoAdiada === e.versao) return b?.remove()
+      if (!b) {
+        b = document.createElement('div')
+        b.id = 'sb-atualizacao'
+        b.setAttribute('role', 'status')
+        b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;background:#2a1f14;color:#f3ece4;border:1px solid #5a4630;border-radius:12px;padding:12px 14px;font:13px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:340px;display:flex;flex-direction:column;gap:8px'
+        document.body.appendChild(b)
+      }
+      const txt = e.fase === 'baixando' ? 'Baixando a nova versão…' : e.fase === 'pronta' ? 'Nova versão pronta. Reinicie para usar.' : 'Tem uma nova atualização do Segundo Cérebro (' + e.versao + ').'
+      b.innerHTML = '<span></span><div style="display:flex;gap:8px;justify-content:flex-end"></div>'
+      b.firstChild.textContent = txt + (e.erro ? ' ' + e.erro : '')
+      const acoes = b.lastChild
+      const botao = (rotulo, fn, forte) => {
+        const x = document.createElement('button')
+        x.textContent = rotulo
+        x.style.cssText = 'border:1px solid #5a4630;border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;' + (forte ? 'background:#e0805f;color:#1a120b;border-color:#e0805f' : 'background:transparent;color:#f3ece4')
+        x.onclick = fn
+        acoes.appendChild(x)
+      }
+      if (e.fase === 'disponivel') {
+        botao('Depois', () => ((window.__sbAtualizacaoAdiada = e.versao), b.remove()))
+        botao('Atualizar', () => window.sb.atualizacao.baixar(), true)
+      } else if (e.fase === 'pronta') botao('Reiniciar agora', () => window.sb.atualizacao.instalar(), true)
+    }
+    window.sb.atualizacao.aoMudar(desenharAtualizacao)
+    window.sb.atualizacao.estado().then(desenharAtualizacao).catch(() => {})
+  }
   // versão web: a conexão caiu e voltou (a máquina pode ter reiniciado e perdido a conversa em andamento).
   // Quem não der sinal em 10 s é dado como perdido: a tela fecha a resposta e refaz o pedido sozinha, sem o cliente precisar pedir de novo.
   window.sb.aoRetomar?.(() => {

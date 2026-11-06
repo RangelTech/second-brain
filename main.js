@@ -23,6 +23,8 @@ const { Sessao, prepararBase, localizarBinario, registrar: registrarAgente } = r
 const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
 const hermesInstalarMod = require('./hermes-instalar')
+const atualizadorMod = require('./atualizador')
+const { conversaDeTeste } = require('./autoteste')
 const skillsRepoMod = require('./skills-repo')
 const unlimitedMod = require('./unlimited')
 const navegadorMod = require('./navegador')
@@ -48,6 +50,7 @@ const PADRAO = {
   raciocinio: 'none',
   pasta: path.join(app.getPath('documents'), 'Segundo Cerebro'),
   hermesHome: path.join(HOME, 'hermes'),
+  atualizarAuto: false,
 }
 
 const arq = (nome) => path.join(app.getPath('userData'), nome)
@@ -154,6 +157,44 @@ let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
 let remoto = null // acesso web remoto (spec 21 §12)
 const hermesInstalar = hermesInstalarMod.criar({ app, localizar: () => localizarBinario(app) })
+// Teste de instalação: uma conversa de verdade com o agente (modelo local de mentira). Passou uma vez, não repete.
+const marcaTeste = () => path.join(app.getPath('userData'), 'teste-instalacao.ok')
+async function verificarAgente(anotar = () => {}) {
+  if (fs.existsSync(marcaTeste())) return { ok: true, jaFeito: true }
+  const pasta = path.join(app.getPath('documents'), 'Segundo Cerebro')
+  fs.mkdirSync(pasta, { recursive: true })
+  let r
+  for (let i = 1; i <= 2; i++) {
+    r = await conversaDeTeste({
+      anotar,
+      criarSessao: (base, emitir) => new Sessao({ app, id: 'teste-instalacao', pasta, base, modelo: 'principal', chave: 'teste', raciocinio: 'none', emitir, pedirPermissao: async () => 'negar', modo: () => 'manual', nivel: 1 }),
+    })
+    anotar(r.ok ? 'teste de conversa passou' : `teste de conversa falhou (tentativa ${i}): ${r.motivo}`)
+    if (r.ok) break
+  }
+  if (r.ok) {
+    try {
+      fs.writeFileSync(marcaTeste(), new Date().toISOString())
+    } catch {}
+  }
+  return r
+}
+// o chat só começa depois do agente instalado e testado; falha do teste fica no log e o chat tenta mesmo assim
+let agentePronto = null
+let testeFalhou = false
+function garantirAgente(aviso) {
+  agentePronto ||= (async () => {
+    await hermesInstalar.garantir(aviso)
+    if (testeFalhou) return
+    const r = await verificarAgente((t) => registrarAgente(app, 'teste: ' + t)).catch((e) => ({ ok: false, motivo: e.message }))
+    if (!r.ok) testeFalhou = true
+    if (!r.ok) throw Object.assign(new Error(r.motivo || 'falhou'), { teste: true })
+  })().catch((e) => {
+    agentePronto = null
+    if (!e.teste) throw e
+  })
+  return agentePronto
+}
 // API de imagens do servidor (Unlimited): usa a mesma chave do chat; sem chave (cadastro pendente) a ferramenta some
 function midiaDoApp() {
   try {
@@ -211,7 +252,7 @@ async function responder(alvo, msgs, ctx) {
     return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
   }
   // o Hermes não vem no instalador: na primeira conversa o app o instala (uma vez) e mostra o andamento
-  await hermesInstalar.garantir((aviso) => ctx.onDelta?.({ aviso }))
+  await garantirAgente((aviso) => ctx.onDelta?.({ aviso }))
   // se o agente precisar recomeçar (raciocínio ou modelo mudou), o novo recebe um resumo das últimas mensagens
   const ultimo = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
   const anteriores = msgs.slice(0, -1).slice(-10)
@@ -303,14 +344,14 @@ app.whenReady().then(() => {
     hermesInstalar
       .garantir((t) => anotar(t))
       .then(async () => {
-        // aquece o agente: a primeira abertura monta o ambiente dele (minutos) e grava pronto.ok; fazendo aqui, o cliente já abre pronto
-        anotar('montando o ambiente do agente (primeira abertura)')
-        const pasta = path.join(app.getPath('documents'), 'Segundo Cerebro')
-        fs.mkdirSync(pasta, { recursive: true })
-        const s = new Sessao({ app, id: 'preparo', pasta, base: 'http://127.0.0.1:9/v1', modelo: 'principal', chave: 'preparo', raciocinio: 'none', emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => 'manual', nivel: 1 })
-        await s.iniciar()
-        s.encerrar()
-        anotar('agente pronto')
+        // teste de instalação: monta o ambiente do agente e manda uma conversa de verdade; só sai com sucesso se ele respondeu
+        anotar('testando o agente com uma conversa')
+        const r = await verificarAgente(anotar)
+        if (!r.ok) {
+          anotar('falhou: ' + r.motivo)
+          return app.exit(3)
+        }
+        anotar('agente pronto e testado')
         app.exit(0)
       })
       .catch((e) => {
@@ -420,13 +461,12 @@ app.whenReady().then(() => {
     gravar('favoritos.json', atuais)
     return atuais
   })
-  if (app.isPackaged) {
-    try {
-      const { autoUpdater } = require('electron-updater')
-      autoUpdater.autoDownload = true
-      autoUpdater.checkForUpdatesAndNotify().catch(() => {})
-    } catch {}
-  }
+  const atualizador = atualizadorMod.criar({ app, cfgGet: () => cfg, enviar: (c, d) => janela?.webContents.send(c, d) })
+  ipcMain.handle('atualizacao:estado', () => atualizador.estado())
+  ipcMain.handle('atualizacao:conferir', () => atualizador.conferir())
+  ipcMain.handle('atualizacao:baixar', () => atualizador.baixar(true))
+  ipcMain.handle('atualizacao:instalar', () => atualizador.instalar())
+  if (!MODO_SERVIDOR) atualizador.iniciar()
   prepararBase(app)
   const unl = unlimitedMod.criar({
     app,
@@ -534,7 +574,7 @@ app.whenReady().then(() => {
   }
   ipcMain.handle('cfg:get', () => publica())
   ipcMain.handle('cfg:set', (_e, parcial) => {
-    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
+    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
     salvarCfg()
     return publica()
   })
@@ -590,8 +630,7 @@ app.whenReady().then(() => {
       janela?.webContents.send('hermes:preparando', t)
     } catch {}
   }
-  hermesInstalar
-    .garantir(MODO_SERVIDOR ? undefined : avisarPreparo)
+  garantirAgente(MODO_SERVIDOR ? undefined : avisarPreparo)
     .then(() => avisarPreparo(''))
     .catch((e) => {
       console.error('[hermes]', e.message)

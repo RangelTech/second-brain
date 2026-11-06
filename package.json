@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.6.15",
+  "version": "0.6.16",
   "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
@@ -40,6 +40,8 @@
       "skills-repo.js",
       "remoto.js",
       "hermes-instalar.js",
+      "atualizador.js",
+      "autoteste.js",
       "embed-router.js",
       "renderer/**",
       "package.json"

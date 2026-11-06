@@ -30,6 +30,13 @@
       lerArquivo: (p) => invoke('arquivo:ler', p),
       abrirLogs: () => invoke('logs:abrir'),
       info: () => invoke('app:info'),
+      atualizacao: {
+        estado: () => invoke('atualizacao:estado'),
+        conferir: () => invoke('atualizacao:conferir'),
+        baixar: () => invoke('atualizacao:baixar'),
+        instalar: () => invoke('atualizacao:instalar'),
+        aoMudar: (fn) => on('atualizacao:estado', fn),
+      },
       responderPermissao: (req, resposta) => invoke('chat:permissao-resp', { req, resposta }),
       aoPermissao: (fn) => on('chat:permissao', fn),
       skills: {

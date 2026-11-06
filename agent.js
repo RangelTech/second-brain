@@ -259,6 +259,7 @@ class Sessao {
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }
     this.subir()
     this.pronta = this.iniciar()
+    this.pronta.catch(() => {}) // quem usa trata o erro; evita aviso de rejeição sem tratamento
     this.vigiarCompressao()
   }
 
@@ -311,7 +312,9 @@ class Sessao {
     this.filho = filho
     filho.stdout.on('data', (d) => this.aoDados(d))
     filho.stderr.on('data', (d) => registrar(this.app, 'stderr ' + d.toString('utf8').trim().slice(0, 300)))
-    filho.on('exit', () => {
+    filho.on('error', (e) => registrar(this.app, 'erro ao abrir o agente: ' + e.message + ' (' + this.bin + ')'))
+    filho.on('exit', (codigo, sinal) => {
+      registrar(this.app, 'agente saiu codigo=' + codigo + ' sinal=' + sinal + ' bin=' + this.bin)
       if (this.filho !== filho) return // foi substituído de propósito
       for (const p of this.pendentes.values()) p.rej(new Error('O agente encerrou.'))
       this.pendentes.clear()

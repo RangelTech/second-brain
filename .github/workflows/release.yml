@@ -32,6 +32,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/checar-pacote.js
+      - run: node --test test/atualizador.test.js
       - run: npm run router:build
       - run: npm run modelo:voz
       # tira do pacote os binários do Whisper (onnxruntime) de outros sistemas: deixa o instalador menor
@@ -51,6 +52,34 @@ jobs:
             sleep 15
           done
           exit 1
+      # Teste de instalação em cada sistema: instala o pacote que acabou de ser gerado e manda uma conversa de verdade ao agente.
+      # Se não responder, o release não é publicado. Dados em pasta isolada (SB_DATA_DIR).
+      - name: Testar instalação (conversa com o agente)
+        shell: bash
+        timeout-minutes: 30
+        env:
+          SB_DATA_DIR: ${{ runner.temp }}/sb-dados
+        run: |
+          mkdir -p "$SB_DATA_DIR"
+          case "$RUNNER_OS" in
+            Windows)
+              powershell -NoProfile -Command "\$p = Start-Process -FilePath 'dist/Segundo-Cerebro-Windows.exe' -ArgumentList '/S' -Wait -PassThru; exit \$p.ExitCode" ;;
+            Linux)
+              sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgbm1 libasound2t64 || true
+              chmod +x dist/Segundo-Cerebro-Linux.AppImage
+              (cd dist && ./Segundo-Cerebro-Linux.AppImage --appimage-extract >/dev/null)
+              xvfb-run -a dist/squashfs-root/AppRun --no-sandbox --preparar-agente ;;
+            macOS)
+              app=$(ls -d dist/mac*/*.app | head -1)
+              "$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)" --preparar-agente ;;
+          esac
+          test -f "$SB_DATA_DIR/teste-instalacao.ok"
+      - name: Registro do teste de instalação
+        if: always()
+        shell: bash
+        env:
+          SB_DATA_DIR: ${{ runner.temp }}/sb-dados
+        run: cat "$SB_DATA_DIR/preparo.log" 2>/dev/null || echo "sem preparo.log"
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
