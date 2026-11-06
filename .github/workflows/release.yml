@@ -68,12 +68,15 @@ jobs:
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgbm1 libasound2t64 || true
               chmod +x dist/Segundo-Cerebro-Linux.AppImage
               (cd dist && ./Segundo-Cerebro-Linux.AppImage --appimage-extract >/dev/null)
-              xvfb-run -a "$PWD/dist/squashfs-root/AppRun" --no-sandbox --preparar-agente ;;
+              xvfb-run -a "$PWD/dist/squashfs-root/second-brain" --no-sandbox --preparar-agente ;;
             macOS)
               app=$(ls -d dist/mac-arm64/*.app 2>/dev/null | head -1)
               [ -n "$app" ] || app=$(ls -d dist/mac*/*.app | head -1)
               ls "$app/Contents/MacOS"
-              "$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)" --preparar-agente ;;
+              export ELECTRON_ENABLE_LOGGING=1
+              "$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)" --preparar-agente 2>&1 | tail -60 || true
+              ls ~/Library/Logs/DiagnosticReports 2>/dev/null | head -3
+              for r in $(ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -1); do head -c 4000 "$r"; done ;;
           esac
           test -f "$SB_DATA_DIR/teste-instalacao.ok"
       - name: Registro do teste de instalação
