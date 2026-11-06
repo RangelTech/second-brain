@@ -21,15 +21,16 @@ jobs:
           t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 200 o.txt; }
           W=$PWD
           mkdir -p ../of && cd ../of && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1; OF=$PWD/node_modules/electron/dist/Electron.app; cd $W
-          echo "=== L: pacote com tudo ASCII (exe e helpers sem acento)"
+          echo "=== L: tudo ASCII (globs sem digitar o acento)"
           rm -rf L.app; cp -R "$app" L.app
-          mv "L.app/Contents/MacOS/Segundo Cérebro" "L.app/Contents/MacOS/SegundoCerebro"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable SegundoCerebro" L.app/Contents/Info.plist
-          cd L.app/Contents/Frameworks
-          for h in "Segundo Cérebro Helper"*.app; do n="${h/Segundo Cérebro/SegundoCerebro}"; mv "$h" "$n"; e=$(ls "$n/Contents/MacOS"); mv "$n/Contents/MacOS/$e" "$n/Contents/MacOS/${e/Segundo Cérebro/SegundoCerebro}"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${e/Segundo Cérebro/SegundoCerebro}" "$n/Contents/Info.plist"; done
-          ls; cd $W
+          mv L.app/Contents/MacOS/* L.app/Contents/MacOS/SegundoCerebro; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable SegundoCerebro" L.app/Contents/Info.plist
+          for h in L.app/Contents/Frameworks/*Helper*.app; do
+            suf=$(basename "$h" .app); suf=${suf#*Helper}; n="L.app/Contents/Frameworks/SegundoCerebro Helper$suf.app"
+            mv "$h" "$n"; e="$(ls "$n/Contents/MacOS")"; ne="SegundoCerebro Helper$suf"; mv "$n/Contents/MacOS/$e" "$n/Contents/MacOS/$ne"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable '$ne'" "$n/Contents/Info.plist"
+          done
+          ls L.app/Contents/Frameworks
           t "L.app/Contents/MacOS/SegundoCerebro" --version
-          echo "=== M: so o 'Segundo Cérebro' em NFD no nome do exe? (info)"
-          for h in "$app/Contents/Frameworks/"*Helper*.app; do echo "$h"; ls "$h/Contents/MacOS"; /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$h/Contents/Info.plist"; /usr/libexec/PlistBuddy -c "Print :CFBundleName" "$h/Contents/Info.plist"; done
-          echo "=== plist de helper oficial"; /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$OF/Contents/Frameworks/Electron Helper.app/Contents/Info.plist"
+          echo "=== bytes do nome (normalizacao)"; ls "$app/Contents/MacOS" | xxd | head -3
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
