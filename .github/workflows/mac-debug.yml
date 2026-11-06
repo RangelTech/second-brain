@@ -21,16 +21,12 @@ jobs:
           t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 200 o.txt; }
           W=$PWD
           mkdir -p ../of && cd ../of && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1; OF=$PWD/node_modules/electron/dist/Electron.app; cd $W
-          echo "=== L: tudo ASCII (globs sem digitar o acento)"
-          rm -rf L.app; cp -R "$app" L.app
-          mv L.app/Contents/MacOS/* L.app/Contents/MacOS/SegundoCerebro; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable SegundoCerebro" L.app/Contents/Info.plist
-          for h in L.app/Contents/Frameworks/*Helper*.app; do
-            suf=$(basename "$h" .app); suf=${suf#*Helper}; n="L.app/Contents/Frameworks/SegundoCerebro Helper$suf.app"
-            mv "$h" "$n"; e="$(ls "$n/Contents/MacOS")"; ne="SegundoCerebro Helper$suf"; mv "$n/Contents/MacOS/$e" "$n/Contents/MacOS/$ne"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable '$ne'" "$n/Contents/Info.plist"
-          done
-          ls L.app/Contents/Frameworks
-          t "L.app/Contents/MacOS/SegundoCerebro" --version
-          echo "=== bytes do nome (normalizacao)"; ls "$app/Contents/MacOS" | xxd | head -3
+          echo "=== diff dos frameworks (pacote x oficial), sem helpers"
+          for f in "Electron Framework.framework" Mantle.framework ReactiveObjC.framework Squirrel.framework; do echo "-- $f"; diff -rq "$app/Contents/Frameworks/$f" "$OF/Contents/Frameworks/$f" 2>&1 | head -8; done
+          echo "=== H2: pacote com Frameworks do pacote mas Mantle/ReactiveObjC/Squirrel oficiais"
+          rm -rf H2.app; cp -R "$app" H2.app; for f in Mantle.framework ReactiveObjC.framework Squirrel.framework; do rm -rf "H2.app/Contents/Frameworks/$f"; cp -R "$OF/Contents/Frameworks/$f" "H2.app/Contents/Frameworks/"; done; t "H2.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== H3: pacote com helpers oficiais (Electron Helper*.app) no lugar dos renomeados"
+          rm -rf H3.app; cp -R "$app" H3.app; rm -rf H3.app/Contents/Frameworks/*Helper*.app; cp -R "$OF/Contents/Frameworks/"Electron\ Helper*.app H3.app/Contents/Frameworks/; t "H3.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== helper do pacote: diff de binario vs oficial"; shasum -a 256 "$app/Contents/Frameworks/"*Helper.app/Contents/MacOS/* "$OF/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
