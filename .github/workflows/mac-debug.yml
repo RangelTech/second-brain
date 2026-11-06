@@ -19,7 +19,7 @@ jobs:
           export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
           for v in "" "--no-sandbox" "--no-sandbox --disable-gpu" "--no-sandbox --disable-gpu --disable-software-rasterizer"; do
             echo "=== variante: [$v]"
-            ELECTRON_ENABLE_LOGGING=1 timeout 40 "$bin" $v --preparar-agente > out.txt 2>&1; echo "rc=$?"; head -c 1500 out.txt
+            ELECTRON_ENABLE_LOGGING=1 perl -e "alarm 40; exec @ARGV" "$bin" $v --preparar-agente > out.txt 2>&1; echo "rc=$?"; head -c 1500 out.txt
             cat "$SB_DATA_DIR/preparo.log" 2>/dev/null | head -3
           done
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
