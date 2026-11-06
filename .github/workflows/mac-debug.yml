@@ -18,18 +18,17 @@ jobs:
           file "$bin"; codesign -dv "$app" 2>&1 | head -5 || true
           uname -m; sw_vers; launchctl managername || true
           export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
-          echo "=== Info.plist"; plutil -p "$app/Contents/Info.plist" | head -60
-          echo "=== fuses"; npx --yes @electron/fuses read --app "$app" 2>&1 | tail -15
-          ls "$app/Contents/Resources" | head -30; ls "$app/Contents/Frameworks" | head
-          echo "=== run: --version"; "$bin" --version 2>&1 | tail -3; echo rc=$?
-          echo "=== run com app.asar renomeado (sem JS do app)"
-          mv "$app/Contents/Resources/app.asar" "$app/Contents/Resources/app.asar.x"
-          perl -e 'alarm 10; exec @ARGV' "$bin" 2>&1 | tail -3; echo "rc=$?"
-          mv "$app/Contents/Resources/app.asar.x" "$app/Contents/Resources/app.asar"
-          echo "=== run com --disable-features / --in-process-gpu"
-          perl -e 'alarm 10; exec @ARGV' "$bin" --no-sandbox --in-process-gpu --disable-gpu --use-mock-keychain 2>&1 | tail -3; echo "rc=$?"
-          echo "=== run com caminho do app extraido (electron do bundle)"
-          mkdir -p ../ex2 && npx asar extract "$app/Contents/Resources/app.asar" ../ex2 2>/dev/null || (npm i --silent @electron/asar >/dev/null 2>&1; npx asar extract "$app/Contents/Resources/app.asar" ../ex2)
-          SB_DATA_DIR="$RUNNER_TEMP/d4" perl -e 'alarm 25; exec @ARGV' "$bin" ../ex2 --preparar-agente 2>&1 | tail -5; echo "rc=$?"; cat "$RUNNER_TEMP/d4/preparo.log" 2>/dev/null | head -3
+          t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 300 o.txt; }
+          echo "=== --version do app publicado"; t "$bin" --version
+          echo "=== copia com nome ASCII"
+          cp -R "$app" "ASCII.app"; mv "ASCII.app/Contents/MacOS/Segundo Cérebro" "ASCII.app/Contents/MacOS/Segundo"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable Segundo" ASCII.app/Contents/Info.plist
+          t "ASCII.app/Contents/MacOS/Segundo" --version
+          echo "=== Electron oficial renomeado para o nome com acento"
+          mkdir -p ../oficial && cd ../oficial && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1
+          cp -R node_modules/electron/dist/Electron.app "Segundo Cérebro.app"; mv "Segundo Cérebro.app/Contents/MacOS/Electron" "Segundo Cérebro.app/Contents/MacOS/Segundo Cérebro"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable 'Segundo Cérebro'" "Segundo Cérebro.app/Contents/Info.plist"
+          t "Segundo Cérebro.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== Electron oficial, nome original"
+          t node_modules/electron/dist/Electron.app/Contents/MacOS/Electron --version
+          cd ../w
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
