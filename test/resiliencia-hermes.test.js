@@ -1,0 +1,89 @@
+// Prova real (processo de verdade, não mock): se o Hermes morre com um turno em voo, a Sessao relança sozinha e
+// reenvia o mesmo pedido, sem o chamador precisar fazer nada, até o processo falso parar de "cair de propósito".
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { execSync } = require('child_process')
+const { Sessao } = require('../agent')
+
+const BIN = path.join(__dirname, 'fixtures', 'fake-hermes.cmd')
+const vivos = new Set() // só neste teste: o fixture roda via .cmd (cmd.exe + node), e matar só o cmd.exe não mata o neto
+
+function appFalso(dir) {
+  return { getPath: () => dir }
+}
+function desligar(s) {
+  vivos.delete(s)
+  if (s.filho?.pid) {
+    try {
+      execSync(`taskkill /pid ${s.filho.pid} /T /F`, { stdio: 'ignore' })
+    } catch {}
+  }
+  try {
+    s.encerrar()
+  } catch {}
+}
+test.after(() => {
+  for (const s of vivos) desligar(s)
+  // no Windows, o fixture roda via cmd.exe (shell:true só nesse .cmd de teste); mesmo com o taskkill /T, a árvore de
+  // pipes às vezes deixa o runner esperando um pouco mais pra encerrar sozinho — força a saída, já com tudo limpo acima
+  setTimeout(() => process.exit(0), 200).unref?.()
+})
+
+function montar(crashesIniciais, eventos = []) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-resil-'))
+  const crashesFile = path.join(dir, 'crashes.txt')
+  fs.writeFileSync(crashesFile, String(crashesIniciais))
+  process.env.SB_FAKE_CRASHES_FILE = crashesFile
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-pasta-'))
+  process.env.SECOND_BRAIN_HERMES_BIN = BIN
+  const s = new Sessao({
+    app: appFalso(dir),
+    id: 'teste',
+    pasta,
+    base: 'http://127.0.0.1:1/v1',
+    modelo: 'principal',
+    chave: 'x',
+    raciocinio: 'none',
+    emitir: (e) => eventos.push(e),
+    pedirPermissao: async () => 'negar',
+    modo: () => 'manual',
+    nivel: 1,
+  })
+  vivos.add(s)
+  return s
+}
+
+test('o agente morre uma vez no meio do turno e a Sessao termina sozinha, sem o chamador reenviar nada', async () => {
+  const eventos = []
+  const s = montar(1, eventos) // cai 1 vez, depois responde
+  try {
+    const r = await s.perguntar('oi')
+    assert.equal(r.stopReason, 'end_turn')
+    assert.ok(eventos.some((e) => e.novoCard), 'a tela precisa saber que um card novo começou (o pedaço antigo fecha e um novo abre)')
+  } finally {
+    desligar(s)
+  }
+})
+
+test('cai várias vezes seguidas: continua tentando, sem limite, até conseguir', async () => {
+  const s = montar(4) // cai 4 vezes antes de deixar responder
+  try {
+    const r = await s.perguntar('oi')
+    assert.equal(r.stopReason, 'end_turn')
+  } finally {
+    desligar(s)
+  }
+})
+
+test('cancelar() interrompe o laço de relançamento (o cliente pediu pra parar)', async () => {
+  const eventos = []
+  const s = montar(999, eventos) // nunca vai deixar de cair sozinho: só o cancelar() deve parar
+  const p = s.perguntar('oi')
+  await new Promise((r) => setTimeout(r, 400)) // dá tempo da 1ª morte+relançamento acontecer pelo menos uma vez
+  s.cancelar()
+  await assert.rejects(p, /Interrompido/)
+  desligar(s)
+})

@@ -308,7 +308,9 @@ class Sessao {
   // sobe (ou sobe de novo) o processo do Hermes
   subir() {
     this.buf = ''
-    const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true })
+    // .cmd/.bat (só em teste/dev: nunca o .exe real) não roda com spawn puro no Windows (EINVAL) sem passar pelo shell
+    const viaShell = /\.(cmd|bat)$/i.test(this.bin)
+    const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true, shell: viaShell })
     this.filho = filho
     filho.stdout.on('data', (d) => this.aoDados(d))
     filho.stderr.on('data', (d) => registrar(this.app, 'stderr ' + d.toString('utf8').trim().slice(0, 300)))
@@ -508,10 +510,15 @@ class Sessao {
       },
     ]
   }
+  // O Hermes não pode desistir de uma tarefa por ter caído: se o processo morrer com um turno em voo, relança sozinho e
+  // reenvia o mesmo pedido, sem limite de tentativas nem de tempo total — só um pedido explícito de parar (cancelar())
+  // interrompe o laço. Falha de UMA ferramenta dentro de uma sessão viva (ex.: comando sem um pacote) não entra aqui:
+  // isso o próprio modelo já resolve normalmente, com o processo de pé; isto só cobre o processo inteiro caindo.
   async perguntar(texto, anexos = []) {
     clearTimeout(this.ocioso)
     this.limiteUso = false
     this.avisouLimite = false
+    this.pedidoParar = false
     await this.pronta
     let corpo = texto
     if (anexos.length) corpo += '\n\nArquivos anexados (use as ferramentas para ler):\n' + anexos.map((a) => `- ${a}`).join('\n')
@@ -521,16 +528,52 @@ class Sessao {
       corpo = contextoDeSistema({ pasta: this.pasta, navegador: !!this.navegador, midia: !!this.midia, memoria: !!this.memoria }) + hist + nl + nl + '---' + nl + corpo
       this.primeira = false
     }
-    this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })
-    try {
-      return await this.turno
-    } finally {
-      this.turno = null
-      this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+    let tentativa = 0
+    while (true) {
+      tentativa++
+      this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })
+      try {
+        const r = await this.turno
+        this.turno = null
+        this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+        return r
+      } catch (e) {
+        this.turno = null
+        if (this.pedidoParar || e.message !== 'O agente encerrou.') {
+          this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+          throw e
+        }
+      }
+      registrar(this.app, `turno interrompido pela morte do agente (tentativa ${tentativa}), relançando`)
+      this.emitir({ novoCard: true })
+      // só avança pro reenvio quando subir()+iniciar() realmente confirmarem um processo novo de pé (com sessão nova);
+      // tentar reenviar contra um processo que nunca terminou de inicializar ficaria esperando uma resposta que não vem
+      while (!this.pedidoParar) {
+        await new Promise((res) => setTimeout(res, Math.min(10000, 1000 * tentativa)))
+        if (this.pedidoParar) break
+        try {
+          this.subir()
+          this.morto = false
+          await this.iniciar()
+          break
+        } catch (e2) {
+          registrar(this.app, `relançamento falhou (tentativa ${tentativa}): ${e2.message}`)
+          tentativa++
+        }
+      }
+      if (this.pedidoParar) {
+        this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+        throw new Error('Interrompido.')
+      }
     }
   }
   cancelar() {
-    if (this.sid) this.enviar({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: this.sid } })
+    this.pedidoParar = true // interrompe também o laço de relançamento de perguntar(), se estiver nele
+    if (this.sid && !this.morto && this.filho) {
+      try {
+        this.enviar({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: this.sid } })
+      } catch {}
+    }
   }
   encerrar() {
     clearTimeout(this.ocioso)

@@ -11,6 +11,10 @@
   // Único controle por tempo: o modelo ficar 5 min sem dar NENHUM sinal (nem o primeiro token, nem qualquer evento depois). A atividade
   // em si (muitas chamadas, ferramentas longas, horas de trabalho) nunca é interrompida por demorar.
   const LIMITE_SEM_SINAL_MS = 300000
+  // "Executando ferramenta" é isento do vigia de cima (ações longas de verdade existem), mas não pode ser isento pra
+  // sempre: sem este teto, um stream que morre bem na hora de uma ferramenta ficava sem nenhum vigia nosso (só o do
+  // Hermes, de 15 min, entrava em ação). A ponte (ponte-llm.js) já corta sozinha boa parte desses casos antes disso.
+  const LIMITE_FERRAMENTA_MS = 600000 // menor que o vigia de 15 min do Hermes: o nosso age primeiro
   let anexosPendentes = [] // {nome, caminho, tipo}
   let gravador = null
   let modelos = []
@@ -574,14 +578,35 @@
     $('titulo').textContent = c && c.msgs.length ? c.titulo : 'Nova conversa'
     if (!c || c.msgs.length === 0) {
       el.appendChild(telaInicial())
+      pintarBotaoFim()
+      atualizarRodapeAtividade()
       return
     }
     for (const m of c.msgs) el.appendChild(bolha(m))
     const viva = respostas.get(c.id)
     if (viva) el.appendChild(montarVivo(viva))
-    el.scrollTop = el.scrollHeight
+    el.scrollTop = el.scrollHeight // ao abrir a conversa, vai direto pro fim (sem checar: é a primeira vez que ela aparece)
+    pintarBotaoFim() // a conversa pode ter trocado: a seta não pode ficar com o estado da conversa anterior
+    atualizarRodapeAtividade()
     desenharFila()
   }
+  // scroll do chat: só força pro fim quando o cliente já está perto dele; se ele rolou pra cima de propósito, nada o puxa de volta
+  const PERTO_DO_FIM_PX = 80
+  const pertoDoFim = () => { const el = $('conversa'); return el.scrollHeight - el.scrollTop - el.clientHeight < PERTO_DO_FIM_PX }
+  function rolarSeEstivaPerto() {
+    const el = $('conversa')
+    if (pertoDoFim()) el.scrollTop = el.scrollHeight
+    pintarBotaoFim()
+  }
+  function pintarBotaoFim() {
+    const b = document.getElementById('ir-pro-fim')
+    if (b) b.hidden = pertoDoFim()
+  }
+  $('conversa').addEventListener('scroll', pintarBotaoFim)
+  document.getElementById('ir-pro-fim')?.addEventListener('click', () => {
+    const el = $('conversa')
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  })
 
   function alternarBotao(parar) {
     const b = $('enviar')
@@ -589,11 +614,22 @@
       b.innerHTML = IC.arrowUp
       b.classList.remove('parar')
       b.setAttribute('aria-label', 'Enviar para a fila')
-      return
+      return atualizarRodapeAtividade()
     }
     b.innerHTML = parar ? IC.stop : IC.arrowUp
     b.classList.toggle('parar', parar)
     b.setAttribute('aria-label', parar ? 'Parar' : 'Enviar')
+    atualizarRodapeAtividade()
+  }
+  // sinal de atividade perto da caixa de digitar: só uma bolinha girando, discreta, e só depois que a resposta já
+  // está demorando (resposta rápida não precisa disso) — sem isso, uma tarefa longa parece travada quando o card de
+  // cima sai da vista (rolou pra longe, ou a conversa é comprida demais pra caber na tela)
+  const RODAPE_DEMORA_MS = 8000
+  function atualizarRodapeAtividade(r) {
+    const el = document.getElementById('rodape-atividade')
+    if (!el) return
+    r = r || respostas.get(atual)
+    el.hidden = !r || Date.now() - r.inicio < RODAPE_DEMORA_MS
   }
 
   // ---------- anexos e áudio ----------
@@ -690,7 +726,7 @@
   async function transcreverAudio(audio) {
     transcrevendo = true
     pintarMic('transcrevendo')
-    aviso('Transcrevendo o áudio…')
+    aviso('Transcrevendo o áudio…', true)
     let r
     try {
       r = await window.sb.ditadoServidor(audio.bytes, audio.mime)
@@ -792,11 +828,15 @@
   }
   $('microfone').onclick = alternarGravacao
 
-  function aviso(txt) {
+  let avisoTimer = null
+  // persistente=true: fica na tela até outra chamada de aviso() (sucesso, erro ou aviso('')) — usado quando o próprio
+  // chamador sabe que vai limpar na hora certa (ex.: transcrição), em vez do timeout fixo de 6s que não serve pra isso
+  function aviso(txt, persistente) {
     const a = $('aviso-geral')
+    clearTimeout(avisoTimer)
     a.textContent = txt
     a.hidden = !txt
-    if (txt) setTimeout(() => (a.hidden = true), 6000)
+    if (txt && !persistente) avisoTimer = setTimeout(() => (a.hidden = true), 6000)
   }
 
   // ---------- envio ----------
@@ -1012,7 +1052,8 @@
       }
       if (visivel(r)) r.el.querySelector('.atividade')?.classList.remove('compactando')
       const parou = Date.now() - r.ultimo
-      if (parou > LIMITE_SEM_SINAL_MS && r.fase !== 'Executando ferramenta' && !r.travou && !r.paradoManual) {
+      const isento = r.fase === 'Executando ferramenta' && parou < LIMITE_FERRAMENTA_MS
+      if (parou > LIMITE_SEM_SINAL_MS && !isento && !r.travou && !r.paradoManual) {
         r.travou = true
         window.sb.parar(r.id)
       }
@@ -1022,10 +1063,12 @@
       const parado = Date.now() - r.ultimo
       at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
       // nunca falamos de "sinal" ou "silêncio" ao cliente: etapa longa é etapa longa, e o relógio mostra que está andando
-      at.querySelector('.atv-txt').textContent = parado > 45000 && !/ação longa|Compactando/.test(r.fase) ? 'Trabalhando numa etapa longa…' : r.fase
+      const faseMostrada = parado > 45000 && !/ação longa|Compactando/.test(r.fase) ? 'Trabalhando numa etapa longa…' : r.fase
+      at.querySelector('.atv-txt').textContent = faseMostrada
       at.classList.remove('demora')
       const extra = at.querySelector('.atv-extra')
       if (extra.firstChild) extra.innerHTML = ''
+      atualizarRodapeAtividade(r)
     }
   }
   document.addEventListener('click', async (e) => {
@@ -1048,6 +1091,25 @@
   window.sb.aoDelta((d) => {
     const r = respostas.get(d.id)
     if (!r) return
+    // o agente morreu com o turno em andamento e já foi relançado por baixo dos panos (sem o cliente precisar pedir):
+    // o que já tinha sido escrito vira um card encerrado de verdade na conversa, e um card novo começa do zero
+    if (d.novoCard) {
+      const c = chats.find((x) => x.id === d.id)
+      if (c && (r.partes.length || r.raz)) {
+        const partes = r.partes.length ? r.partes : []
+        c.msgs.push({ role: 'assistant', content: partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || '(continuando…)', partes, raciocinio: r.raz || undefined, midias: r.midias, inicio: r.inicio, fim: Date.now() })
+        salvar()
+      }
+      r.partes = []
+      r.raz = ''
+      r.aviso = ''
+      r.midias = []
+      r.log = [{ ms: 0, txt: 'O agente precisou recomeçar; continuando…' }]
+      r.inicio = Date.now()
+      sinal(r, 'Reconectando ao agente…')
+      if (d.id === atual) desenhar()
+      return
+    }
     if (d.raciocinio) {
       r.raz += d.raciocinio
       sinal(r, 'Pensando… (' + Math.round(r.raz.length / 4) + ' palavras)')
@@ -1129,7 +1191,7 @@
     }
     if (visivel(r)) {
       renderPartes(r.el.querySelector('.partes'), r.partes)
-      $('conversa').scrollTop = $('conversa').scrollHeight
+      rolarSeEstivaPerto()
     }
   })
   window.sb.aoFim((d) => fim(d.id, d.texto, '', d.uso))
@@ -1198,7 +1260,7 @@
     r.perms.push(p)
     if (visivel(r)) {
       r.el.appendChild(cartaoPermissao(r, p))
-      $('conversa').scrollTop = $('conversa').scrollHeight
+      rolarSeEstivaPerto()
     }
   })
 

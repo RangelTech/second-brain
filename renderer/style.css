@@ -30,6 +30,11 @@ button:hover{background:var(--card2)}
 .item{width:100%;text-align:left;background:transparent;border:0;padding:9px 10px;border-radius:8px;color:var(--mut)}
 .item:hover{background:var(--card);color:var(--fg)}
 .central{display:flex;flex-direction:column;min-width:0;height:100%}
+.entrada{position:relative}
+.ir-pro-fim{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:10px;width:36px;height:36px;border-radius:50%;background:var(--bg2,#2a1f14);border:1px solid var(--bd,#3a332b);color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:5}
+.ir-pro-fim:hover{background:var(--bd,#3a332b)}
+.ir-pro-fim svg{width:18px;height:18px}
+.rodape-atividade{position:absolute;left:16px;bottom:100%;margin-bottom:8px;display:flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--bg2,#2a1f14);border:1px solid var(--bd,#3a332b);border-radius:50%;box-shadow:0 4px 14px rgba(0,0,0,.35);z-index:4}
 .barra{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bd)}
 .mostrar{display:none}
 .app.recolhido .mostrar{display:inline-block}
