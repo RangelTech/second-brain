@@ -78,6 +78,7 @@
       contaUso: () => invoke('conta:uso'),
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),
+      ditadoServidor: (dados, mime) => invoke('ditado:servidor', dados, mime),
       ditadoWhisperPronto: () => invoke('ditado:whisper-pronto'),
       ditadoWhisperAquecer: () => invoke('ditado:whisper-aquecer'),
       ditadoWhisper: (pcm) => invoke('ditado:whisper', pcm),

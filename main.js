@@ -416,6 +416,30 @@ app.whenReady().then(() => {
     setTimeout(() => wkPend.has(id) && (wkPend.delete(id), res({ ok: false, erro: 'prazo' })), 60000)
     whisperWorker().postMessage({ ...m, id }, transfer || [])
   })
+  // Ditado por voz: o áudio da gravação inteira vai ao servidor de transcrição (Whisper na GPU) com a chave da conta e o texto volta.
+  // Vale para o app e para a web (a web chama este mesmo canal pela ponte, e quem fala com o servidor é a máquina do cliente).
+  ipcMain.handle('ditado:servidor', async (_e, dados, mime) => {
+    const m = midiaDoApp()
+    if (!m) return { ok: false, erro: 'Entre na sua conta para usar o ditado por voz.' }
+    try {
+      const buf = Buffer.from(dados)
+      if (!buf.length) return { ok: false, erro: 'Não ouvi nada. Tente de novo.' }
+      const ext = /mp4|aac/.test(mime || '') ? 'm4a' : /ogg/.test(mime || '') ? 'ogg' : 'webm'
+      const fd = new FormData()
+      fd.append('file', new Blob([buf], { type: mime || 'audio/webm' }), 'fala.' + ext)
+      fd.append('language', 'pt')
+      const r = await fetch(m.base + '/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + m.chave }, body: fd, signal: AbortSignal.timeout(240000) })
+      if (!r.ok) {
+        registrarAgente(app, 'ditado: servidor respondeu ' + r.status)
+        return { ok: false, erro: r.status === 503 || r.status === 502 ? 'O ditado está indisponível agora.' : r.status === 413 ? 'A gravação ficou grande demais. Grave um trecho menor.' : 'Não consegui transcrever agora.' }
+      }
+      const j = await r.json()
+      return { ok: true, texto: String(j.text || '').trim() }
+    } catch (e) {
+      registrarAgente(app, 'ditado: ' + String(e && e.message || e).slice(0, 160))
+      return { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
+    }
+  })
   ipcMain.handle('ditado:whisper-pronto', () => !!pastaWhisper())
   ipcMain.handle('ditado:whisper-aquecer', () => (pastaWhisper() ? whisperChamar({ tipo: 'aquecer' }) : { ok: false }))
   ipcMain.handle('ditado:whisper', async (_e, ab) => {

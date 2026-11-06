@@ -673,157 +673,122 @@
       aviso('Não consegui acessar o microfone: ' + (e.message || e))
     }
   }
-  // Ditado: o áudio é entendido aqui mesmo, no computador, e só o texto vai para a caixa de mensagem (nada de anexo).
-  let ditando = null
+  // Ditado: clica no microfone, fala, clica de novo. O áudio inteiro vai ao servidor de transcrição (Whisper) e o texto cai na caixa
+  // de mensagem. Igual no app (Windows, Mac, Linux) e na web. Sem tempo real: o texto aparece quando a gravação termina.
+  let gravandoVoz = null // { rec, fluxo, ctx, raf, limite }
+  let transcrevendo = false
+  let ultimoAudio = null // { bytes, mime, em, falhou }: guardado para tentar de novo se a transcrição falhar
   const barras = () => [...document.querySelectorAll('#ditado-barras i')]
   function pintarMic(estado) {
     const b = $('microfone')
     b.classList.toggle('gravando', estado === 'ouvindo')
-    b.classList.toggle('preparando', estado === 'carregando')
+    b.classList.toggle('preparando', estado === 'transcrevendo')
     $('ditado-barras').hidden = estado !== 'ouvindo'
-    b.title = b.ariaLabel = estado ? 'Parar o ditado' : 'Ditar por voz'
-    if (!estado) barras().forEach((i) => (i.style.height = ''))
+    b.title = b.ariaLabel = estado === 'ouvindo' ? 'Parar e transcrever' : estado === 'transcrevendo' ? 'Transcrevendo…' : 'Ditar por voz'
+    if (estado !== 'ouvindo') barras().forEach((i) => (i.style.height = ''))
   }
-  function ditarComNavegador(SR) {
+  async function transcreverAudio(audio) {
+    transcrevendo = true
+    pintarMic('transcrevendo')
+    aviso('Transcrevendo o áudio…')
+    let r
+    try {
+      r = await window.sb.ditadoServidor(audio.bytes, audio.mime)
+    } catch {
+      r = { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
+    }
+    transcrevendo = false
+    pintarMic(null)
     const t = $('texto')
-    const base = t.value
-    let final = ''
-    let ativo = true
-    const r = new SR()
-    r.lang = 'pt-BR'
-    r.continuous = true
-    r.interimResults = true
-    r.onresult = (e) => {
-      let prov = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const x = e.results[i]
-        if (x.isFinal) final = (final + ' ' + x[0].transcript).trim()
-        else prov += x[0].transcript
-      }
-      t.value = [base, final, prov].map((s) => s.trim()).filter(Boolean).join(' ')
+    if (r && r.ok && r.texto) {
+      ultimoAudio = null
+      t.value = [t.value.trim(), r.texto].filter(Boolean).join(' ')
       t.dispatchEvent(new Event('input'))
       t.scrollTop = t.scrollHeight
+      aviso('')
+      t.focus()
+    } else if (r && r.ok) {
+      ultimoAudio = null
+      aviso('Não entendi nenhuma fala nesse áudio. Tente de novo, mais perto do microfone.')
+    } else if (audio.falhou) {
+      ultimoAudio = null // já tentou de novo: a próxima gravação é nova
+      aviso((r && r.erro) || 'Não consegui transcrever agora. Grave de novo em instantes.')
+    } else {
+      ultimoAudio = { ...audio, falhou: true }
+      aviso(((r && r.erro) || 'Não consegui transcrever agora.') + ' Clique no microfone para tentar de novo com a mesma gravação.')
     }
-    const parar = async () => {
-      ativo = false
-      ditando = null
-      pintarMic(null)
-      try {
-        r.stop()
-      } catch {}
-    }
-    r.onerror = (e) => {
-      if (e.error === 'no-speech' || e.error === 'aborted') return
-      aviso('Não consegui ditar: ' + (e.error === 'not-allowed' ? 'permita o microfone no navegador.' : e.error === 'network' ? 'sem conexão com o reconhecimento de voz do navegador.' : e.error))
-      parar()
-    }
-    r.onend = () => {
-      if (ativo) {
-        try {
-          r.start() // o navegador encerra sozinho após um silêncio: religa enquanto o ditado estiver ligado
-        } catch {}
-      }
-    }
+  }
+  function pararGravacao() {
+    const g = gravandoVoz
+    if (!g) return
+    gravandoVoz = null
+    clearTimeout(g.limite)
+    cancelAnimationFrame(g.raf)
+    pintarMic('transcrevendo') // o "parar" do gravador entrega o áudio logo em seguida
     try {
-      r.start()
-    } catch (e) {
-      return aviso('Não consegui iniciar o ditado: ' + (e.message || e))
+      g.rec.stop()
+    } catch {
+      pintarMic(null)
     }
-    ditando = { parar }
-    pintarMic('ouvindo')
   }
   async function alternarGravacao() {
-    if (ditando) {
-      const d = ditando
-      ditando = null
-      pintarMic(null)
-      await d.parar()
-      $('texto').focus()
-      return
+    if (transcrevendo) return
+    if (gravandoVoz) return pararGravacao()
+    if (ultimoAudio && Date.now() - ultimoAudio.em < 5 * 60 * 1000) return transcreverAudio(ultimoAudio) // tentar de novo
+    ultimoAudio = null
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return aviso('Este navegador não permite gravar áudio aqui. Use o Chrome ou o app instalado.')
+    let fluxo
+    try {
+      fluxo = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } })
+    } catch (e) {
+      return aviso(e && e.name === 'NotAllowedError' ? 'Permita o uso do microfone para ditar.' : 'Não consegui acessar o microfone.')
     }
-    if (window.__sbWeb) {
-      // versão web: o reconhecimento de voz é o do próprio navegador (roda no aparelho de quem usa; não pesa a máquina nem a GPU)
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-      return SR ? ditarComNavegador(SR) : gravarComoAnexo()
+    const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find((m) => window.MediaRecorder.isTypeSupported(m)) || ''
+    const rec = new MediaRecorder(fluxo, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : {})
+    const partes = []
+    rec.ondataavailable = (e) => e.data && e.data.size && partes.push(e.data)
+    const AC = window.AudioContext || window.webkitAudioContext
+    const ctx = AC ? new AC() : null
+    const g = { rec, fluxo, ctx, raf: 0, limite: 0 }
+    rec.onstop = async () => {
+      try {
+        fluxo.getTracks().forEach((t) => t.stop())
+      } catch {}
+      try {
+        ctx && ctx.close()
+      } catch {}
+      const blob = new Blob(partes, { type: rec.mimeType || mime || 'audio/webm' })
+      if (blob.size < 1500) {
+        pintarMic(null)
+        return aviso('Não ouvi nada. Tente de novo, mais perto do microfone.')
+      }
+      await transcreverAudio({ bytes: new Uint8Array(await blob.arrayBuffer()), mime: blob.type, em: Date.now() })
     }
-    if (!window.Ditado?.suportado()) return gravarComoAnexo()
-    const t = $('texto')
-    // Texto provisório (Vosk, na hora) + texto preciso (Whisper, a cada pausa na fala). O provisório some quando o preciso chega.
-    let base = t.value // o que já estava escrito antes de começar (ou que o usuário editou no meio do ditado)
-    let escrito = base
-    let confirmado = '' // trechos já corrigidos pelo Whisper
-    let palavras = [] // tudo que o Vosk já entendeu, em palavras
-    let offPal = 0 // quantas dessas palavras já foram substituídas pelo texto preciso
-    let cadeia = Promise.resolve()
-    const juntar = (...p) => p.map((x) => String(x || '').trim()).filter(Boolean).join(' ')
-    const desenhar = (provisorio) => {
-      escrito = juntar(base, confirmado, provisorio === false ? '' : palavras.slice(offPal).join(' '))
-      t.value = escrito
-      t.dispatchEvent(new Event('input'))
-      t.scrollTop = t.scrollHeight
-    }
-    const temWhisper = await window.sb.ditadoWhisperPronto().catch(() => false)
-    if (temWhisper) window.sb.ditadoWhisperAquecer() // carrega o modelo enquanto o microfone abre
-    const cancelar = { cancelado: false, parar: async () => (cancelar.cancelado = true) }
-    ditando = cancelar
-    pintarMic('carregando')
-    const d = await window.Ditado.iniciar({
-      urlModelo: async () => {
-        if (!(await window.sb.ditadoEmbutido())) aviso('Preparando o ditado por voz (só na primeira vez, baixa ~32 MB)…')
-        const bytes = await window.sb.ditadoModelo()
-        $('aviso-geral').hidden = true
-        return URL.createObjectURL(new Blob([bytes], { type: 'application/gzip' }))
-      },
-      aoTexto: (finais, parcial) => {
-        if (t.value !== escrito) {
-          // o usuário mexeu no texto no meio do ditado: o que ele escreveu vira a base e o provisório recomeça daqui
-          base = t.value
-          confirmado = ''
-          offPal = palavras.length
-        }
-        palavras = juntar(finais, parcial).split(/\s+/).filter(Boolean)
-        desenhar()
-      },
-      aoSegmento: temWhisper
-        ? (pcm) => {
-            const ate = palavras.length // o que o Vosk já ouviu até o fim deste trecho
-            const de = offPal
-            cadeia = cadeia.then(async () => {
-              let texto = ''
-              try {
-                const r = await window.sb.ditadoWhisper(pcm)
-                if (r && r.ok) texto = r.texto
-              } catch {}
-              if (!texto) texto = palavras.slice(de, Math.max(de, ate)).join(' ') // Whisper falhou: fica o provisório
-              confirmado = juntar(confirmado, texto)
-              offPal = Math.max(offPal, ate)
-              desenhar()
-            })
-          }
-        : undefined,
-      aoNivel: (n) => {
+    if (ctx) {
+      try {
+        const an = ctx.createAnalyser()
+        an.fftSize = 512
+        ctx.createMediaStreamSource(fluxo).connect(an)
+        const amostra = new Uint8Array(an.fftSize)
         const f = [0.55, 0.8, 1, 0.8, 0.55]
-        barras().forEach((i, k) => (i.style.height = 4 + Math.round(n * f[k] * 16) + 'px'))
-      },
-      aoEstado: (e, x) => {
-        if (ditando !== cancelar && !cancelar.cancelado) return
-        if (e === 'ouvindo' && !cancelar.cancelado) pintarMic('ouvindo')
-        if (e === 'erro') {
-          if (ditando === cancelar) ditando = null
-          pintarMic(null)
-          aviso('Não consegui ditar: ' + x)
+        const medir = () => {
+          an.getByteTimeDomainData(amostra)
+          let soma = 0
+          for (let i = 0; i < amostra.length; i++) {
+            const v = (amostra[i] - 128) / 128
+            soma += v * v
+          }
+          const n = Math.min(1, Math.sqrt(soma / amostra.length) * 4)
+          barras().forEach((i, k) => (i.style.height = 4 + Math.round(n * f[k] * 16) + 'px'))
+          g.raf = requestAnimationFrame(medir)
         }
-      },
-    })
-    const parar0 = d.parar
-    d.parar = async () => {
-      await parar0()
-      if (temWhisper) await Promise.race([cadeia, new Promise((r) => setTimeout(r, 25000))]) // espera o último trecho ser corrigido
-      offPal = palavras.length
-      desenhar(false)
+        medir()
+      } catch {}
     }
-    if (cancelar.cancelado) await d.parar()
-    else if (ditando === cancelar) ditando = d
+    rec.start(1000)
+    gravandoVoz = g
+    g.limite = setTimeout(pararGravacao, 15 * 60 * 1000) // trava de segurança: 15 minutos por gravação
+    pintarMic('ouvindo')
   }
   $('microfone').onclick = alternarGravacao
 
