@@ -21,16 +21,15 @@ jobs:
           t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 200 o.txt; }
           W=$PWD
           mkdir -p ../of && cd ../of && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1; OF=$PWD/node_modules/electron/dist/Electron.app; cd $W
-          echo "=== G: pacote com Resources oficial"
-          rm -rf G.app; cp -R "$app" G.app; rm -rf G.app/Contents/Resources; cp -R "$OF/Contents/Resources" G.app/Contents/Resources; t "G.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== H: pacote com Frameworks oficial (espera erro de helper, nao queda muda)"
-          rm -rf H.app; cp -R "$app" H.app; rm -rf H.app/Contents/Frameworks; cp -R "$OF/Contents/Frameworks" H.app/Contents/Frameworks; t "H.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== I: oficial com Resources do pacote + plist do pacote"
-          rm -rf I.app; cp -R "$OF" I.app; cp "$app/Contents/Info.plist" I.app/Contents/Info.plist; rm -rf I.app/Contents/Resources; cp -R "$app/Contents/Resources" I.app/Contents/Resources; mv I.app/Contents/MacOS/Electron "I.app/Contents/MacOS/Segundo Cérebro"; t "I.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== J: pacote sem _CodeSignature"
-          rm -rf J.app; cp -R "$app" J.app; rm -rf J.app/Contents/_CodeSignature; t "J.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== K: pacote, so o helper (Renderer) trocado pelo oficial renomeado"
-          ls "$app/Contents/Frameworks"; ls "$OF/Contents/Frameworks"
-          echo "=== conteudo de Contents"; ls -la "$app/Contents"
+          echo "=== L: pacote com tudo ASCII (exe e helpers sem acento)"
+          rm -rf L.app; cp -R "$app" L.app
+          mv "L.app/Contents/MacOS/Segundo Cérebro" "L.app/Contents/MacOS/SegundoCerebro"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable SegundoCerebro" L.app/Contents/Info.plist
+          cd L.app/Contents/Frameworks
+          for h in "Segundo Cérebro Helper"*.app; do n="${h/Segundo Cérebro/SegundoCerebro}"; mv "$h" "$n"; e=$(ls "$n/Contents/MacOS"); mv "$n/Contents/MacOS/$e" "$n/Contents/MacOS/${e/Segundo Cérebro/SegundoCerebro}"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${e/Segundo Cérebro/SegundoCerebro}" "$n/Contents/Info.plist"; done
+          ls; cd $W
+          t "L.app/Contents/MacOS/SegundoCerebro" --version
+          echo "=== M: so o 'Segundo Cérebro' em NFD no nome do exe? (info)"
+          for h in "$app/Contents/Frameworks/"*Helper*.app; do echo "$h"; ls "$h/Contents/MacOS"; /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$h/Contents/Info.plist"; /usr/libexec/PlistBuddy -c "Print :CFBundleName" "$h/Contents/Info.plist"; done
+          echo "=== plist de helper oficial"; /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$OF/Contents/Frameworks/Electron Helper.app/Contents/Info.plist"
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
