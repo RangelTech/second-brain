@@ -21,12 +21,17 @@ jobs:
           t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 200 o.txt; }
           W=$PWD
           mkdir -p ../of && cd ../of && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1; OF=$PWD/node_modules/electron/dist/Electron.app; cd $W
-          echo "=== diff dos frameworks (pacote x oficial), sem helpers"
-          for f in "Electron Framework.framework" Mantle.framework ReactiveObjC.framework Squirrel.framework; do echo "-- $f"; diff -rq "$app/Contents/Frameworks/$f" "$OF/Contents/Frameworks/$f" 2>&1 | head -8; done
-          echo "=== H2: pacote com Frameworks do pacote mas Mantle/ReactiveObjC/Squirrel oficiais"
-          rm -rf H2.app; cp -R "$app" H2.app; for f in Mantle.framework ReactiveObjC.framework Squirrel.framework; do rm -rf "H2.app/Contents/Frameworks/$f"; cp -R "$OF/Contents/Frameworks/$f" "H2.app/Contents/Frameworks/"; done; t "H2.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== H3: pacote com helpers oficiais (Electron Helper*.app) no lugar dos renomeados"
-          rm -rf H3.app; cp -R "$app" H3.app; rm -rf H3.app/Contents/Frameworks/*Helper*.app; cp -R "$OF/Contents/Frameworks/"Electron\ Helper*.app H3.app/Contents/Frameworks/; t "H3.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== helper do pacote: diff de binario vs oficial"; shasum -a 256 "$app/Contents/Frameworks/"*Helper.app/Contents/MacOS/* "$OF/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
+          echo "=== L2: tudo ASCII incluindo CFBundleName/DisplayName"
+          rm -rf L.app; cp -R "$app" L.app
+          mv L.app/Contents/MacOS/* L.app/Contents/MacOS/SegundoCerebro
+          for k in CFBundleExecutable CFBundleName CFBundleDisplayName; do /usr/libexec/PlistBuddy -c "Set :$k SegundoCerebro" L.app/Contents/Info.plist; done
+          for h in L.app/Contents/Frameworks/*Helper*.app; do
+            suf=$(basename "$h" .app); suf=${suf#*Helper}; n="L.app/Contents/Frameworks/SegundoCerebro Helper$suf.app"
+            mv "$h" "$n"; e="$(ls "$n/Contents/MacOS")"; ne="SegundoCerebro Helper$suf"; mv "$n/Contents/MacOS/$e" "$n/Contents/MacOS/$ne"
+            for k in CFBundleExecutable CFBundleName CFBundleDisplayName; do /usr/libexec/PlistBuddy -c "Set :$k '$ne'" "$n/Contents/Info.plist" 2>/dev/null; done
+          done
+          t "L.app/Contents/MacOS/SegundoCerebro" --version
+          echo "=== L3: igual mas so CFBundleName do principal ASCII, helpers originais"
+          rm -rf N.app; cp -R "$app" N.app; /usr/libexec/PlistBuddy -c "Set :CFBundleName SegundoCerebro" N.app/Contents/Info.plist; t N.app/Contents/MacOS/* --version
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
