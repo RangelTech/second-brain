@@ -29,6 +29,7 @@ const skillsRepoMod = require('./skills-repo')
 const unlimitedMod = require('./unlimited')
 const navegadorMod = require('./navegador')
 const path = require('path')
+const os = require('os')
 const fs = require('fs')
 
 // janela encoberta não pode congelar a interface (testes e uso em segundo plano)
@@ -146,6 +147,7 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 }
 
 // ---------- resposta do chat ----------
+const roteador = require('./roteador')
 const sessoes = new Map()
 // Ponte entre o Hermes e o roteador: repassa tudo e conta o que o modelo já gerou, para a tela mostrar progresso de verdade
 const ponteLLM = require('./ponte-llm').criar({
@@ -250,6 +252,21 @@ async function responder(alvo, msgs, ctx) {
   if (cfg.soConversa) {
     const chave = await chaveLocal()
     return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
+  }
+  // roteador: pedido que não precisa de ferramenta sai numa chamada direta (rápido); se o modelo pedir o agente, segue para o Hermes
+  const ultimoPedido = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
+  if (cfg.roteador !== false && roteador.classificar(ultimoPedido, ctx.anexos || []) === 'rapido') {
+    try {
+      const r = await roteador.responderRapido({
+        base: est.origem + '/v1', chave: await chaveLocal(), modelo: alvo, msgs, onDelta: ctx.onDelta, sinal: ctx.sinal, raciocinio: cfg.raciocinio,
+        memoriaArquivo: path.join(app.getPath('userData'), 'chats.json'), chat: ctx.chat, skillsDir: path.join(app.getPath('userData'), 'hermes-home', 'skills'), usuario: os.userInfo().username,
+      })
+      if (!r.escalar) return r.texto
+      ctx.onDelta?.({ aviso: 'Isso precisa do agente, preparando…' })
+    } catch (e) {
+      if (ctx.sinal?.aborted) throw e
+      registrarAgente(app, 'roteador: falhou, seguindo pelo agente: ' + (e.message || e))
+    }
   }
   // o Hermes não vem no instalador: na primeira conversa o app o instala (uma vez) e mostra o andamento
   await garantirAgente((aviso) => ctx.onDelta?.({ aviso }))
