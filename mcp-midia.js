@@ -31,14 +31,14 @@ const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
   {
     nome: 'gerar_video',
-    desc: 'Gera um VÍDEO curto (1 a 4 segundos, sem áudio, até 512x512) a partir de uma descrição, numa GPU do servidor. Leva de 1 a vários minutos; o app mostra o andamento. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
+    desc: 'Gera um VÍDEO (1 a 60 segundos, sem áudio, até 512x512; acima de 4 s o servidor encadeia vários clipes e entrega um MP4 só, o que leva alguns minutos) a partir de uma descrição, numa GPU do servidor. Leva de 1 a vários minutos; o app mostra o andamento. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
     schema: obj({
       prompt: { type: 'string', description: 'Cena e movimento, em inglês, detalhado.' },
       formato: { type: 'string', enum: FORMATOS_VIDEO, description: 'paisagem (768x512), retrato (512x768) ou quadrado. Padrão: paisagem.' },
       imagem: { type: 'string', description: 'Caminho de uma imagem para ANIMAR (imagem para vídeo). PNG, JPEG ou WEBP até 6 MB. Opcional.' },
       strength: { type: 'number', description: 'Quanto mudar a imagem de partida, de 0 a 1 (opcional).' },
       fps: { type: 'number', description: 'Quadros por segundo, de 8 a 30 (opcional).' },
-      segundos: { type: 'number', description: 'Duração de 1 a 4 segundos (máximo real do servidor). Padrão: 4.' },
+      segundos: { type: 'number', description: 'Duração total de 1 a 60 segundos (o servidor encadeia clipes de até 4 s). Padrão: 4.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
       negative_prompt: { type: 'string', description: 'O que evitar (em inglês): ex. "blurry, deformed hands, extra fingers, watermark, text". Opcional.' },
       qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'rapida (padrão, menos passos) ou alta (mais passos, mais lento).' },
@@ -189,7 +189,7 @@ async function gerarVideo(args) {
   const corpo = {
     prompt: String(prompt || '').slice(0, 3500),
     format: FORMATOS_VIDEO.includes(formato) ? formato : FORMATOS_VIDEO.includes(PREFS.proporcao) ? PREFS.proporcao : 'paisagem',
-    seconds: Math.max(1, Math.min(4, Number(segundos) || Number(PREFS.duracao) || 4)),
+    seconds: Math.max(1, Math.min(60, Number(segundos) || Number(PREFS.duracao) || 4)),
     ...paramsComuns(args, true),
   }
   if (args.fps != null) corpo.fps = Number(args.fps)
@@ -200,7 +200,7 @@ async function gerarVideo(args) {
     corpo.image = bin.toString('base64')
     if (args.strength != null) corpo.strength = Math.max(0, Math.min(1, Number(args.strength)))
   }
-  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt, nome, limiteMs: 20 * 60 * 1000 })
+  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt, nome, limiteMs: Math.max(20, Math.ceil((corpo.seconds || 4) / 4) * 3) * 60 * 1000 })
 }
 
 // uma nova tentativa em silêncio (o cartão segue em "Gerando...") antes de mostrar a falha
