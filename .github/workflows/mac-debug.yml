@@ -1,0 +1,26 @@
+name: mac-debug
+on: workflow_dispatch
+jobs:
+  mac:
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Baixar o app do release e tentar abrir
+        shell: bash
+        run: |
+          mkdir -p w && cd w
+          gh release download v0.6.15 --repo RangelTech/second-brain -p 'Segundo-Cerebro-macOS-arm64.zip'
+          unzip -q Segundo-Cerebro-macOS-arm64.zip
+          app=$(ls -d *.app | head -1); echo "app=$app"
+          bin="$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)"
+          file "$bin"; codesign -dv "$app" 2>&1 | head -5 || true
+          uname -m; sw_vers; launchctl managername || true
+          export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
+          for v in "" "--no-sandbox" "--no-sandbox --disable-gpu" "--no-sandbox --disable-gpu --disable-software-rasterizer"; do
+            echo "=== variante: [$v]"
+            ELECTRON_ENABLE_LOGGING=1 timeout 40 "$bin" $v --preparar-agente > out.txt 2>&1; echo "rc=$?"; head -c 1500 out.txt
+            cat "$SB_DATA_DIR/preparo.log" 2>/dev/null | head -3
+          done
+          echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
+          ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)"; echo rc=$?
