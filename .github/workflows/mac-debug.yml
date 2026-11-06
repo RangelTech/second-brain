@@ -18,17 +18,17 @@ jobs:
           file "$bin"; codesign -dv "$app" 2>&1 | head -5 || true
           uname -m; sw_vers; launchctl managername || true
           export SB_DATA_DIR="$RUNNER_TEMP/d1"; mkdir -p "$SB_DATA_DIR"
-          t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 300 o.txt; }
-          echo "=== --version do app publicado"; t "$bin" --version
-          echo "=== copia com nome ASCII"
-          cp -R "$app" "ASCII.app"; mv "ASCII.app/Contents/MacOS/Segundo Cérebro" "ASCII.app/Contents/MacOS/Segundo"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable Segundo" ASCII.app/Contents/Info.plist
-          t "ASCII.app/Contents/MacOS/Segundo" --version
-          echo "=== Electron oficial renomeado para o nome com acento"
-          mkdir -p ../oficial && cd ../oficial && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1
-          cp -R node_modules/electron/dist/Electron.app "Segundo Cérebro.app"; mv "Segundo Cérebro.app/Contents/MacOS/Electron" "Segundo Cérebro.app/Contents/MacOS/Segundo Cérebro"; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable 'Segundo Cérebro'" "Segundo Cérebro.app/Contents/Info.plist"
-          t "Segundo Cérebro.app/Contents/MacOS/Segundo Cérebro" --version
-          echo "=== Electron oficial, nome original"
-          t node_modules/electron/dist/Electron.app/Contents/MacOS/Electron --version
-          cd ../w
+          t() { perl -e 'alarm 10; exec @ARGV' "$@" > o.txt 2>&1; echo "rc=$? bytes=$(wc -c < o.txt)"; head -c 200 o.txt; }
+          W=$PWD
+          mkdir -p ../of && cd ../of && npm i --silent --no-audit --no-fund electron@33.4.11 >/dev/null 2>&1; OF=$PWD/node_modules/electron/dist/Electron.app; cd $W
+          echo "=== A: oficial + Info.plist do pacote"
+          rm -rf A.app; cp -R "$OF" A.app; cp "$app/Contents/Info.plist" A.app/Contents/Info.plist; mv A.app/Contents/MacOS/Electron "A.app/Contents/MacOS/Segundo Cérebro"; t "A.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== B: pacote + Info.plist oficial"
+          rm -rf B.app; cp -R "$app" B.app; cp "$OF/Contents/Info.plist" B.app/Contents/Info.plist; /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable 'Segundo Cérebro'" B.app/Contents/Info.plist; t "B.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== C: pacote com Electron Framework oficial"
+          rm -rf C.app; cp -R "$app" C.app; rm -rf "C.app/Contents/Frameworks/Electron Framework.framework"; cp -R "$OF/Contents/Frameworks/Electron Framework.framework" "C.app/Contents/Frameworks/"; t "C.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== D: pacote com executavel oficial"
+          rm -rf D.app; cp -R "$app" D.app; cp "$OF/Contents/MacOS/Electron" "D.app/Contents/MacOS/Segundo Cérebro"; t "D.app/Contents/MacOS/Segundo Cérebro" --version
+          echo "=== hashes"; shasum -a 256 "$app/Contents/MacOS/Segundo Cérebro" "$OF/Contents/MacOS/Electron"; shasum -a 256 "$app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework" "$OF/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework"
           echo "=== com ELECTRON_RUN_AS_NODE (so o binario)"
           ELECTRON_RUN_AS_NODE=1 "$bin" -e "console.log('node ok', process.versions.electron)" || echo falhou
