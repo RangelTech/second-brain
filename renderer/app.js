@@ -183,7 +183,7 @@
   const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
   const ehMidia = (f) => /midia_gerar_(imagem|video)/.test((f && f.titulo) || '')
   const ROTULOS = [
-    [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
+    [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
     [/navegador_|browser|web_?search|search_web/i, 'Pesquisando na web'], [/vision_analyze/, 'Olhando a imagem'],
     [/read_file|^read\b/i, 'Lendo arquivo'], [/write_file|patch|edit/i, 'Escrevendo arquivo'], [/terminal|execute|shell/i, 'Executando'],
   ]
@@ -800,11 +800,49 @@
     }
     return d
   }
+  // registro do que o agente está fazendo, só para quem abrir a setinha: uma linha por etapa, em português, sem jargão
+  const semNumero = (t) => String(t).replace(/\d+/g, '#')
+  function anotar(r, txt) {
+    if (!txt) return
+    r.log = r.log || []
+    const ult = r.log[r.log.length - 1]
+    if (ult && semNumero(ult.txt) === semNumero(txt)) {
+      ult.txt = txt
+    } else {
+      r.log.push({ ms: Date.now() - r.inicio, txt })
+      if (r.log.length > 80) r.log.shift()
+    }
+    pintarLog(r)
+  }
+  function pintarLog(r) {
+    if (!r.el || !r.el.isConnected) return
+    const box = r.el.querySelector('.atv-log')
+    if (!box || box.hidden) return
+    const linhas = (r.log || []).map((l) => `<div class="atv-lin"><span class="atv-t">${fmtTempo(l.ms)}</span><span>${esc(l.txt)}</span></div>`).join('')
+    const perto = box.scrollHeight - box.scrollTop - box.clientHeight < 40
+    box.innerHTML = linhas || '<div class="atv-lin"><span>Começando…</span></div>'
+    if (perto) box.scrollTop = box.scrollHeight
+  }
   function montarVivo(r) {
     const d = document.createElement('div')
     d.className = 'msg assistant'
-    d.innerHTML = `${QUEM}</div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
+    d.innerHTML = `${QUEM}</div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span><button class="atv-seta" type="button" aria-expanded="false" aria-label="Ver o que está sendo feito" title="Ver o que está sendo feito">›</button></div><div class="atv-log" hidden></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
     r.el = d
+    const seta = d.querySelector('.atv-seta')
+    const caixa = d.querySelector('.atv-log')
+    seta.onclick = () => {
+      r.logAberto = !r.logAberto
+      caixa.hidden = !r.logAberto
+      seta.setAttribute('aria-expanded', String(!!r.logAberto))
+      seta.classList.toggle('aberta', !!r.logAberto)
+      pintarLog(r)
+    }
+    if (r.logAberto) {
+      caixa.hidden = false
+      seta.classList.add('aberta')
+      seta.setAttribute('aria-expanded', 'true')
+      pintarLog(r)
+    }
     if (r.raz) {
       const det = d.querySelector('.raciocinio')
       det.hidden = false
@@ -828,7 +866,7 @@
     if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     salvar()
-    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', retomadas, texto, anexosEnviados: anexos })
+    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', log: [{ ms: 0, txt: 'Enviando o pedido ao agente…' }], retomadas, texto, anexosEnviados: anexos })
     if (!relogio) relogio = setInterval(tiquetaque, 1000)
     if (c.id === atual) desenhar()
     alternarBotao(respostas.has(atual))
@@ -952,6 +990,7 @@
         if (at) {
           at.classList.add('compactando')
           at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
+      if (r.fase && !/^(Pensando|Executando ferramenta|Analisando o resultado|Compactando)/.test(r.fase)) anotar(r, r.fase) // a espera também aparece no painel, com o tempo correndo
           at.querySelector('.atv-txt').innerHTML = `<i class="relogio-compactar"></i>Compactando o contexto · ${fmtTempo(Date.now() - r.compactando)}`
           at.querySelector('.atv-extra').innerHTML = ''
         }
@@ -986,7 +1025,10 @@
   })
   function sinal(r, fase) {
     r.ultimo = Date.now()
-    if (fase) r.fase = fase
+    if (fase) {
+      r.fase = fase
+      if (!/^(Pensando|Executando ferramenta|Analisando o resultado)/.test(fase)) anotar(r, fase)
+    }
   }
   const EXT_MIDIA = /\.(png|jpe?g|gif|webp|svg|mp3|wav|ogg|m4a|mp4|mov)$/i
   window.sb.aoDelta((d) => {
@@ -995,6 +1037,7 @@
     if (d.raciocinio) {
       r.raz += d.raciocinio
       sinal(r, 'Pensando… (' + Math.round(r.raz.length / 4) + ' palavras)')
+      anotar(r, 'Pensando… ' + String(r.raz).replace(/\s+/g, ' ').trim().slice(-110))
       if (visivel(r)) {
         const det = r.el.querySelector('.raciocinio')
         det.hidden = false
@@ -1055,6 +1098,12 @@
       const f = d.ferramenta
       sinal(r, f.status === 'completed' || f.status === 'failed' ? 'Analisando o resultado…' : 'Executando ferramenta')
       const existente = r.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
+      if (!INTERNA.test(f.titulo || '')) {
+        const o = `${rotuloFerr(f)}${tituloLimpo(f.titulo) ? ': ' + tituloLimpo(f.titulo).slice(0, 70) : ''}`
+        if (f.status === 'completed') anotar(r, '✓ ' + o)
+        else if (f.status === 'failed') anotar(r, 'Não deu certo, tentando de outro jeito: ' + o)
+        else if (!existente) anotar(r, o)
+      }
       if (existente) Object.assign(existente.f, Object.fromEntries(Object.entries(f).filter(([, v]) => v !== null && v !== undefined && v !== '')))
       else r.partes.push({ t: 'ferr', f: { ...f } })
       if (f.status === 'completed' && f.caminho && f.tipo === 'edit' && EXT_MIDIA.test(f.caminho) && !r.midias.includes(f.caminho)) r.midias.push(f.caminho)
