@@ -68,9 +68,11 @@ jobs:
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgbm1 libasound2t64 || true
               chmod +x dist/Segundo-Cerebro-Linux.AppImage
               (cd dist && ./Segundo-Cerebro-Linux.AppImage --appimage-extract >/dev/null)
-              xvfb-run -a dist/squashfs-root/AppRun --no-sandbox --preparar-agente ;;
+              xvfb-run -a "$PWD/dist/squashfs-root/AppRun" --no-sandbox --preparar-agente ;;
             macOS)
-              app=$(ls -d dist/mac*/*.app | head -1)
+              app=$(ls -d dist/mac-arm64/*.app 2>/dev/null | head -1)
+              [ -n "$app" ] || app=$(ls -d dist/mac*/*.app | head -1)
+              ls "$app/Contents/MacOS"
               "$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)" --preparar-agente ;;
           esac
           test -f "$SB_DATA_DIR/teste-instalacao.ok"
