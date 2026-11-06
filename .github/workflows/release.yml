@@ -43,6 +43,10 @@ jobs:
       # hdiutil do macOS falha de vez em quando (disco ocupado ao montar a imagem): repete o empacotamento até 3 vezes.
       - name: Empacotar
         shell: bash
+        # Windows: assina o instalador e o programa com o certificado da Rangel Tech (segredos do repositório; Mac e Linux ignoram)
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
           for i in 1 2 3; do
             npm run ${{ matrix.alvo }} && exit 0
@@ -52,6 +56,15 @@ jobs:
             sleep 15
           done
           exit 1
+      - name: Conferir a assinatura (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem dist/Segundo-Cerebro-Windows*.exe) {
+            $s = Get-AuthenticodeSignature $f.FullName
+            "{0}: {1} | {2}" -f $f.Name, $s.Status, $s.SignerCertificate.Subject
+            if (-not $s.SignerCertificate) { throw "sem assinatura: $($f.Name)" }
+          }
       # Teste de instalação em cada sistema: instala o pacote que acabou de ser gerado e manda uma conversa de verdade ao agente.
       # Se não responder, o release não é publicado. Dados em pasta isolada (SB_DATA_DIR).
       - name: Testar instalação (conversa com o agente)
