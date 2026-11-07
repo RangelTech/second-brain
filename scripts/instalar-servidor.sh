@@ -83,10 +83,7 @@ Environment=SB_DATA_DIR=$DADOS SB_SERVIDOR=1 HOME=$DADOS
 ExecStart=/usr/bin/env bash -c '$CMD'
 Restart=always
 RestartSec=5
-# o agente cria arquivos e roda ferramentas na pasta de dados; nada fora dela é gravável
-ProtectSystem=full
-ReadWritePaths=$DADOS /tmp
-NoNewPrivileges=true
+# a VM é do cliente: o agente roda como o dono dela (sudo, Docker, instalar pacotes). Só o próprio Segundo Cérebro é protegido (build/liberdade-vm.sh).
 
 [Install]
 WantedBy=multi-user.target
@@ -126,6 +123,9 @@ Persistent=true
 WantedBy=timers.target
 UNIT3
 systemctl daemon-reload
+# liberdade do dono da VM + protecao do proprio Segundo Cerebro (sudo sem senha, Docker, vigia); o script vem dentro do pacote
+LIB="$(dpkg -L second-brain 2>/dev/null | grep 'resources/liberdade-vm.sh$' | head -1 || true)"
+if [ -n "$LIB" ]; then bash "$LIB" || LOG "aviso: a configuracao de liberdade nao terminou (o vigia tenta de novo em 5 min)."; fi
 systemctl enable --now segundo-cerebro.service
 systemctl enable --now segundo-cerebro-atualizar.timer
 sleep 6

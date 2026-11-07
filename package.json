@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.6.29",
+  "version": "0.6.30",
   "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
@@ -120,6 +120,10 @@
         "filter": [
           "whisper-small/**/*"
         ]
+      },
+      {
+        "from": "build/liberdade-vm.sh",
+        "to": "liberdade-vm.sh"
       }
     ],
     "publish": [
@@ -138,7 +142,10 @@
       "node_modules/@huggingface/**",
       "node_modules/sharp/**",
       "node_modules/@img/**"
-    ]
+    ],
+    "deb": {
+      "afterInstall": "build/liberdade-vm.sh"
+    }
   },
   "devDependencies": {
     "electron": "^33.0.0",
