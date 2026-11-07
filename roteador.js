@@ -9,6 +9,9 @@ const path = require('path')
 const CAMINHO = /(\b[a-z]:[\\/]|\\\\|(^|\s)~[\\/]|(^|\s)\/(users|home|etc|var|tmp|mnt)\/|\.(pdf|docx?|xlsx?|pptx?|csv|json|zip|png|jpe?g|mp4|py|js|ts|html|sql|md|txt)\b)/i
 const URL_RE = /https?:\/\/|www\./i
 const ACAO_FORTE = /\b(pesquis[ae]\w* (na|pela|no) (web|internet|google)|busqu?e\w* (na|pela|no) (web|internet|google)|navegu?e|abr[ae] o (site|navegador)|gere? (uma |um )?(imagem|foto|v[ií]deo)|cri[ae]r? (uma |um )?(imagem|foto|v[ií]deo|arquivo|pasta|site|planilha|apresenta[cç][aã]o)|salv[ae]\w* (em|num|no|na) |execut[ae]\w* (o |a |este |esse )?(comando|script|programa)|rod[ae]\w* (o |a |este |esse )?(comando|script|teste)|instal[ae]\w* |baix[ae]\w* |apag[ae]\w* (o |a |os |as )?(arquivo|pasta)|liste? (os )?arquivos|na minha (m[aá]quina|pasta|tela)|meu computador|git (commit|push|pull|clone))\b/i
+const VERBO_ACAO = /\b(ger[ae]\w*|cri[ae]\w*|fa[cç]\w*|fez|mont[ae]\w*|constru\w*|anim[ae]\w*|edit[ae]\w*|salv[ae]\w*|convert\w*|baix[ae]\w*|sub[ae]\w*|instal\w*|rod[ae]\w*|execut\w*|abr[ae]\w*|apag\w*|mov[ae]\w*|renome\w*|desenh\w*|produz\w*|program\w*|deploy\w*|publiq\w*|envie\w*|envia\w*|exporte\w*|transforme\w*|coloque\w*|ponha\w*|troque\w*|substitu\w*|refa[cç]\w*)\b/i
+const SUBSTANTIVO_PRODUCAO = /\b(v[ií]deo\w*|imagem|imagens|foto\w*|figura|ilustra[cç]\w*|logo\w*|banner\w*|capa|avatar|arquivo\w*|pasta\w*|site\w*|p[aá]gina\w*|planilha\w*|pdf|docx?|word|excel|powerpoint|pptx?|apresenta[cç]\w*|slide\w*|script\w*|programa\w*|aplicativo\w*|app|api|docker|container\w*|servidor\w*|banco de dados|metabase|git|commit|reposit[oó]rio|terminal|comando\w*|pip|npm|processo\w*|porta)\b/i
+const ANIMA = /\banim[ae]\w*\b/i
 const CUE_MEMORIA = /\b(lembra|lembrar|lembro|conversamos|falamos|combinamos|combinado|j[aá] te (disse|falei|contei|pedi)|outro dia|aquilo que|ontem|semana passada|da outra vez|antes eu)\b/i
 
 const USAR_AGENTE = {
@@ -19,6 +22,11 @@ const USAR_AGENTE = {
     parameters: { type: 'object', properties: { motivo: { type: 'string', description: 'Em poucas palavras, o que precisa ser feito.' } }, required: ['motivo'] },
   },
 }
+
+// O modelo do caminho rápido não cria nada. Se a resposta AFIRMA que criou/salvou/gerou um arquivo (nome com extensão, "Arquivo:", "salvo em"), é invenção.
+const AFIRMA_ARQUIVO = /(\barquivo\s*[:=]|\bsalv[oa]s?\s+(em|na|no)\b|\bcaminho\s*[:=]|\bgerei\b|\bcriei\b|\banimei\b|\bsalvei\b|\bpronto!?|\bv[ií]deo pronto)/i
+const NOME_ARQUIVO = /\b[\w\-]{3,}\.(mp4|mov|webm|png|jpe?g|webp|gif|pdf|docx?|xlsx?|pptx?|zip|html?|py|js|ts|csv|txt)\b/i
+const afirmaArquivo = (texto) => AFIRMA_ARQUIVO.test(String(texto || '')) && NOME_ARQUIVO.test(String(texto || ''))
 
 // o modelo pode chamar usar_agente depois de já ter respondido (resposta completa + chamada à toa): nesse caso a resposta vale e o Hermes não roda de novo.
 // Só escala quando ainda não há resposta de verdade (nada escrito, ou só uma frase de preâmbulo como "Vou criar o arquivo").
@@ -37,7 +45,7 @@ function inicioDoLoop(texto) {
 function classificar(texto, anexos = []) {
   if (anexos.length) return 'agente'
   const t = String(texto || '')
-  if (CAMINHO.test(t) || URL_RE.test(t) || ACAO_FORTE.test(t)) return 'agente'
+  if (CAMINHO.test(t) || URL_RE.test(t) || ACAO_FORTE.test(t) || ANIMA.test(t) || (VERBO_ACAO.test(t) && SUBSTANTIVO_PRODUCAO.test(t))) return 'agente'
   return 'rapido'
 }
 
@@ -88,6 +96,7 @@ function sistema({ usuario, skills, memoria }) {
     'Você é o Segundo Cérebro, o assistente pessoal da Rangel Tech. Responda em português do Brasil, direto e útil, sem enrolação; na dúvida entre curto e longo, prefira o que o usuário realmente precisa.',
     `Usuário: ${usuario}. Data e hora: ${new Date().toLocaleString('pt-BR')}.`,
     'Você responde sozinho conhecimento geral, conversa, explicações, tradução, resumo de texto colado, matemática e código escrito no próprio chat.',
+    'VOCÊ NÃO CRIA, SALVA NEM GERA ARQUIVOS, IMAGENS OU VÍDEOS: nunca diga que fez, salvou, gerou ou animou algo, nem invente nome de arquivo ou caminho. Se o pedido pede qualquer produção ou ação no computador, chame `usar_agente` sem escrever texto.',
     'A única ferramenta que você tem é `usar_agente`. Chame-a, sem escrever texto antes, quando o pedido exigir: ler ou criar arquivos, rodar comandos, navegar ou pesquisar na web, informação de hoje/atual que você não tem, gerar imagem ou vídeo, ou usar uma skill especializada.',
     skills ? `Skills instaladas (se o pedido combinar com alguma, chame usar_agente): ${skills}` : '',
     memoria ? `Trechos de conversas antigas deste usuário que podem ser relevantes (use só se ajudarem; não diga que "buscou"):\n${memoria}` : '',
@@ -166,4 +175,4 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
   return { escalar, texto: total, loop }
 }
 
-module.exports = { classificar, deveEscalar, inicioDoLoop, responderRapido, resumoDeSkills, memoriaRelevante }
+module.exports = { classificar, deveEscalar, inicioDoLoop, afirmaArquivo, responderRapido, resumoDeSkills, memoriaRelevante }

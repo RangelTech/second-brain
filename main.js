@@ -261,7 +261,9 @@ async function responder(alvo, msgs, ctx) {
         base: est.origem + '/v1', chave: await chaveLocal(), modelo: alvo, msgs, onDelta: ctx.onDelta, sinal: ctx.sinal, raciocinio: cfg.raciocinio,
         memoriaArquivo: path.join(app.getPath('userData'), 'chats.json'), chat: ctx.chat, skillsDir: path.join(app.getPath('userData'), 'hermes-home', 'skills'), usuario: os.userInfo().username,
       })
-      if (!r.escalar && String(r.texto || '').trim()) return r.texto
+      if (!r.escalar && String(r.texto || '').trim() && !roteador.afirmaArquivo(r.texto)) return r.texto
+      // a resposta rapida afirmou ter criado um arquivo (invenção): desmente e faz de verdade pelo agente
+      if (!r.escalar && roteador.afirmaArquivo(r.texto)) ctx.onDelta?.({ texto: '\n\n⚠ Correção: eu não criei nenhum arquivo ainda. Vou fazer de verdade agora.\n\n' })
       // escalou, ou o modelo devolveu uma resposta vazia: o agente assume (nunca mostrar mensagem em branco)
       ctx.onDelta?.({ aviso: 'Isso precisa do agente, preparando…' })
     } catch (e) {
@@ -347,6 +349,11 @@ function criarJanela() {
 }
 
 if (MODO_SERVIDOR) app.disableHardwareAcceleration()
+app.on('will-quit', () => {
+  try {
+    require('./agent').limparHermesPreso(app, path.join(app.getPath('userData'), 'hermes-home'))
+  } catch {}
+})
 app.whenReady().then(() => {
   try {
     require('./agent').limparHermesPreso(app, path.join(app.getPath('userData'), 'hermes-home'))

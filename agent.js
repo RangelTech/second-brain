@@ -52,6 +52,24 @@ function limparHermesPreso(app, home, exceto = []) {
   return n
 }
 
+// Gateway de segundo plano do Hermes (gateway.pid): cada sessao precisa de um gateway pronto. Se sobrou um antigo vivo (launcher encerrado, tarefa
+// morta no meio), o novo ESPERA ~60 s ele sair antes de assumir, e a partida estoura o prazo em ciclo. Sem nenhuma sessao ativa neste app, ele
+// nao tem cliente: pode ser encerrado com seguranca e o proximo sobe limpo em segundos.
+const sessoesVivas = new Set() // pids dos hermes-acp deste app que estao de pe
+function matarGatewayOrfao(app, home) {
+  if (sessoesVivas.size > 0) return false // outro chat usa o gateway: nao mexe
+  try {
+    const arq = path.join(home, 'gateway.pid')
+    const g = JSON.parse(fs.readFileSync(arq, 'utf8'))
+    if (g && g.kind === 'hermes-gateway' && vivo(g.pid) && fs.statSync(arq).mtimeMs > Date.now() - os.uptime() * 1000) {
+      matarArvore(g.pid)
+      registrar(app, `gateway orfao (pid ${g.pid}) encerrado antes de subir o agente`)
+      return true
+    }
+  } catch {}
+  return false
+}
+
 const OCIOSO_MS = 10 * 60 * 1000
 const CONTEXTO_REAL = 131072
 const COMPRIMIR_EM = 72000
@@ -263,7 +281,7 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR. Depois de criar código ou uma página, confira que funciona: para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console, ou tire uma captura e olhe. Se houver erro, corrija e confira de novo. Só então responda, dizendo o que você verificou.',
     navegador ? 'Você tem um NAVEGADOR INTEGRADO que o usuário vê na tela ao lado do chat. Para abrir sites, clicar, preencher formulários, ler páginas e tirar capturas de tela, use as ferramentas do servidor "navegador" (navegador_abrir, navegador_ler, navegador_clicar, navegador_digitar, navegador_rolar, navegador_print, navegador_voltar, navegador_esperar, navegador_js). Comece com navegador_abrir, depois navegador_ler para ver a página e os elementos clicáveis (cada um tem um id), e use navegador_print para VER a página de verdade (depois olhe a imagem com vision_analyze no caminho devolvido). Prefira essas ferramentas ao navegador próprio do Hermes.' : '',
-    midia ? 'Você pode GERAR IMAGENS de verdade com a ferramenta midia_gerar_imagem (roda numa GPU do servidor, leva de 10 a 30 segundos e salva um PNG na pasta Imagens da pasta de trabalho). Quando o usuário pedir uma imagem, ilustração, capa, avatar, propaganda ou caricatura, USE a ferramenta em vez de dizer que não consegue: escreva o prompt em inglês, bem detalhado (assunto, estilo, luz, enquadramento, cores), escolha o formato (quadrado, retrato, paisagem, story ou banner) e depois diga o caminho completo do arquivo. Título curto dentro da imagem (1 a 3 palavras, em caixa alta, entre aspas no prompt) sai legível; frase longa e letra acentuada saem erradas, e nesses casos gere a imagem sem texto e aplique o título depois. Peça a contagem exata de pessoas no prompt (por exemplo exactly two people) e confira o resultado olhando a imagem. Você também pode GERAR VÍDEOS (1 a 60 s, sem áudio) com midia_gerar_video, numa GPU do servidor: qualidade rapida leva cerca de 1 minuto; qualidade alta usa um modelo melhor em 1280x704 e leva de 7 a 20 minutos (use alta quando o usuário pedir qualidade, cinema ou algo para publicar, e nesse caso gere antes a imagem com midia_gerar_imagem e anime-a passando o caminho em imagem). Salva um MP4 na pasta Videos. Para TROCAR a pessoa de um vídeo pela de uma foto (troca de personagem ou de rosto) use midia_trocar_personagem, que leva vários minutos. REGRA DE ROTEAMENTO: quando o usuário pedir "um vídeo de" alguma coisa que tem imagem real (um balão, um animal, uma pessoa, uma paisagem, um produto, uma comida, uma cena), USE SEMPRE midia_gerar_video, com o prompt em inglês descrevendo a cena, o movimento e a câmera. NUNCA improvise esse pedido com video-motion, Remotion, HyperFrames, terminal ou código: eles só servem para animação gráfica com texto (títulos, legendas, gráficos, vinhetas, reels com texto) e só quando o usuário pedir isso de forma explícita. Se midia_gerar_video falhar ou estiver indisponível, NÃO faça outra coisa no lugar: diga em português simples que o vídeo não pôde ser gerado agora e ofereça tentar de novo em instantes; não fale de servidor, GPU, fila nem erro técnico. A tela já mostra a fila, o percentual e o resultado, então não repita isso no texto. DIREÇÃO DE MÍDIA: antes de chamar midia_gerar_imagem ou midia_gerar_video, transforme o pedido curto em um briefing detalhado em inglês (sujeito, cena, ação e movimento, enquadramento e câmera, iluminação, estilo, cores, o que evitar em negative_prompt; texto dentro da imagem só se o usuário pediu) e preencha os parâmetros (formato, segundos, qualidade, seed). Siga a skill direcao-de-midia. Em pedidos simples como "um vídeo de um balão" ou "um logo para loja de carros", NÃO pergunte nada e NÃO liste opções nem briefings por escrito: monte o briefing sozinho e chame a ferramenta na mesma hora. Só pergunte UMA coisa curta se faltar uma informação essencial que não dá para inferir (por exemplo, o nome que vai no logo). ENCADEAMENTO: "este vídeo" ou "esta imagem" no pedido seguinte é o ÚLTIMO arquivo de mídia que você gerou nesta conversa (o caminho está no resultado da ferramenta). Para pôr texto, legenda, zoom ou animação num clipe de IA, use a skill video-motion SOBRE esse arquivo (clipes de IA têm 2 a 6 s: estenda com loop, câmera lenta ou concatenando vários clipes, sem dizer que gerou 20 s de uma vez) e entregue o arquivo final. Siga a skill orquestrador-de-midia. Depois de uma falha de mídia a tela já mostra um cartão com "Tentar de novo": responda com UMA frase curta (por exemplo "Não consegui gerar agora.") e nunca fale de instabilidade, primeira tentativa, servidor, nem tente de novo sozinho em sequência.' : '',
+    midia ? 'Você pode GERAR IMAGENS de verdade com a ferramenta midia_gerar_imagem (roda numa GPU do servidor, leva de 10 a 30 segundos e salva um PNG na pasta Imagens da pasta de trabalho). Quando o usuário pedir uma imagem, ilustração, capa, avatar, propaganda ou caricatura, USE a ferramenta em vez de dizer que não consegue: escreva o prompt em inglês, bem detalhado (assunto, estilo, luz, enquadramento, cores), escolha o formato (quadrado, retrato, paisagem, story ou banner) e depois diga o caminho completo do arquivo. Título curto dentro da imagem (1 a 3 palavras, em caixa alta, entre aspas no prompt) sai legível; frase longa e letra acentuada saem erradas, e nesses casos gere a imagem sem texto e aplique o título depois. Peça a contagem exata de pessoas no prompt (por exemplo exactly two people) e confira o resultado olhando a imagem. Você também pode GERAR VÍDEOS (1 a 60 s, sem áudio) com midia_gerar_video, numa GPU do servidor: qualidade rapida leva cerca de 1 minuto; qualidade alta usa um modelo melhor em 1280x704 e leva de 7 a 20 minutos (use alta quando o usuário pedir qualidade, cinema ou algo para publicar, e nesse caso gere antes a imagem com midia_gerar_imagem e anime-a passando o caminho em imagem). Salva um MP4 na pasta Videos. Para TROCAR a pessoa de um vídeo pela de uma foto (troca de personagem ou de rosto) use midia_trocar_personagem, que leva vários minutos. REGRA DE ROTEAMENTO: quando o usuário pedir "um vídeo de" alguma coisa que tem imagem real (um balão, um animal, uma pessoa, uma paisagem, um produto, uma comida, uma cena), USE SEMPRE midia_gerar_video, com o prompt em inglês descrevendo a cena, o movimento e a câmera. NUNCA improvise esse pedido com video-motion, Remotion, HyperFrames, terminal ou código: eles só servem para animação gráfica com texto (títulos, legendas, gráficos, vinhetas, reels com texto) e só quando o usuário pedir isso de forma explícita. Se midia_gerar_video falhar ou estiver indisponível, NÃO faça outra coisa no lugar: diga em português simples que o vídeo não pôde ser gerado agora e ofereça tentar de novo em instantes; não fale de servidor, GPU, fila nem erro técnico. A tela já mostra a fila, o percentual e o resultado, então não repita isso no texto. DIREÇÃO DE MÍDIA: antes de chamar midia_gerar_imagem ou midia_gerar_video, transforme o pedido curto em um briefing detalhado em inglês (sujeito, cena, ação e movimento, enquadramento e câmera, iluminação, estilo, cores, o que evitar em negative_prompt; texto dentro da imagem só se o usuário pediu) e preencha os parâmetros (formato, segundos, qualidade, seed). Siga a skill direcao-de-midia. DETALHE SEMPRE: o prompt enviado à ferramenta precisa ser RICO (imagem: 60 a 120 palavras em inglês; vídeo: 80 a 150) com sujeito, cenário, ação e movimento, câmera e lente, iluminação, paleta, atmosfera, estilo e qualidade, mais negative_prompt; prompt curto é recusado pela ferramenta. Se o pedido do usuário for curto e vago (só o assunto), faça UMA mensagem curta com até 5 perguntas numeradas (estilo, cenário, ação, cores e clima, formato e duração), cada uma com uma sugestão sua entre parênteses, e diga que ele pode responder "pode seguir" para você decidir tudo. Se ele responder "pode seguir" ou "tanto faz", ignorar as perguntas ou já tiver dado detalhes suficientes, NÃO pergunte de novo: invente você mesmo os detalhes que faltam, de forma coerente e caprichada (sem inventar textos, marcas nem rostos de pessoas reais), e gere. Antes de chamar a ferramenta, mostre em 1 ou 2 linhas em português o que vai gerar. ENCADEAMENTO: "este vídeo" ou "esta imagem" no pedido seguinte é o ÚLTIMO arquivo de mídia que você gerou nesta conversa (o caminho está no resultado da ferramenta). Para pôr texto, legenda, zoom ou animação num clipe de IA, use a skill video-motion SOBRE esse arquivo (clipes de IA têm 2 a 6 s: estenda com loop, câmera lenta ou concatenando vários clipes, sem dizer que gerou 20 s de uma vez) e entregue o arquivo final. Siga a skill orquestrador-de-midia. Depois de uma falha de mídia a tela já mostra um cartão com "Tentar de novo": responda com UMA frase curta (por exemplo "Não consegui gerar agora.") e nunca fale de instabilidade, primeira tentativa, servidor, nem tente de novo sozinho em sequência.' : '',
     memoria ? 'Você tem MEMÓRIA das conversas antigas com este usuário: a ferramenta memoria_buscar procura nelas pelos assuntos. Quando ele perguntar "você lembra de...", "aquilo que conversamos", "o que ficou combinado" ou citar algo que não está nesta conversa, USE memoria_buscar (com palavras-chave do assunto) antes de responder; se precisar de mais contexto de um trecho, memoria_ler_conversa. Nunca diga que não lembra sem ter buscado. Diga de qual conversa e data veio a informação.' : '',
     ferramentas ? `Skills e ferramentas: ${ferramentas}` : '',
   ]
@@ -357,15 +375,18 @@ class Sessao {
     this.buf = ''
     // .cmd/.bat (só em teste/dev: nunca o .exe real) não roda com spawn puro no Windows (EINVAL) sem passar pelo shell
     const viaShell = /\.(cmd|bat)$/i.test(this.bin)
+    matarGatewayOrfao(this.app, this.env.HERMES_HOME)
     const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true, shell: viaShell, detached: process.platform !== 'win32' })
     this.filho = filho
     if (filho.pid) anotarPid(this.app, filho.pid)
+    if (filho.pid) sessoesVivas.add(filho.pid)
     filho.stdout.on('data', (d) => this.aoDados(d))
     filho.stderr.on('data', (d) => registrar(this.app, 'stderr ' + d.toString('utf8').trim().slice(0, 300)))
     filho.on('error', (e) => registrar(this.app, 'erro ao abrir o agente: ' + e.message + ' (' + this.bin + ')'))
     filho.on('exit', (codigo, sinal) => {
       registrar(this.app, 'agente saiu codigo=' + codigo + ' sinal=' + sinal + ' bin=' + this.bin)
       esquecerPid(this.app, filho.pid)
+      sessoesVivas.delete(filho.pid)
       if (this.filho !== filho) return // foi substituído de propósito
       for (const p of this.pendentes.values()) p.rej(new Error('O agente encerrou.'))
       this.pendentes.clear()
@@ -504,6 +525,7 @@ class Sessao {
         const antigo = this.filho
         this.pendentes.clear()
         matarArvore(antigo.pid) // arvore inteira da PROPRIA sessao (o filho Python segura travas); nao mexe nos outros chats
+        sessoesVivas.delete(antigo.pid)
         this.subir()
       }
     }
@@ -626,9 +648,10 @@ class Sessao {
     clearTimeout(this.ocioso)
     clearInterval(this.vigia)
     try {
+      sessoesVivas.delete(this.filho.pid)
       matarArvore(this.filho.pid)
     } catch {}
   }
 }
 
-module.exports = { Sessao, localizarBinario, prepararBase, registrar, matarArvore, limparHermesPreso }
+module.exports = { Sessao, localizarBinario, prepararBase, registrar, matarArvore, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

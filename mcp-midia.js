@@ -44,7 +44,7 @@ const FERRAMENTAS = [
     nome: 'gerar_video',
     desc: 'Gera um VÍDEO (1 a 60 segundos, sem áudio, até 512x512; acima de 4 s o servidor encadeia vários clipes e entrega um MP4 só, o que leva alguns minutos) a partir de uma descrição, numa GPU do servidor. Leva de 1 a vários minutos; o app mostra o andamento. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
     schema: obj({
-      prompt: { type: 'string', description: 'Cena e movimento, em inglês, detalhado.' },
+      prompt: { type: 'string', description: 'Cena e movimento, em inglês, MUITO detalhado (80 a 150 palavras, mínimo 40; 20 se passar imagem): sujeito, cenário, ação e movimento, câmera e lente, luz, paleta, atmosfera, estilo e qualidade.' },
       formato: { type: 'string', enum: FORMATOS_VIDEO, description: 'paisagem (768x512), retrato (512x768) ou quadrado. Padrão: paisagem.' },
       imagem: { type: 'string', description: 'Caminho de uma imagem para ANIMAR (imagem para vídeo). PNG, JPEG ou WEBP até 6 MB. Opcional.' },
       strength: { type: 'number', description: 'Quanto mudar a imagem de partida, de 0 a 1 (opcional).' },
@@ -62,7 +62,7 @@ const FERRAMENTAS = [
     nome: 'gerar_imagem',
     desc: 'Gera uma imagem a partir de uma descrição, numa GPU do servidor (cerca de 10 a 30 segundos). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Título curto (1 a 3 palavras, caixa alta, entre aspas no prompt) sai legível. Para frase longa ou texto com acento (ÃO, É, Ç), gere a imagem SEM texto e avise que o texto pode ser colocado depois: o modelo erra acentos e letras. Para pessoas, peça a contagem exata no prompt (exactly two people).',
     schema: obj({
-      prompt: { type: 'string', description: 'Descrição da imagem, em inglês e detalhada.' },
+      prompt: { type: 'string', description: 'Descrição da imagem, em inglês, MUITO detalhada (60 a 120 palavras, mínimo 30): sujeito e aparência, cenário, enquadramento e lente, luz, paleta, atmosfera, estilo e qualidade.' },
       estilo: { type: 'string', enum: ['foto', 'cinema', 'ilustracao', 'anime', '3d', 'minimalista', 'aquarela'], description: 'Estilo visual (opcional; segue a preferência do usuário).' },
       n: { type: 'number', description: 'Quantas opções gerar, de 1 a 4 (opcional).' },
       formato: { type: 'string', enum: Object.keys(FORMATOS), description: 'quadrado (1024x1024), retrato, paisagem, story (vertical 9:16) ou banner. Padrão: quadrado.' },
@@ -182,8 +182,16 @@ function paramsComuns(a, video) {
   return o
 }
 
+// O resultado só é tão bom quanto o prompt: prompt curto vira resultado genérico. Recusa e orienta o agente a detalhar (ele tenta de novo sozinho).
+function exigirDetalhe(tipo, prompt, minimo) {
+  const palavras = String(prompt || '').trim().split(/\s+/).filter(Boolean).length
+  if (palavras >= minimo) return
+  throw new Error(`O prompt está curto demais (${palavras} palavras; o mínimo é ${minimo}). Detalhe mais e chame a ferramenta de novo: sujeito com aparência, cenário, ${tipo === 'vídeo' ? 'ação e movimento, câmera e lente, ' : 'enquadramento e lente, '}iluminação, paleta de cores, atmosfera, estilo e qualidade, mais negative_prompt. Se faltar informação do usuário, pergunte (até 5 perguntas curtas com sugestão); se ele disser "pode seguir", invente os detalhes você mesmo.`)
+}
+
 async function gerarImagem(args) {
   const { prompt, formato, nome } = args
+  exigirDetalhe('imagem', prompt, 30)
   if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor (Unlimited). Abra Configurações e conclua o cadastro.')
   if (process.env.SB_MIDIA_MOCK) return simular('imagem', prompt, process.env.SB_MIDIA_MOCK_IMG || path.join(__dirname, 'renderer', 'img', 'segundo-cerebro-64.png'))
   const corpo = { prompt: String(prompt || '').slice(0, 3500), size: FORMATOS[formato] || FORMATOS[PREFS.proporcao] || FORMATOS.quadrado, ...paramsComuns(args, false) }
@@ -207,6 +215,7 @@ async function trocarPersonagem(args) {
 
 async function gerarVideo(args) {
   const { prompt, formato, segundos, nome } = args
+  exigirDetalhe('vídeo', prompt, args.imagem ? 20 : 40)
   if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular('video', prompt, process.env.SB_MIDIA_MOCK_ARQ || '')
   const corpo = {

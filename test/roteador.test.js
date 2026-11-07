@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert')
-const { classificar, deveEscalar, inicioDoLoop } = require('../roteador')
+const { classificar, deveEscalar, inicioDoLoop, afirmaArquivo } = require('../roteador')
 
 test('conversa e conhecimento geral vão pelo caminho rápido', () => {
   for (const t of ['Qual a capital da Austrália?', 'Explique o que é TCP em 3 linhas', 'Traduza "bom dia" para o inglês', 'Você lembra do que combinamos ontem?', 'Escreva um poema curto sobre o mar'])
@@ -25,4 +25,16 @@ test('detecta loop de palavra repetida e corta no inicio, mantendo uma ocorrênc
   assert.ok(texto.slice(0, ini).length < base.length + 40)
   assert.strictEqual(inicioDoLoop('texto normal sem repetição nenhuma, só prosa comum e variada para ver que não dispara.'), -1)
   assert.strictEqual(inicioDoLoop('sim sim sim'), -1) // repetição curta e legítima não é loop
+})
+test('pedidos de produção e de sistema vão para o agente (nada de inventar resultado)', () => {
+  for (const t of ['Agora anime essa imagem em um vídeo de 5 segundos', 'Anime isso', 'Faça um vídeo do carro', 'Suba um Metabase num Docker na porta 3010', 'Construa um site de portfólio', 'Monte uma planilha com os gastos', 'Transforme esse texto em PDF', 'Crie um logo para minha loja'])
+    assert.strictEqual(classificar(t, []), 'agente', t)
+  for (const t of ['Qual a capital do Peru?', 'Como funciona um servidor DNS?', 'Me dá uma receita de bolo de cenoura', 'Explique o que é um container em 2 linhas', 'oi, bom dia, tudo bem?'])
+    assert.strictEqual(classificar(t, []), 'rapido', t)
+})
+test('detecta resposta que inventa arquivo criado', () => {
+  assert.strictEqual(afirmaArquivo('Vídeo pronto! Animei a cena. Arquivo: carro-video-20261107.mp4'), true)
+  assert.strictEqual(afirmaArquivo('Salvei em C:/Users/x/relatorio.pdf'), true)
+  assert.strictEqual(afirmaArquivo('A capital do Peru é Lima. O arquivo mp4 é um formato de vídeo comum.'), false)
+  assert.strictEqual(afirmaArquivo('Pronto! A resposta é 42.'), false)
 })
