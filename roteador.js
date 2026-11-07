@@ -20,6 +20,11 @@ const USAR_AGENTE = {
   },
 }
 
+// o modelo pode chamar usar_agente depois de já ter respondido (resposta completa + chamada à toa): nesse caso a resposta vale e o Hermes não roda de novo.
+// Só escala quando ainda não há resposta de verdade (nada escrito, ou só uma frase de preâmbulo como "Vou criar o arquivo").
+const PREAMBULO_MAX = 160
+const deveEscalar = (textoJaEscrito) => String(textoJaEscrito || '').trim().length < PREAMBULO_MAX
+
 function classificar(texto, anexos = []) {
   if (anexos.length) return 'agente'
   const t = String(texto || '')
@@ -119,7 +124,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
       if (dado === '[DONE]') continue
       try {
         const d = JSON.parse(dado).choices?.[0]?.delta ?? {}
-        if (d.tool_calls?.length) escalar = true
+        if (d.tool_calls?.length && deveEscalar(total)) escalar = true
         const raz = d.reasoning_content ?? d.reasoning
         if (raz) onDelta?.({ raciocinio: raz })
         if (d.content && !escalar) {
@@ -132,4 +137,4 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
   return { escalar, texto: total }
 }
 
-module.exports = { classificar, responderRapido, resumoDeSkills, memoriaRelevante }
+module.exports = { classificar, deveEscalar, responderRapido, resumoDeSkills, memoriaRelevante }
