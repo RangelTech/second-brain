@@ -247,3 +247,26 @@ Pasta: `data/raw/segundo-cerebro/seed-20261106_07/`. Scripts em `harness/segundo
 
 ### 11c. Skill `projetos`
 A skill `projetos` (catálogo da campanha de benchmark de GPU e IA) ganha uma seção "Segundo Cérebro, produção (nov/2026)" que, **por dia**, diz: o que foi testado, o que mediu e **onde estão os dados** (`benchmarks/data/raw/segundo-cerebro/...`). Atualizar essa seção a cada rodada nova. O `sync-skills` envia a skill para o repositório `personal-skills`.
+
+## 12. Resultado da janela de 07/11/2026 (12:58 a 14:58 BRT)
+
+Dados completos: repositório benchmarks, `data/raw/segundo-cerebro/20261107-janela2h/` (`meta.json`, `resultados_*.csv`, `runs/`).
+
+**Decisão da trilha B (servidor): vLLM 0.30.0 oficial, SEM MTP, com `--prefix-match-unit 16`.** Está em produção na hold 58831117 (`/workspace/NO_MTP` + `start_vllm.sh`, backup `start_vllm.sh.bak_20261107`). O dono removeu a regra de manter o MTP ligado: vale a combinação mais rápida.
+
+Decode, tok/s, 1 usuário:
+
+| Contexto | MTP n=2 (antiga) | Sem MTP | Fork + MTP n=2 | MTP n=1 | MTP n=3 |
+|---|---|---|---|---|---|
+| 2 mil | 78,8 | 71,1 | n/m | 75,9 | 76,2 |
+| 10 mil | 52,7 | 68,6 | 72,4 | 51,0 | 56,2 |
+| 25 mil | 35,4 | 65,3 | 65,0 | 30,7 | 33,1 |
+| 50 mil | 23,2 | 61,5 | 54,7 | n/m | n/m |
+
+4 usuários a 25 mil tokens, tok/s por usuário: MTP n=2 18,4; MTP n=1 17,5; fork 11,8; sem MTP 27,0; **sem MTP + prefix-match-unit 16: 32,7**.
+
+Fila de pedidos frios, pior espera até o 1º token: 20×15k frios 288 s → 234 s com prefix-match-unit; 20 com prefixo compartilhado 60,3 → 53,2 s; mix realista (14 curtas, 4 agentes de 20k, 2 de 10k) 23 s na baseline. Fila de 20 frios continua acima do limite de 180 s: só cai com prefixo compartilhado ou contexto menor.
+
+Qualidade (portão): sem MTP empata ou supera a baseline (conversa 19/20 contra 17/20 com gabarito diferente, ferramentas 19/20 nas duas, código 25/30 nas duas, 0 estouros contra 2).
+
+**Não testado (para a próxima janela):** trilha A com LLM real (tarefas A1 a A6 e a VM do Juca), mais de 4 usuários, ngram, KV fp8, `max-num-seqs`/`max-num-batched-tokens`, fila P com prefix-match-unit (rodada invalidada por reinício meu), qualidade do fork. Código da trilha A (E5.1 prefixo estável, knobs E4 e E6 por variável de ambiente) está commitado mas **sem nova versão do app**, porque não foi medido.
