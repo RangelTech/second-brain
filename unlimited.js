@@ -63,6 +63,17 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
     }
   }
 
+  // o plano pode mudar depois do login (upgrade, downgrade): confere se o pacote de skills continua valendo para a conta
+  async function atualizarPlano(chave) {
+    try {
+      const r = await fetch(BASE() + '/auth/whoami', { headers: { Authorization: 'Bearer ' + chave }, signal: AbortSignal.timeout(15000) })
+      if (r.status !== 200) return
+      const j = await r.json()
+      const pacote = j?.plan?.skill_pack
+      if (typeof pacote === 'boolean' && pacote !== cfgGet().unlimitedPacote) cfgSet({ unlimitedPacote: pacote })
+    } catch {}
+  }
+
   async function ciclo() {
     clearTimeout(timer)
     try {
@@ -74,6 +85,7 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
       const chave = decifrar(c2.unlimitedChave)
       const s = await conferir(chave)
       if (s === 'ativo') {
+        await atualizarPlano(chave)
         if (!c2.unlimitedLigado && embed.estado().pronto) await ligarNoMotor(chave)
         publicar({ fase: 'ativo', codigo: c2.unlimitedCodigo, detalhe: '' })
         if (!cfgGet().unlimitedLigado) timer = setTimeout(ciclo, 5000) // motor ainda subindo
@@ -82,7 +94,7 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
       if (s === 'pendente') publicar({ fase: 'pendente', detalhe: 'O seu acesso está aguardando liberação ou foi bloqueado. Assim que for liberado, o app volta a funcionar sozinho.' })
       else if (s === 'invalida') {
         // a chave deste computador caiu (limite de computadores, assinatura encerrada ou troca de senha): pede o login de novo
-        cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined })
+        cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined, unlimitedPacote: undefined })
         publicar({ fase: 'login', detalhe: 'Sua sessão neste computador terminou. Entre de novo.' })
       }
       else publicar({ fase: 'offline', codigo: c2.unlimitedCodigo, detalhe: 'Sem conexão com o servidor. Tentando de novo…' })
@@ -112,7 +124,7 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
         return { ok: false, codigo: 'offline', erro: 'Sem conexão com o servidor. Confira a internet e tente de novo.' }
       }
       if (r.status === 200 && r.json?.api_key) {
-        cfgSet({ unlimitedChave: cifrar(r.json.api_key), unlimitedEmail: r.json.account?.email, unlimitedPlano: r.json.plan?.name, unlimitedLigado: false, unlimitedRecusado: false })
+        cfgSet({ unlimitedChave: cifrar(r.json.api_key), unlimitedEmail: r.json.account?.email, unlimitedPlano: r.json.plan?.name, unlimitedPacote: r.json.plan?.skill_pack, unlimitedLigado: false, unlimitedRecusado: false })
         clearTimeout(timer)
         ciclo()
         return { ok: true, plano: r.json.plan?.name }
@@ -132,7 +144,7 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
     },
     sair: () => {
       clearTimeout(timer)
-      cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined })
+      cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined, unlimitedPacote: undefined })
       publicar({ fase: 'login', detalhe: '' })
     },
   }

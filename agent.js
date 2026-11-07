@@ -130,6 +130,12 @@ function localizarBinario(app) {
 
 // HERMES_HOME próprio do app. Na primeira vez traz skills, memória e SOUL.md da instalação do piloto;
 // a cada início atualiza as skills globais da Rangel Tech (somente leitura) dentro de skills/rangeltech.
+// O pacote de skills da Rangel Tech vai no instalador de todo mundo, mas só é entregue a quem o plano inclui (o Light não tem).
+// O login informa (plan.skill_pack) e o app grava; sem essa informação (provedor próprio, instalação antiga) o pacote é entregue.
+let ENTREGAR_PACOTE = true
+function definirPacote(v) {
+  ENTREGAR_PACOTE = v !== false
+}
 function prepararBase(app) {
   const home = path.join(app.getPath('userData'), 'hermes-home')
   fs.mkdirSync(path.join(home, 'skills'), { recursive: true })
@@ -144,7 +150,7 @@ function prepararBase(app) {
     fs.writeFileSync(marca, new Date().toISOString())
   }
   const globais = [path.join(process.resourcesPath || '', 'skills-globais', 'rangeltech'), path.join(__dirname, 'skills-globais', 'rangeltech')].find((p) => fs.existsSync(p))
-  if (globais) sincronizarSkillsGlobais(globais, path.join(home, 'skills', 'rangeltech'))
+  if (globais && ENTREGAR_PACOTE) sincronizarSkillsGlobais(globais, path.join(home, 'skills', 'rangeltech'))
   return home
 }
 
@@ -702,4 +708,4 @@ class Sessao {
   }
 }
 
-module.exports = { Sessao, localizarBinario, prepararBase, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { Sessao, localizarBinario, prepararBase, definirPacote, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

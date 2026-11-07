@@ -19,7 +19,7 @@ const handlersIpc = new Map()
 // modo servidor (VM sem tela): janela escondida, acesso web ligado, sem depender de monitor
 const MODO_SERVIDOR = process.argv.includes('--servidor') || process.env.SB_SERVIDOR === '1'
 const embed = require('./embed-router')
-const { Sessao, prepararBase, localizarBinario, registrar: registrarAgente } = require('./agent')
+const { Sessao, prepararBase, definirPacote, localizarBinario, registrar: registrarAgente } = require('./agent')
 const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
 const hermesInstalarMod = require('./hermes-instalar')
@@ -522,12 +522,14 @@ app.whenReady().then(() => {
   ipcMain.handle('atualizacao:baixar', () => atualizador.baixar(true))
   ipcMain.handle('atualizacao:instalar', () => atualizador.instalar())
   if (!MODO_SERVIDOR) atualizador.iniciar()
+  definirPacote(cfg.unlimitedPacote)
   prepararBase(app)
   const unl = unlimitedMod.criar({
     app,
     cfgGet: () => cfg,
     cfgSet: (p) => {
       Object.assign(cfg, p)
+      if ('unlimitedPacote' in p) definirPacote(cfg.unlimitedPacote)
       salvarCfg()
     },
     cifrar,
