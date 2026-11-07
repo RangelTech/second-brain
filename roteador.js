@@ -42,9 +42,16 @@ function inicioDoLoop(texto) {
   return inicio + m[1].length
 }
 
-function classificar(texto, anexos = []) {
+// Continuação automática do app e respostas curtas ("sim", "pode fazer") só fazem sentido com o contexto do agente: nunca vão para o caminho rápido.
+const CONTINUACAO = /^\s*(continue exatamente|continue|continua|prossiga|pode (seguir|continuar|fazer|ir)|segue|vai l[aá]|manda ver|faz isso|fa[cç]a isso|isso mesmo|sim|ok|beleza|certo|pode sim)\b/i
+const MAX_PALAVRAS_CURTA = 10
+
+// `emAgente`: este chat já tem um agente vivo (a sessão guarda o histórico de ferramentas). Mensagem curta nesse chat continua com ele.
+function classificar(texto, anexos = [], { emAgente = false } = {}) {
   if (anexos.length) return 'agente'
   const t = String(texto || '')
+  if (CONTINUACAO.test(t)) return 'agente'
+  if (emAgente && t.trim().split(/\s+/).filter(Boolean).length <= MAX_PALAVRAS_CURTA && !/\?\s*$/.test(t.trim())) return 'agente'
   if (CAMINHO.test(t) || URL_RE.test(t) || ACAO_FORTE.test(t) || ANIMA.test(t) || (VERBO_ACAO.test(t) && SUBSTANTIVO_PRODUCAO.test(t))) return 'agente'
   return 'rapido'
 }

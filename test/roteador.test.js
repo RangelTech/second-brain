@@ -38,3 +38,11 @@ test('detecta resposta que inventa arquivo criado', () => {
   assert.strictEqual(afirmaArquivo('A capital do Peru é Lima. O arquivo mp4 é um formato de vídeo comum.'), false)
   assert.strictEqual(afirmaArquivo('Pronto! A resposta é 42.'), false)
 })
+test('continuação automática e resposta curta dentro de chat com agente vão para o agente', () => {
+  assert.strictEqual(classificar('Continue exatamente de onde parou.', []), 'agente')
+  for (const t of ['sim', 'pode fazer', 'ok, manda ver', 'Pode seguir.']) assert.strictEqual(classificar(t, []), 'agente', t)
+  assert.strictEqual(classificar('faz o segundo então', [], { emAgente: true }), 'agente')
+  // pergunta curta de conhecimento continua rápida mesmo com agente vivo; e mensagem curta sem agente vivo também
+  assert.strictEqual(classificar('Qual a capital do Peru?', [], { emAgente: true }), 'rapido')
+  assert.strictEqual(classificar('bom dia', []), 'rapido')
+})

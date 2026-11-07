@@ -255,7 +255,7 @@ async function responder(alvo, msgs, ctx) {
   }
   // roteador: pedido que não precisa de ferramenta sai numa chamada direta (rápido); se o modelo pedir o agente, segue para o Hermes
   const ultimoPedido = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
-  if (cfg.roteador !== false && roteador.classificar(ultimoPedido, ctx.anexos || []) === 'rapido') {
+  if (cfg.roteador !== false && roteador.classificar(ultimoPedido, ctx.anexos || [], { emAgente: !!(sessoes.get(ctx.chat) && !sessoes.get(ctx.chat).morto) }) === 'rapido') {
     try {
       const r = await roteador.responderRapido({
         base: est.origem + '/v1', chave: await chaveLocal(), modelo: alvo, msgs, onDelta: ctx.onDelta, sinal: ctx.sinal, raciocinio: cfg.raciocinio,
