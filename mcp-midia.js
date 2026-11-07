@@ -38,10 +38,10 @@ const FERRAMENTAS = [
       imagem: { type: 'string', description: 'Caminho de uma imagem para ANIMAR (imagem para vídeo). PNG, JPEG ou WEBP até 6 MB. Opcional.' },
       strength: { type: 'number', description: 'Quanto mudar a imagem de partida, de 0 a 1 (opcional).' },
       fps: { type: 'number', description: 'Quadros por segundo, de 8 a 30 (opcional).' },
-      segundos: { type: 'number', description: 'Duração total de 1 a 60 segundos (o servidor encadeia clipes de até 4 s). Padrão: 4.' },
+      segundos: { type: 'number', description: 'Duração total de 1 a 60 segundos (o servidor encadeia clipes de 4 s na qualidade rápida e de 5 s na alta). Padrão: 4.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
       negative_prompt: { type: 'string', description: 'O que evitar (em inglês): ex. "blurry, deformed hands, extra fingers, watermark, text". Opcional.' },
-      qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'rapida (padrão, menos passos) ou alta (mais passos, mais lento).' },
+      qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'rapida (padrão): modelo leve, cerca de 1 minuto, 640x384, serve para testar. alta: modelo Wan 2.2 em 1280x704 e 24 quadros por segundo, mantém logos, rostos e detalhes, leva de 7 a 20 minutos (5 segundos de vídeo levam cerca de 7 minutos). Use alta quando o usuário pedir qualidade, cinema, comercial ou algo para publicar. Para o melhor resultado, gere antes uma imagem com gerar_imagem e anime-a passando em imagem.' },
       steps: { type: 'number', description: 'Passos de geração (opcional; normalmente deixe a qualidade escolher).' },
       cfg: { type: 'number', description: 'Fidelidade ao prompt (opcional).' },
       seed: { type: 'number', description: 'Semente para repetir ou variar um resultado (opcional).' },
@@ -193,6 +193,12 @@ async function gerarVideo(args) {
     ...paramsComuns(args, true),
   }
   if (args.fps != null) corpo.fps = Number(args.fps)
+  const alta = args.qualidade === 'alta'
+  if (alta) {
+    corpo.recipe = 'wan22-ti2v' // alta qualidade: Wan 2.2 (1280x704, 24 fps); o servidor encadeia clipes de 5 s
+    delete corpo.fps
+    if (args.steps == null) delete corpo.steps // o Wan já usa 20 passos; 40 só dobraria o tempo
+  }
   // imagem -> vídeo: a imagem de partida vai em base64 (PNG, JPEG ou WEBP, até 6 MB)
   if (args.imagem) {
     const bin = fs.readFileSync(String(args.imagem))
@@ -200,7 +206,7 @@ async function gerarVideo(args) {
     corpo.image = bin.toString('base64')
     if (args.strength != null) corpo.strength = Math.max(0, Math.min(1, Number(args.strength)))
   }
-  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt, nome, limiteMs: Math.max(20, Math.ceil((corpo.seconds || 4) / 4) * 3) * 60 * 1000 })
+  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt, nome, limiteMs: (alta ? Math.max(30, Math.ceil((corpo.seconds || 5) / 5) * 12) : Math.max(20, Math.ceil((corpo.seconds || 4) / 4) * 3)) * 60 * 1000 })
 }
 
 // uma nova tentativa em silêncio (o cartão segue em "Gerando...") antes de mostrar a falha
