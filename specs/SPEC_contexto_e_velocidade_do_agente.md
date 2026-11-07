@@ -1,0 +1,252 @@
+# Spec: contexto menor e geração mais rápida no agente
+
+Data: 07/11/2026. **Só especificação: nada foi implementado nem alterado em produção.**
+
+## 0. Regras de ouro (decisões do Lucas)
+
+1. **Sempre melhorar, nunca piorar.** Qualidade, velocidade e fila só andam para frente. Toda mudança passa pelo portão de não regressão (seção 3) antes de ir para produção. Mudança que piora qualquer métrica de qualidade volta atrás.
+2. **O MTP continua ligado** (mediu +50% de tok/s em contexto curto). Desligar o MTP só entra como medição de diagnóstico, nunca como solução.
+3. **Nenhum gasto extra.** Nada de alugar máquina. Os testes rodam na **própria GPU de produção** (a 2×3090 `hold-cz-25792`), em **janelas curtas** com a produção parada, e depois volta o deploy do que funcionou (seção 4). **Regra dura: a instância da Vast NUNCA é destruída, parada nem recriada** (perderíamos a máquina barata e o aluguel até 28/11). Mexemos só em processos dentro dela (vLLM, venvs, arquivos); nenhum comando `stop`/`destroy` da Vast e nenhuma troca de imagem.
+4. **Os benchmarks existem para melhorar a nossa GPU** (modelo, parâmetros do vLLM, fila, contexto do agente).
+5. **Guardar todos os valores** em JSON/CSV na pasta de benchmarks, inclusive resultados ruins, porque viram artigo (seção 3d).
+
+## 1. Problema
+
+O agente (Hermes) manda cerca de 25 mil tokens de contexto a cada passo. Com esse contexto:
+- a geração cai de ~107 tok/s (contexto curto, com MTP) para ~33 tok/s (observado no log do vLLM, 1 requisição ativa);
+- o prefill anda a ~1,7 mil tok/s, então vários usuários em modo agente se enfileiram;
+- a cota de 5 M tokens de sessão dura cerca de 200 passos.
+
+Resultado: tarefa grande leva de 10 a 35 min (site do currículo: 36 passos, 35 min).
+
+## 2. O que já sabemos (e o que não sabemos)
+
+| Fato | Origem | Confiança |
+|---|---|---|
+| ~19,6 mil tokens já no 1º passo, subindo para 27 mil e até 52 mil em sessões longas | log `usage_update` do Hermes (QA de 06 e 07/11) | alta |
+| O Hermes reenvia a cada turno um prompt de sistema que costuma passar de 20 mil tokens incluindo as definições de ferramentas | documentação de integração de terceiros (Requesty) | média: bate com o nosso 19,6 mil |
+| Definições de ferramentas pesam de ~2 mil a ~15 mil tokens conforme os toolsets ligados | issue #4379 do Hermes, citada em fórum | média |
+| Hermes já adia 4 ferramentas (~2 mil tokens) e deixa 16 visíveis | `agent.log` do Hermes | alta |
+| Compressão do Hermes: padrão em 50% da janela; camada de gateway em 85%; as duas não podem ser iguais | documentação oficial | alta |
+| Taxa de acerto do cache de prefixo ~78% (70% a 83%) | log do vLLM | alta |
+| Prefill ~1,7 mil tok/s a frio | teste de carga 06/11 | alta |
+| Geração ~33 tok/s com contexto longo | 1 amostra do log do vLLM, não controlada | **baixa** |
+| MTP piora em contexto longo (>10 mil) nos híbridos Qwen3.5/3.6 | notas de um fork de terceiros | **média/baixa**: não reproduzido por nós |
+| Saídas de ferramentas dominam o contexto de agentes (~84% no SWE-agent) | estudo da JetBrains (arXiv 2508.21433) | média: outro agente |
+| O prompt do app tem data e hora com segundos no início (`contextoDeSistema` em `agent.js`) | código | alta; efeito no cache a medir |
+
+**Conclusão provisória:** a maior parte dos ~19,6 mil do 1º passo parece ser o **piso fixo do próprio Hermes** (prompt + ferramentas + índice de skills), não histórico. Se for isso, mascarar saídas antigas (E4) não derruba o piso; o que derruba é reduzir toolsets, prefixo estável e delegação (E5 a E7). **A medição E0 decide.**
+
+Não sabemos ainda: a composição exata dos 25 mil, e se a nossa vLLM 0.30.0 já traz a correção do fork.
+
+## 2b. Duas trilhas independentes
+
+São duas melhorias diferentes, medidas e implantadas separadamente, para saber exatamente o que causou cada ganho. **Uma mudança por vez** dentro de cada trilha.
+
+| | Trilha A: Hermes (o agente) | Trilha B: LLM (o servidor) |
+|---|---|---|
+| O que é | o que o app manda ao modelo: prompt, ferramentas, histórico, compressão, subagentes | como o modelo roda: vLLM, MTP, fork, cache de prefixo, fila |
+| Experimentos | E4, E5 parte 1, E6, E7, E8 | E1, E2, E3, E5 parte 2, fila de 20 |
+| Alvo | tokens por passo, passos por tarefa, tempo da T6 | tok/s a 25k, 1º token, fila de 20 |
+| Como vai ao ar | nova versão do app (e do atualizador das VMs); a medição limpa usa a janela | `start_vllm.sh` na `hold`, só em janela, com rollback |
+| Dono do risco | agente perder informação ou ferramenta | regressão de qualidade ou de velocidade do modelo |
+
+A **subagentes (E7)** é a melhoria mais promissora da trilha A para o problema do contexto: a tarefa longa roda num subagente com contexto isolado e o contexto principal fica pequeno. É melhoria do Hermes, não do modelo. As duas trilhas se somam: contexto menor (A) deixa o modelo mais rápido (B) e a fila mais curta.
+
+Medição: cada trilha tem a sua linha de base e o seu portão (seção 3); depois do deploy das duas, uma medição conjunta confirma que os ganhos se somam.
+
+## 3. Métricas e portão de não regressão
+
+### 3a. Métricas
+Por passo do agente: tokens de entrada, tokens em cache, 1º token, tok/s de geração, tokens de saída.
+Por tarefa: passos, tokens totais, tempo total, **sucesso** (checagem objetiva).
+
+**Tarefas fixas** (as do QA, 3 repetições cada, na conta de teste): T1 listar arquivos · T2 pesquisa de cotação na internet · T3 navegador integrado (G1) · T4 imagem detalhada · T5 Metabase em Docker (na VM) · T6 site do currículo.
+
+### 3b. Suíte de não regressão (roda antes de qualquer deploy)
+| Grupo | Verificação | Regra |
+|---|---|---|
+| Qualidade | sucesso nas 6 tarefas (3 repetições) | **igual ou melhor** que a base |
+| Qualidade | 30 chamadas de ferramenta válidas (JSON correto, ferramenta certa) | 100% |
+| Qualidade | 60 gerações de código com limite de 6 mil tokens: loops, estouros, código que não compila | 0 loops, 0 estouros, 100% compila |
+| Qualidade | 30 perguntas de conversa com gabarito simples | acerto ≥ base |
+| Velocidade | tok/s de geração a 2k, 10k e 25k de contexto, com 1 e 4 usuários | ≥ base − margem |
+| Velocidade | 1º token do 1º passo e prefill (tok/s) | ≤ / ≥ base ± margem |
+| Fila | benchmark da fila de 20 (3c) | ≥ base ± margem |
+| Custo | tokens por tarefa | ≤ base |
+
+**Margem de ruído:** 3 repetições da linha de base; margem = o maior entre 5% e 2 desvios padrão.
+**Como decide:**
+- Regressão em **Qualidade**: bloqueia, sem exceção, e volta ao estado anterior.
+- Regressão em **Velocidade, Fila ou Custo**: só passa com troca explicitamente aprovada por você e registrada.
+- Cada ciclo precisa **melhorar pelo menos uma métrica primária** (tokens por passo, tok/s a 25k, p95 da fila de 20, tempo da T6) fora da margem; senão não vira deploy e fica registrado como resultado negativo.
+- A linha de base só é atualizada depois de um deploy aprovado.
+
+### 3c. Benchmark da fila de 20
+Mede o que você sempre mede: **quanto tempo demora a resposta do pedido mais antigo** numa fila de 20.
+- **Caminho real:** llm-access → llm-queue → vLLM, com chave de teste e limites zerados.
+- **Rajada:** 20 pedidos no mesmo instante. **Laço fechado:** 1, 4, 10 e 20 usuários virtuais (mesmo formato do harness de outubro).
+- **Quatro mixes:** (A) 20 conversas curtas; (B) realista: 14 curtas + 4 de agente (~20k de contexto) + 2 médias (~10k); (C) 20 de agente (~20k); **(D) reprodução de outubro: 20 chats simultâneos de ~13 a 17 mil tokens, a frio e a quente**.
+- **Linha de base de outubro** (skill `projetos`, `references/hermes_fila_llm.md`, 2×3090): fila de 20 quente em **42 a 55 s** (43 s com bf16 + `align`), a frio ~**104 s**; cliente isolado 4,5 s quente e 7,5 s frio; prefill de pico ~3,5 a 5,8 mil tok/s. A meta daquela campanha era o **pior cliente em até 15 s**, que a 2×3090 não atingiu. O limite teórico de 20 chats quentes com cache perfeito naquele contexto é de **~27 s ou mais**.
+- **Por que isso importa aqui:** a fila é limitada pelo prefill, que é proporcional ao contexto. Se a trilha A reduzir o contexto do agente de ~25 mil para ~12 mil, o prefill da fila cai pela metade (estimativa, rótulo `calculated`); o mix D mede isso de verdade.
+- **Por pedido:** 1º token, total, posição na fila, erro.
+- **Resumo:** 1ª resposta, mediana, p95 e pior caso (o pedido que mais esperou); **idade do pedido mais antigo ainda sem resposta**, amostrada a cada 1 s (máximo e p95); tempo até esvaziar a fila; tok/s agregado; % de erro.
+- O simulador de fila `harness/eco/qsim.py` do repositório de benchmarks pode projetar capacidade a partir das curvas; esses números levam o rótulo `simulated`.
+
+### 3d. Registro dos dados (para artigos)
+Tudo em `new_ragente_private_stage/benchmarks/data/raw/segundo-cerebro/`, seguindo as convenções do repositório de outubro (bruto só de acréscimo, nunca regenerado):
+- `RUNS.csv`: índice, uma linha por rodada.
+- `achados.jsonl`: problemas e decisões, cada um com sintoma, causa, correção e evidência.
+- `<run_id>/meta.json`: versão do app e do llm-queue, imagem e flags do vLLM, instância da GPU, parâmetros do teste.
+- `<run_id>/requests.jsonl`: 1 linha por requisição, com os campos do harness de outubro (`request_id, level, kind, thinking, status, error, ttft_s, total_s, usage, n_chunks, chunk_times_s`) mais `ctx_tokens, cached_tokens, t_envio_s, t_fim_s, experimento, variante, repeticao`.
+- `<run_id>/summary.csv`, `logs/` (trechos do vLLM e da ponte) e `evidencias/` (prints, vídeos, imagens).
+- Nome da rodada: `<UTC>Z-<experimento>-<variante>-<6hex>`. Rótulos: `measured`, `calculated`, `simulated`, `external`, `not_tested`.
+- Resultados negativos e falhas são guardados e valem artigo.
+- Scripts de teste ficam em `harness/segundo-cerebro/` para reproduzir.
+- Os dados já coletados em 06 e 07/11 (MTP, carga de usuários, penalidades, QA, mídia) entram como `seed-20261106_07`, com a confiabilidade de cada um marcada.
+- Commit e push do repositório (privado) só com a sua ordem.
+
+## 4. Janelas de teste na nossa GPU (sem gasto extra)
+
+**O que roda sem parar nada:** E0, E2, E5 parte 1, escrever o harness e testá-lo em contexto curto, preparar o fork (4b).
+**O que exige a GPU limpa (janela com produção parada):** linha de base completa, E1, fila de 20, E3, E4 e E5 parte 2 com medição, confirmação final.
+
+### 4a. Procedimento da janela (máximo 90 min; se estourar, abortar e restaurar)
+1. Escolher o horário de menor uso (painel `/admin`, uso por hora) e avisar.
+2. Ligar `reserved` no llm-queue (`PUT /admin/api/gpu-config`): os clientes recebem "GPU reservada" em vez de erro e o vigia **não religa** o vLLM sozinho. Sem isso o vigia briga com o teste.
+3. Parar o vLLM, rodar o bloco de testes, com tempo máximo por bloco.
+4. **Restaurar** o vLLM de produção com o `start_vllm.sh` original (MTP n=2) e conferir: saúde, 1 conversa, 1 chamada de ferramenta.
+5. Desligar `reserved`.
+6. Guardar os dados da rodada (3d).
+
+**A instância da Vast fica sempre ligada**: a janela só para e religa o processo do vLLM dentro dela. A máquina de mídia (`midia-gpu-4`) é separada e não é afetada.
+
+### 4b. Preparação para a janela ser rápida
+Scripts prontos e testados em contexto curto; chaves de teste com limites zerados; wheel ou patch do fork já baixado na máquina; venv separada criada; **checar o disco** (a `hold` tem 50 GB e ~25 GB usados).
+
+### 4c. Janelas previstas
+| Janela | Conteúdo | Tempo |
+|---|---|---|
+| 1 | Linha de base completa (suíte + fila de 20 + E1) | ~60 min |
+| 2 | Candidatos: fork (E3) e ajustes (E5 parte 2) | ~90 min |
+| 3 | Confirmação final do que vai ao deploy, com a suíte completa | ~45 min |
+| deploy | Voltar a produção com a configuração aprovada; se nada passou no portão, fica como está | ~10 min |
+
+## 5. Experimentos, em ordem
+
+### E0. Composição do contexto (sem parar nada) [ambas as trilhas]
+- **Pergunta:** de que é feito o contexto do 1º passo e do passo 15?
+- **Como:** na ponte (só em teste), somar tokens por parte: prompt do Hermes, definições de ferramentas, **índice de skills** (a lista `Skills e ferramentas:` que o app injeta), memória injetada, histórico do usuário, mensagens do assistente, saídas de ferramentas.
+- **Decide:** a prioridade entre E4, E5, E6 e E7.
+
+### E1. Curva de geração por contexto (janela 1) [Trilha B]
+- **Pergunta:** a geração cai por causa do contexto em si ou por causa do MTP?
+- **Como:** mesmo prompt, 2k, 10k, 25k e 50k tokens; 3 repetições; **com MTP (n=2) e com `NO_MTP`**; 1 usuário e 4.
+- **Decisão:** se sem MTP ganhar acima de ~10 mil tokens, a hipótese do fork se confirma e a saída preferida é E3, **não** desligar o MTP.
+
+### E2. A vLLM 0.30.0 já tem a correção? (sem parar nada) [Trilha B]
+- Ler notas de versão e o código do backend de atenção atrás do caminho de verificação do MTP com divisão de KV (o fork usa `fwd_kvcache` com split-KV) e conferir se `vllm serve --help` lista `--prefix-match-unit`.
+- Se já tem, o fork fica descartado.
+
+### E3. Fork do vLLM, na nossa própria máquina (janela 2; só se E1 mostrar o problema e E2 não achar a correção) [Trilha B]
+- **O que é:** `avesed/vllm-ampere-optimized` v0.2, de terceiros, base vLLM **0.23.0**. Alega +60% (16k) e +106% (32k) de ganho do MTP no 27B com tensor parallel 2.
+- **Como, sem trocar a imagem da instância:** instalar o wheel do release **numa venv separada** (`/venv/fork`), com o mesmo modelo AWQ em `/workspace/models/awq` e os mesmos parâmetros do `start_vllm.sh`. Alternativa: aplicar o patch `patches/fa2_kvcache_verify/` numa cópia da nossa vLLM. Cada tentativa com limite de 30 min; se não carregar, abandonar. A produção nunca é tocada.
+- **Aprova se:** passa no portão (3b), geração a 25k ≥ 60 tok/s e sem regressão em contexto curto (≥ 100 tok/s).
+- **Riscos:** base mais antiga que a nossa, mantido por uma pessoa só, wheel pode exigir outro torch (a venv isolada protege). Só vai à produção depois da janela 3.
+
+### E4. Compressão e poda de observações (janela 2) [Trilha A]
+- **Ideia:** manter a chamada da ferramenta e trocar a saída antiga por um marcador curto; grandes saídas viram arquivo e o contexto leva só o caminho.
+- **O Hermes já faz parte disso:** a compressão dele primeiro poda resultados antigos sem chamar o modelo e só então resume o miolo. O limite padrão é 50% da janela (65 mil de 131 mil). O app tem `PODAR_EM` (~48 mil) e `COMPRIMIR_EM` (~72 mil) em `agent.js`; **verificar como esses valores chegam ao Hermes** antes de mexer.
+- **Cuidados vindos da pesquisa:** a camada do gateway (85%) tem que ficar acima da do agente, senão comprime a todo turno; comprimir mais cedo é mais chamadas ao modelo, e aqui o modelo é a nossa única GPU.
+- **Variantes:** (a) base; (b) limite menor de poda; (c) (b) + teto de 4 mil tokens por saída; (d) (c) + resumo ao passar de 30 mil.
+- **Aprova se:** tokens por passo caem ≥ 40% e passa no portão (3b).
+
+### E5. Prefixo estável e `--prefix-match-unit` [parte 1: Trilha A; parte 2: Trilha B]
+- **Parte 1 (sem parar nada):** auditar o que muda a cada sessão no início do prompt (data e hora com segundos, memória injetada, ordem das ferramentas, índice de skills) e passar o volátil para o **fim**. Medir a taxa de acerto do cache antes e depois em 5 sessões novas seguidas. Lembrete da pesquisa: "cache suportado" não garante acerto, então medir.
+- **Parte 2 (janela 2, só se E2 confirmar a opção):** `--prefix-match-unit 16` com `--mamba-cache-mode align`.
+- **Aprova se:** taxa de acerto sobe ≥ 10 pontos ou o 1º token do 1º passo cai ≥ 30%, e passa no portão.
+
+### E6. Toolsets e skills enxutos (maior ganho esperado no piso fixo) [Trilha A]
+- **Ideia:** ligar só os toolsets que o fluxo usa e manter curto o índice de skills. Segundo a pesquisa, as ferramentas pesam de 2 a 15 mil tokens conforme os toolsets ligados.
+- **Como:** com os números de E0, desligar toolsets não usados e podar o índice de skills; medir erro de escolha de ferramenta nas 6 tarefas. Não mexer no parser de ferramentas (`qwen3_xml`): 100% de acerto hoje, e trocá-lo só traria risco.
+- **Aprova se:** o piso do 1º passo cai ≥ 30% sem perder ferramenta necessária.
+
+### E7. Subagentes para isolar contexto (janela 2) [Trilha A; a mais promissora para o contexto]
+- **Ideia:** o Hermes tem a ferramenta `delegate_task`, que cria subagentes com contexto isolado e toolsets restritos (3 simultâneos por padrão). Tarefas longas como o site do currículo poderiam rodar num subagente, mantendo o contexto principal pequeno.
+- **Teste:** a T6 com e sem delegação; medir tokens do agente principal, tempo e sucesso.
+- **Cuidado:** subagentes em paralelo disputam a mesma GPU; começar com 1.
+
+### E8. Higiene de memória e skills [Trilha A]
+- A pesquisa recomenda memória pequena e curada e skills revisadas como código (as geradas sozinhas duplicam e envelhecem). Medir o tamanho da memória e do índice de skills em E0 e podar só o que o dado mostrar que pesa.
+
+## 6. Ordem e prazos
+| Ordem | Experimento | Precisa de | Tempo |
+|---|---|---|---|
+| 1 | Harness, instrumentação, E0, E2, E5 parte 1 | só código e leitura | 1 dia |
+| 2 | Janela 1: linha de base completa + E1 | GPU parada ~60 min | 0,5 dia |
+| 3 | E6 e E4 (preparar mudanças) | código | 1 a 2 dias |
+| 4 | Janela 2: E3, E4, E5 parte 2, E7 | GPU parada ~90 min | 0,5 dia |
+| 5 | Janela 3: confirmação, depois deploy | GPU parada ~45 min | 0,5 dia |
+
+## 7. Metas
+- Tokens por passo: de ~25 mil para **menos de 12 mil**.
+- Geração a 25 mil de contexto: de ~33 para **60 tok/s ou mais**, mantendo o MTP.
+- Tarefa T6 (site do currículo): de 35 min para **menos de 12 min**.
+- Fila de 20: **melhor** que a linha de base no pior caso e no p95, em todos os mixes. Para o mix D, a referência é 43 s quente e ~104 s frio (outubro) e o objetivo continua o pior cliente em **15 s**; a meta intermediária é fixada depois da janela 1.
+- Qualidade: **igual ou melhor** em tudo.
+
+## 8. Regras
+- Nada vai para produção sem passar no portão (3b) e sem o rollback descrito.
+- Mudança de parâmetro ou de versão do vLLM só em janela, com o `start_vllm.sh` original e o `NO_MTP` como reversão rápida.
+- **Custo extra zero.** Sem aluguel de GPU.
+- Ao fim de cada experimento: tabela antes/depois, dados na pasta de benchmarks e nota na memória do projeto.
+
+## 9. Pesquisa: o que o pessoal faz com o Hermes
+- **Contexto grande é conhecido:** o prompt de sistema do Hermes passa de 20 mil tokens com ferramentas e é reenviado a cada turno; a mitigação principal é o cache de prompt. Itens voláteis devem ficar fora do prefixo em cache.
+- **Cortar toolsets é uma alavanca direta** (2 a 15 mil tokens). Existe um plugin comunitário de roteamento de toolsets em teste que alega 60% a 80% menos, não verificado.
+- **Compressão:** padrão em 50% da janela; gateway em 85%, nunca iguais; poda de resultados antigos antes do resumo. Resumo por modelo auxiliar mais barato é possível, mas aqui só temos um modelo.
+- **Delegação** com contexto isolado e toolsets restritos; modelo caro no pai e barato nos filhos (relato anedótico).
+- **Memória e skills:** curtas e revisadas; skills geradas sozinhas duplicam e envelhecem.
+- **MCP:** cada servidor é uma fronteira de confiança; usar só os necessários.
+- **Modelo local:** a documentação de terceiros recomenda no mínimo 32 mil tokens de contexto e 64 mil ou mais para raciocínio em vários passos (não confirmado na oficial). O parser de ferramentas deve casar com o modelo; para Qwen3 há guias com `hermes` e com `qwen3`, e o nosso `qwen3_xml` funciona.
+- **Lacuna:** não achei nada sobre o modo ACP (que é o que usamos) nem casos de produção detalhados; confirmar nas páginas "Tips & Best Practices" e "Security" da documentação oficial.
+
+## 10. Fontes
+- Hermes, compressão e cache (oficial): https://hermes-agent.nousresearch.com/docs/developer-guide/context-compression-and-caching?full=true
+- Hermes, montagem do prompt: https://hermesagent.org.cn/en/docs/developer-guide/prompt-assembly
+- Integração Requesty com Hermes (prompt de 20 mil tokens): https://docs.requesty.ai/integrations/hermes
+- mem0, compressão no Hermes e no Claude: https://mem0.ai/blog/how-hermes-and-claude-handle-context-compression-in-real-production-agents-(and-what-you-should-extract)
+- Como a compactação funciona no Hermes: https://dev.to/john_lingi_f754bc63dd9ff1/how-compaction-works-in-hermes-agent-2m0m
+- Hermes com modelos locais: https://fast.io/resources/hermes-agent-ollama-local-llm/
+- Manus, engenharia de contexto: https://manus.im/en/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+- Anthropic, gerenciamento de contexto: https://www.anthropic.com/news/context-management
+- Anthropic, advanced tool use: https://anthropic.com/engineering/advanced-tool-use
+- JetBrains, "The Complexity Trap": https://arxiv.org/pdf/2508.21433
+- vLLM, receita Qwen3.5: https://docs.vllm.ai/projects/recipes/en/stable/Qwen/Qwen3.5.html
+- Fork `avesed/vllm-ampere-optimized` v0.2: https://github.com/avesed/vllm-ampere-optimized/releases/tag/v0.2
+- vLLM PR #46384 (`--prefix-match-unit`): https://github.com/vllm-project/vllm/pull/46384
+- Prefix caching em modelos híbridos (LMCache): https://docs.lmcache.ai/mp/hybrid_models.html
+
+## 11. Gravar na pasta de benchmarks tudo que já foi testado
+
+Regra: **nada do que medimos se perde.** Todo teste de qualquer dia vai para `new_ragente_private_stage/benchmarks`, no formato da seção 3d, e a skill `projetos` aponta para essa pasta e conta o que foi testado em cada dia.
+
+### 11a. Dias 06 e 07/11/2026 (já gravados em 07/11)
+Pasta: `data/raw/segundo-cerebro/seed-20261106_07/`. Scripts em `harness/segundo-cerebro/`.
+
+| Dado | Arquivo | Conteúdo |
+|---|---|---|
+| MTP | `mtp_ab.csv` | tok/s sem MTP e com MTP n=1, 2 e 3 (2×3090, contexto curto), aceitação média, divergência de texto |
+| Carga de usuários | `carga_usuarios.csv` | 1, 3 e 10 usuários simultâneos, contexto de ~0,5k a ~21k tokens, antes e depois do limite de paralelismo 3 para 12 |
+| Penalidades | `penalidades.csv` | efeito de `presence_penalty` e `repetition_penalty` em código por ferramenta e em conversa |
+| QA geral | `qa_tempos.csv`, `qa_raw/`, `evidencias/qa_telas/` | tempo, passos e resultado de cada pedido, local e web, em cada versão do app |
+| Mídia | `midia.csv`, `evidencias/midia/` | Flux, LTX, Wan 2.2 (5 s e 15 s) e troca de personagem (Openjutsu) |
+| Achados | `achados.jsonl` | 13 problemas com sintoma, causa, correção e evidência |
+
+### 11b. O que ainda falta gravar
+1. **Dias anteriores:** varrer e registrar (com a data) o que foi testado e ainda não está na pasta. Fontes a percorrer: `second-brain/specs/TESTES_SKILLS_NOITE.md` e `HANDOFF_2026-11-06.md`; `qwen-abliterated-api/reports/` (`longctx`, `ops`, `quality`, `refusal`, `runs`), `docs/BENCHMARKS.md`, `docs/RESULTS.md` e `docs/DECISOES.md`; os testes em `qwen-abliterated-api/tests/`; e a memória do projeto (por exemplo, testes de 03 a 05/11: hub de mídia, 3090, skills, limites de clipe de vídeo). O que for da campanha de outubro já está na pasta e só precisa de índice.
+2. **Daqui para frente:** cada experimento desta spec grava a sua rodada (3d) no mesmo dia.
+3. **Conferir** que `RUNS.csv` tem uma linha por rodada e que cada rodada tem `meta.json`.
+
+### 11c. Skill `projetos`
+A skill `projetos` (catálogo da campanha de benchmark de GPU e IA) ganha uma seção "Segundo Cérebro, produção (nov/2026)" que, **por dia**, diz: o que foi testado, o que mediu e **onde estão os dados** (`benchmarks/data/raw/segundo-cerebro/...`). Atualizar essa seção a cada rodada nova. O `sync-skills` envia a skill para o repositório `personal-skills`.
