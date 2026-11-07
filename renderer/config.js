@@ -761,5 +761,5 @@
     },
   }
   window.SBConfig = SBConfig
-  window.SBConfigInternos = { esc, janela, aviso, corpo: () => raiz.querySelector('.cfg-corpo'), aba: () => S.aba, fechado: () => !raiz || raiz.hidden }
+  window.SBConfigInternos = { esc, janela, aviso, corpo: () => raiz?.querySelector('.cfg-corpo'), aba: () => S.aba, fechado: () => !raiz || raiz.hidden }
 })()

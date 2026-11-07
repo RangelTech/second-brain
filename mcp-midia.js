@@ -30,6 +30,17 @@ const FORMATOS = { quadrado: '1024x1024', retrato: '832x1216', paisagem: '1216x8
 const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
   {
+    nome: 'trocar_personagem',
+    desc: 'Troca a pessoa principal de um VÍDEO pela pessoa de uma FOTO (troca de personagem / de rosto), mantendo câmera, cortes, movimento e áudio do vídeo original. Roda na GPU do servidor com o Openjutsu (MiniMax H3) e leva vários minutos (cerca de 9 minutos para 5 segundos em 480p). Use quando o usuário pedir para colocar o rosto ou a pessoa de uma foto num vídeo. Funciona melhor com uma pessoa em primeiro plano, rosto grande no quadro e foto nítida de frente; espelhos e reflexos falham. Salva um MP4 na pasta Videos e devolve o caminho.',
+    schema: obj({
+      video: { type: 'string', description: 'Caminho do vídeo de origem (MP4, MOV ou WEBM, até 40 MB).' },
+      foto: { type: 'string', description: 'Caminho da foto da pessoa que vai entrar no vídeo (PNG, JPEG ou WEBP, até 6 MB).' },
+      resolucao: { type: 'string', enum: ['480p', '576p', '736p'], description: 'Altura do vídeo gerado. Padrão: 480p (mais rápido). Mais alto leva muito mais tempo.' },
+      sem_sincronia_labial: { type: 'boolean', description: 'true (padrão) quando as pessoas do vídeo não estão cantando nem falando junto com o áudio.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+    }, ['video', 'foto']),
+  },
+  {
     nome: 'gerar_video',
     desc: 'Gera um VÍDEO (1 a 60 segundos, sem áudio, até 512x512; acima de 4 s o servidor encadeia vários clipes e entrega um MP4 só, o que leva alguns minutos) a partir de uma descrição, numa GPU do servidor. Leva de 1 a vários minutos; o app mostra o andamento. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
     schema: obj({
@@ -182,6 +193,18 @@ async function gerarImagem(args) {
   return rodarJob({ tipo: 'imagem', rota: '/images/generations', corpo, prompt, nome, limiteMs: ESPERA_MAX_MS })
 }
 
+async function trocarPersonagem(args) {
+  const { video, foto, resolucao, nome } = args
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (process.env.SB_MIDIA_MOCK) return simular('video', 'troca de personagem', process.env.SB_MIDIA_MOCK_ARQ || '')
+  const v = fs.readFileSync(String(video))
+  const f = fs.readFileSync(String(foto))
+  if (v.length > 40 * 1024 * 1024) throw new Error('O vídeo é grande demais (máximo 40 MB). Corte ou comprima o vídeo antes.')
+  if (f.length > 6 * 1024 * 1024) throw new Error('A foto é grande demais (máximo 6 MB).')
+  const corpo = { recipe: 'openjutsu-swap', video: v.toString('base64'), image: f.toString('base64'), resolution: ['480p', '576p', '736p'].includes(resolucao) ? resolucao : '480p', no_lip_sync: args.sem_sincronia_labial !== false }
+  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt: 'troca de personagem', nome: nome || 'troca-personagem', limiteMs: 60 * 60 * 1000 })
+}
+
 async function gerarVideo(args) {
   const { prompt, formato, segundos, nome } = args
   if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
@@ -231,6 +254,10 @@ async function tratar(msg) {
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^midia_/, '')
     try {
+      if (nome === 'trocar_personagem') {
+        const v = await comReserva(trocarPersonagem, params?.arguments || {}, 'video')
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo com a troca criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
+      }
       if (nome === 'gerar_video') {
         const v = await comReserva(gerarVideo, params?.arguments || {}, 'video')
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
@@ -257,4 +284,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { gerarImagem, gerarVideo, FORMATOS }
+module.exports = { gerarImagem, gerarVideo, trocarPersonagem, FORMATOS }
