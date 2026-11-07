@@ -279,6 +279,7 @@ async function responder(alvo, msgs, ctx) {
   const linhaHist = (m) => (m.role === 'user' ? 'Usuário' : 'Assistente') + ': ' + String(m.content).slice(0, 700)
   const historico = anteriores.map(linhaHist).join(String.fromCharCode(10))
   const sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
+  if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o resumo do que já foi dito
   sessao.emitir = ctx.onDelta // cada mensagem tem o seu canal de resposta e de permissão
   sessao.pedirPermissao = ctx.pedirPermissao
   ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
@@ -691,6 +692,25 @@ app.whenReady().then(() => {
       avisarPreparo('')
     })
   ipcMain.handle('chat:permissao-resp', (_e, { req, resposta }) => permissoes.get(req)?.(resposta))
+  // Aquecimento: a partida do Hermes leva 10 a 15 s; quem começa a digitar num chat novo já deixa a sessão subindo, e a 1ª pergunta não espera.
+  // Só chat sem histórico, só com o agente já instalado/verificado no arranque, e sem canal de resposta (a mensagem real religa o canal).
+  const aquecidos = new Map()
+  ipcMain.handle('agente:aquecer', async (_e, { id, alvo } = {}) => {
+    try {
+      if (!id || !alvo || cfg.soConversa || !cfg.unlimitedEmail || cfg.aquecerAgente === false) return { ok: false }
+      const ex = sessoes.get(id)
+      if (ex && !ex.morto) return { ok: true, ja: true }
+      if (Date.now() - (aquecidos.get(id) || 0) < 60000) return { ok: true }
+      if (!embed.estado().pronto) return { ok: false }
+      aquecidos.set(id, Date.now())
+      await garantirAgente()
+      await sessaoDoChat(id, alvo, { onDelta: () => {}, pedirPermissao: async () => 'negar' }, '')
+      return { ok: true }
+    } catch (e) {
+      registrarAgente(app, 'aquecer: ' + (e.message || e))
+      return { ok: false }
+    }
+  })
   ipcMain.handle('chat:enviar', async (e, { id, mensagens, alvo, anexos }) => {
     const ac = new AbortController()
     abortos.set(id, ac)

@@ -3,6 +3,7 @@
   const IC = window.IC
   let cfg = null
   let chats = []
+  const aquecidos = new Set() // chats novos cujo agente já foi aquecido (ver agente:aquecer no main)
   let atual = null
   const respostas = new Map() // id do chat -> resposta em curso (várias conversas respondem ao mesmo tempo)
   let relogio = null
@@ -1690,6 +1691,11 @@
     })
     t.addEventListener('input', () => {
       if (respostas.has(atual)) alternarBotao(true)
+      const ca = chatAtual()
+      if (ca && ca.msgs.length === 0 && t.value.trim().length >= 2 && cfg.ativo && !aquecidos.has(ca.id)) {
+        aquecidos.add(ca.id)
+        Promise.resolve(window.sb.aquecer?.({ id: ca.id, alvo: cfg.ativo })).catch(() => {})
+      }
       t.style.height = 'auto'
       t.style.height = Math.min(t.scrollHeight, Math.round(window.innerHeight * 0.45)) + 'px'
       t.style.overflowY = t.scrollHeight > window.innerHeight * 0.45 ? 'auto' : 'hidden'
