@@ -7,6 +7,7 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
+const { criarRestaurador } = require('./ponte-restaurar')
 
 const SEP = '::sb::'
 const CHARS_POR_TOKEN = 3.6
@@ -80,6 +81,7 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
     }
     const fimBatida = () => batida && clearInterval(batida)
     let pares = new Map() // sufixos MCP trocados nesta chamada (fixo -> real)
+    let restaurador = null // restaura os nomes na resposta em stream (criado quando há troca)
     let pend = '' // resposta SSE ainda sem linha completa, só usada quando há troca
     const up = http.request({ hostname: d.hostname, port: d.port, path: req.url, method: req.method, headers }, (r) => {
       res.writeHead(r.statusCode || 502, r.headers)
@@ -105,12 +107,15 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
       }
       r.on('data', (b) => {
         if (pares.size) {
-          // com troca de sufixo, só sai linha completa (o nome da ferramenta não pode ficar cortado entre dois pedaços)
+          // com troca de sufixo, só sai linha completa, e os argumentos de cada chamada de ferramenta passam por um restaurador com janela de
+          // retenção: o nome MCP (chamado pelos argumentos do tool_call) chega partido entre eventos e precisa voltar inteiro com o sufixo real
+          if (!restaurador) restaurador = criarRestaurador(pares)
           pend += b.toString('utf8')
-          const k = pend.lastIndexOf('\n')
-          if (k >= 0) {
-            res.write(restaurarEditor(pend.slice(0, k + 1), pares))
+          let k
+          while ((k = pend.indexOf('\n')) >= 0) {
+            const linha = pend.slice(0, k).replace(/\r$/, '')
             pend = pend.slice(k + 1)
+            for (const saida of restaurador.linha(linha)) res.write(saida + '\n')
           }
         } else res.write(b)
         est.ultimo = Date.now()
@@ -146,7 +151,11 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
       r.on('end', () => {
         fimBatida()
         if (chars) avisar(true)
-        if (pend) res.write(restaurarEditor(pend, pares))
+        if (restaurador) {
+          if (pend) for (const saida of restaurador.linha(pend)) res.write(saida + '\n')
+          for (const saida of restaurador.fim()) res.write(saida + '\n')
+          pend = ''
+        } else if (pend) res.write(restaurarEditor(pend, pares))
         res.end()
       })
       r.on('error', () => (fimBatida(), res.destroy()))
