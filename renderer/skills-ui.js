@@ -4,7 +4,7 @@
   if (!K) return
   const { esc, janela, aviso } = K
   const SK = { itens: [], aberta: null, original: '', previa: false, busca: '', abertos: new Set(['minhas']) }
-  const $ = (sel) => K.corpo().querySelector(sel)
+  const $ = (sel) => K.corpo()?.querySelector(sel)
 
   async function desenhar() {
     const r = await window.sb.skills.listar()

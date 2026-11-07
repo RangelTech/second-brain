@@ -4,10 +4,11 @@
   const K = window.SBConfigInternos
   if (!K || window.__sbWeb || !window.sb.acessoWeb) return
   const { esc, aviso } = K
-  const $ = (sel) => K.corpo().querySelector(sel)
+  const $ = (sel) => K.corpo()?.querySelector(sel)
   let est = { ativo: false, conectado: false, erro: '', nome: '', url: '', maquinaId: '' }
 
   function desenhar() {
+    if (!K.corpo()) return // a tela de configuração ainda não existe (não desenha antes de abrir)
     K.corpo().innerHTML = `
       <div class="cfg-cab"><div><h1>Acesso web</h1><p>Controle este Segundo Cérebro pelo celular ou por outro computador, entrando com o e-mail e a senha da sua conta. O computador precisa estar ligado e com o app aberto.</p></div></div>
       <div class="cartao-rem">
