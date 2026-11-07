@@ -261,7 +261,8 @@ async function responder(alvo, msgs, ctx) {
         base: est.origem + '/v1', chave: await chaveLocal(), modelo: alvo, msgs, onDelta: ctx.onDelta, sinal: ctx.sinal, raciocinio: cfg.raciocinio,
         memoriaArquivo: path.join(app.getPath('userData'), 'chats.json'), chat: ctx.chat, skillsDir: path.join(app.getPath('userData'), 'hermes-home', 'skills'), usuario: os.userInfo().username,
       })
-      if (!r.escalar) return r.texto
+      if (!r.escalar && String(r.texto || '').trim()) return r.texto
+      // escalou, ou o modelo devolveu uma resposta vazia: o agente assume (nunca mostrar mensagem em branco)
       ctx.onDelta?.({ aviso: 'Isso precisa do agente, preparando…' })
     } catch (e) {
       if (ctx.sinal?.aborted) throw e
@@ -347,6 +348,11 @@ function criarJanela() {
 
 if (MODO_SERVIDOR) app.disableHardwareAcceleration()
 app.whenReady().then(() => {
+  try {
+    require('./agent').limparHermesPreso(app, path.join(app.getPath('userData'), 'hermes-home'))
+  } catch (e) {
+    console.error('limpeza do Hermes falhou:', e && e.message)
+  }
   // modo do instalador: baixa e prepara o agente (Hermes) sem abrir janela e sai. O instalador do Windows chama isto no fim da
   // instalação, então depois de instalar o cliente só conversa. O progresso vai para um arquivo de log na pasta de dados.
   if (process.argv.includes('--preparar-agente')) {

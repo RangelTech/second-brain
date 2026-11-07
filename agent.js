@@ -1,9 +1,56 @@
 // Agente de verdade: cliente ACP (Agent Client Protocol) falando com o Hermes por stdio.
 // Um processo por conversa, com sessão contínua, cancelamento e permissões mostradas na tela.
-const { spawn } = require('child_process')
+const { spawn, execFileSync } = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+
+
+// ---- processos do Hermes: matar a ARVORE inteira (o launcher hermes-acp deixa filhos Python e um gateway que seguram travas) ----
+function matarArvore(pid) {
+  if (!pid) return
+  try {
+    if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 15000 })
+    else {
+      try { process.kill(-pid, 'SIGKILL') } catch { process.kill(pid, 'SIGKILL') } // filho criado com detached: o grupo inteiro cai
+    }
+  } catch {}
+}
+const vivo = (pid) => { try { process.kill(pid, 0); return true } catch { return false } }
+const inicioDoSistema = () => Math.round((Date.now() - os.uptime() * 1000) / 60000) // minuto em que a maquina ligou: pid de antes de reiniciar nao vale
+const arquivoPids = (app) => path.join(app.getPath('userData'), 'hermes-pids.json')
+function lerPids(app) {
+  try {
+    const j = JSON.parse(fs.readFileSync(arquivoPids(app), 'utf8'))
+    return Math.abs((j.boot || 0) - inicioDoSistema()) <= 1 ? j.pids || [] : [] // tolera 1 min de diferenca no calculo
+  } catch { return [] }
+}
+function gravarPids(app, pids) {
+  try { fs.writeFileSync(arquivoPids(app), JSON.stringify({ boot: inicioDoSistema(), pids })) } catch {}
+}
+function anotarPid(app, pid) { gravarPids(app, [...new Set([...lerPids(app), pid])].slice(-40)) }
+function esquecerPid(app, pid) { gravarPids(app, lerPids(app).filter((p) => p !== pid)) }
+// Mata o que ficou do Hermes numa execucao anterior (ou numa partida que estourou o prazo): os processos que este app subiu e o gateway
+// de segundo plano desta pasta (gateway.pid). Seguro: o gateway sobe de novo sozinho na proxima sessao. `exceto` preserva sessoes vivas.
+function limparHermesPreso(app, home, exceto = []) {
+  let n = 0
+  for (const pid of lerPids(app)) {
+    if (exceto.includes(pid) || !vivo(pid)) continue
+    matarArvore(pid)
+    n++
+  }
+  gravarPids(app, lerPids(app).filter((p) => exceto.includes(p)))
+  try {
+    const g = JSON.parse(fs.readFileSync(path.join(home, 'gateway.pid'), 'utf8'))
+    const modif = fs.statSync(path.join(home, 'gateway.pid')).mtimeMs
+    if (g && g.kind === 'hermes-gateway' && vivo(g.pid) && modif > Date.now() - os.uptime() * 1000) {
+      matarArvore(g.pid)
+      n++
+    }
+  } catch {}
+  if (n) registrar(app, `limpeza: ${n} processo(s) do Hermes que tinham ficado presos foram encerrados`)
+  return n
+}
 
 const OCIOSO_MS = 10 * 60 * 1000
 const CONTEXTO_REAL = 131072
@@ -310,13 +357,15 @@ class Sessao {
     this.buf = ''
     // .cmd/.bat (só em teste/dev: nunca o .exe real) não roda com spawn puro no Windows (EINVAL) sem passar pelo shell
     const viaShell = /\.(cmd|bat)$/i.test(this.bin)
-    const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true, shell: viaShell })
+    const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true, shell: viaShell, detached: process.platform !== 'win32' })
     this.filho = filho
+    if (filho.pid) anotarPid(this.app, filho.pid)
     filho.stdout.on('data', (d) => this.aoDados(d))
     filho.stderr.on('data', (d) => registrar(this.app, 'stderr ' + d.toString('utf8').trim().slice(0, 300)))
     filho.on('error', (e) => registrar(this.app, 'erro ao abrir o agente: ' + e.message + ' (' + this.bin + ')'))
     filho.on('exit', (codigo, sinal) => {
       registrar(this.app, 'agente saiu codigo=' + codigo + ' sinal=' + sinal + ' bin=' + this.bin)
+      esquecerPid(this.app, filho.pid)
       if (this.filho !== filho) return // foi substituído de propósito
       for (const p of this.pendentes.values()) p.rej(new Error('O agente encerrou.'))
       this.pendentes.clear()
@@ -439,7 +488,7 @@ class Sessao {
     const TENTATIVAS = montado ? 5 : 3
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
       try {
-        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : montado ? 35000 : tentativa === 1 ? 240000 : 90000
+        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : montado ? (tentativa === 1 ? 90000 : 60000) : tentativa === 1 ? 240000 : 90000
         const t0 = Date.now()
         await this.comPrazo(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }), prazo)
         const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: this.servidoresMcp() }), prazo)
@@ -454,10 +503,8 @@ class Sessao {
         if (tentativa < TENTATIVAS) this.emitir({ aviso: 'Preparando o agente… só um instante.' })
         const antigo = this.filho
         this.pendentes.clear()
+        matarArvore(antigo.pid) // arvore inteira da PROPRIA sessao (o filho Python segura travas); nao mexe nos outros chats
         this.subir()
-        try {
-          antigo.kill()
-        } catch {}
       }
     }
     throw new Error('O agente não respondeu ao iniciar: ' + (ultimo?.message || 'sem detalhe'))
@@ -579,9 +626,9 @@ class Sessao {
     clearTimeout(this.ocioso)
     clearInterval(this.vigia)
     try {
-      this.filho.kill()
+      matarArvore(this.filho.pid)
     } catch {}
   }
 }
 
-module.exports = { Sessao, localizarBinario, prepararBase, registrar }
+module.exports = { Sessao, localizarBinario, prepararBase, registrar, matarArvore, limparHermesPreso }

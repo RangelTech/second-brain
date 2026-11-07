@@ -25,6 +25,15 @@ const USAR_AGENTE = {
 const PREAMBULO_MAX = 160
 const deveEscalar = (textoJaEscrito) => String(textoJaEscrito || '').trim().length < PREAMBULO_MAX
 
+// Loop degenerado: o modelo repete a mesma palavra ou o mesmo trecho sem parar. Devolve onde o loop começa (mantendo uma ocorrência) ou -1.
+function inicioDoLoop(texto) {
+  const cauda = String(texto || '').slice(-1200)
+  const m = /(\S[\s\S]{2,60}?)\1{5,}$/.exec(cauda)
+  if (!m) return -1
+  const inicio = texto.length - cauda.length + m.index
+  return inicio + m[1].length
+}
+
 function classificar(texto, anexos = []) {
   if (anexos.length) return 'agente'
   const t = String(texto || '')
@@ -98,12 +107,17 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
     tool_choice: 'auto',
     messages: [{ role: 'system', content: sistema({ usuario, skills: resumoDeSkills(skillsDir), memoria: mem }) }, ...msgs.filter((m) => m.role !== 'system').slice(-24)],
   }
-  if (!raciocinio || raciocinio === 'none') corpo.chat_template_kwargs = { enable_thinking: false }
+  // amostragem pensada para evitar loop de repetição (medida em 07/11/2026: 0 loops e 0 estouros em 12 respostas) e teto de tokens: resposta longa de verdade vai para o agente
+  const pensando = !!raciocinio && raciocinio !== 'none'
+  Object.assign(corpo, pensando ? { temperature: 1.0, top_p: 0.95, top_k: 20, presence_penalty: 0.5 } : { temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 0.8, repetition_penalty: 1.05 }, { max_tokens: 6000 })
+  if (!pensando) corpo.chat_template_kwargs = { enable_thinking: false }
+  const ctl = new AbortController()
+  sinal?.addEventListener('abort', () => ctl.abort())
   const res = await fetch(`${base.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(chave ? { Authorization: `Bearer ${chave}` } : {}) },
     body: JSON.stringify(corpo),
-    signal: sinal,
+    signal: ctl.signal,
   })
   if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 200)}`)
   const leitor = res.body.getReader()
@@ -111,14 +125,23 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
   let buf = ''
   let total = ''
   let escalar = false
+  let loop = false
   for (;;) {
-    const { done, value } = await leitor.read()
+    let lido
+    try {
+      lido = await leitor.read()
+    } catch (e) {
+      if (loop) break // abortado de propósito por causa do loop
+      throw e
+    }
+    const { done, value } = lido
     if (done) break
     buf += dec.decode(value, { stream: true })
     let i
     while ((i = buf.indexOf('\n')) >= 0) {
       const linha = buf.slice(0, i).trim()
       buf = buf.slice(i + 1)
+      if (loop) break
       if (!linha.startsWith('data:')) continue
       const dado = linha.slice(5).trim()
       if (dado === '[DONE]') continue
@@ -130,11 +153,17 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
         if (d.content && !escalar) {
           total += d.content
           onDelta?.({ texto: d.content })
+          const ini = inicioDoLoop(total)
+          if (ini >= 0) { // o modelo entrou em loop: corta aqui e para de gastar tokens
+            total = total.slice(0, ini).trimEnd()
+            ctl.abort()
+            loop = true
+          }
         }
       } catch {}
     }
   }
-  return { escalar, texto: total }
+  return { escalar, texto: total, loop }
 }
 
-module.exports = { classificar, deveEscalar, responderRapido, resumoDeSkills, memoriaRelevante }
+module.exports = { classificar, deveEscalar, inicioDoLoop, responderRapido, resumoDeSkills, memoriaRelevante }
