@@ -4,6 +4,8 @@
 // conta o que o modelo já gerou (texto, raciocínio ou argumentos de ferramenta) para a tela mostrar progresso real.
 // Cada agente usa uma chave "<chave real>::sb::<id da conversa>"; a ponte tira o sufixo antes de repassar ao roteador.
 const http = require('http')
+const fs = require('fs')
+const path = require('path')
 
 const SEP = '::sb::'
 const CHARS_POR_TOKEN = 3.6
@@ -26,6 +28,17 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
     const d = alvo()
     headers.host = d.host
     const t0 = Date.now()
+    // medição (spec de contexto): com SB_DUMP_REQ_DIR o corpo de cada chamada de chat vai para um arquivo, só para analisar a composição do contexto
+    if (process.env.SB_DUMP_REQ_DIR && req.method === 'POST' && /chat\/completions/.test(req.url)) {
+      const partes = []
+      req.on('data', (c) => partes.push(c))
+      req.on('end', () => {
+        try {
+          fs.mkdirSync(process.env.SB_DUMP_REQ_DIR, { recursive: true })
+          fs.writeFileSync(path.join(process.env.SB_DUMP_REQ_DIR, `req-${Date.now()}-${(chat || 'x').slice(0, 8)}.json`), Buffer.concat(partes))
+        } catch {}
+      })
+    }
     // O servidor só entrega uma chamada de ferramenta quando ela termina de ser escrita (nenhum byte antes disso), então
     // "conectado e sem erro" já é sinal de vida: a cada segundo avisamos a tela, que mostra o tempo de espera de verdade.
     const est = { ultimo: t0, primeiro: 0, destruir: null }

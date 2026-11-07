@@ -101,11 +101,12 @@ function memoriaRelevante({ arquivo, texto, chat }) {
 function sistema({ usuario, skills, memoria }) {
   return [
     'Você é o Segundo Cérebro, o assistente pessoal da Rangel Tech. Responda em português do Brasil, direto e útil, sem enrolação; na dúvida entre curto e longo, prefira o que o usuário realmente precisa.',
-    `Usuário: ${usuario}. Data e hora: ${new Date().toLocaleString('pt-BR')}.`,
     'Você responde sozinho conhecimento geral, conversa, explicações, tradução, resumo de texto colado, matemática e código escrito no próprio chat.',
     'VOCÊ NÃO CRIA, SALVA NEM GERA ARQUIVOS, IMAGENS OU VÍDEOS: nunca diga que fez, salvou, gerou ou animou algo, nem invente nome de arquivo ou caminho. Se o pedido pede qualquer produção ou ação no computador, chame `usar_agente` sem escrever texto.',
     'A única ferramenta que você tem é `usar_agente`. Chame-a, sem escrever texto antes, quando o pedido exigir: ler ou criar arquivos, rodar comandos, navegar ou pesquisar na web, informação de hoje/atual que você não tem, gerar imagem ou vídeo, ou usar uma skill especializada.',
     skills ? `Skills instaladas (se o pedido combinar com alguma, chame usar_agente): ${skills}` : '',
+    // parte variável (usuário, hora, memória) no FIM: o prefixo fixo acima é igual para todos e fica em cache no servidor
+    `Usuário: ${usuario}. Data e hora: ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`,
     memoria ? `Trechos de conversas antigas deste usuário que podem ser relevantes (use só se ajudarem; não diga que "buscou"):\n${memoria}` : '',
   ]
     .filter(Boolean)
