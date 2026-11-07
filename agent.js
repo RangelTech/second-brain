@@ -16,6 +16,48 @@ function matarArvore(pid) {
     }
   } catch {}
 }
+// O gateway de segundo plano do Hermes e FILHO do primeiro agente que o iniciou, mas serve TODOS os chats. Encerrar um chat ocioso com
+// matarArvore() derrubava o gateway no meio do turno de outro chat ("Gateway disconnected"). Aqui a arvore da sessao cai, menos o gateway.
+function descendentes(raiz) {
+  let linhas = ''
+  try {
+    linhas = process.platform === 'win32'
+      ? execFileSync('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId)" }'], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
+      : execFileSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8', timeout: 10000 })
+  } catch { return [] }
+  const filhos = new Map()
+  for (const l of linhas.split('\n')) {
+    const [p, pp] = l.trim().split(/\s+/).map(Number)
+    if (!p || !pp) continue
+    if (!filhos.has(pp)) filhos.set(pp, [])
+    filhos.get(pp).push(p)
+  }
+  const saida = []
+  const pilha = [raiz]
+  while (pilha.length) {
+    const x = pilha.pop()
+    for (const f of filhos.get(x) || []) { saida.push(f); pilha.push(f) }
+  }
+  return saida
+}
+function pidDoGateway(home) {
+  try {
+    const g = JSON.parse(fs.readFileSync(path.join(home, 'gateway.pid'), 'utf8'))
+    return g && g.kind === 'hermes-gateway' ? g.pid : 0
+  } catch { return 0 }
+}
+function matarArvorePoupandoGateway(pid, home) {
+  if (!pid) return
+  const gw = pidDoGateway(home)
+  const alvos = [pid, ...descendentes(pid)].filter((p) => p !== gw)
+  for (const p of alvos.reverse()) { // folhas primeiro
+    try {
+      if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(p), '/F'], { stdio: 'ignore', windowsHide: true, timeout: 15000 })
+      else process.kill(p, 'SIGKILL')
+    } catch {}
+  }
+}
+
 const vivo = (pid) => { try { process.kill(pid, 0); return true } catch { return false } }
 const inicioDoSistema = () => Math.round((Date.now() - os.uptime() * 1000) / 60000) // minuto em que a maquina ligou: pid de antes de reiniciar nao vale
 const arquivoPids = (app) => path.join(app.getPath('userData'), 'hermes-pids.json')
@@ -524,7 +566,7 @@ class Sessao {
         if (tentativa < TENTATIVAS) this.emitir({ aviso: 'Preparando o agente… só um instante.' })
         const antigo = this.filho
         this.pendentes.clear()
-        matarArvore(antigo.pid) // arvore inteira da PROPRIA sessao (o filho Python segura travas); nao mexe nos outros chats
+        matarArvorePoupandoGateway(antigo.pid, this.env.HERMES_HOME) // arvore da PROPRIA sessao; o gateway compartilhado nao cai
         sessoesVivas.delete(antigo.pid)
         this.subir()
       }
@@ -649,9 +691,9 @@ class Sessao {
     clearInterval(this.vigia)
     try {
       sessoesVivas.delete(this.filho.pid)
-      matarArvore(this.filho.pid)
+      matarArvorePoupandoGateway(this.filho.pid, this.env.HERMES_HOME)
     } catch {}
   }
 }
 
-module.exports = { Sessao, localizarBinario, prepararBase, registrar, matarArvore, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { Sessao, localizarBinario, prepararBase, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
