@@ -6,6 +6,7 @@
 const http = require('http')
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 
 const SEP = '::sb::'
 const CHARS_POR_TOKEN = 3.6
@@ -14,6 +15,27 @@ const INTERVALO_MS = 1000
 // (o sintoma real que vimos: ficava 15 min esperando o vigia do próprio Hermes perceber). Antes do 1º byte não vale
 // (fila, GPU acordando), por isso só conta depois que a resposta já começou a chegar.
 const LIMITE_STREAM_MORTO_MS = +process.env.SB_TESTE_STREAM_MORTO_MS || 90000
+
+// O Hermes nomeia os servidores MCP do editor como editor_<nome>_<8 hex>, e o sufixo vem do id da sessão (muda a cada conversa).
+// Esse nome aparece na descrição da ferramenta tool_search, ANTES do prompt de sistema na ordem que o modelo lê: mudar o sufixo
+// invalida o cache de prefixo do servidor e cada sessão nova recalcula ~8 mil tokens à toa (medido: 9,7 s contra 2,0 s no 1º token).
+// A ponte troca o sufixo por um fixo (mesmo tamanho, derivado do nome) na ida e desfaz na volta: o Hermes continua vendo e usando o nome real.
+const RE_EDITOR = /editor_([A-Za-z0-9]+(?:_[A-Za-z0-9]+)*?)_([0-9a-f]{8})(?![0-9a-f])/g
+function normalizarEditor(texto) {
+  const pares = new Map()
+  const novo = texto.replace(RE_EDITOR, (m, nome, hash) => {
+    const fixo = crypto.createHash('sha1').update('sb-editor:' + nome).digest('hex').slice(0, 8)
+    if (fixo === hash) return m
+    pares.set(`editor_${nome}_${fixo}`, `editor_${nome}_${hash}`)
+    return `editor_${nome}_${fixo}`
+  })
+  return { texto: novo, pares }
+}
+function restaurarEditor(texto, pares) {
+  let t = texto
+  for (const [fixo, real] of pares) if (t.includes(fixo)) t = t.split(fixo).join(real)
+  return t
+}
 
 function criar({ destino, aoProgresso, registrar = () => {} }) {
   let servidor = null
@@ -57,6 +79,8 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
       }, 1000)
     }
     const fimBatida = () => batida && clearInterval(batida)
+    let pares = new Map() // sufixos MCP trocados nesta chamada (fixo -> real)
+    let pend = '' // resposta SSE ainda sem linha completa, só usada quando há troca
     const up = http.request({ hostname: d.hostname, port: d.port, path: req.url, method: req.method, headers }, (r) => {
       res.writeHead(r.statusCode || 502, r.headers)
       const sse = /text\/event-stream/.test(String(r.headers['content-type'] || ''))
@@ -80,7 +104,15 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
         try { res.destroy() } catch {}
       }
       r.on('data', (b) => {
-        res.write(b)
+        if (pares.size) {
+          // com troca de sufixo, só sai linha completa (o nome da ferramenta não pode ficar cortado entre dois pedaços)
+          pend += b.toString('utf8')
+          const k = pend.lastIndexOf('\n')
+          if (k >= 0) {
+            res.write(restaurarEditor(pend.slice(0, k + 1), pares))
+            pend = pend.slice(k + 1)
+          }
+        } else res.write(b)
         est.ultimo = Date.now()
         if (!primeiro) {
           primeiro = Date.now()
@@ -114,6 +146,7 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
       r.on('end', () => {
         fimBatida()
         if (chars) avisar(true)
+        if (pend) res.write(restaurarEditor(pend, pares))
         res.end()
       })
       r.on('error', () => (fimBatida(), res.destroy()))
@@ -125,7 +158,20 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
     })
     // o Hermes cancelou (parar): corta o pedido ao roteador também
     res.on('close', () => (fimBatida(), up.destroy()))
-    req.pipe(up)
+    if (req.method === 'POST' && /chat\/completions/.test(req.url || '') && !process.env.SB_SEM_NORMALIZAR_EDITOR) {
+      const partes = []
+      req.on('data', (c) => partes.push(c))
+      req.on('end', () => {
+        let corpo = Buffer.concat(partes)
+        const n = normalizarEditor(corpo.toString('utf8'))
+        if (n.pares.size) {
+          pares = n.pares
+          corpo = Buffer.from(n.texto, 'utf8')
+        }
+        up.setHeader('content-length', corpo.length)
+        up.end(corpo)
+      })
+    } else req.pipe(up)
   }
 
   return {
@@ -142,4 +188,4 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
   }
 }
 
-module.exports = { criar, SEP }
+module.exports = { criar, SEP, normalizarEditor, restaurarEditor }
