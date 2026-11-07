@@ -131,10 +131,11 @@ function localizarBinario(app) {
 // HERMES_HOME próprio do app. Na primeira vez traz skills, memória e SOUL.md da instalação do piloto;
 // a cada início atualiza as skills globais da Rangel Tech (somente leitura) dentro de skills/rangeltech.
 // O pacote de skills da Rangel Tech vai no instalador de todo mundo, mas só é entregue a quem o plano inclui (o Light não tem).
-// O login informa (plan.skill_pack) e o app grava; sem essa informação (provedor próprio, instalação antiga) o pacote é entregue.
-let ENTREGAR_PACOTE = true
+// O login informa (plan.skill_pack) e o app grava. Sem essa informação (ainda não entrou, primeiro início) NÃO entrega: o pacote chega
+// na primeira sessão depois do login, e só para quem o plano inclui. O app exige login, então ninguém fica sem a informação.
+let ENTREGAR_PACOTE = false
 function definirPacote(v) {
-  ENTREGAR_PACOTE = v !== false
+  ENTREGAR_PACOTE = v === true
 }
 function prepararBase(app) {
   const home = path.join(app.getPath('userData'), 'hermes-home')

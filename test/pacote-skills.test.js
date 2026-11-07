@@ -19,14 +19,20 @@ test('plano sem o pacote (Light): a pasta rangeltech não é criada', () => {
   fs.rmSync(dados, { recursive: true, force: true })
 })
 
-test('plano com o pacote, ou sem informação (provedor próprio): as skills são entregues', () => {
-  for (const v of [true, undefined]) {
-    const { dados, app } = appFalso()
-    agent.definirPacote(v)
-    const home = agent.prepararBase(app)
-    assert.equal(fs.existsSync(path.join(home, 'skills', 'rangeltech', 'README.md')), true, String(v))
-    fs.rmSync(dados, { recursive: true, force: true })
-  }
+test('plano com o pacote: as skills são entregues', () => {
+  const { dados, app } = appFalso()
+  agent.definirPacote(true)
+  const home = agent.prepararBase(app)
+  assert.equal(fs.existsSync(path.join(home, 'skills', 'rangeltech', 'README.md')), true)
+  fs.rmSync(dados, { recursive: true, force: true })
+})
+
+test('antes do login (plano desconhecido) nada é entregue: o Light não ganha o pacote no primeiro início', () => {
+  const { dados, app } = appFalso()
+  agent.definirPacote(undefined)
+  const home = agent.prepararBase(app)
+  assert.equal(fs.existsSync(path.join(home, 'skills', 'rangeltech')), false)
+  fs.rmSync(dados, { recursive: true, force: true })
 })
 
 test('depois do upgrade o pacote chega na próxima sessão', () => {
