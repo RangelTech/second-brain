@@ -76,7 +76,11 @@ jobs:
           mkdir -p "$SB_DATA_DIR"
           case "$RUNNER_OS" in
             Windows)
-              powershell -NoProfile -Command "\$p = Start-Process -FilePath 'dist/Segundo-Cerebro-Windows.exe' -ArgumentList '/S' -Wait -PassThru; exit \$p.ExitCode" ;;
+              # o powershell do runner do Windows trava (segfault 139) de vez em quando, antes de rodar o instalador: tenta de novo até 3 vezes
+              for tentativa in 1 2 3; do
+                powershell -NoProfile -Command "\$p = Start-Process -FilePath 'dist/Segundo-Cerebro-Windows.exe' -ArgumentList '/S' -Wait -PassThru; exit \$p.ExitCode" && break
+                echo "instalador: tentativa $tentativa falhou, repetindo"; sleep 5
+              done ;;
             Linux)
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgbm1 libasound2t64 || true
               chmod +x dist/Segundo-Cerebro-Linux.AppImage
