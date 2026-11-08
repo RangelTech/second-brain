@@ -719,6 +719,19 @@ app.whenReady().then(() => {
       return { ok: false }
     }
   })
+  // Jobs pesados de mídia (vídeo em alta, troca de personagem) são enviados à GPU e a ferramenta volta na hora: aqui o app acompanha, baixa o arquivo
+  // quando termina e avisa no chat (evento midia:pronta), sem gastar chamadas do modelo e sem prender o turno do agente. Sobrevive a fechar o app.
+  const midiaPendentes = require('./mcp-midia')
+  setInterval(async () => {
+    try {
+      const m = midiaDoApp()
+      if (!m || !m.chave || !cfg.pasta) return
+      midiaPendentes.configurar({ base: m.base, chave: m.chave, pasta: cfg.pasta })
+      for (const f of await midiaPendentes.concluirPendentes()) janela?.webContents.send('midia:pronta', f)
+    } catch (e) {
+      registrarAgente(app, 'midia pendente: ' + (e.message || e))
+    }
+  }, 8000).unref?.()
   // Falar no meio do trabalho do agente: a mensagem entra no turno em andamento (o Hermes cancela só a chamada ao modelo em voo e refaz o fim com a
   // correção), em vez de esperar na fila até o turno acabar. Sem turno de agente ativo neste chat, devolve ok:false e a tela enfileira como antes.
   ipcMain.handle('agente:direcionar', async (_e, { id, texto } = {}) => {

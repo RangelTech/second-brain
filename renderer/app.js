@@ -1216,6 +1216,20 @@
     }
   })
   window.sb.aoFim((d) => fim(d.id, d.texto, '', d.uso))
+  // vídeo pesado (alta qualidade, troca de personagem) terminou em segundo plano: entra na conversa de onde saiu o pedido, com o card pronto
+  window.sb.aoMidiaPronta?.((m) => {
+    const c = chats.find((x) => x.id === m.chat) || chatAtual()
+    if (!c) return
+    const ok = !m.falhou
+    const texto = ok ? 'Pronto! Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo agora. Tente de novo em instantes.'
+    const partes = ok ? [{ t: 'ferr', f: { id: 'bg-' + Date.now(), titulo: 'midia_gerar_video', status: 'completed', tipo: 'other', conteudo: 'caminho: ' + m.caminho, entrada: '{}' } }] : [{ t: 'texto', v: texto }]
+    c.msgs.push({ role: 'assistant', content: texto, partes, midias: ok ? [m.caminho] : undefined, fim: Date.now() })
+    c.em = Date.now()
+    salvar()
+    if (c.id === atual) desenhar()
+    listar()
+    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Segundo Cérebro', { body: texto }) } catch {}
+  })
   // primeira abertura: o agente está sendo preparado em segundo plano; aviso discreto, some sozinho quando termina
   window.sb.aoPreparando?.((t) => {
     let p = document.getElementById('sb-preparando')

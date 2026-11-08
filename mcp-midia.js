@@ -5,9 +5,15 @@ const readline = require('readline')
 const fs = require('fs')
 const path = require('path')
 
-const BASE = (process.env.SB_MIDIA_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
-const CHAVE = process.env.SB_MIDIA_CHAVE || ''
-const PASTA = process.env.SB_MIDIA_PASTA || process.cwd()
+let BASE = (process.env.SB_MIDIA_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+let CHAVE = process.env.SB_MIDIA_CHAVE || ''
+let PASTA = process.env.SB_MIDIA_PASTA || process.cwd()
+// o aplicativo (processo principal) reaproveita este módulo para concluir os jobs pesados em segundo plano: aponta para a conta e a pasta dele
+function configurar(c = {}) {
+  if (c.base) BASE = String(c.base).replace(/\/+$/, '')
+  if (c.chave !== undefined) CHAVE = c.chave
+  if (c.pasta) PASTA = c.pasta
+}
 const ESPERA_MAX_MS = 5 * 60 * 1000
 
 // preferências que o usuário edita em Configurações > Imagens e vídeos (o agente pode sobrescrever caso a caso)
@@ -127,12 +133,27 @@ async function api(rota, opcoes = {}) {
   return r
 }
 
+const TEXTO_PENDENTE = (o, min) => `Enviado para a GPU: ${o}, cerca de ${min} minutos (mais a fila). O arquivo será salvo sozinho na pasta Videos e o aplicativo avisa a pessoa neste chat quando ficar pronto. Diga isso ao usuário AGORA, em uma frase, e siga com o que ele pedir. NÃO espere, NÃO consulte o andamento e NÃO gere de novo.`
 const MSG_FALHA = 'Não consegui gerar agora, tente de novo em instantes.'
 const EXT_POR_MIME = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' }
 const stampAgora = () => new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{6})$/, '$1-$2')
 
 // Contrato do servidor de mídia: POST ... { async: true } -> 202 { id }; GET /media/jobs/{id} (fila, percentual); GET /jobs/{id}/file (arquivo com o Content-Type real)
-async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs }) {
+// baixa o arquivo do job pronto e salva na pasta certa (Videos ou Imagens); confere que o tipo entregue é o pedido
+async function salvarResultado(id, tipo, nome, s) {
+  const f = await api('/jobs/' + id + '/file')
+  const mime = String(f.headers.get('content-type') || (s && s.mime) || '').split(';')[0].trim()
+  const ext = EXT_POR_MIME[mime]
+  const ehVideo = tipo === 'video'
+  if (!f.ok || !ext || (ehVideo ? !/^video\//.test(mime) : !/^image\//.test(mime))) throw new Error(MSG_FALHA)
+  const dir = path.join(PASTA, ehVideo ? 'Videos' : 'Imagens')
+  fs.mkdirSync(dir, { recursive: true })
+  const arq = path.join(dir, `${limpo(nome || (ehVideo ? 'video' : 'imagem'))}-${stampAgora()}${ext}`)
+  fs.writeFileSync(arq, Buffer.from(await f.arrayBuffer()))
+  return { arq }
+}
+
+async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono }) {
   const t0 = Date.now()
   marcar(tipo, prompt, { status: 'queued', position: null, eta_s: null, progress: 0 })
   const r = await api(rota, { method: 'POST', body: JSON.stringify({ ...corpo, async: true }) })
@@ -144,24 +165,24 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs }) {
     throw new Error(r.status === 429 ? 'Estamos com bastante movimento agora. Tente de novo em instantes.' : r.status === 503 ? 'Este recurso não está disponível no momento.' : MSG_FALHA + (process.env.SB_MIDIA_DEBUG ? ' (' + msg + ')' : ''))
   }
   const id = j.id
+  if (assincrono) {
+    // job pesado (vídeo em alta, troca de personagem): o agente não fica preso esperando a GPU. O app acompanha, baixa e avisa no chat (concluirPendentes).
+    try {
+      fs.writeFileSync(path.join(PASTA, '.midia', `pendente-${id}.json`), JSON.stringify({ id, tipo, nome: nome || '', prompt: String(prompt || '').slice(0, 3500), chat: process.env.SB_MIDIA_CHAT || '', t0: Date.now() }))
+    } catch (e) {
+      throw new Error(MSG_FALHA + ' (não consegui registrar o acompanhamento)')
+    }
+    return { pendente: true, id }
+  }
   while (Date.now() - t0 < limiteMs) {
     await pausa(1500)
     const s = await andamento(id)
     marcar(tipo, prompt, s)
     if (s.status === 'failed') throw new Error(MSG_FALHA)
     if (s.status === 'done') {
-      const f = await api('/jobs/' + id + '/file')
-      const mime = String(f.headers.get('content-type') || s.mime || '').split(';')[0].trim()
-      const ext = EXT_POR_MIME[mime]
-      const ehVideo = tipo === 'video'
-      // o tipo vem do que o servidor entregou: vídeo precisa chegar como vídeo e imagem como imagem
-      if (!f.ok || !ext || (ehVideo ? !/^video\//.test(mime) : !/^image\//.test(mime))) { marcar(tipo, prompt, { status: 'failed' }); throw new Error(MSG_FALHA) }
-      const dir = path.join(PASTA, ehVideo ? 'Videos' : 'Imagens')
-      fs.mkdirSync(dir, { recursive: true })
-      const arq = path.join(dir, `${limpo(nome || (ehVideo ? 'video' : 'imagem'))}-${stampAgora()}${ext}`)
-      fs.writeFileSync(arq, Buffer.from(await f.arrayBuffer()))
+      const r = await salvarResultado(id, tipo, nome, s)
       marcar(tipo, prompt, { status: 'done', position: null, eta_s: 0, progress: 100 })
-      return { caminho: arq, segundos: s.seconds ?? Math.round((Date.now() - t0) / 100) / 10, tamanho: s.size, ajustes: s.adjusted, params: s.params }
+      return { caminho: r.arq, segundos: s.seconds ?? Math.round((Date.now() - t0) / 100) / 10, tamanho: s.size, ajustes: s.adjusted, params: s.params }
     }
   }
   marcar(tipo, prompt, { status: 'failed' })
@@ -210,7 +231,7 @@ async function trocarPersonagem(args) {
   if (v.length > 40 * 1024 * 1024) throw new Error('O vídeo é grande demais (máximo 40 MB). Corte ou comprima o vídeo antes.')
   if (f.length > 6 * 1024 * 1024) throw new Error('A foto é grande demais (máximo 6 MB).')
   const corpo = { recipe: 'openjutsu-swap', video: v.toString('base64'), image: f.toString('base64'), resolution: ['480p', '576p', '736p'].includes(resolucao) ? resolucao : '480p', no_lip_sync: args.sem_sincronia_labial !== false }
-  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt: 'troca de personagem', nome: nome || 'troca-personagem', limiteMs: 60 * 60 * 1000 })
+  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt: 'troca de personagem', nome: nome || 'troca-personagem', limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
 }
 
 async function gerarVideo(args) {
@@ -238,7 +259,41 @@ async function gerarVideo(args) {
     corpo.image = bin.toString('base64')
     if (args.strength != null) corpo.strength = Math.max(0, Math.min(1, Number(args.strength)))
   }
-  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt, nome, limiteMs: (alta ? Math.max(30, Math.ceil((corpo.seconds || 5) / 5) * 12) : Math.max(20, Math.ceil((corpo.seconds || 4) / 4) * 3)) * 60 * 1000 })
+  return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt, nome, limiteMs: (alta ? Math.max(30, Math.ceil((corpo.seconds || 5) / 5) * 12) : Math.max(20, Math.ceil((corpo.seconds || 4) / 4) * 3)) * 60 * 1000, assincrono: alta && process.env.SB_MIDIA_SINCRONO !== '1' })
+}
+
+// Chamado pelo app a cada poucos segundos: confere os jobs enviados em segundo plano, baixa os prontos e devolve o que terminou ({ caminho, tipo, chat } ou { falhou }).
+let concluindo = false
+async function concluirPendentes() {
+  if (concluindo) return []
+  concluindo = true
+  const prontos = []
+  try {
+    const dir = path.join(PASTA, '.midia')
+    let nomes = []
+    try { nomes = fs.readdirSync(dir).filter((n) => /^pendente-[\w-]+\.json$/.test(n)) } catch { return [] }
+    for (const n of nomes) {
+      const arqP = path.join(dir, n)
+      let p
+      try { p = JSON.parse(fs.readFileSync(arqP, 'utf8')) } catch { try { fs.unlinkSync(arqP) } catch {} continue }
+      if (Date.now() - (p.t0 || 0) > 6 * 3600 * 1000) { try { fs.unlinkSync(arqP) } catch {} continue }
+      let s
+      try { s = await andamento(p.id) } catch { continue } // sem rede agora: tenta no próximo ciclo
+      marcar(p.tipo, p.prompt, s)
+      if (s.status === 'failed') { try { fs.unlinkSync(arqP) } catch {} prontos.push({ falhou: true, tipo: p.tipo, chat: p.chat }); continue }
+      if (s.status === 'done') {
+        try {
+          const r = await salvarResultado(p.id, p.tipo, p.nome, s)
+          marcar(p.tipo, p.prompt, { status: 'done', position: null, eta_s: 0, progress: 100 })
+          try { fs.unlinkSync(arqP) } catch {}
+          prontos.push({ caminho: r.arq, tipo: p.tipo, chat: p.chat, nome: p.nome })
+        } catch { /* arquivo ainda não disponível: tenta de novo */ }
+      }
+    }
+  } finally {
+    concluindo = false
+  }
+  return prontos
 }
 
 // uma nova tentativa em silêncio (o cartão segue em "Gerando...") antes de mostrar a falha
@@ -265,10 +320,12 @@ async function tratar(msg) {
     try {
       if (nome === 'trocar_personagem') {
         const v = await comReserva(trocarPersonagem, params?.arguments || {}, 'video')
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('troca de personagem', 8) }] } })
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo com a troca criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
       }
       if (nome === 'gerar_video') {
         const v = await comReserva(gerarVideo, params?.arguments || {}, 'video')
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('vídeo em alta qualidade', 8) }] } })
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
       }
       if (nome !== 'gerar_imagem') throw new Error('ferramenta desconhecida')
@@ -293,4 +350,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { gerarImagem, gerarVideo, trocarPersonagem, FORMATOS }
+module.exports = { gerarImagem, gerarVideo, trocarPersonagem, FORMATOS, configurar, concluirPendentes }
