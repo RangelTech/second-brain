@@ -11,28 +11,36 @@ const PROMPT = Array.from({ length: 60 }, (_, i) => 'palavra' + i).join(' ') // 
 
 function servidor(estados) {
   let consultas = 0
+  const bodies = []
   const srv = http.createServer((req, res) => {
-    if (req.method === 'POST' && req.url === '/videos/generations') { res.writeHead(202, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ id: 'job1' })) }
+    if (req.method === 'POST' && req.url === '/videos/generations') {
+      let b = ''
+      req.on('data', (c) => (b += c))
+      return req.on('end', () => { try { bodies.push(JSON.parse(b)) } catch {} res.writeHead(202, { 'content-type': 'application/json' }); res.end(JSON.stringify({ id: 'job1' })) })
+    }
     if (req.url === '/media/jobs/job1') {
       const st = estados[Math.min(consultas++, estados.length - 1)]
       res.writeHead(200, { 'content-type': 'application/json' })
-      return res.end(JSON.stringify({ status: st, progress: st === 'done' ? 100 : 40, seconds: 450 }))
+      return res.end(JSON.stringify({ status: st, progress: st === 'done' ? 100 : 40, seconds: 450, eta_s: st === 'done' ? 0 : 780 }))
     }
     if (req.url === '/jobs/job1/file') { res.writeHead(200, { 'content-type': 'video/mp4' }); return res.end(Buffer.from('mp4-falso')) }
     res.writeHead(404); res.end('{}')
   })
+  srv.bodies = bodies
   return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok(srv)))
 }
 
 test('video em alta devolve na hora; o app conclui em segundo plano e entrega o arquivo na pasta Videos', async () => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-midia-'))
-  const srv = await servidor(['running', 'done'])
+  const srv = await servidor(['queued', 'running', 'done']) // a 1a consulta e a da previsão devolvida ao usuário
   try {
     midia.configurar({ base: 'http://127.0.0.1:' + srv.address().port, chave: 'k', pasta })
     process.env.SB_MIDIA_CHAT = 'chat-xyz'
     const t0 = Date.now()
     const r = await midia.gerarVideo({ prompt: PROMPT, qualidade: 'alta', nome: 'carro' })
     assert.equal(r.pendente, true, 'a ferramenta nao espera a GPU')
+    assert.equal(r.min, 13, 'a previsao em minutos vem do servidor (780 s), nao de um numero fixo')
+    assert.equal(srv.bodies[0].recipe, 'wan22-a14b')
     assert.ok(Date.now() - t0 < 2000)
     assert.ok(fs.existsSync(path.join(pasta, '.midia', 'pendente-job1.json')))
     assert.deepEqual(await midia.concluirPendentes(), [], '1a conferencia: ainda rodando')
@@ -70,8 +78,24 @@ test('video rapido continua sincrono (espera e devolve o caminho)', async () => 
   const srv = await servidor(['done'])
   try {
     midia.configurar({ base: 'http://127.0.0.1:' + srv.address().port, chave: 'k', pasta })
-    const r = await midia.gerarVideo({ prompt: PROMPT, nome: 'rapido' })
+    const r = await midia.gerarVideo({ prompt: PROMPT, qualidade: 'rapida', nome: 'rapido' })
     assert.ok(!r.pendente && r.caminho && fs.existsSync(r.caminho))
+    assert.equal(srv.bodies[0].recipe, 'ltx-video', 'o rapido pede a receita leve de forma explicita (sem receita o servidor usa a de alta qualidade)')
+  } finally {
+    srv.close()
+  }
+})
+
+test('sem qualidade escolhida o video e de ALTA qualidade (5 s, receita do worker)', async () => {
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-midia-'))
+  const srv = await servidor(['queued', 'done'])
+  try {
+    midia.configurar({ base: 'http://127.0.0.1:' + srv.address().port, chave: 'k', pasta })
+    const r = await midia.gerarVideo({ prompt: PROMPT, nome: 'padrao' })
+    assert.equal(r.pendente, true)
+    assert.equal(srv.bodies[0].recipe, 'wan22-a14b')
+    assert.equal(srv.bodies[0].seconds, 5)
+    assert.ok(!('fps' in srv.bodies[0]) && !('steps' in srv.bodies[0]), 'o servidor escolhe fps e passos do modelo')
   } finally {
     srv.close()
   }

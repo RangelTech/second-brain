@@ -48,17 +48,17 @@ const FERRAMENTAS = [
   },
   {
     nome: 'gerar_video',
-    desc: 'Gera um VÍDEO (1 a 60 segundos, sem áudio, até 512x512; acima de 4 s o servidor encadeia vários clipes e entrega um MP4 só, o que leva alguns minutos) a partir de uma descrição, numa GPU do servidor. Leva de 1 a vários minutos; o app mostra o andamento. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
+    desc: 'Gera um VÍDEO (1 a 60 segundos, sem áudio) a partir de uma descrição. Qualidade ALTA (padrão): modelo Wan 2.2 de 14 bilhões de parâmetros, 720p, o melhor resultado possível; leva de 5 a 20 minutos por clipe de 5 s (acima de 5 s o servidor encadeia clipes e entrega um MP4 só, em 480p). A ferramenta volta na hora com a previsão e o app avisa no chat quando o arquivo fica pronto. Qualidade RAPIDA: modelo leve, cerca de 1 minuto, só para testar uma ideia. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
     schema: obj({
       prompt: { type: 'string', description: 'Cena e movimento, em inglês, MUITO detalhado (80 a 150 palavras, mínimo 40; 20 se passar imagem): sujeito, cenário, ação e movimento, câmera e lente, luz, paleta, atmosfera, estilo e qualidade.' },
       formato: { type: 'string', enum: FORMATOS_VIDEO, description: 'paisagem (768x512), retrato (512x768) ou quadrado. Padrão: paisagem.' },
       imagem: { type: 'string', description: 'Caminho de uma imagem para ANIMAR (imagem para vídeo). PNG, JPEG ou WEBP até 6 MB. Opcional.' },
       strength: { type: 'number', description: 'Quanto mudar a imagem de partida, de 0 a 1 (opcional).' },
       fps: { type: 'number', description: 'Quadros por segundo, de 8 a 30 (opcional).' },
-      segundos: { type: 'number', description: 'Duração total de 1 a 60 segundos (o servidor encadeia clipes de 4 s na qualidade rápida e de 5 s na alta). Padrão: 4.' },
+      segundos: { type: 'number', description: 'Duração total de 1 a 60 segundos (o servidor encadeia clipes de 4 s na qualidade rápida e de 5 s na alta; até 5 s sai em 720p, acima disso em 480p para a entrega caber em cerca de 20 minutos). Padrão: 5 na alta, 4 na rápida.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
       negative_prompt: { type: 'string', description: 'O que evitar (em inglês): ex. "blurry, deformed hands, extra fingers, watermark, text". Opcional.' },
-      qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'rapida (padrão): modelo leve, cerca de 1 minuto, 640x384, serve para testar. alta: modelo Wan 2.2 em 1280x704 e 24 quadros por segundo, mantém logos, rostos e detalhes, leva de 7 a 20 minutos (5 segundos de vídeo levam cerca de 7 minutos). Use alta quando o usuário pedir qualidade, cinema, comercial ou algo para publicar. Para o melhor resultado, gere antes uma imagem com gerar_imagem e anime-a passando em imagem.' },
+      qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'alta (padrão): Wan 2.2 de 14 bilhões de parâmetros, 720p, 16 quadros por segundo, movimento e rostos muito mais coerentes; leva de 5 a 20 minutos por clipe de 5 s (a primeira vez do dia inclui ~8 min de partida) e o app avisa quando fica pronto. rapida: modelo leve, cerca de 1 minuto, 640x384, só para testar uma ideia (a qualidade é bem menor). Para o melhor resultado, gere antes uma imagem com gerar_imagem, confira e anime-a passando em imagem.' },
       steps: { type: 'number', description: 'Passos de geração (opcional; normalmente deixe a qualidade escolher).' },
       cfg: { type: 'number', description: 'Fidelidade ao prompt (opcional).' },
       seed: { type: 'number', description: 'Semente para repetir ou variar um resultado (opcional).' },
@@ -172,7 +172,14 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono 
     } catch (e) {
       throw new Error(MSG_FALHA + ' (não consegui registrar o acompanhamento)')
     }
-    return { pendente: true, id }
+    // a previsão vem do servidor (partida da máquina + pedidos na frente + o próprio vídeo), não de um número fixo
+    let min = 0
+    try {
+      const s0 = await andamento(id)
+      marcar(tipo, prompt, s0)
+      if (s0 && s0.eta_s) min = Math.max(1, Math.ceil(s0.eta_s / 60))
+    } catch {}
+    return { pendente: true, id, min }
   }
   while (Date.now() - t0 < limiteMs) {
     await pausa(1500)
@@ -239,21 +246,23 @@ async function gerarVideo(args) {
   exigirDetalhe('vídeo', prompt, args.imagem ? 20 : 40)
   if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular('video', prompt, process.env.SB_MIDIA_MOCK_ARQ || '')
+  const alta = (args.qualidade || PREFS.qualidade || 'alta') !== 'rapida' // qualidade é o produto: alta é o padrão, rápida só quando pedida
   const corpo = {
     prompt: String(prompt || '').slice(0, 3500),
     format: FORMATOS_VIDEO.includes(formato) ? formato : FORMATOS_VIDEO.includes(PREFS.proporcao) ? PREFS.proporcao : 'paisagem',
-    seconds: Math.max(1, Math.min(60, Number(segundos) || Number(PREFS.duracao) || 4)),
+    seconds: Math.max(1, Math.min(60, Number(segundos) || Number(PREFS.duracao) || (alta ? 5 : 4))),
     ...paramsComuns(args, true),
   }
   // medido em 08/11/2026: vídeo em alta direto do texto saiu com o carro de TRÊS rodas de lado. Negativo padrão contra deformação (somado ao que o agente mandar).
   const NEG_VIDEO = 'deformed, distorted, extra wheels, extra limbs, extra fingers, warped body, melting, morphing geometry, asymmetrical, bad anatomy, blurry, low quality, watermark, text'
   corpo.negative_prompt = [corpo.negative_prompt, NEG_VIDEO].filter(Boolean).join(', ').slice(0, 600)
   if (args.fps != null) corpo.fps = Number(args.fps)
-  const alta = args.qualidade === 'alta'
   if (alta) {
-    corpo.recipe = 'wan22-ti2v' // alta qualidade: Wan 2.2 (1280x704, 24 fps); o servidor encadeia clipes de 5 s
+    corpo.recipe = 'wan22-a14b' // alta qualidade: Wan 2.2 14B numa máquina dedicada sob demanda (720p, 16 fps); o servidor encadeia clipes de 5 s
     delete corpo.fps
-    if (args.steps == null) delete corpo.steps // o Wan já usa 20 passos; 40 só dobraria o tempo
+    if (args.steps == null) delete corpo.steps // o servidor já usa 20 passos; mais só alongaria o tempo
+  } else {
+    corpo.recipe = 'ltx-video' // explícito: sem receita o servidor manda o vídeo para a máquina de alta qualidade
   }
   // imagem -> vídeo: a imagem de partida vai em base64 (PNG, JPEG ou WEBP, até 6 MB)
   if (args.imagem) {
@@ -323,12 +332,12 @@ async function tratar(msg) {
     try {
       if (nome === 'trocar_personagem') {
         const v = await comReserva(trocarPersonagem, params?.arguments || {}, 'video')
-        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('troca de personagem', 8) }] } })
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('troca de personagem', v.min || 9) }] } })
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo com a troca criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
       }
       if (nome === 'gerar_video') {
         const v = await comReserva(gerarVideo, params?.arguments || {}, 'video')
-        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('vídeo em alta qualidade', 8) }] } })
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('vídeo em alta qualidade', v.min || 15) }] } })
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Vídeo criado em ${v.segundos} s (${v.tamanho}). caminho: ${v.caminho}` }] } })
       }
       if (nome !== 'gerar_imagem') throw new Error('ferramenta desconhecida')
