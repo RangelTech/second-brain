@@ -949,7 +949,7 @@
       // mensagem só de texto durante o trabalho do agente: entra no turno em andamento (como no Claude Code), sem esperar na fila
       if (t && !anexosPendentes.length && !t.startsWith('/')) {
         const rr = respostas.get(atual)
-        const dir = await window.sb.direcionar?.({ id: atual, texto: t }).catch(() => ({ ok: false }))
+        const dir = await Promise.race([window.sb.direcionar?.({ id: atual, texto: t }).catch(() => ({ ok: false })), new Promise((r) => setTimeout(() => r({ ok: false }), 6000))])
         if (dir && dir.ok && rr) {
           rr.partes.push({ t: 'voce', v: t })
           $('texto').value = ''

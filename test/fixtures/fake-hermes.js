@@ -57,19 +57,19 @@ rl.on('line', (linha) => {
     return enviar({ jsonrpc: '2.0', id: j.id, result: { sessionId } })
   }
   if (j.method === 'session/prompt') {
-    // turno lento com redirecionamento (como o ACP real): um 2o session/prompt com turno ativo vira correcao do turno em andamento
+    // turno lento, como o ACP real: prompts sao tratados um por vez; session/cancel encerra o turno ('cancelled') e o PROXIMO prompt vem com a correcao
     if (process.env.SB_FAKE_LENTO_MS) {
-      if (global.__turnoAtivo) {
-        global.__correcao = j.params.prompt[0].text
-        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Redirected the active turn with your correction.' } } } })
+      if (global.__cancelado) {
+        global.__cancelado = false
+        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'feito com correcao: ' + j.params.prompt[0].text } } } })
         return enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn' } })
       }
-      global.__turnoAtivo = true
-      return setTimeout(() => {
-        global.__turnoAtivo = false
-        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'feito' + (global.__correcao ? ' com correcao: ' + global.__correcao : '') } } } })
+      global.__turno = { id: j.id, timer: setTimeout(() => {
+        global.__turno = null
+        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'feito sem correcao' } } } })
         enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn' } })
-      }, +process.env.SB_FAKE_LENTO_MS)
+      }, +process.env.SB_FAKE_LENTO_MS) }
+      return
     }
     if (crashesRestantes() > 0) {
       decrementar()
@@ -91,6 +91,14 @@ rl.on('line', (linha) => {
     enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' + eco } } } })
     return enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn', usage: { totalTokens: 1 } } })
   }
-  if (j.method === 'session/cancel') return
+  if (j.method === 'session/cancel') {
+    if (global.__turno) {
+      clearTimeout(global.__turno.timer)
+      enviar({ jsonrpc: '2.0', id: global.__turno.id, result: { stopReason: 'cancelled' } })
+      global.__turno = null
+      global.__cancelado = true
+    }
+    return
+  }
   if (j.id !== undefined) enviar({ jsonrpc: '2.0', id: j.id, error: { code: -32601, message: 'não suportado' } })
 })

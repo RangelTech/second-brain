@@ -110,20 +110,22 @@ test('"Gateway disconnected" com o processo ainda de pe: retoma sozinho, sem err
   }
 })
 
-test('mensagem no meio do turno entra no turno em andamento (nao fica na fila) e a confirmacao em ingles do Hermes nao vaza para a tela', async () => {
+test('mensagem no meio do turno cancela so a etapa e o MESMO perguntar() termina incorporando a correcao (sem fila)', async () => {
   const eventos = []
-  process.env.SB_FAKE_LENTO_MS = '1500'
+  process.env.SB_FAKE_LENTO_MS = '4000'
   const s = montar(0, eventos)
   try {
     await s.pronta
+    const t0 = Date.now()
     const turno = s.perguntar('faca a tarefa grande')
     await new Promise((r) => setTimeout(r, 400)) // o turno esta em andamento
     assert.equal(await s.direcionar('troque o titulo para Azul'), true)
     const r = await turno
-    assert.equal(r.stopReason, 'end_turn')
+    assert.equal(r.stopReason, 'end_turn', 'o resultado final e o do turno retomado, nao o cancelado')
+    assert.ok(Date.now() - t0 < 3000, 'nao esperou o turno lento de 4 s terminar: foi cancelado')
     const texto = eventos.filter((e) => e.texto).map((e) => e.texto).join('')
-    assert.match(texto, /feito com correcao: troque o titulo para Azul/, 'o turno em andamento recebeu a correcao')
-    assert.doesNotMatch(texto, /Redirected the active turn/, 'a confirmacao tecnica em ingles nao aparece')
+    assert.match(texto, /feito com correcao: troque o titulo para Azul/)
+    assert.doesNotMatch(texto, /feito sem correcao/)
   } finally {
     delete process.env.SB_FAKE_LENTO_MS
     desligar(s)
