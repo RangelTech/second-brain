@@ -279,7 +279,8 @@
     let status = st?.status
     if (!status) status = video && seg < 3 ? 'queued' : 'running'
     if (status === 'done') status = 'running' // o cartão vira o resultado quando a ferramenta termina
-    const estimado = Math.max(1, Math.min(96, Math.round(100 * (1 - Math.exp(-seg / (video ? 70 : 5.5))))))
+    if (status === 'queued') status = 'running' // o cliente nunca vê fila: para ele está sempre gerando
+    const estimado = Math.max(1, Math.min(96, Math.round(100 * (1 - Math.exp(-seg / (video ? Math.max(70, (j.padrao || 90) / 3) : 5.5))))))
     const real = typeof st?.progress === 'number' && status === 'running' ? Math.max(1, Math.min(99, Math.round(st.progress))) : null
     return { status, alvo: status === 'queued' ? 0 : real ?? estimado, real: real != null, pos: st?.position ?? null, eta: st?.eta_s ?? null }
   }
@@ -290,16 +291,12 @@
     const tit = d.querySelector('.mc-tit')
     const sub = d.querySelector('.mc-sub')
     if (!tit || !d.querySelector('.img-pct')) return
-    const novoTit = e.status === 'queued' ? `${video ? 'Seu vídeo está' : 'Sua imagem está'} na fila para ser ${video ? 'gerado' : 'gerada'}` : `Gerando ${video ? 'o seu vídeo' : 'a sua imagem'}...`
+    const novoTit = `Gerando ${video ? 'o seu vídeo' : 'a sua imagem'}...`
     if (tit.textContent !== novoTit) tit.textContent = novoTit // região "status": só anuncia quando a fase muda
-    const partes = []
-    if (e.status === 'queued') {
-      partes.push(e.pos === 1 ? 'Você é o próximo' : e.pos > 1 ? `Você é o ${e.pos}º da fila` : 'Estamos organizando o seu pedido')
-      if (textoEta(e.eta)) partes.push(`tempo estimado: ${textoEta(e.eta)}`)
-    } else {
-      partes.push(video ? 'Vídeos levam alguns minutos. Você pode continuar usando o app.' : 'Estamos criando a sua imagem.')
-      if (textoEta(e.eta)) partes.push(`faltam ${textoEta(e.eta)}`)
-    }
+    // nunca fala de fila, posição ou servidor: só o tempo aproximado (o do servidor quando existe, senão o típico do tipo)
+    const alvoS = e.eta != null && e.eta > 0 ? e.eta : j.padrao || (video ? 90 : 30)
+    const aprox = alvoS < 90 ? Math.max(10, Math.round(alvoS / 10) * 10) + ' segundos' : Math.ceil(alvoS / 60) + (Math.ceil(alvoS / 60) === 1 ? ' minuto' : ' minutos')
+    const partes = [`Fica ${video ? 'pronto' : 'pronta'} em aproximadamente ${aprox}.`]
     sub.textContent = partes.join(' · ')
     d.dataset.fase = e.status
     // o número sobe suavemente e nunca volta
@@ -339,14 +336,15 @@
     return j
   }
   function criandoImagem(d, f) {
-    const video = /midia_gerar_video/.test(f.titulo || '')
+    const video = /midia_(gerar_video|trocar_personagem)/.test(f.titulo || '')
+    const pendente = f.status === 'completed' && /\[\[midia-pendente\]\]/.test(String(f.conteudo || '')) // enviado em segundo plano: segue "gerando" até o app avisar
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
     const prox = video ? 'o vídeo' : 'a imagem'
-    if (f.status === 'completed' || f.status === 'failed') {
+    if ((f.status === 'completed' || f.status === 'failed') && !pendente) {
       const j = jobsMidia.get(f.id)
       if (j) { j.fim = Date.now(); clearTimeout(j.timer) }
     }
-    if (f.status === 'completed') {
+    if (f.status === 'completed' && !pendente) {
       const m = (video ? /caminho:\s*(.+?\.mp4)/i : /caminho:\s*(.+?\.png)/i).exec(String(f.conteudo || ''))
       if (!m) {
         d.className = 'ferr img-ferr'
@@ -378,8 +376,10 @@
       return true
     }
     d.hidden = false
-    d.className = 'ferr img-ferr mc-ferr ' + (f.status || 'pending')
-    const j = acompanharMidia(f, video, arg.prompt)
+    d.className = 'ferr img-ferr mc-ferr ' + (pendente ? 'pending' : f.status || 'pending')
+    const trocar = /trocar_personagem/.test(f.titulo || '')
+    const j = acompanharMidia(f, video, trocar ? 'troca de personagem' : arg.prompt)
+    j.padrao = video ? (trocar || arg.qualidade === 'alta' ? 480 : 90) : 30 // tempo típico, até o servidor informar o dele
     const n = 9
     let pts = ''
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) pts += `<i style="--d:${(Math.hypot(x - n / 2, y - n / 2) * 0.16).toFixed(2)}s"></i>`
@@ -390,7 +390,7 @@
   function atualizarCartao(d, f) {
     d.hidden = INTERNA.test(f.titulo || '') // etapa interna do agente, sem significado para quem usa
     if (d.hidden) return
-    if (/midia_gerar_(imagem|video)/.test(f.titulo || '') && criandoImagem(d, f)) return
+    if (/midia_(gerar_(imagem|video)|trocar_personagem)/.test(f.titulo || '') && criandoImagem(d, f)) return
     const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
     let titulo = tituloLimpo(f.titulo)
@@ -1221,14 +1221,31 @@
     const c = chats.find((x) => x.id === m.chat) || chatAtual()
     if (!c) return
     const ok = !m.falhou
-    const texto = ok ? 'Pronto! Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo agora. Tente de novo em instantes.'
-    const partes = ok ? [{ t: 'ferr', f: { id: 'bg-' + Date.now(), titulo: 'midia_gerar_video', status: 'completed', tipo: 'other', conteudo: 'caminho: ' + m.caminho, entrada: '{}' } }] : [{ t: 'texto', v: texto }]
-    c.msgs.push({ role: 'assistant', content: texto, partes, midias: ok ? [m.caminho] : undefined, fim: Date.now() })
+    // acha o card que ficou "gerando" e troca no lugar pelo vídeo pronto (ou marca a falha)
+    let achou = false
+    for (const msg of [...c.msgs].reverse()) {
+      for (const p of msg.partes || []) {
+        if (!achou && p.t === 'ferr' && /\[\[midia-pendente\]\]/.test(String(p.f.conteudo || ''))) {
+          p.f.conteudo = ok ? 'caminho: ' + m.caminho : 'falhou'
+          p.f.status = ok ? 'completed' : 'failed'
+          if (ok) (msg.midias = msg.midias || []).push(m.caminho)
+          achou = true
+        }
+      }
+      if (achou) break
+    }
+    if (!achou) {
+      const texto = ok ? 'Pronto! Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo agora. Tente de novo em instantes.'
+      const partes = ok ? [{ t: 'ferr', f: { id: 'bg-' + Date.now(), titulo: 'midia_gerar_video', status: 'completed', tipo: 'other', conteudo: 'caminho: ' + m.caminho, entrada: '{}' } }] : [{ t: 'texto', v: texto }]
+      c.msgs.push({ role: 'assistant', content: texto, partes, midias: ok ? [m.caminho] : undefined, fim: Date.now() })
+    } else if (!ok) {
+      c.msgs.push({ role: 'assistant', content: 'Não consegui gerar o vídeo agora. Tente de novo em instantes.', fim: Date.now() })
+    }
     c.em = Date.now()
     salvar()
     if (c.id === atual) desenhar()
     listar()
-    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Segundo Cérebro', { body: texto }) } catch {}
+    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Segundo Cérebro', { body: ok ? 'Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo.' }) } catch {}
   })
   // primeira abertura: o agente está sendo preparado em segundo plano; aviso discreto, some sozinho quando termina
   window.sb.aoPreparando?.((t) => {

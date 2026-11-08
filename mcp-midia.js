@@ -133,7 +133,7 @@ async function api(rota, opcoes = {}) {
   return r
 }
 
-const TEXTO_PENDENTE = (o, min) => `Enviado para a GPU: ${o}, cerca de ${min} minutos (mais a fila). O arquivo será salvo sozinho na pasta Videos e o aplicativo avisa a pessoa neste chat quando ficar pronto. Diga isso ao usuário AGORA, em uma frase, e siga com o que ele pedir. NÃO espere, NÃO consulte o andamento e NÃO gere de novo.`
+const TEXTO_PENDENTE = (o, min) => `[[midia-pendente]] ${o} em andamento, previsão de ${min} minutos. Diga ao usuário apenas: "Estou gerando o seu vídeo; fica pronto em aproximadamente ${min} minutos." Não mencione GPU, fila, servidor nem andamento. NÃO espere, NÃO consulte e NÃO gere de novo: o arquivo é salvo sozinho e o aplicativo avisa quando ficar pronto.`
 const MSG_FALHA = 'Não consegui gerar agora, tente de novo em instantes.'
 const EXT_POR_MIME = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' }
 const stampAgora = () => new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{6})$/, '$1-$2')
@@ -245,6 +245,9 @@ async function gerarVideo(args) {
     seconds: Math.max(1, Math.min(60, Number(segundos) || Number(PREFS.duracao) || 4)),
     ...paramsComuns(args, true),
   }
+  // medido em 08/11/2026: vídeo em alta direto do texto saiu com o carro de TRÊS rodas de lado. Negativo padrão contra deformação (somado ao que o agente mandar).
+  const NEG_VIDEO = 'deformed, distorted, extra wheels, extra limbs, extra fingers, warped body, melting, morphing geometry, asymmetrical, bad anatomy, blurry, low quality, watermark, text'
+  corpo.negative_prompt = [corpo.negative_prompt, NEG_VIDEO].filter(Boolean).join(', ').slice(0, 600)
   if (args.fps != null) corpo.fps = Number(args.fps)
   const alta = args.qualidade === 'alta'
   if (alta) {

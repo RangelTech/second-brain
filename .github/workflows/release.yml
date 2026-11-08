@@ -30,7 +30,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: for i in 1 2 3 4; do npm ci && exit 0; echo "npm ci falhou (tentativa $i), esperando"; rm -rf node_modules; sleep $((i*20)); done; exit 1
+        shell: bash
       - run: node scripts/checar-pacote.js
       - run: node --test test/atualizador.test.js
       - run: npm run router:build
