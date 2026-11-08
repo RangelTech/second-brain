@@ -87,3 +87,14 @@ test('ambiente já montado: a partida é rápida e não monta de novo', async ()
   assert.ok(Date.now() - t0 < 3000, 'segunda partida levou ' + (Date.now() - t0) + ' ms')
   assert.equal(montagens(dir), 1)
 })
+
+test('iniciar() chamado de novo durante a partida (como o teste de instalação faz) não mata o próprio processo', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-mont-dup-'))
+  process.env.SB_FAKE_MONTAGEM_MS = '4000'
+  process.env.SB_TESTE_PRAZO = '2500'
+  const s = novaSessao(dir, 'dup')
+  await s.iniciar() // 2ª chamada, enquanto a do construtor ainda monta o ambiente
+  await s.pronta
+  assert.ok(s.sid, 'a sessão foi criada')
+  assert.equal(montagens(dir), 1)
+})

@@ -101,7 +101,9 @@ jobs:
         shell: bash
         env:
           SB_DATA_DIR: ${{ runner.temp }}/sb-dados
-        run: cat "$SB_DATA_DIR/preparo.log" 2>/dev/null || echo "sem preparo.log"
+        run: |
+          cat "$SB_DATA_DIR/preparo.log" 2>/dev/null || echo "sem preparo.log"
+          echo "--- agente.log (final)"; tail -n 60 "$SB_DATA_DIR/logs/agente.log" 2>/dev/null | cut -c1-240 || true
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:

@@ -633,7 +633,17 @@ class Sessao {
   comPrazo(promessa, ms) {
     return Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('prazo')), ms))])
   }
-  async iniciar() {
+  // Idempotente: o construtor já dispara a partida e quem usa a Sessao pode chamar iniciar() de novo (o teste de instalação faz isso). Chamadas
+  // simultâneas compartilham a MESMA partida; sem isso a segunda se achava "outro chat" e matava o processo da primeira.
+  iniciar() {
+    if (this.iniciandoAgora) return this.iniciandoAgora
+    const p = this.iniciarVigiado().finally(() => {
+      if (this.iniciandoAgora === p) this.iniciandoAgora = null
+    })
+    this.iniciandoAgora = p
+    return p
+  }
+  async iniciarVigiado() {
     // ambiente já montado: o normal é responder em segundos, então tentativas curtas (reinicia o processo e tenta de novo)
     // "montado" só vale depois de uma sessão já ter respondido nesta pasta; antes disso a 1ª subida leva minutos (prazo longo)
     const desligarVigia = vigiarGitPreso(this.app)
