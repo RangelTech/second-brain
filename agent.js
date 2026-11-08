@@ -667,6 +667,9 @@ class Sessao {
         this.sid = r.sessionId
         registrar(this.app, `agente pronto em ${((Date.now() - t0) / 1000).toFixed(1)} s (tentativa ${tentativa})`)
         marcarMontado(this.env.HERMES_HOME, this.bin)
+        // sessão aquecida e ainda sem uso: não fica de pé para sempre (perguntar() cancela este timer ao começar um turno)
+        clearTimeout(this.ocioso)
+        this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
         return
       } catch (e) {
         ultimo = e

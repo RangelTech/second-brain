@@ -1702,6 +1702,25 @@
     })
     if (chats.length === 0) criarChat()
     else abrir([...chats].sort(ordem)[0].id)
+    // O agente (Hermes) sobe sozinho assim que existe um chat novo e vazio: ao abrir o app, ao entrar na conta e em "Nova conversa".
+    // Sem isso a 1ª pergunta esperava 10 a 15 s pela partida. O main só aquece com conta entrada e motor pronto (senão devolve ok:false e tentamos de novo).
+    let tentativasAquecer = 0
+    const aquecerAgora = async () => {
+      const ca = chatAtual()
+      if (!ca || ca.msgs.length > 0 || !cfg.ativo || aquecidos.has(ca.id)) return aquecidos.has(ca && ca.id) || (ca && ca.msgs.length > 0)
+      try {
+        const r = await window.sb.aquecer?.({ id: ca.id, alvo: cfg.ativo })
+        if (r && r.ok) aquecidos.add(ca.id)
+      } catch {}
+      return false
+    }
+    setInterval(async () => {
+      if (tentativasAquecer > 400) return
+      tentativasAquecer++
+      await aquecerAgora()
+    }, 8000)
+    setTimeout(aquecerAgora, 1500)
+    $('novo').addEventListener('click', () => setTimeout(aquecerAgora, 400))
   }
   // alterações feitas por outra tela (outro computador, a web ou outra pessoa do mesmo login)
   window.sb.aoChatsMudou((d) => {
