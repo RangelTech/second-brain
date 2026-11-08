@@ -46,3 +46,14 @@ test('continuação automática e resposta curta dentro de chat com agente vão 
   assert.strictEqual(classificar('Qual a capital do Peru?', [], { emAgente: true }), 'rapido')
   assert.strictEqual(classificar('bom dia', []), 'rapido')
 })
+
+test('atualidade (noticia, cotacao, jogo de ontem, tempo) vai sempre ao agente, que pesquisa na web; conhecimento fixo continua rapido', () => {
+  for (const t of ['Quais as principais noticias de hoje no Brasil?', 'Quanto esta o dolar hoje?', 'Quem ganhou o jogo do Flamengo ontem?', 'Qual a previsao do tempo em Goiania?', 'Como esta o tempo hoje?'])
+    assert.strictEqual(classificar(t, []), 'agente', t)
+  for (const t of ['Qual e a capital da Australia?', 'Quem descobriu o Brasil?', 'Voce lembra o que combinamos ontem?', 'Quanto e 15% de 240?'])
+    assert.strictEqual(classificar(t, []), 'rapido', t)
+})
+test('chat com agente vivo: pergunta completa (com ?) no meio do texto continua no caminho rapido', () => {
+  assert.strictEqual(classificar('Qual e a capital da Australia? Responda em uma frase.', [], { emAgente: true }), 'rapido')
+  assert.strictEqual(classificar('agora salva isso', [], { emAgente: true }), 'agente')
+})

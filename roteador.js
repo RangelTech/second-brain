@@ -12,6 +12,12 @@ const ACAO_FORTE = /\b(pesquis[ae]\w* (na|pela|no) (web|internet|google)|busqu?e
 const VERBO_ACAO = /\b(ger[ae]\w*|cri[ae]\w*|fa[cç]\w*|fez|mont[ae]\w*|constru\w*|anim[ae]\w*|edit[ae]\w*|salv[ae]\w*|convert\w*|baix[ae]\w*|sub[ae]\w*|instal\w*|rod[ae]\w*|execut\w*|abr[ae]\w*|apag\w*|mov[ae]\w*|renome\w*|desenh\w*|produz\w*|program\w*|deploy\w*|publiq\w*|envie\w*|envia\w*|exporte\w*|transforme\w*|coloque\w*|ponha\w*|troque\w*|substitu\w*|refa[cç]\w*)\b/i
 const SUBSTANTIVO_PRODUCAO = /\b(v[ií]deo\w*|imagem|imagens|foto\w*|figura|ilustra[cç]\w*|logo\w*|banner\w*|capa|avatar|arquivo\w*|pasta\w*|site\w*|p[aá]gina\w*|planilha\w*|pdf|docx?|word|excel|powerpoint|pptx?|apresenta[cç]\w*|slide\w*|script\w*|programa\w*|aplicativo\w*|app|api|docker|container\w*|servidor\w*|banco de dados|metabase|git|commit|reposit[oó]rio|terminal|comando\w*|pip|npm|processo\w*|porta)\b/i
 const ANIMA = /\banim[ae]\w*\b/i
+// Atualidade: o modelo do caminho rápido NÃO sabe o que aconteceu hoje e, medido em 08/11/2026, responde "notícias de hoje" chutando. Isso vai SEMPRE ao agente (que pesquisa na web).
+const ATUALIDADE_FORTE = /\b(not[ií]cias?|cota[cç][aã]o|d[oó]lar|euro|bitcoin|previs[aã]o do tempo|placar|quem (ganhou|venceu|perdeu)|resultado d[oa]s? (jogo|partida|elei[cç][aã]o|rodada)|o que (est[aá] acontecendo|aconteceu)|em alta|trending|[uú]ltimas (not[ií]cias|do)|tabela do (campeonato|brasileir[aã]o))\b/i
+const MARCA_TEMPO = /\b(hoje|agora|ontem|amanh[aã]|atualmente|nesta semana|essa semana|este m[eê]s|[uú]ltim[oa]s?|recente|2026)\b/i
+const PEDE_FATO = /\b(quanto|qual|quais|quem|onde|quando|como est[aá]|est[aá])\b/i
+// "ontem" sozinho é atualidade (jogo de ontem); só vira conversa antiga quando fala de lembrar/combinar
+const REFERE_CONVERSA = /\b(lembra|lembrar|lembro|conversamos|falamos|combinamos|combinado|j[aá] te (disse|falei|contei|pedi)|outro dia|da outra vez)\b/i
 const CUE_MEMORIA = /\b(lembra|lembrar|lembro|conversamos|falamos|combinamos|combinado|j[aá] te (disse|falei|contei|pedi)|outro dia|aquilo que|ontem|semana passada|da outra vez|antes eu)\b/i
 
 const USAR_AGENTE = {
@@ -51,7 +57,8 @@ function classificar(texto, anexos = [], { emAgente = false } = {}) {
   if (anexos.length) return 'agente'
   const t = String(texto || '')
   if (CONTINUACAO.test(t)) return 'agente'
-  if (emAgente && t.trim().split(/\s+/).filter(Boolean).length <= MAX_PALAVRAS_CURTA && !/\?\s*$/.test(t.trim())) return 'agente'
+  if (emAgente && t.trim().split(/\s+/).filter(Boolean).length <= MAX_PALAVRAS_CURTA && !/\?/.test(t)) return 'agente'
+  if (!REFERE_CONVERSA.test(t) && (ATUALIDADE_FORTE.test(t) || (MARCA_TEMPO.test(t) && PEDE_FATO.test(t)))) return 'agente'
   if (CAMINHO.test(t) || URL_RE.test(t) || ACAO_FORTE.test(t) || ANIMA.test(t) || (VERBO_ACAO.test(t) && SUBSTANTIVO_PRODUCAO.test(t))) return 'agente'
   return 'rapido'
 }

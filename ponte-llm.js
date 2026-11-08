@@ -38,6 +38,20 @@ function restaurarEditor(texto, pares) {
   return t
 }
 
+// O servidor NÃO desliga o raciocínio com reasoning_effort:"none" (medido em 08/11/2026 no mesmo pedido real do Hermes: 13,1 s assim, 2,7 s com
+// chat_template_kwargs.enable_thinking=false; uma resposta de 505 caracteres gastou 5.821 tokens e 93 s). Sem raciocínio escolhido, a ponte liga o parâmetro certo.
+function semPensar(texto) {
+  try {
+    const j = JSON.parse(texto)
+    const e = j.reasoning_effort
+    if (e === undefined || e === null || e === '' || e === 'none') {
+      j.chat_template_kwargs = { ...(j.chat_template_kwargs || {}), enable_thinking: false }
+      return JSON.stringify(j)
+    }
+  } catch {}
+  return texto
+}
+
 function criar({ destino, aoProgresso, registrar = () => {} }) {
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
@@ -173,10 +187,8 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
       req.on('end', () => {
         let corpo = Buffer.concat(partes)
         const n = normalizarEditor(corpo.toString('utf8'))
-        if (n.pares.size) {
-          pares = n.pares
-          corpo = Buffer.from(n.texto, 'utf8')
-        }
+        if (n.pares.size) pares = n.pares
+        corpo = Buffer.from(semPensar(n.pares.size ? n.texto : corpo.toString('utf8')), 'utf8')
         up.setHeader('content-length', corpo.length)
         up.end(corpo)
       })
@@ -197,4 +209,4 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
   }
 }
 
-module.exports = { criar, SEP, normalizarEditor, restaurarEditor }
+module.exports = { semPensar, criar, SEP, normalizarEditor, restaurarEditor }
