@@ -113,6 +113,84 @@ function matarGatewayOrfao(app, home) {
 }
 
 const OCIOSO_MS = 10 * 60 * 1000
+
+// Primeira execução de cada HERMES_HOME: o Hermes monta um ambiente Python isolado (cerca de 700 MB entre installs/ e cache/uv, baixados da internet).
+// Leva minutos e, se o processo for morto no meio, recomeça do zero. O app antigo desistia aos 90 s e matava o Hermes em laço (sessão nova do zero, 30 min
+// sem agente). Agora UM processo monta o ambiente com paciência (o relógio é a atividade, não um prazo fixo) e os outros chats esperam essa montagem.
+const SEM_PROGRESSO_MS = +process.env.SB_TESTE_SEM_PROGRESSO_MS || 5 * 60 * 1000 // só desiste se ficar tanto tempo sem NENHUM sinal de vida
+const TETO_MONTAGEM_MS = +process.env.SB_TESTE_TETO_MONTAGEM_MS || 40 * 60 * 1000
+
+// CAUSA RAIZ do "Hermes intermitente" (diagnosticada com py-spy no processo pendurado): na partida de uma sessão o Hermes roda `git rev-parse HEAD` etc. com
+// subprocess.run(timeout=3). No Windows, se o git demora mais que isso, o Python o mata mas continua esperando os pipes para sempre (um processo neto
+// segura as pontas) e o session/new nunca responde (medido: 621 s parado; matar o git.exe pendurado liberou em 6 s). O app então desistia aos 90 s e reiniciava,
+// em laço. Aqui, enquanto uma sessão está subindo, qualquer git.exe do Hermes com mais de alguns segundos de vida é encerrado: o Python volta e segue.
+let limpandoGit = false
+function limparGitPreso(app, minIdadeMs = 8000, trecho = 'hermes') {
+  if (process.platform !== 'win32' || limpandoGit) return
+  limpandoGit = true
+  const ps =
+    `$lim=[timespan]::FromMilliseconds(${Math.max(1000, minIdadeMs | 0)});` +
+    `Get-CimInstance Win32_Process -Filter "Name='git.exe'" | Where-Object { $_.ExecutablePath -like '*${String(trecho).replace(/[^A-Za-z0-9_-]/g, '')}*' -and ((Get-Date) - $_.CreationDate) -gt $lim } | ` +
+    `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.ProcessId }`
+  try {
+    require('child_process').execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true, timeout: 20000 }, (err, out) => {
+      limpandoGit = false
+      const pids = String(out || '').split(/\s+/).filter(Boolean)
+      if (pids.length) registrar(app, 'git preso do Hermes encerrado (pid ' + pids.join(', ') + '): o session/new volta a responder')
+    })
+  } catch {
+    limpandoGit = false
+  }
+}
+// liga o vigia enquanto algo está subindo; devolve a função que desliga
+function vigiarGitPreso(app, aposMs = 8000, passoMs = 4000) {
+  if (process.platform !== 'win32') return () => {}
+  const t0 = Date.now()
+  const timer = setInterval(() => {
+    if (Date.now() - t0 >= aposMs) limparGitPreso(app, aposMs)
+  }, passoMs)
+  timer.unref?.()
+  return () => clearInterval(timer)
+}
+const montagens = new Map() // HERMES_HOME -> promessa da montagem em andamento
+function assinaturaBin(bin) {
+  try {
+    const st = fs.statSync(bin)
+    return st.size + '-' + Math.round(st.mtimeMs)
+  } catch {
+    return 'sem-binario'
+  }
+}
+// "montado" vale para esta versão do Hermes: atualizar o Hermes refaz o ambiente, então a marca guarda a assinatura do binário
+function ambienteMontado(home, bin) {
+  try {
+    return fs.readFileSync(path.join(home, 'pronto.ok'), 'utf8').includes(assinaturaBin(bin))
+  } catch {
+    return false
+  }
+}
+function marcarMontado(home, bin) {
+  try {
+    fs.writeFileSync(path.join(home, 'pronto.ok'), new Date().toISOString() + ' ' + assinaturaBin(bin))
+  } catch {}
+}
+// quantidade de arquivos nas pastas onde o ambiente cresce: cresceu, o Hermes está trabalhando (mesmo calado)
+async function contarArquivos(dirs) {
+  let n = 0
+  const andar = async (d, prof) => {
+    let itens
+    try {
+      itens = await fs.promises.readdir(d, { withFileTypes: true })
+    } catch {
+      return
+    }
+    n += itens.length
+    if (prof > 8 || n > 400000) return
+    for (const e of itens) if (e.isDirectory()) await andar(path.join(d, e.name), prof + 1)
+  }
+  for (const d of dirs) await andar(d, 0)
+  return n
+}
 const CONTEXTO_REAL = 131072
 const COMPRIMIR_EM = +process.env.SB_COMPRIMIR_EM || 72000 // variáveis SB_* só para medir variantes (spec de contexto); sem elas vale o padrão
 const PODAR_EM = +process.env.SB_PODAR_EM || 48000
@@ -556,11 +634,19 @@ class Sessao {
     return Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error('prazo')), ms))])
   }
   async iniciar() {
-    let ultimo
     // ambiente já montado: o normal é responder em segundos, então tentativas curtas (reinicia o processo e tenta de novo)
     // "montado" só vale depois de uma sessão já ter respondido nesta pasta; antes disso a 1ª subida leva minutos (prazo longo)
-    const marca = path.join(this.env.HERMES_HOME, 'pronto.ok')
-    const montado = fs.existsSync(marca)
+    const desligarVigia = vigiarGitPreso(this.app)
+    try {
+      await this.iniciarComVigia()
+    } finally {
+      desligarVigia()
+    }
+  }
+  async iniciarComVigia() {
+    let ultimo
+    if (!ambienteMontado(this.env.HERMES_HOME, this.bin)) await this.aguardarMontagem()
+    const montado = ambienteMontado(this.env.HERMES_HOME, this.bin)
     const TENTATIVAS = montado ? 5 : 3
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
       try {
@@ -570,7 +656,7 @@ class Sessao {
         const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: this.servidoresMcp() }), prazo)
         this.sid = r.sessionId
         registrar(this.app, `agente pronto em ${((Date.now() - t0) / 1000).toFixed(1)} s (tentativa ${tentativa})`)
-        try { fs.writeFileSync(marca, new Date().toISOString()) } catch {}
+        marcarMontado(this.env.HERMES_HOME, this.bin)
         return
       } catch (e) {
         ultimo = e
@@ -585,6 +671,93 @@ class Sessao {
       }
     }
     throw new Error('O agente não respondeu ao iniciar: ' + (ultimo?.message || 'sem detalhe'))
+  }
+  // Primeira montagem do ambiente: o primeiro chat monta (com o próprio processo); os outros saem do caminho e esperam, para não montarem em paralelo.
+  // Quando termina, cada um sobe o seu processo de novo, agora com o ambiente pronto (partida de segundos).
+  async aguardarMontagem() {
+    const home = this.env.HERMES_HOME
+    let m = montagens.get(home)
+    let dono = false
+    if (!m) {
+      dono = true
+      m = this.montarAmbiente()
+      montagens.set(home, m)
+      m.then(() => {}, () => {}).then(() => montagens.delete(home))
+    } else {
+      this.emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
+      const antigo = this.filho
+      sessoesVivas.delete(antigo.pid)
+      matarArvorePoupandoGateway(antigo.pid, home) // este processo não monta em paralelo
+    }
+    try {
+      await m
+    } catch (e) {
+      registrar(this.app, 'montagem do ambiente falhou: ' + e.message + (dono ? '' : ' (outro chat montava)'))
+      // não derruba o chat: segue para as tentativas normais abaixo (que reiniciam o processo e tentam de novo)
+    }
+    // o processo que montou foi encerrado ao fim da montagem; todos sobem um novo para a sessão de verdade
+    if (this.filho !== null && !this.filho.killed && dono) {
+      const antigo = this.filho
+      sessoesVivas.delete(antigo.pid)
+      matarArvorePoupandoGateway(antigo.pid, home)
+    }
+    this.pendentes.clear()
+    this.subir()
+    this.morto = false
+  }
+  async montarAmbiente() {
+    const home = this.env.HERMES_HOME
+    const t0 = Date.now()
+    let sinal = Date.now()
+    const vivo = () => (sinal = Date.now())
+    this.filho.stdout.on('data', vivo)
+    this.filho.stderr.on('data', vivo)
+    const dirs = [path.join(home, 'installs'), path.join(home, 'cache')]
+    let ultimaContagem = -1
+    let contando = false
+    const sonda = setInterval(async () => {
+      if (contando) return
+      contando = true
+      try {
+        const n = await contarArquivos(dirs)
+        if (n !== ultimaContagem) {
+          ultimaContagem = n
+          vivo()
+        }
+      } finally {
+        contando = false
+      }
+    }, 10000)
+    const aviso = setInterval(() => {
+      const min = Math.floor((Date.now() - t0) / 60000)
+      this.emitir({ aviso: 'Preparando o agente pela primeira vez' + (min ? ` (${min} min)` : '') + '. Isso leva alguns minutos e acontece uma vez só…' })
+    }, 30000)
+    this.emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
+    registrar(this.app, 'montando o ambiente do Hermes (primeira execução deste HERMES_HOME)')
+    const desligarVigia = vigiarGitPreso(this.app)
+    const esperar = (promessa) =>
+      new Promise((res, rej) => {
+        const vigia = setInterval(() => {
+          if (Date.now() - sinal > SEM_PROGRESSO_MS) (clearInterval(vigia), rej(new Error('prazo (sem sinal de vida)')))
+          else if (Date.now() - t0 > TETO_MONTAGEM_MS) (clearInterval(vigia), rej(new Error('prazo (teto da montagem)')))
+        }, 5000)
+        promessa.then(
+          (v) => (clearInterval(vigia), res(v)),
+          (e) => (clearInterval(vigia), rej(e))
+        )
+      })
+    try {
+      await esperar(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }))
+      await esperar(this.chamar('session/new', { cwd: this.pasta, mcpServers: [] }))
+      marcarMontado(home, this.bin)
+      registrar(this.app, `ambiente do Hermes montado em ${((Date.now() - t0) / 1000).toFixed(0)} s`)
+    } finally {
+      clearInterval(sonda)
+      clearInterval(aviso)
+      desligarVigia()
+      this.filho.stdout.off('data', vivo)
+      this.filho.stderr.off('data', vivo)
+    }
   }
   // ferramentas do navegador integrado: um servidor MCP (stdio) que repassa as chamadas ao app
   servidoresMcp() {
@@ -644,6 +817,7 @@ class Sessao {
     this.avisouLimite = false
     this.pedidoParar = false
     await this.pronta
+    if (this.pedidoParar) throw new Error('Interrompido.') // o usuário parou enquanto o agente ainda subia (ex.: 1ª montagem do ambiente)
     let corpo = texto
     if (anexos.length) corpo += '\n\nArquivos anexados (use as ferramentas para ler):\n' + anexos.map((a) => `- ${a}`).join('\n')
     if (this.primeira) {
@@ -709,4 +883,4 @@ class Sessao {
   }
 }
 
-module.exports = { Sessao, localizarBinario, prepararBase, definirPacote, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { Sessao, ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

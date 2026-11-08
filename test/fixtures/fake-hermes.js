@@ -22,6 +22,27 @@ function decrementar() {
 
 const enviar = (o) => process.stdout.write(JSON.stringify(o) + '\n')
 
+const path = require('path')
+
+// Primeira execução de um HERMES_HOME (como o Hermes de verdade, que monta o ambiente Python): session/new só responde depois de SB_FAKE_MONTAGEM_MS,
+// escrevendo no stderr enquanto trabalha. Depois disso o ambiente "existe" e as partidas seguintes respondem na hora.
+const HOME = process.env.HERMES_HOME || ''
+const FLAG = path.join(HOME, '_fake_montado')
+const MONTAGEM_MS = +process.env.SB_FAKE_MONTAGEM_MS || 0
+function iniciarMontagem(id) {
+  try {
+    fs.appendFileSync(path.join(HOME, '_fake_montagens.txt'), 'x')
+  } catch {}
+  const t = setInterval(() => process.stderr.write('instalando dependencias...\n'), 500)
+  setTimeout(() => {
+    clearInterval(t)
+    try {
+      fs.writeFileSync(FLAG, '1')
+    } catch {}
+    enviar({ jsonrpc: '2.0', id, result: { sessionId } })
+  }, MONTAGEM_MS)
+}
+
 const rl = readline.createInterface({ input: process.stdin })
 rl.on('line', (linha) => {
   let j
@@ -31,7 +52,10 @@ rl.on('line', (linha) => {
     return
   }
   if (j.method === 'initialize') return enviar({ jsonrpc: '2.0', id: j.id, result: { agentCapabilities: {}, agentInfo: { name: 'fake-hermes' } } })
-  if (j.method === 'session/new') return enviar({ jsonrpc: '2.0', id: j.id, result: { sessionId } })
+  if (j.method === 'session/new') {
+    if (MONTAGEM_MS && HOME && !fs.existsSync(FLAG)) return iniciarMontagem(j.id)
+    return enviar({ jsonrpc: '2.0', id: j.id, result: { sessionId } })
+  }
   if (j.method === 'session/prompt') {
     if (crashesRestantes() > 0) {
       decrementar()

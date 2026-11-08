@@ -19,7 +19,7 @@ const handlersIpc = new Map()
 // modo servidor (VM sem tela): janela escondida, acesso web ligado, sem depender de monitor
 const MODO_SERVIDOR = process.argv.includes('--servidor') || process.env.SB_SERVIDOR === '1'
 const embed = require('./embed-router')
-const { Sessao, prepararBase, definirPacote, localizarBinario, registrar: registrarAgente } = require('./agent')
+const { Sessao, ambienteMontado, prepararBase, definirPacote, localizarBinario, registrar: registrarAgente } = require('./agent')
 const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
 const hermesInstalarMod = require('./hermes-instalar')
@@ -167,9 +167,15 @@ async function verificarAgente(anotar = () => {}) {
   fs.mkdirSync(pasta, { recursive: true })
   let r
   for (let i = 1; i <= 2; i++) {
+    // a 1ª execução monta o ambiente do Hermes (minutos, ~700 MB): o teste espera essa montagem em vez de desistir aos 2 min
+    const montado = ambienteMontado(path.join(app.getPath('userData'), 'hermes-home'), localizarBinario(app))
     r = await conversaDeTeste({
       anotar,
-      criarSessao: (base, emitir) => new Sessao({ app, id: 'teste-instalacao', pasta, base, modelo: 'principal', chave: 'teste', raciocinio: 'none', emitir, pedirPermissao: async () => 'negar', modo: () => 'manual', nivel: 1 }),
+      prazoMs: montado ? 120000 : 45 * 60000,
+      criarSessao: (base, emitir) => new Sessao({ app, id: 'teste-instalacao', pasta, base, modelo: 'principal', chave: 'teste', raciocinio: 'none', emitir: (e) => {
+        if (e && e.aviso) { try { janela?.webContents.send('hermes:preparando', e.aviso) } catch {} } // a tela mostra o progresso da montagem
+        emitir(e)
+      }, pedirPermissao: async () => 'negar', modo: () => 'manual', nivel: 1 }),
     })
     anotar(r.ok ? 'teste de conversa passou' : `teste de conversa falhou (tentativa ${i}): ${r.motivo}`)
     if (r.ok) break
