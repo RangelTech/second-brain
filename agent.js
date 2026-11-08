@@ -346,6 +346,10 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
     'tools:',
     '  tool_search:',
     '    enabled: "off"',
+    // o Hermes corta qualquer ferramenta MCP em 300 s; vídeo em qualidade alta e troca de personagem levam ~460 s de GPU mais a fila (medido 08/11/2026)
+    'timeouts:',
+    '  mcp:',
+    '    tool_call: 3600',
     'compression:',
     '  enabled: true',
     `  threshold_tokens: ${COMPRIMIR_EM}`, // comprime cedo: o resumo fica pequeno e rápido
