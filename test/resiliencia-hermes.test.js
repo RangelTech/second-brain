@@ -109,3 +109,32 @@ test('"Gateway disconnected" com o processo ainda de pe: retoma sozinho, sem err
     desligar(s)
   }
 })
+
+test('mensagem no meio do turno entra no turno em andamento (nao fica na fila) e a confirmacao em ingles do Hermes nao vaza para a tela', async () => {
+  const eventos = []
+  process.env.SB_FAKE_LENTO_MS = '1500'
+  const s = montar(0, eventos)
+  try {
+    await s.pronta
+    const turno = s.perguntar('faca a tarefa grande')
+    await new Promise((r) => setTimeout(r, 400)) // o turno esta em andamento
+    assert.equal(await s.direcionar('troque o titulo para Azul'), true)
+    const r = await turno
+    assert.equal(r.stopReason, 'end_turn')
+    const texto = eventos.filter((e) => e.texto).map((e) => e.texto).join('')
+    assert.match(texto, /feito com correcao: troque o titulo para Azul/, 'o turno em andamento recebeu a correcao')
+    assert.doesNotMatch(texto, /Redirected the active turn/, 'a confirmacao tecnica em ingles nao aparece')
+  } finally {
+    delete process.env.SB_FAKE_LENTO_MS
+    desligar(s)
+  }
+})
+test('direcionar sem turno ativo devolve false (a tela enfileira como antes)', async () => {
+  const s = montar(0)
+  try {
+    await s.pronta
+    assert.equal(await s.direcionar('oi'), false)
+  } finally {
+    desligar(s)
+  }
+})

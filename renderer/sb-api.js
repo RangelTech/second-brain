@@ -15,6 +15,7 @@
       escolherPasta: () => invoke('pasta:escolher'),
       enviar: (p) => invoke('chat:enviar', p),
       aquecer: (p) => invoke('agente:aquecer', p),
+      direcionar: (p) => invoke('agente:direcionar', p),
       parar: (id) => invoke('chat:parar', id),
       aoDelta: (fn) => on('chat:delta', fn),
       aoFim: (fn) => on('chat:fim', fn),

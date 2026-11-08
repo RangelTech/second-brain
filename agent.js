@@ -608,6 +608,8 @@ class Sessao {
     const tipo = u.sessionUpdate
     if (tipo === 'agent_message_chunk' && u.content?.text) {
       const t = u.content.text
+      // confirmação em inglês do Hermes para a mensagem enviada no meio do turno: a tela mostra a sua própria
+      if (this.direcionando && /^s*(Redirected the active turn|Queued for the next turn|⏩ Steer queued)/i.test(t)) return
       // O servidor recusou por limite de uso, mas o Hermes só diz "conversa longa demais" ou "provedor indisponível".
       // Mostramos a causa real, com o que o servidor informou (janela e quando renova).
       if (this.tratarLimiteDeUso(t)) return
@@ -917,6 +919,19 @@ class Sessao {
       }
     } finally {
       this.emitir = emitirOriginal
+    }
+  }
+  // Mensagem do usuário no MEIO do turno: o Hermes (ACP) trata um 2º session/prompt com turno ativo como correção do turno em andamento
+  // ("Redirected the active turn") ou, se não puder, enfileira para depois. Só texto; anexos seguem o caminho da fila.
+  async direcionar(texto) {
+    if (!this.turno || this.morto || !this.sid) return false
+    this.direcionando = (this.direcionando || 0) + 1
+    try {
+      await this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: texto }] })
+      registrar(this.app, 'mensagem do usuário entrou no turno em andamento')
+      return true
+    } finally {
+      setTimeout(() => (this.direcionando = Math.max(0, (this.direcionando || 1) - 1)), 1500)
     }
   }
   cancelar() {

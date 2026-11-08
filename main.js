@@ -637,7 +637,7 @@ app.whenReady().then(() => {
   }
   ipcMain.handle('cfg:get', () => publica())
   ipcMain.handle('cfg:set', (_e, parcial) => {
-    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
+    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto', 'acessoWebPerguntado']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
     salvarCfg()
     return publica()
   })
@@ -716,6 +716,18 @@ app.whenReady().then(() => {
       return { ok: true }
     } catch (e) {
       registrarAgente(app, 'aquecer: ' + (e.message || e))
+      return { ok: false }
+    }
+  })
+  // Falar no meio do trabalho do agente: a mensagem entra no turno em andamento (o Hermes cancela só a chamada ao modelo em voo e refaz o fim com a
+  // correção), em vez de esperar na fila até o turno acabar. Sem turno de agente ativo neste chat, devolve ok:false e a tela enfileira como antes.
+  ipcMain.handle('agente:direcionar', async (_e, { id, texto } = {}) => {
+    try {
+      const s = sessoes.get(id)
+      if (!s || s.morto || !s.turno || !String(texto || '').trim()) return { ok: false }
+      return { ok: await s.direcionar(String(texto)) }
+    } catch (e) {
+      registrarAgente(app, 'direcionar: ' + (e.message || e))
       return { ok: false }
     }
   })

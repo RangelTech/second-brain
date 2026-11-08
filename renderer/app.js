@@ -439,7 +439,13 @@
       grupo = null
     }
     for (const p of partes) {
-      if (p.t === 'texto') {
+      if (p.t === 'voce') {
+        fechaGrupo()
+        const v = document.createElement('div')
+        v.className = 'voce-add'
+        v.textContent = '↪ Você acrescentou: ' + p.v
+        el.appendChild(v)
+      } else if (p.t === 'texto') {
         fechaGrupo()
         const c = document.createElement('div')
         c.className = 'corpo'
@@ -939,6 +945,19 @@
         desenharFila()
         window.sb.parar(atual)
         return
+      }
+      // mensagem só de texto durante o trabalho do agente: entra no turno em andamento (como no Claude Code), sem esperar na fila
+      if (t && !anexosPendentes.length && !t.startsWith('/')) {
+        const rr = respostas.get(atual)
+        const dir = await window.sb.direcionar?.({ id: atual, texto: t }).catch(() => ({ ok: false }))
+        if (dir && dir.ok && rr) {
+          rr.partes.push({ t: 'voce', v: t })
+          $('texto').value = ''
+          $('texto').style.height = 'auto'
+          if (visivel(rr)) renderPartes(rr.el.querySelector('.partes'), rr.partes)
+          rolarSeEstivaPerto()
+          return
+        }
       }
       const anexosF = anexosPendentes
       anexosPendentes = []
@@ -1583,7 +1602,19 @@
       $('login').hidden = true
       cfg = await window.sb.cfg()
       pintarConta()
+      perguntarAcessoWeb()
     } else loginMsg(r.erro, false)
+  }
+  // Depois do primeiro login neste computador: pergunta UMA vez se a pessoa quer acessá-lo pelo celular ou por outro navegador (remoto.rangeltech.net).
+  // Não liga sozinho: o acesso remoto dá controle de arquivos e comandos deste computador. Na tela web (remoto) a chamada é bloqueada e nada acontece.
+  async function perguntarAcessoWeb() {
+    try {
+      if (cfg.acessoWebPerguntado) return
+      const est = await window.sb.acessoWeb?.estado?.()
+      if (!est || est.ok === false || est.ativo !== false) return
+      await window.sb.salvarCfg({ acessoWebPerguntado: true })
+      if (confirm('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em remoto.rangeltech.net, com este computador ligado. Você pode desligar quando quiser em Configurações.')) await window.sb.acessoWeb.ativar(true)
+    } catch {}
   }
   $('login-esqueci').onclick = async () => {
     const email = $('login-email').value.trim()

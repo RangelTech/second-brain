@@ -57,6 +57,20 @@ rl.on('line', (linha) => {
     return enviar({ jsonrpc: '2.0', id: j.id, result: { sessionId } })
   }
   if (j.method === 'session/prompt') {
+    // turno lento com redirecionamento (como o ACP real): um 2o session/prompt com turno ativo vira correcao do turno em andamento
+    if (process.env.SB_FAKE_LENTO_MS) {
+      if (global.__turnoAtivo) {
+        global.__correcao = j.params.prompt[0].text
+        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Redirected the active turn with your correction.' } } } })
+        return enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn' } })
+      }
+      global.__turnoAtivo = true
+      return setTimeout(() => {
+        global.__turnoAtivo = false
+        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'feito' + (global.__correcao ? ' com correcao: ' + global.__correcao : '') } } } })
+        enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn' } })
+      }, +process.env.SB_FAKE_LENTO_MS)
+    }
     if (crashesRestantes() > 0) {
       decrementar()
       process.exit(1) // morre sem responder: exatamente o sintoma real
