@@ -113,6 +113,8 @@ function matarGatewayOrfao(app, home) {
 }
 
 const OCIOSO_MS = 10 * 60 * 1000
+// erros que significam "o processo (ou o gateway dele) caiu": o app retoma sozinho, sem mostrar nada ao cliente
+const MORTE_DO_AGENTE = /O agente encerrou|Gateway disconnected|turn outcome is unknown|EPIPE|ECONNRESET|Connection (closed|reset)|write after end/i
 
 // Primeira execução de cada HERMES_HOME: o Hermes monta um ambiente Python isolado (cerca de 700 MB entre installs/ e cache/uv, baixados da internet).
 // Leva minutos e, se o processo for morto no meio, recomeça do zero. O app antigo desistia aos 90 s e matava o Hermes em laço (sessão nova do zero, 30 min
@@ -833,49 +835,84 @@ class Sessao {
     if (this.pedidoParar) throw new Error('Interrompido.') // o usuário parou enquanto o agente ainda subia (ex.: 1ª montagem do ambiente)
     let corpo = texto
     if (anexos.length) corpo += '\n\nArquivos anexados (use as ferramentas para ler):\n' + anexos.map((a) => `- ${a}`).join('\n')
+    const corpoPuro = corpo
     if (this.primeira) {
       const nl = String.fromCharCode(10)
       const hist = this.historico ? nl + nl + 'Conversa até aqui (continue dela):' + nl + this.historico : ''
       corpo = contextoDeSistema({ pasta: this.pasta, navegador: !!this.navegador, midia: !!this.midia, memoria: !!this.memoria }) + hist + nl + nl + '---' + nl + corpo
       this.primeira = false
     }
+    // o que já aconteceu NESTE turno (texto escrito e ferramentas concluídas): se o processo cair, a retomada conta isso ao agente novo
+    const feitos = []
+    let parcial = ''
+    const emitirOriginal = this.emitir
+    this.emitir = (e) => {
+      if (e && e.texto) parcial += e.texto
+      if (e && e.ferramenta && e.ferramenta.status === 'completed' && e.ferramenta.titulo) feitos.push(String(e.ferramenta.titulo).slice(0, 120) + (e.ferramenta.conteudo ? ' -> ' + String(e.ferramenta.conteudo).replace(/\s+/g, ' ').slice(0, 200) : ''))
+      emitirOriginal(e)
+    }
+    const guardarTurno = () => {
+      this.turnosVivos = ((this.turnosVivos || '') + '\nUsuário: ' + texto.slice(0, 2000) + '\nAssistente: ' + parcial.slice(0, 2000)).slice(-12000)
+    }
     let tentativa = 0
-    while (true) {
-      tentativa++
-      this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })
-      try {
-        const r = await this.turno
-        this.turno = null
-        this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
-        return r
-      } catch (e) {
-        this.turno = null
-        if (this.pedidoParar || e.message !== 'O agente encerrou.') {
-          this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
-          throw e
-        }
-      }
-      registrar(this.app, `turno interrompido pela morte do agente (tentativa ${tentativa}), relançando`)
-      this.emitir({ novoCard: true })
-      // só avança pro reenvio quando subir()+iniciar() realmente confirmarem um processo novo de pé (com sessão nova);
-      // tentar reenviar contra um processo que nunca terminou de inicializar ficaria esperando uma resposta que não vem
-      while (!this.pedidoParar) {
-        await new Promise((res) => setTimeout(res, Math.min(10000, 1000 * tentativa)))
-        if (this.pedidoParar) break
+    try {
+      while (true) {
+        tentativa++
+        this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })
         try {
-          this.subir()
-          this.morto = false
-          await this.iniciar()
-          break
-        } catch (e2) {
-          registrar(this.app, `relançamento falhou (tentativa ${tentativa}): ${e2.message}`)
-          tentativa++
+          const r = await this.turno
+          this.turno = null
+          guardarTurno()
+          this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+          return r
+        } catch (e) {
+          this.turno = null
+          if (this.pedidoParar || !MORTE_DO_AGENTE.test(String(e.message))) {
+            this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+            throw e
+          }
+        }
+        registrar(this.app, `turno interrompido pela morte do agente (tentativa ${tentativa}), retomando sozinho`)
+        this.emitir({ novoCard: true })
+        // o processo pode estar de pé mas sem gateway: derruba a árvore DESTA sessão (o gateway compartilhado não cai) e sobe outro
+        const antigo = this.filho
+        this.pendentes.clear()
+        try {
+          sessoesVivas.delete(antigo.pid)
+          matarArvorePoupandoGateway(antigo.pid, this.env.HERMES_HOME)
+        } catch {}
+        // a sessão nova não tem a memória da anterior: leva o contexto, a conversa até aqui e o que este turno já fez
+        const nl = String.fromCharCode(10)
+        const hist = [this.historico, this.turnosVivos].filter(Boolean).join(nl)
+        corpo =
+          contextoDeSistema({ pasta: this.pasta, navegador: !!this.navegador, midia: !!this.midia, memoria: !!this.memoria }) +
+          (hist ? nl + nl + 'Conversa até aqui (continue dela):' + nl + hist : '') +
+          nl + nl + '---' + nl + corpoPuro +
+          nl + nl + '[Retomada automática] O processo caiu no meio desta tarefa, sem culpa do usuário. ' +
+          (feitos.length ? 'Já foi feito neste pedido:' + nl + feitos.map((f) => '- ' + f).join(nl) + nl : '') +
+          (parcial ? 'Texto que você já tinha escrito: ' + parcial.slice(-1500) + nl : '') +
+          'Continue de onde parou, sem refazer o que já foi entregue (arquivos e imagens já gerados estão na pasta de trabalho) e SEM mencionar a queda nem pedir desculpas.'
+        // só avança pro reenvio quando subir()+iniciar() confirmarem um processo novo de pé (com sessão nova)
+        while (!this.pedidoParar) {
+          await new Promise((res) => setTimeout(res, Math.min(10000, 1000 * tentativa)))
+          if (this.pedidoParar) break
+          try {
+            this.subir()
+            this.morto = false
+            await this.iniciar()
+            break
+          } catch (e2) {
+            registrar(this.app, `relançamento falhou (tentativa ${tentativa}): ${e2.message}`)
+            tentativa++
+          }
+        }
+        if (this.pedidoParar) {
+          this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+          throw new Error('Interrompido.')
         }
       }
-      if (this.pedidoParar) {
-        this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
-        throw new Error('Interrompido.')
-      }
+    } finally {
+      this.emitir = emitirOriginal
     }
   }
   cancelar() {
@@ -896,4 +933,4 @@ class Sessao {
   }
 }
 
-module.exports = { Sessao, ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

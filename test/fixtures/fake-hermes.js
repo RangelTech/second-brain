@@ -61,7 +61,20 @@ rl.on('line', (linha) => {
       decrementar()
       process.exit(1) // morre sem responder: exatamente o sintoma real
     }
-    enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' } } } })
+    // sintoma real do "Gateway disconnected": o processo continua de pé, mas o turno volta com erro (depois de uma ferramenta já concluída)
+    if (process.env.SB_FAKE_GATEWAY_ERR_FILE) {
+      let n = 0
+      try {
+        n = parseInt(fs.readFileSync(process.env.SB_FAKE_GATEWAY_ERR_FILE, 'utf8').trim(), 10) || 0
+      } catch {}
+      if (n > 0) {
+        fs.writeFileSync(process.env.SB_FAKE_GATEWAY_ERR_FILE, String(n - 1))
+        enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'tool_call_update', toolCallId: 't1', title: 'midia_gerar_imagem', status: 'completed', kind: 'other', content: [] } } })
+        return enviar({ jsonrpc: '2.0', id: j.id, error: { code: -32603, message: 'Internal error', data: { details: 'Gateway disconnected; turn outcome is unknown. Resume the printed session ID to check whether it completed or was interrupted; do not resend the work.' } } })
+      }
+    }
+    const eco = process.env.SB_FAKE_ECO ? ':' + JSON.stringify(j.params.prompt[0].text).slice(0, 4000) : ''
+    enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' + eco } } } })
     return enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn', usage: { totalTokens: 1 } } })
   }
   if (j.method === 'session/cancel') return

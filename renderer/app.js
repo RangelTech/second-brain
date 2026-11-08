@@ -1009,6 +1009,7 @@
       alternarBotao(respostas.has(atual))
       return
     }
+    for (const p of r.partes) if (p.t === 'ferr' && !['completed', 'failed'].includes(p.f.status)) p.f.status = 'failed' // nenhum card fica "gerando" para sempre quando o turno acaba
     if (c) {
       const partes = (r.partes.length ? r.partes : texto ? [{ t: 'texto', v: texto }] : []).map((p) => (p.t === 'texto' && eErroTecnico(p.v) ? { ...p, v: FRASE_FALHA } : p))
       if (erro) partes.push({ t: 'texto', v: eErroTecnico(erro) ? FRASE_FALHA : `⚠ ${erro}` })
@@ -1097,7 +1098,7 @@
     if (d.novoCard) {
       const c = chats.find((x) => x.id === d.id)
       if (c && (r.partes.length || r.raz)) {
-        const partes = r.partes.length ? r.partes : []
+        const partes = r.partes.length ? r.partes.filter((p) => p.t !== 'ferr' || ['completed', 'failed'].includes(p.f.status)) : [] // ferramenta que ficou no ar quando o agente caiu some do card antigo: a retomada refaz
         c.msgs.push({ role: 'assistant', content: partes.filter((p) => p.t === 'texto').map((p) => p.v).join('\n') || '(continuando…)', partes, raciocinio: r.raz || undefined, midias: r.midias, inicio: r.inicio, fim: Date.now() })
         salvar()
       }

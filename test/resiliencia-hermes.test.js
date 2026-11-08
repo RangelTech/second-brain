@@ -87,3 +87,25 @@ test('cancelar() interrompe o laço de relançamento (o cliente pediu pra parar)
   await assert.rejects(p, /Interrompido/)
   desligar(s)
 })
+
+test('"Gateway disconnected" com o processo ainda de pe: retoma sozinho, sem erro, e o agente novo recebe o que ja foi feito', async () => {
+  const eventos = []
+  const arq = path.join(os.tmpdir(), 'sb-gw-' + Math.random().toString(36).slice(2))
+  fs.writeFileSync(arq, '1')
+  process.env.SB_FAKE_GATEWAY_ERR_FILE = arq
+  process.env.SB_FAKE_ECO = '1'
+  const s = montar(0, eventos)
+  try {
+    const r = await s.perguntar('gere a imagem do sedan')
+    assert.equal(r.stopReason, 'end_turn')
+    assert.ok(eventos.some((e) => e.novoCard), 'a tela fecha o pedaco antigo e abre um card novo')
+    const texto = eventos.filter((e) => e.texto).map((e) => e.texto).join('')
+    assert.match(texto, /Retomada automática/, 'o agente novo precisa saber que e uma retomada')
+    assert.match(texto, /midia_gerar_imagem/, 'e o que ja foi feito neste pedido')
+    assert.match(texto, /gere a imagem do sedan/, 'e o pedido original')
+  } finally {
+    delete process.env.SB_FAKE_GATEWAY_ERR_FILE
+    delete process.env.SB_FAKE_ECO
+    desligar(s)
+  }
+})
