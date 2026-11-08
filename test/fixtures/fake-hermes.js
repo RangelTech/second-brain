@@ -57,6 +57,10 @@ rl.on('line', (linha) => {
     return enviar({ jsonrpc: '2.0', id: j.id, result: { sessionId } })
   }
   if (j.method === 'session/prompt') {
+    if (crashesRestantes() > 0) {
+      decrementar()
+      process.exit(1) // morre sem responder: exatamente o sintoma real
+    }
     // turno lento, como o ACP real: prompts sao tratados um por vez; session/cancel encerra o turno ('cancelled') e o PROXIMO prompt vem com a correcao
     if (process.env.SB_FAKE_LENTO_MS) {
       if (global.__cancelado) {
@@ -70,10 +74,6 @@ rl.on('line', (linha) => {
         enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn' } })
       }, +process.env.SB_FAKE_LENTO_MS) }
       return
-    }
-    if (crashesRestantes() > 0) {
-      decrementar()
-      process.exit(1) // morre sem responder: exatamente o sintoma real
     }
     // sintoma real do "Gateway disconnected": o processo continua de pé, mas o turno volta com erro (depois de uma ferramenta já concluída)
     if (process.env.SB_FAKE_GATEWAY_ERR_FILE) {

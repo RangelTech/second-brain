@@ -112,7 +112,7 @@ function matarGatewayOrfao(app, home) {
   return false
 }
 
-const OCIOSO_MS = 10 * 60 * 1000
+const OCIOSO_MS = +process.env.SB_TESTE_OCIOSO_MS || 10 * 60 * 1000
 // erros que significam "o processo (ou o gateway dele) caiu": o app retoma sozinho, sem mostrar nada ao cliente
 const MORTE_DO_AGENTE = /O agente encerrou|Gateway disconnected|turn outcome is unknown|EPIPE|ECONNRESET|Connection (closed|reset)|write after end/i
 
@@ -684,7 +684,7 @@ class Sessao {
         marcarMontado(this.env.HERMES_HOME, this.bin)
         // sessão aquecida e ainda sem uso: não fica de pé para sempre (perguntar() cancela este timer ao começar um turno)
         clearTimeout(this.ocioso)
-        this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+        this.agendarOcioso()
         return
       } catch (e) {
         ultimo = e
@@ -841,6 +841,15 @@ class Sessao {
   // interrompe o laço. Falha de UMA ferramenta dentro de uma sessão viva (ex.: comando sem um pacote) não entra aqui:
   // isso o próprio modelo já resolve normalmente, com o processo de pé; isto só cobre o processo inteiro caindo.
   async perguntar(texto, anexos = []) {
+    this.ativo = true
+    clearTimeout(this.ocioso)
+    try {
+      return await this._perguntar(texto, anexos)
+    } finally {
+      this.ativo = false
+    }
+  }
+  async _perguntar(texto, anexos = []) {
     clearTimeout(this.ocioso)
     this.limiteUso = false
     this.avisouLimite = false
@@ -885,12 +894,12 @@ class Sessao {
             continue
           }
           guardarTurno()
-          this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+          this.agendarOcioso()
           return r
         } catch (e) {
           this.turno = null
           if (this.pedidoParar || !MORTE_DO_AGENTE.test(String(e.message))) {
-            this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+            this.agendarOcioso()
             throw e
           }
         }
@@ -929,7 +938,7 @@ class Sessao {
           }
         }
         if (this.pedidoParar) {
-          this.ocioso = setTimeout(() => this.encerrar(), OCIOSO_MS)
+          this.agendarOcioso()
           throw new Error('Interrompido.')
         }
       }
@@ -965,6 +974,21 @@ class Sessao {
         this.enviar({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId: this.sid } })
       } catch {}
     }
+  }
+  // Sessão ociosa por muito tempo (aquecida e sem uso) encerra para não deixar processo à toa. NUNCA derruba uma sessão com trabalho em andamento:
+  // se há turno (ou retomada) em curso, só adia. Antes disso o cronômetro era rearmado ao relançar o agente no meio de uma tarefa e matava o Hermes
+  // no meio do trabalho (taskkill /F sai com código 1: era o "agente saiu codigo=1" a cada ~10 min em tarefas longas).
+  agendarOcioso() {
+    clearTimeout(this.ocioso)
+    this.ocioso = setTimeout(() => {
+      if (this.ativo || this.turno) {
+        registrar(this.app, 'sessão ociosa NÃO encerrada: há turno em andamento (adiada)')
+        return this.agendarOcioso()
+      }
+      registrar(this.app, 'sessão ociosa encerrada (' + Math.round(OCIOSO_MS / 60000) + ' min sem uso)')
+      this.encerrar()
+    }, OCIOSO_MS)
+    this.ocioso.unref?.()
   }
   encerrar() {
     clearTimeout(this.ocioso)
