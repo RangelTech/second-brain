@@ -1112,6 +1112,8 @@
   }
   const EXT_MIDIA = /\.(png|jpe?g|gif|webp|svg|mp3|wav|ogg|m4a|mp4|mov)$/i
   window.sb.aoDelta((d) => {
+    if (d.creditos) return window.SBCreditos?.abrir(d.creditos.kind) // limite estourado: pop-up de comprar crédito ou assinar o próximo plano (Spec 24)
+    if (d.ferramenta) window.SBCerebro?.evento(d.ferramenta) // cada chamada de ferramenta do Hermes vira um sinal no cérebro (Spec 24 §5.1)
     const r = respostas.get(d.id)
     if (!r) return
     // o agente morreu com o turno em andamento e já foi relançado por baixo dos panos (sem o cliente precisar pedir):
@@ -1548,6 +1550,7 @@
     webNavTimer = setInterval(atualizar, 1500)
   }
   $('abrir-nav').onclick = () => navAbrir(!navAberto)
+  window.SBCerebro?.instalar($('abrir-cerebro')) // botão 'Visualizar cérebro' com mini cérebro vivo
   $('nav-fechar').onclick = () => navAbrir(false)
   $('nav-voltar').onclick = () => NAV.acao('voltar')
   $('nav-avancar').onclick = () => NAV.acao('avancar')

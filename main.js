@@ -550,6 +550,7 @@ app.whenReady().then(() => {
   ipcMain.handle('unlimited:recusar', () => unl.recusar())
   ipcMain.handle('unlimited:entrar', (_e, { email, senha }) => unl.entrar(email, senha))
   ipcMain.handle('unlimited:esqueci', (_e, email) => unl.esqueci(email))
+  ipcMain.handle('creditos:opcoes', () => unl.creditos())
   ipcMain.handle('unlimited:sair', () => unl.sair())
   // Uso da assinatura: janelas de 5 horas e da semana, medidas pelo servidor para a chave desta conta
   ipcMain.handle('conta:uso', async () => {

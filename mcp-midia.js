@@ -218,6 +218,8 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono,
     marcar(tipo, prompt, { status: 'failed' })
     const msg = j.error?.message || j.detail || `HTTP ${r.status}`
     if (r.status === 422) throw new Error(String(msg)) // pedido inválido: a mensagem já vem em português para o agente corrigir
+    // cota do plano acabou (e não há crédito): diz a verdade. O app lê este texto no resultado da ferramenta e abre o pop-up de crédito (agent.js, Spec 24).
+    if (r.status === 429 && j.error?.code === 'media_quota_exceeded') throw new Error(`${msg} O aplicativo já está oferecendo ao usuário comprar mais crédito ou assinar o próximo plano. Não tente de novo agora: avise o usuário em uma frase.`)
     throw new Error(r.status === 429 ? 'Estamos com bastante movimento agora. Tente de novo em instantes.' : r.status === 503 ? 'Este recurso não está disponível no momento.' : MSG_FALHA + (process.env.SB_MIDIA_DEBUG ? ' (' + msg + ')' : ''))
   }
   const id = j.id
