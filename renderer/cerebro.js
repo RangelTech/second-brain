@@ -260,6 +260,14 @@
       ui.painel = p
       ui.linhaAgora = p.querySelector('#cerebro-agora')
       ui.grande = criarRede(p.querySelector('#cerebro-canvas'), { n: celular() ? 65 : 110, reduzir: reduzido() })
+      // ferramentas que já estavam rodando quando o painel abriu aparecem acesas desde o início
+      let ultima = null
+      for (const v of ui.vistos.values()) {
+        if (v.fim) continue
+        ui.grande.disparar(v.cat, 'inicio')
+        ultima = v.cat
+      }
+      if (ultima) ui.linhaAgora.textContent = `Agora: ${CATS[ultima].rotulo}…`
       p.querySelector('#cerebro-fechar').onclick = fechar
       document.addEventListener('keydown', (e) => e.key === 'Escape' && !p.hidden && fechar())
     }
