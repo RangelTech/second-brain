@@ -4,6 +4,7 @@
 const readline = require('readline')
 const fs = require('fs')
 const path = require('path')
+const { detalhar, formatarSaida, conferirTroca, formatarConferencia } = require('./midia-detalhar')
 
 let BASE = (process.env.SB_MIDIA_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
 let CHAVE = process.env.SB_MIDIA_CHAVE || ''
@@ -35,6 +36,60 @@ const obj = (props, req = []) => ({ type: 'object', properties: props, required:
 const FORMATOS = { quadrado: '1024x1024', retrato: '832x1216', paisagem: '1216x832', story: '720x1280', banner: '1344x768' }
 const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
+  {
+    nome: 'detalhar_prompt',
+    desc: 'PRIMEIRO PASSO de TODA imagem e TODO vídeo: transforma o pedido do usuário (curto ou vago) num briefing profissional em inglês (sujeito, ação e movimento, câmera, luz, cores, estilo, o que evitar) com o formato e a duração certos, e devolve o prompt pronto para você passar EXATAMENTE a midia_gerar_imagem ou midia_gerar_video. Quanto mais detalhado, mais o modelo acerta na primeira tentativa (um vídeo errado custa até 20 minutos do cliente). Leva de 5 a 15 segundos. Depois de chamar, mostre ao usuário o resumo devolvido em 1 ou 2 linhas e gere.',
+    schema: obj({
+      tipo: { type: 'string', enum: ['imagem', 'video'], description: 'O que será gerado.' },
+      pedido: { type: 'string', description: 'O que o usuário pediu, com as palavras dele (português serve).' },
+      respostas: { type: 'string', description: 'Detalhes extras que o usuário deu depois de suas perguntas (estilo, cenário, cores, clima...). Opcional.' },
+      formato: { type: 'string', description: 'Formato pedido, se houver (imagem: quadrado, retrato, paisagem, story, banner; vídeo: paisagem, retrato, quadrado).' },
+      segundos: { type: 'number', description: 'Duração pedida do vídeo, se houver.' },
+      estilo: { type: 'string', description: 'Estilo pedido, se houver.' },
+      tem_imagem_inicial: { type: 'boolean', description: 'true se o vídeo vai animar uma imagem que você já gerou (o prompt então descreve só o movimento).' },
+    }, ['tipo', 'pedido']),
+  },
+  {
+    nome: 'conferir_troca',
+    desc: 'Confere o vídeo e a foto ANTES de midia_trocar_personagem (existência, formato, tamanho, duração, resolução, áudio) e diz o que olhar e o que avisar ao usuário. Sem custo de geração, leva 1 segundo. Use sempre antes da troca de personagem.',
+    schema: obj({
+      video: { type: 'string', description: 'Caminho do vídeo de origem.' },
+      foto: { type: 'string', description: 'Caminho da foto da pessoa que vai entrar no vídeo.' },
+    }, ['video', 'foto']),
+  },
+  {
+    nome: 'clonar_voz',
+    desc: 'CLONA uma voz: lê um texto com a voz de uma AMOSTRA (de 3 a 25 segundos de fala limpa, de um arquivo de áudio ou vídeo) e salva um WAV na pasta Audios. Serve para locução, narração e avisos com a voz da pessoa. Idiomas: pt, en, es, fr, de, it, ja, ko, zh, ru. Leva cerca de 1 a 6 minutos (a primeira do dia inclui a partida da máquina); a ferramenta volta na hora e o app avisa quando ficar pronto. O texto é o que será falado: escreva-o exatamente como deve soar, com pontuação para as pausas.',
+    schema: obj({
+      texto: { type: 'string', description: 'O texto que será falado, no idioma escolhido, até 3000 caracteres.' },
+      amostra: { type: 'string', description: 'Caminho do arquivo com a voz de referência (WAV, MP3, M4A ou vídeo com fala).' },
+      idioma: { type: 'string', description: 'Código do idioma do texto (pt, en, es, fr, de, it, ja, ko, zh, ru). Padrão: pt.' },
+      amostra_texto: { type: 'string', description: 'O que a amostra diz, se você souber (melhora a clonagem). Opcional.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+    }, ['texto', 'amostra']),
+  },
+  {
+    nome: 'trocar_voz',
+    desc: 'TROCA a voz de um áudio ou vídeo: a fala passa a soar como a voz da amostra, mantendo o conteúdo, o ritmo, a música de fundo e o resto do vídeo. Vídeo entra e sai vídeo (MP4); áudio entra e sai WAV. Até 180 segundos. Leva cerca de 2 a 8 minutos; a ferramenta volta na hora e o app avisa quando ficar pronto.',
+    schema: obj({
+      arquivo: { type: 'string', description: 'Caminho do áudio ou vídeo cuja voz será trocada (até 40 MB).' },
+      voz_alvo: { type: 'string', description: 'Caminho do áudio com a voz que vai substituir (3 a 25 s de fala limpa).' },
+      manter_fundo: { type: 'boolean', description: 'true (padrão) mantém música e ruído de fundo; false deixa só a voz nova.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+    }, ['arquivo', 'voz_alvo']),
+  },
+  {
+    nome: 'redublar_video',
+    desc: 'REDUBLA um vídeo para outro idioma: transcreve a fala, traduz mantendo o tom, fala de novo com a voz CLONADA do próprio locutor (ou com outra voz, se você passar uma amostra), encaixa no tempo original e mantém a música de fundo. Até 120 segundos. Leva cerca de 3 a 12 minutos; a ferramenta volta na hora e o app avisa quando ficar pronto. A dublagem não sincroniza os lábios.',
+    schema: obj({
+      video: { type: 'string', description: 'Caminho do vídeo com fala (MP4, MOV ou WEBM, até 40 MB).' },
+      idioma: { type: 'string', description: 'Idioma da dublagem: pt, en, es, fr, de, it, ja, ko, zh ou ru.' },
+      idioma_origem: { type: 'string', description: 'Idioma original da fala, se o usuário souber (senão é detectado). Opcional.' },
+      voz: { type: 'string', description: 'Caminho de uma amostra de OUTRA voz para dublar (opcional; sem ela usa a voz do próprio locutor).' },
+      manter_fundo: { type: 'boolean', description: 'true (padrão) mantém a música e o ruído de fundo.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+    }, ['video', 'idioma']),
+  },
   {
     nome: 'trocar_personagem',
     desc: 'Troca a pessoa principal de um VÍDEO pela pessoa de uma FOTO (troca de personagem / de rosto), mantendo câmera, cortes, movimento e áudio do vídeo original. Roda na GPU do servidor com o Openjutsu (MiniMax H3) e leva vários minutos (cerca de 9 minutos para 5 segundos em 480p). Use quando o usuário pedir para colocar o rosto ou a pessoa de uma foto num vídeo. Funciona melhor com uma pessoa em primeiro plano, rosto grande no quadro e foto nítida de frente; espelhos e reflexos falham. Salva um MP4 na pasta Videos e devolve o caminho.',
@@ -135,25 +190,26 @@ async function api(rota, opcoes = {}) {
 
 const TEXTO_PENDENTE = (o, min) => `[[midia-pendente]] ${o} em andamento, previsão de ${min} minutos. Diga ao usuário apenas: "Estou gerando o seu vídeo; fica pronto em aproximadamente ${min} minutos." Não mencione GPU, fila, servidor nem andamento. NÃO espere, NÃO consulte e NÃO gere de novo: o arquivo é salvo sozinho e o aplicativo avisa quando ficar pronto.`
 const MSG_FALHA = 'Não consegui gerar agora, tente de novo em instantes.'
-const EXT_POR_MIME = { 'video/mp4': '.mp4', 'video/webm': '.webm', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' }
+const EXT_POR_MIME = { 'audio/wav': '.wav', 'audio/mpeg': '.mp3', 'video/mp4': '.mp4', 'video/webm': '.webm', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' }
 const stampAgora = () => new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{6})$/, '$1-$2')
 
 // Contrato do servidor de mídia: POST ... { async: true } -> 202 { id }; GET /media/jobs/{id} (fila, percentual); GET /jobs/{id}/file (arquivo com o Content-Type real)
 // baixa o arquivo do job pronto e salva na pasta certa (Videos ou Imagens); confere que o tipo entregue é o pedido
 async function salvarResultado(id, tipo, nome, s) {
+  const ehAudio = tipo === 'audio'
   const f = await api('/jobs/' + id + '/file')
   const mime = String(f.headers.get('content-type') || (s && s.mime) || '').split(';')[0].trim()
   const ext = EXT_POR_MIME[mime]
   const ehVideo = tipo === 'video'
-  if (!f.ok || !ext || (ehVideo ? !/^video\//.test(mime) : !/^image\//.test(mime))) throw new Error(MSG_FALHA)
-  const dir = path.join(PASTA, ehVideo ? 'Videos' : 'Imagens')
+  if (!f.ok || !ext || (ehAudio ? !/^audio\//.test(mime) : ehVideo ? !/^video\//.test(mime) : !/^image\//.test(mime))) throw new Error(MSG_FALHA)
+  const dir = path.join(PASTA, ehAudio ? 'Audios' : ehVideo ? 'Videos' : 'Imagens')
   fs.mkdirSync(dir, { recursive: true })
-  const arq = path.join(dir, `${limpo(nome || (ehVideo ? 'video' : 'imagem'))}-${stampAgora()}${ext}`)
+  const arq = path.join(dir, `${limpo(nome || (ehAudio ? 'audio' : ehVideo ? 'video' : 'imagem'))}-${stampAgora()}${ext}`)
   fs.writeFileSync(arq, Buffer.from(await f.arrayBuffer()))
   return { arq }
 }
 
-async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono }) {
+async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono, salvar }) {
   const t0 = Date.now()
   marcar(tipo, prompt, { status: 'queued', position: null, eta_s: null, progress: 0 })
   const r = await api(rota, { method: 'POST', body: JSON.stringify({ ...corpo, async: true }) })
@@ -168,7 +224,7 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono 
   if (assincrono) {
     // job pesado (vídeo em alta, troca de personagem): o agente não fica preso esperando a GPU. O app acompanha, baixa e avisa no chat (concluirPendentes).
     try {
-      fs.writeFileSync(path.join(PASTA, '.midia', `pendente-${id}.json`), JSON.stringify({ id, tipo, nome: nome || '', prompt: String(prompt || '').slice(0, 3500), chat: process.env.SB_MIDIA_CHAT || '', t0: Date.now() }))
+      fs.writeFileSync(path.join(PASTA, '.midia', `pendente-${id}.json`), JSON.stringify({ id, tipo, salvar: salvar || tipo, nome: nome || '', prompt: String(prompt || '').slice(0, 3500), chat: process.env.SB_MIDIA_CHAT || '', t0: Date.now() }))
     } catch (e) {
       throw new Error(MSG_FALHA + ' (não consegui registrar o acompanhamento)')
     }
@@ -187,7 +243,7 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono 
     marcar(tipo, prompt, s)
     if (s.status === 'failed') throw new Error(MSG_FALHA)
     if (s.status === 'done') {
-      const r = await salvarResultado(id, tipo, nome, s)
+      const r = await salvarResultado(id, salvar || tipo, nome, s)
       marcar(tipo, prompt, { status: 'done', position: null, eta_s: 0, progress: 100 })
       return { caminho: r.arq, segundos: s.seconds ?? Math.round((Date.now() - t0) / 100) / 10, tamanho: s.size, ajustes: s.adjusted, params: s.params }
     }
@@ -214,7 +270,7 @@ function paramsComuns(a, video) {
 function exigirDetalhe(tipo, prompt, minimo) {
   const palavras = String(prompt || '').trim().split(/\s+/).filter(Boolean).length
   if (palavras >= minimo) return
-  throw new Error(`O prompt está curto demais (${palavras} palavras; o mínimo é ${minimo}). Detalhe mais e chame a ferramenta de novo: sujeito com aparência, cenário, ${tipo === 'vídeo' ? 'ação e movimento, câmera e lente, ' : 'enquadramento e lente, '}iluminação, paleta de cores, atmosfera, estilo e qualidade, mais negative_prompt. Se faltar informação do usuário, pergunte (até 5 perguntas curtas com sugestão); se ele disser "pode seguir", invente os detalhes você mesmo.`)
+  throw new Error(`O prompt está curto demais (${palavras} palavras; o mínimo é ${minimo}). Chame midia_detalhar_prompt com o pedido do usuário (ele escreve o briefing completo) e use o prompt devolvido; ou detalhe você mesmo: sujeito com aparência, cenário, ${tipo === 'vídeo' ? 'ação e movimento, câmera e lente, ' : 'enquadramento e lente, '}iluminação, paleta de cores, atmosfera, estilo e qualidade, mais negative_prompt. Se faltar informação do usuário, pergunte (até 5 perguntas curtas com sugestão); se ele disser "pode seguir", invente os detalhes você mesmo.`)
 }
 
 async function gerarImagem(args) {
@@ -227,6 +283,40 @@ async function gerarImagem(args) {
   if (estilo) corpo.style = estilo
   if (args.n != null) corpo.n = Math.max(1, Math.min(4, Number(args.n)))
   return rodarJob({ tipo: 'imagem', rota: '/images/generations', corpo, prompt, nome, limiteMs: ESPERA_MAX_MS })
+}
+
+const ehArquivoVideo = (p) => /\.(mp4|mov|webm|mkv)$/i.test(String(p || ''))
+function lerArquivo(caminho, rotulo, maxMb) {
+  if (!caminho || !fs.existsSync(String(caminho))) throw new Error(`${rotulo}: o arquivo não foi encontrado nesse caminho.`)
+  const b = fs.readFileSync(String(caminho))
+  if (b.length > maxMb * 1024 * 1024) throw new Error(`${rotulo}: o arquivo é grande demais (máximo ${maxMb} MB).`)
+  return b
+}
+
+async function clonarVoz(args) {
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  const texto = String(args.texto || '').trim()
+  if (!texto) throw new Error('Diga o texto que será falado (texto).')
+  if (process.env.SB_MIDIA_MOCK) return simular('video', 'clonagem de voz', process.env.SB_MIDIA_MOCK_ARQ || '')
+  const corpo = { text: texto, language: args.idioma || 'pt', reference_audio: lerArquivo(args.amostra, 'Amostra de voz', 12).toString('base64') }
+  if (args.amostra_texto) corpo.reference_text = String(args.amostra_texto).slice(0, 600)
+  return rodarJob({ tipo: 'video', salvar: 'audio', rota: '/audio/voice-clone', corpo, prompt: 'clonagem de voz', nome: args.nome || 'voz-clonada', limiteMs: 30 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
+}
+
+async function trocarVoz(args) {
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (process.env.SB_MIDIA_MOCK) return simular('video', 'troca de voz', process.env.SB_MIDIA_MOCK_ARQ || '')
+  const corpo = { media: lerArquivo(args.arquivo, 'Arquivo', 40).toString('base64'), target_voice: lerArquivo(args.voz_alvo, 'Voz alvo', 12).toString('base64'), keep_background: args.manter_fundo !== false }
+  return rodarJob({ tipo: 'video', salvar: ehArquivoVideo(args.arquivo) ? 'video' : 'audio', rota: '/audio/voice-convert', corpo, prompt: 'troca de voz', nome: args.nome || 'voz-trocada', limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
+}
+
+async function redublarVideo(args) {
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (process.env.SB_MIDIA_MOCK) return simular('video', 'redublagem', process.env.SB_MIDIA_MOCK_ARQ || '')
+  const corpo = { video: lerArquivo(args.video, 'Vídeo', 40).toString('base64'), target_language: args.idioma, keep_background: args.manter_fundo !== false }
+  if (args.idioma_origem) corpo.source_language = args.idioma_origem
+  if (args.voz) corpo.voice = lerArquivo(args.voz, 'Voz', 12).toString('base64')
+  return rodarJob({ tipo: 'video', salvar: ehArquivoVideo(args.video) ? 'video' : 'audio', rota: '/videos/dub', corpo, prompt: 'redublagem', nome: args.nome || 'video-dublado', limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
 }
 
 async function trocarPersonagem(args) {
@@ -295,7 +385,7 @@ async function concluirPendentes() {
       if (s.status === 'failed') { try { fs.unlinkSync(arqP) } catch {} prontos.push({ falhou: true, tipo: p.tipo, chat: p.chat }); continue }
       if (s.status === 'done') {
         try {
-          const r = await salvarResultado(p.id, p.tipo, p.nome, s)
+          const r = await salvarResultado(p.id, p.salvar || p.tipo, p.nome, s)
           marcar(p.tipo, p.prompt, { status: 'done', position: null, eta_s: 0, progress: 100 })
           try { fs.unlinkSync(arqP) } catch {}
           prontos.push({ caminho: r.arq, tipo: p.tipo, chat: p.chat, nome: p.nome })
@@ -330,6 +420,21 @@ async function tratar(msg) {
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^midia_/, '')
     try {
+      if (nome === 'detalhar_prompt') {
+        if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+        const ctx = { base: BASE, chave: CHAVE, fetchFn: process.env.SB_MIDIA_MOCK ? async () => { throw new Error('mock') } : undefined }
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: formatarSaida(await detalhar(params?.arguments || {}, ctx)) }] } })
+      }
+      if (nome === 'conferir_troca') {
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: formatarConferencia(conferirTroca(params?.arguments || {})) }] } })
+      }
+      if (nome === 'clonar_voz' || nome === 'trocar_voz' || nome === 'redublar_video') {
+        const fn = nome === 'clonar_voz' ? clonarVoz : nome === 'trocar_voz' ? trocarVoz : redublarVideo
+        const v = await comReserva(fn, params?.arguments || {}, 'video')
+        const o = nome === 'clonar_voz' ? 'clonagem de voz' : nome === 'trocar_voz' ? 'troca de voz' : 'redublagem'
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE(o, v.min || 6).replace('o seu vídeo', 'o seu arquivo') }] } })
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Pronto em ${v.segundos} s. caminho: ${v.caminho}` }] } })
+      }
       if (nome === 'trocar_personagem') {
         const v = await comReserva(trocarPersonagem, params?.arguments || {}, 'video')
         if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('troca de personagem', v.min || 9) }] } })
@@ -362,4 +467,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { gerarImagem, gerarVideo, trocarPersonagem, FORMATOS, configurar, concluirPendentes }
+module.exports = { gerarImagem, gerarVideo, trocarPersonagem, clonarVoz, trocarVoz, redublarVideo, detalhar, conferirTroca, FORMATOS, configurar, concluirPendentes }

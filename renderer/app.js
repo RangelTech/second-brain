@@ -235,9 +235,9 @@
   const nomeArq = (p) => String(p || '').split(/[\\/]/).pop()
   // nome de ferramenta -> rótulo de gente; etapas internas do agente não aparecem
   const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
-  const ehMidia = (f) => /midia_gerar_(imagem|video)/.test((f && f.titulo) || '')
+  const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz)/.test((f && f.titulo) || '')
   const ROTULOS = [
-    [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
+    [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
     [/navegador_|browser|web_?search|search_web/i, 'Pesquisando na web'], [/vision_analyze/, 'Olhando a imagem'],
     [/read_file|^read\b/i, 'Lendo arquivo'], [/write_file|patch|edit/i, 'Escrevendo arquivo'], [/terminal|execute|shell/i, 'Executando'],
   ]
@@ -336,7 +336,7 @@
     return j
   }
   function criandoImagem(d, f) {
-    const video = /midia_(gerar_video|trocar_personagem)/.test(f.titulo || '')
+    const video = /midia_(gerar_video|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '')
     const pendente = f.status === 'completed' && /\[\[midia-pendente\]\]/.test(String(f.conteudo || '')) // enviado em segundo plano: segue "gerando" até o app avisar
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
     const prox = video ? 'o vídeo' : 'a imagem'
@@ -377,8 +377,10 @@
     }
     d.hidden = false
     d.className = 'ferr img-ferr mc-ferr ' + (pendente ? 'pending' : f.status || 'pending')
-    const trocar = /trocar_personagem/.test(f.titulo || '')
-    const j = acompanharMidia(f, video, trocar ? 'troca de personagem' : arg.prompt)
+    const t = f.titulo || ''
+    const rotuloFixo = /trocar_personagem/.test(t) ? 'troca de personagem' : /redublar_video/.test(t) ? 'redublagem' : /trocar_voz/.test(t) ? 'troca de voz' : /clonar_voz/.test(t) ? 'clonagem de voz' : ''
+    const trocar = !!rotuloFixo
+    const j = acompanharMidia(f, video, rotuloFixo || arg.prompt)
     j.padrao = video ? (trocar || arg.qualidade === 'alta' ? 480 : 90) : 30 // tempo típico, até o servidor informar o dele
     const n = 9
     let pts = ''
@@ -390,7 +392,7 @@
   function atualizarCartao(d, f) {
     d.hidden = INTERNA.test(f.titulo || '') // etapa interna do agente, sem significado para quem usa
     if (d.hidden) return
-    if (/midia_(gerar_(imagem|video)|trocar_personagem)/.test(f.titulo || '') && criandoImagem(d, f)) return
+    if (/midia_(gerar_(imagem|video)|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '') && criandoImagem(d, f)) return
     const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
     let titulo = tituloLimpo(f.titulo)
@@ -1205,8 +1207,8 @@
       else r.partes.push({ t: 'ferr', f: { ...f } })
       if (f.status === 'completed' && f.caminho && f.tipo === 'edit' && EXT_MIDIA.test(f.caminho) && !r.midias.includes(f.caminho)) r.midias.push(f.caminho)
       // imagem gerada pela ferramenta de mídia: o caminho vem no texto do resultado ("caminho: C:\...\x.png")
-      if (f.status === 'completed' && /midia_gerar_(imagem|video)/.test(f.titulo || '')) {
-        const m = /caminho:\s*(.+?\.(?:png|mp4))/i.exec(String(existente?.conteudo || f.conteudo || ''))
+      if (f.status === 'completed' && /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '')) {
+        const m = /caminho:\s*(.+?\.(?:png|mp4|wav))/i.exec(String(existente?.conteudo || f.conteudo || ''))
         if (m && !r.midias.includes(m[1])) r.midias.push(m[1])
       }
     }

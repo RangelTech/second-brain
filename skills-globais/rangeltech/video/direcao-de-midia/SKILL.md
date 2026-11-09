@@ -8,7 +8,10 @@ description: |
 
 O modelo de imagem e de vídeo só devolve o que o prompt descreve. Pedido curto vira resultado genérico ("nada a ver"). Antes de chamar a ferramenta, monte o briefing em inglês e preencha os parâmetros.
 
-## Briefing (sempre)
+## Ferramenta de detalhamento (sempre, antes de gerar)
+Chame `midia_detalhar_prompt` ANTES de `midia_gerar_imagem` e `midia_gerar_video`: ela escreve o briefing profissional em inglês (60 a 150 palavras) com sujeito, ação, câmera, luz, cores, estilo, `negative_prompt`, formato e duração, e devolve também um resumo em português e avisos de risco. Passe `tipo`, o `pedido` com as palavras do usuário, as `respostas` dele às suas perguntas, `formato`/`segundos`/`estilo` se ele disse, e `tem_imagem_inicial: true` quando for animar uma imagem que você já gerou. Depois use EXATAMENTE o `prompt`, o `negative_prompt`, o `formato` e os `segundos` devolvidos (não encurte), mostre o resumo ao usuário em 1 ou 2 linhas e repasse os avisos que importarem. Se o pedido for vago, faça antes as até 5 perguntas abaixo e mande as respostas no campo `respostas`. Para troca de personagem use `midia_conferir_troca` (veja a seção própria).
+
+## Briefing (o que a ferramenta monta; use como critério para conferir)
 1. **Sujeito**: o que aparece, com número exato ("exactly one white sneaker").
 2. **Cena e fundo**: onde está, o que tem em volta.
 3. **Ação e movimento** (vídeo): o que se move e como; um só movimento principal.
@@ -62,7 +65,7 @@ Exemplo curto -> rico: "um carro correndo" vira "a matte-black sports coupe raci
 - Texto na tela e logos em movimento falham: aplique depois (video-motion).
 
 ## Troca de personagem (deepfake): confira antes, mande uma vez
-`midia_trocar_personagem` troca a pessoa principal de um vídeo pela de uma foto e leva cerca de 9 minutos. Para acertar de primeira:
+`midia_trocar_personagem` troca a pessoa principal de um vídeo pela de uma foto e leva cerca de 9 minutos. Para acertar de primeira, chame antes `midia_conferir_troca` (formato, tamanho, duração, áudio, previsão) e depois:
 1. **Olhe a foto** (vision_analyze): rosto de frente, nítido, bem iluminado, sem óculos escuros, mão, cabelo ou máscara cobrindo; uma só pessoa.
 2. **Olhe um quadro do vídeo** (ffmpeg para uma pasta temporária): pessoa principal em primeiro plano, rosto grande no quadro, sem espelho ou reflexo (falham), sem muitas pessoas disputando o centro.
 3. Se algo estiver ruim, diga ao usuário o que trocar (foto mais nítida, trecho com o rosto maior) antes de gastar a geração.

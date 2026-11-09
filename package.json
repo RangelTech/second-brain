@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.6.48",
+  "version": "0.6.49",
   "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
@@ -29,6 +29,7 @@
       "mcp-navegador.js",
       "transcricao-worker.js",
       "mcp-midia.js",
+      "midia-detalhar.js",
       "mcp-memoria.js",
       "navegador.js",
       "unlimited.js",
