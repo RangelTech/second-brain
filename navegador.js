@@ -14,6 +14,15 @@ function resolverEntrada(entrada) {
   if (pareceEndereco) return (/^localhost|^\d/.test(u) ? 'http://' : 'https://') + u
   return 'https://www.google.com/search?q=' + encodeURIComponent(u)
 }
+// O user-agent padrão do Electron traz "Electron/x.y.z" e o nome do app: Instagram e outros sites barram isso com "4xx Client Error".
+// Para os sites o navegador integrado tem de se apresentar como o Chrome comum da mesma versão do Chromium embutido
+// (mesmo formato reduzido que o Chrome usa: versão principal com ".0.0.0").
+function userAgentChrome(plataforma = process.platform, versaoChromium = (process.versions && process.versions.chrome) || '140.0.0.0') {
+  const so = plataforma === 'darwin' ? 'Macintosh; Intel Mac OS X 10_15_7' : plataforma === 'linux' ? 'X11; Linux x86_64' : 'Windows NT 10.0; Win64; x64'
+  const principal = String(versaoChromium).split('.')[0] || '140'
+  return `Mozilla/5.0 (${so}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${principal}.0.0.0 Safari/537.36`
+}
+const IDIOMAS = 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
@@ -50,6 +59,10 @@ function criar({ app, janela, avisar, pedirPainel }) {
     if (vista) return vista
     vista = new WebContentsView({ webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false } })
     const wc = vista.webContents
+    // antes de qualquer carga: o primeiro pedido já sai com o user-agent e o idioma de um Chrome comum
+    const ua = userAgentChrome()
+    wc.setUserAgent(ua)
+    wc.session.setUserAgent(ua, IDIOMAS)
     wc.loadURL(PAGINA_INICIAL).catch(() => {})
     wc.setWindowOpenHandler(({ url }) => {
       wc.loadURL(url).catch(() => {})
@@ -351,4 +364,4 @@ function lerMarcadoresDoNavegador() {
   return saida
 }
 
-module.exports = { criar, lerMarcadoresDoNavegador, resolverEntrada, PAGINA_INICIAL }
+module.exports = { criar, lerMarcadoresDoNavegador, resolverEntrada, userAgentChrome, PAGINA_INICIAL }
