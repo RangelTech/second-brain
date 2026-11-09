@@ -235,6 +235,8 @@ function prepararBase(app) {
   }
   const globais = [path.join(process.resourcesPath || '', 'skills-globais', 'rangeltech'), path.join(__dirname, 'skills-globais', 'rangeltech')].find((p) => fs.existsSync(p))
   if (globais && ENTREGAR_PACOTE) sincronizarSkillsGlobais(globais, path.join(home, 'skills', 'rangeltech'))
+  const essenciais = [path.join(process.resourcesPath || '', 'skills-globais', 'essenciais'), path.join(__dirname, 'skills-globais', 'essenciais')].find((p) => fs.existsSync(p))
+  if (essenciais) sincronizarSkillsGlobais(essenciais, path.join(home, 'skills', 'essenciais')) // vai para TODOS os planos, inclusive o Lite
   return home
 }
 
@@ -442,6 +444,26 @@ function registrar(app, linha) {
   } catch {}
 }
 
+// Servidores MCP do próprio usuário (Higgsfield, Runway, ElevenLabs, fal...): arquivo mcp-externos.json na pasta de dados do app, que o Hermes edita a pedido.
+// Formato: { "nome": { "command": "npx", "args": ["-y", "mcp-remote", "https://..."], "env": { "CHAVE": "valor" } } }  ou  { "nome": { "url": "https://...", "headers": { "Authorization": "Bearer ..." } } }
+// Vale na próxima conversa. Nomes dos servidores do app (memoria, midia, navegador) não podem ser reusados.
+function mcpsExternos(app, reservados = []) {
+  let cfg
+  try {
+    cfg = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'mcp-externos.json'), 'utf8'))
+  } catch {
+    return []
+  }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return []
+  const pares = (o) => Object.entries(o && typeof o === 'object' ? o : {}).map(([name, value]) => ({ name, value: String(value) }))
+  const out = []
+  for (const [nome, c] of Object.entries(cfg)) {
+    if (!/^[a-z0-9_-]{1,40}$/i.test(nome) || reservados.includes(nome) || ['memoria', 'midia', 'navegador'].includes(nome) || !c || typeof c !== 'object') continue
+    if (typeof c.url === 'string' && /^https:\/\//.test(c.url)) out.push({ type: 'http', name: nome, url: c.url, headers: pares(c.headers) })
+    else if (typeof c.command === 'string' && c.command) out.push({ name: nome, command: c.command, args: Array.isArray(c.args) ? c.args.map(String) : [], env: pares(c.env) })
+  }
+  return out
+}
 class Sessao {
   constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, nivel }) {
     this.app = app
@@ -820,6 +842,7 @@ class Sessao {
         ],
       })
     }
+    lista.push(...mcpsExternos(this.app, lista.map((x) => x.name)))
     if (!this.navegador) return lista
     const shim = [path.join(process.resourcesPath || '', 'mcp-navegador.js'), path.join(__dirname, 'mcp-navegador.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-navegador.js')
     return [
@@ -1000,4 +1023,4 @@ class Sessao {
   }
 }
 
-module.exports = { MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
