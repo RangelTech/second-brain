@@ -3,6 +3,7 @@
 // sondagem de rede e as ultimas linhas do log, para a equipe ver o motivo sem pedir nada ao cliente. Nunca derruba nem atrasa a instalacao.
 const fs = require('fs')
 const os = require('os')
+const path = require('path')
 
 const BASE = () => (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
 const LINHAS = 100
@@ -57,7 +58,14 @@ async function enviar({ versao, logArq, codigo, buscar = fetch, base = BASE() })
       }
     })()
     const rede = await sondarRede(buscar).catch(() => '')
-    const log = limpar(ultimasLinhas(logArq) + (rede ? '\nrede: ' + rede : ''), usuario)
+    // o servidor guarda so o comeco do texto: o que mais explica a falha vem primeiro (saida do instalador do Hermes, depois o agente, depois o preparo)
+    const dir = path.dirname(logArq)
+    const bloco = (titulo, arq, n) => {
+      const t = ultimasLinhas(arq, n).split('\n').map((l) => l.slice(0, 200)).join('\n')
+      return t ? `--- ${titulo}\n${t}\n` : ''
+    }
+    const partes = bloco('instalador do Hermes', path.join(dir, 'hermes-instalacao.log'), 40) + bloco('agente', path.join(dir, 'logs', 'agente.log'), 16) + bloco('preparo', logArq, 24)
+    const log = limpar((rede ? 'rede: ' + rede + '\n' : '') + partes, usuario)
     const corpo = { versao, so: `${process.platform} ${os.release()}`, arch: process.arch, etapa: etapaDoLog(log), codigo: String(codigo), maquina: '', log }
     const r = await buscar(base + '/diag/instalacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo), signal: AbortSignal.timeout(15000) })
     return r.ok

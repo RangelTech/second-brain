@@ -200,12 +200,21 @@ const CONTEXTO_REAL = 131072
 const COMPRIMIR_EM = +process.env.SB_COMPRIMIR_EM || 72000 // variáveis SB_* só para medir variantes (spec de contexto); sem elas vale o padrão
 const PODAR_EM = +process.env.SB_PODAR_EM || 48000
 
+const caminhosHermes = require('./caminhos-hermes')
 function localizarBinario(app) {
+  const win = process.platform === 'win32'
+  const exe = win ? 'hermes-acp.exe' : 'hermes-acp'
+  const raiz = caminhosHermes.raizAgente(app) // pasta decidida em caminhos-hermes.js (curta no Windows instalado; a antiga nos demais)
+  const antiga = path.join(app.getPath('userData'), 'hermes')
   const candidatos = [
     process.env.SECOND_BRAIN_HERMES_BIN,
-    path.join(app.getPath('userData'), 'hermes', 'bin', process.platform === 'win32' ? 'hermes-acp.exe' : 'hermes-acp'),
-    path.join(app.getPath('userData'), 'hermes', 'hermes-agent', '.hermes', 'bin', process.platform === 'win32' ? 'hermes-acp.exe' : 'hermes-acp'), // onde o instalador oficial grava no Linux/macOS
-    path.join(os.homedir(), 'hermes', 'bin', process.platform === 'win32' ? 'hermes-acp.exe' : 'hermes-acp'),
+    path.join(raiz, 'bin', exe),
+    path.join(antiga, 'bin', exe),
+    // Linux/macOS: o instalador oficial grava aqui. No Windows esse executavel solto do checkout existe mesmo com a instalacao pela metade
+    // (sem os pacotes Python), e achar "instalado" ali escondia a falha: so vale o comando publicado em bin\.
+    win ? null : path.join(raiz, 'hermes-agent', '.hermes', 'bin', exe),
+    win ? null : path.join(antiga, 'hermes-agent', '.hermes', 'bin', exe),
+    path.join(os.homedir(), 'hermes', 'bin', exe),
     path.join(os.homedir(), '.local', 'bin', 'hermes-acp'),
   ].filter(Boolean)
   return candidatos.find((c) => fs.existsSync(c)) || null
@@ -221,8 +230,16 @@ function definirPacote(v) {
   ENTREGAR_PACOTE = v === true
 }
 function prepararBase(app) {
-  const home = path.join(app.getPath('userData'), 'hermes-home')
+  const home = caminhosHermes.homeAgente(app)
   fs.mkdirSync(path.join(home, 'skills'), { recursive: true })
+  // pasta nova (caminho curto) no lugar da antiga: leva so a memoria do usuario; o ambiente Python e as sessoes se refazem
+  const antiga = path.join(app.getPath('userData'), 'hermes-home')
+  if (antiga !== home && !fs.existsSync(path.join(home, '.memoria-copiada'))) {
+    try {
+      if (fs.existsSync(path.join(antiga, 'memories'))) fs.cpSync(path.join(antiga, 'memories'), path.join(home, 'memories'), { recursive: true, force: false })
+      fs.writeFileSync(path.join(home, '.memoria-copiada'), new Date().toISOString())
+    } catch {}
+  }
   const piloto = path.join(os.homedir(), 'hermes')
   const marca = path.join(home, '.migrado')
   if (!fs.existsSync(marca) && fs.existsSync(piloto)) {
@@ -1023,4 +1040,4 @@ class Sessao {
   }
 }
 
-module.exports = { MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { caminhosHermes, MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

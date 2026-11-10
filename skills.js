@@ -9,7 +9,7 @@ const SOMENTE_LEITURA = ['rangeltech']
 const IGNORAR = new Set(['.git', '.hub', '.archive', 'node_modules', '__pycache__'])
 
 function criar({ app, avisar }) {
-  const home = path.join(app.getPath('userData'), 'hermes-home')
+  const home = require('./caminhos-hermes').homeAgente(app)
   const raiz = path.join(home, 'skills')
   const diarioArq = path.join(app.getPath('userData'), 'skills-diario.json')
   const escritasDoApp = new Map() // rel -> instante da última gravação feita por aqui

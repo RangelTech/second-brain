@@ -21,7 +21,7 @@ function criar({ app, localizar }) {
   }
 
   async function instalar() {
-    const home = path.join(app.getPath('userData'), 'hermes')
+    const home = require('./caminhos-hermes').raizAgente(app)
     fs.mkdirSync(home, { recursive: true })
     const win = process.platform === 'win32'
     falar('baixando o instalador')
@@ -35,12 +35,15 @@ function criar({ app, localizar }) {
     await new Promise((resolve, reject) => {
       const filho = spawn(exe, args, { env: { ...process.env, HERMES_HOME: home }, windowsHide: true })
       const fim = []
+      const todas = []
       const linhas = (d) => {
         for (const l of String(d).replace(SEM_COR, '').split(/\r?\n/)) {
           const t = l.trim()
           if (!t) continue
           fim.push(t)
           if (fim.length > 40) fim.shift()
+          todas.push(t)
+          if (todas.length > 600) todas.shift()
           if (/^[→✓]/.test(t)) falar(t.replace(/^[→✓]\s*/, '').slice(0, 90))
         }
       }
@@ -48,7 +51,16 @@ function criar({ app, localizar }) {
       filho.stderr.on('data', linhas)
       filho.on('error', (e) => reject(new Error('Não consegui iniciar o instalador do agente: ' + e.message)))
       // o instalador oficial pode terminar com erro numa etapa opcional (ex.: Node das ferramentas web) e deixar o agente pronto
-      filho.on('close', (codigo) => (codigo === 0 || localizar() ? resolve() : reject(new Error('A instalação do agente falhou.\n' + fim.slice(-6).join('\n')))))
+      filho.on('close', (codigo) => {
+        // a saida inteira do instalador fica em hermes-instalacao.log (antes era descartada quando o app "achava" um executavel e dava a instalacao por boa)
+        try {
+          fs.appendFileSync(path.join(app.getPath('userData'), 'hermes-instalacao.log'), `${new Date().toISOString()} codigo=${codigo}\n${todas.join('\n')}\n`)
+        } catch {}
+        // so vale o comando PUBLICADO (<raiz>\bin\hermes-acp): o executavel solto do checkout existe mesmo quando a instalacao morre antes dos pacotes Python
+        const publicado = fs.existsSync(path.join(home, 'bin', win ? 'hermes-acp.exe' : 'hermes-acp'))
+        if (codigo === 0 || publicado) return resolve()
+        reject(new Error('A instalação do agente falhou (código ' + codigo + ').\n' + fim.slice(-25).join('\n')))
+      })
     })
     if (!localizar()) throw new Error('O agente foi instalado, mas não achei o programa dele. Fale com o suporte.')
   }

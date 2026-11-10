@@ -24,6 +24,7 @@ const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
 const hermesInstalarMod = require('./hermes-instalar')
 const relatorioInstalacao = require('./relatorio-instalacao')
+const caminhosHermes = require('./caminhos-hermes')
 const atualizadorMod = require('./atualizador')
 const { conversaDeTeste } = require('./autoteste')
 const skillsRepoMod = require('./skills-repo')
@@ -164,7 +165,9 @@ const hermesInstalar = hermesInstalarMod.criar({ app, localizar: () => localizar
 const marcaTeste = () => path.join(app.getPath('userData'), 'teste-instalacao.ok')
 function limparAgenteQuebrado(anotar = () => {}) {
   const dados = app.getPath('userData')
-  const alvos = [path.join(dados, 'hermes'), path.join(dados, 'hermes-home', 'installs'), path.join(dados, 'hermes-home', 'environments'), path.join(dados, 'hermes-home', 'pronto.ok')]
+  const raiz = caminhosHermes.raizAgente(app)
+  const home = caminhosHermes.homeAgente(app)
+  const alvos = [raiz, path.join(home, 'installs'), path.join(home, 'environments'), path.join(home, 'pronto.ok')]
   for (const a of alvos) {
     try {
       fs.rmSync(a, { recursive: true, force: true })
@@ -180,7 +183,7 @@ async function verificarAgente(anotar = () => {}) {
   let r
   for (let i = 1; i <= 2; i++) {
     // a 1ª execução monta o ambiente do Hermes (minutos, ~700 MB): o teste espera essa montagem em vez de desistir aos 2 min
-    const montado = ambienteMontado(path.join(app.getPath('userData'), 'hermes-home'), localizarBinario(app))
+    const montado = ambienteMontado(caminhosHermes.homeAgente(app), localizarBinario(app))
     r = await conversaDeTeste({
       anotar,
       prazoMs: montado ? 120000 : 45 * 60000,
@@ -288,7 +291,7 @@ async function responder(alvo, msgs, ctx) {
     try {
       const r = await roteador.responderRapido({
         base: est.origem + '/v1', chave: await chaveLocal(), modelo: alvo, msgs, onDelta: ctx.onDelta, sinal: ctx.sinal, raciocinio: cfg.raciocinio,
-        memoriaArquivo: path.join(app.getPath('userData'), 'chats.json'), chat: ctx.chat, skillsDir: path.join(app.getPath('userData'), 'hermes-home', 'skills'), usuario: os.userInfo().username,
+        memoriaArquivo: path.join(app.getPath('userData'), 'chats.json'), chat: ctx.chat, skillsDir: path.join(caminhosHermes.homeAgente(app), 'skills'), usuario: os.userInfo().username,
       })
       if (!r.escalar && String(r.texto || '').trim() && !roteador.afirmaArquivo(r.texto)) return r.texto
       // a resposta rapida afirmou ter criado um arquivo (invenção): desmente e faz de verdade pelo agente
@@ -381,12 +384,12 @@ function criarJanela() {
 if (MODO_SERVIDOR) app.disableHardwareAcceleration()
 app.on('will-quit', () => {
   try {
-    require('./agent').limparHermesPreso(app, path.join(app.getPath('userData'), 'hermes-home'))
+    require('./agent').limparHermesPreso(app, caminhosHermes.homeAgente(app))
   } catch {}
 })
 app.whenReady().then(() => {
   try {
-    require('./agent').limparHermesPreso(app, path.join(app.getPath('userData'), 'hermes-home'))
+    require('./agent').limparHermesPreso(app, caminhosHermes.homeAgente(app))
   } catch (e) {
     console.error('limpeza do Hermes falhou:', e && e.message)
   }
