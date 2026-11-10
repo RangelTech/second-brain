@@ -605,6 +605,7 @@
     m.setAttribute('aria-label', m.title)
   }
   function desenhar() {
+    cerebroSincronizar()
     const el = $('conversa')
     const c = chatAtual()
     pintarContexto()
@@ -934,38 +935,9 @@
   function montarVivo(r) {
     const d = document.createElement('div')
     d.className = 'msg assistant'
-    // Enquanto o agente trabalha, o "pensamento" é o cérebro animado (Spec 25 §15): no topo da mensagem, grande, com a ferramenta em uso e uma frase
-    // que troca no mesmo lugar. O que o agente for escrevendo aparece embaixo; quando a resposta final chega, esta mensagem viva é trocada pela
-    // definitiva e o cérebro some. A setinha recolhe (aberto por padrão; quem fecha uma vez, fica fechado em todo chat).
-    d.innerHTML = `${QUEM}</div><div class="atividade"><button class="atv-seta" type="button" aria-expanded="false" aria-label="Mostrar ou esconder o pensamento" title="Mostrar ou esconder o pensamento">›</button><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span></div><div class="sin-cartao" hidden><canvas class="sin-canvas" aria-hidden="true"></canvas><div class="sin-hud"><span class="sin-chip"><i></i><b>Pensando</b></span><span class="sin-frase" aria-live="off"></span></div></div><div class="aviso" hidden></div><div class="partes"></div>`
+    // o "pensamento" agora é o CÉREBRO FIXO da tela (#cerebro-vivo, fora da mensagem): aqui fica só a linha de trabalho com o relógio
+    d.innerHTML = `${QUEM}</div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span></div><div class="aviso" hidden></div><div class="partes"></div>`
     r.el = d
-    const seta = d.querySelector('.atv-seta')
-    const cartao = d.querySelector('.sin-cartao')
-    const SA = window.SBAtividade
-    const abrir = (sim) => {
-      cartao.hidden = !sim
-      seta.setAttribute('aria-expanded', String(!!sim))
-      seta.classList.toggle('aberta', !!sim)
-      if (!r.card) return
-      if (sim) {
-        r.card.iniciar()
-        requestAnimationFrame(() => r.card?.tamanho())
-      } else r.card.parar()
-    }
-    if (SA) {
-      const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-      r.card?.parar()
-      r.card = SA.criarCartao(d.querySelector('.sin-canvas'), d.querySelector('.sin-frase'), { reduzir, chipEl: d.querySelector('.sin-chip') })
-      // o que já estava em andamento quando a tela foi redesenhada volta aceso
-      for (const cat of r.cats?.values() || []) r.card.evento(cat, 'inicio')
-      r.card.pensar(r.frase || 'Pensando…')
-      seta.onclick = () => {
-        const sim = cartao.hidden // vai abrir?
-        SA.lembrar(sim)
-        abrir(sim)
-      }
-      abrir(SA.aberto())
-    } else seta.hidden = true
     if (r.aviso) {
       const a = d.querySelector('.aviso')
       a.hidden = false
@@ -974,6 +946,58 @@
     renderPartes(d.querySelector('.partes'), r.partes)
     for (const p of r.perms) d.appendChild(cartaoPermissao(r, p))
     return d
+  }
+  // ---------- cérebro fixo da tela (Spec 25 §15, pedido do Lucas em 10/11/2026) ----------
+  // Sempre visível no chat: PARADO (âmbar, girando devagar) quando não há pergunta rodando na conversa da tela; ATIVO (azul) quando há,
+  // com a ferramenta em uso acesa e a frase de pensamento. Sem quadro e sem fundo: desenha sobre a própria tela. O botão "Cérebro" esconde/mostra.
+  var CV = { card: null } // var (e nao const): desenhar() pode rodar antes desta linha no arranque
+  function cardDe(r) {
+    return r && r.id === atual && CV ? CV.card : null
+  }
+  function cerebroSincronizar() {
+    const card = CV && CV.card
+    if (!card) return
+    card.limpar()
+    const r = respostas.get(atual)
+    if (r) {
+      card.modo('ativo')
+      for (const cat of r.cats?.values() || []) card.evento(cat, 'inicio')
+      card.base(r.base || 'pensar')
+      card.pensar(r.frase || 'Pensando…')
+    } else {
+      card.modo('parado')
+      card.pensar('Pronto para a próxima pergunta')
+    }
+  }
+  function cerebroInstalar() {
+    const SA = window.SBAtividade
+    const el = $('cerebro-vivo')
+    const bt = $('abrir-cerebro')
+    if (!SA || !el) {
+      if (bt) bt.hidden = true
+      if (el) el.hidden = true
+      return
+    }
+    const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    CV.card = SA.criarCartao($('cv-canvas'), $('cv-frase'), { reduzir, chipEl: $('cv-chip') })
+    const mostrar = (sim) => {
+      el.hidden = !sim
+      bt.setAttribute('aria-pressed', String(!!sim))
+      bt.classList.toggle('ligado', !!sim)
+      if (sim) {
+        CV.card.iniciar()
+        requestAnimationFrame(() => CV.card.tamanho())
+      } else CV.card.parar()
+    }
+    bt.onclick = () => {
+      const sim = el.hidden
+      SA.lembrar(sim) // quem fecha uma vez, fica fechado (inclusive depois de reiniciar)
+      mostrar(sim)
+    }
+    $('cv-fechar').onclick = () => (SA.lembrar(false), mostrar(false))
+    window.addEventListener('resize', () => !el.hidden && CV.card.tamanho())
+    mostrar(SA.aberto())
+    cerebroSincronizar()
   }
   const visivel = (r) => r.el && r.el.isConnected && r.id === atual
 
@@ -1072,6 +1096,7 @@
     const r = respostas.get(id)
     if (!r) return
     respostas.delete(id)
+    if (id === atual) cerebroSincronizar()
     if (!respostas.size) {
       clearInterval(relogio)
       relogio = null
@@ -1163,7 +1188,7 @@
   function definirFrase(r, txt, forcar) {
     if (!txt || (!forcar && r.cats && r.cats.size)) return // com ferramenta em andamento, ela manda na frase
     r.frase = txt
-    r.card?.pensar(txt)
+    cardDe(r)?.pensar(txt)
   }
   function sinal(r, fase) {
     r.ultimo = Date.now()
@@ -1200,6 +1225,7 @@
       sinal(r, 'Pensando… (' + Math.round(r.raz.length / 4) + ' palavras)')
       anotar(r, 'Pensando… ' + String(r.raz).replace(/\s+/g, ' ').trim().slice(-110))
       if (window.SBAtividade) definirFrase(r, window.SBAtividade.fraseDoRaciocinio(r.raz))
+      if (r.base !== 'pensar') (r.base = 'pensar'), cardDe(r)?.base('pensar')
       if (visivel(r)) {
         const det = r.el.querySelector('.raciocinio')
         det.hidden = false
@@ -1253,6 +1279,7 @@
       }
     }
     if (d.texto) {
+      if (r.base !== 'escrever') (r.base = 'escrever'), cardDe(r)?.base('escrever'), definirFrase(r, 'Escrevendo a resposta…')
       sinal(r, 'Escrevendo a resposta…')
       const ult = r.partes[r.partes.length - 1]
       if (ult && ult.t === 'texto') ult.v += d.texto
@@ -1261,6 +1288,8 @@
     if (d.ferramenta) {
       const f = d.ferramenta
       sinal(r, f.status === 'completed' || f.status === 'failed' ? 'Analisando o resultado…' : 'Executando ferramenta')
+      ;(window.__ferrVistas ||= []).push({ t: Date.now(), id: f.id, titulo: f.titulo, tipo: f.tipo, status: f.status })
+      if (window.__ferrVistas.length > 30) window.__ferrVistas.shift()
       const SA = window.SBAtividade
       if (SA && !INTERNA.test(f.titulo || '')) {
         // sinapse até o ícone certo, em tempo real: acende quando a ferramenta começa e dá o "ok" (ou erro) quando termina
@@ -1269,13 +1298,14 @@
         const fim = f.status === 'completed' || f.status === 'failed'
         if (!r.cats.has(f.id)) {
           r.cats.set(f.id, cat)
-          r.card?.evento(cat, 'inicio')
+          cardDe(r)?.evento(cat, 'inicio')
           definirFrase(r, SA.fraseDaFerramenta(f, rotuloFerr, tituloLimpo), true)
         }
         if (fim) {
           const c = r.cats.get(f.id)
           r.cats.delete(f.id)
-          r.card?.evento(c, f.status === 'failed' ? 'erro' : 'ok')
+          cardDe(r)?.evento(c, f.status === 'failed' ? 'erro' : 'ok')
+          if (!r.cats.size) (r.base = 'pensar'), cardDe(r)?.base('pensar'), definirFrase(r, f.status === 'failed' ? 'Tentando de outro jeito…' : 'Analisando o resultado…')
         }
       }
       const existente = r.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
@@ -1659,6 +1689,7 @@
     webNavTimer = setInterval(atualizar, 1500)
   }
   $('abrir-nav').onclick = () => navAbrir(!navAberto)
+  cerebroInstalar()
   $('nav-fechar').onclick = () => navAbrir(false)
   $('nav-voltar').onclick = () => NAV.acao('voltar')
   $('nav-avancar').onclick = () => NAV.acao('avancar')

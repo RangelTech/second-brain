@@ -377,12 +377,12 @@ function aplicarSeguranca(home, nivel) {
 }
 
 // plugins do Hermes que o produto nao usa (medido em 10/11/2026: 63 descobertos, 59 ligados, ~3 s de partida e checks a cada turno)
+// SO provedores externos (imagem, video, busca, navegador na nuvem) que o produto nao usa: a lista larga de antes ('default', 'platforms', 'memory'...)
+// tirava junto o que manda os passos das ferramentas para a tela (o cerebro ficava sem saber o que o agente fazia). Medido em 10/11/2026.
 const PLUGINS_FORA = [
-  'browser-browser-use', 'browser-browserbase', 'browser-firecrawl', 'computer_use', 'config_backends', 'cron_providers', 'dashboard_auth', 'delegation',
-  'disk-cleanup', 'google_meet', 'hermes-achievements', 'image_gen', 'kanban', 'security-guidance', 'teams_pipeline', 'video_gen',
-  'deepinfra', 'fal', 'krea', 'meta-ai-image-gen', 'openai', 'openai-codex', 'openrouter', 'xai',
+  'browser-browser-use', 'browser-browserbase', 'browser-firecrawl', 'deepinfra', 'fal', 'krea', 'meta-ai-image-gen', 'openai', 'openai-codex', 'openrouter', 'xai',
   'web-brave-free', 'web-ddgs', 'web-exa', 'web-firecrawl', 'web-keenable', 'web-openai-native', 'web-parallel', 'web-perplexity', 'web-searxng', 'web-tavily', 'web-xai',
-  'platforms', 'model-providers', 'context_engine', 'nous', 'default', 'web', 'browser', 'memory', 'cron', 'dashboard',
+  'hermes-achievements', 'google_meet', 'teams_pipeline', 'disk-cleanup',
 ]
 function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
   const home = prepararBase(app)
@@ -416,8 +416,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
     '  environment_probe: false', // sondagem do toolchain da maquina a cada partida: nao entra no nosso prompt
     // PARTIDA: o Hermes descobre e carrega 59 plugins (provedores de imagem, video, busca, navegador externo, Discord, Feishu...) e nenhum serve ao
     // Segundo Cerebro: imagem, video, navegador e memoria sao os NOSSOS servidores MCP. Cada plugin e um import e um check_fn na partida e no 1o turno.
-    'plugins:',
-    `  disabled: ${JSON.stringify(PLUGINS_FORA)}`,
+    ...(process.env.SB_SEM_PLUGINS_FORA ? [] : ['plugins:', `  disabled: ${JSON.stringify(PLUGINS_FORA)}`]), // SB_SEM_PLUGINS_FORA=1 so para medir/comparar
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     // (so aceita nome de TOOLSET; `search_files` sozinha e tirada pela ponte-llm.js, porque o toolset `file` levaria read/write junto)
@@ -523,6 +522,14 @@ function mcpsExternos(app, reservados = []) {
   return out
 }
 class Sessao {
+  // Canal de eventos para a tela. Durante o AQUECIMENTO (turno invisível) tudo é descartado pelo `mudo`, sem trocar o canal: antes o aquecimento
+  // trocava o canal por um mudo e, se a pergunta real chegasse no meio, devolvia o mudo no fim e a resposta inteira sumia (achado em 10/11/2026).
+  get emitir() {
+    return this.mudo ? () => {} : this._emitir || (() => {})
+  }
+  set emitir(f) {
+    this._emitir = f
+  }
   constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, nivel }) {
     this.app = app
     this.id = id
@@ -929,8 +936,7 @@ class Sessao {
     this.aquecendo = (async () => {
       await this.pronta
       if (!this.primeira || this.turno || this.morto) return
-      const guardado = this.emitir
-      this.emitir = () => {}
+      this.mudo = true
       const t0 = Date.now()
       try {
         this.ativo = true
@@ -940,7 +946,7 @@ class Sessao {
         registrar(this.app, 'aquecimento falhou: ' + (e.message || e))
       } finally {
         this.ativo = false
-        this.emitir = guardado
+        this.mudo = false
       }
     })().finally(() => (this.aquecendo = null))
     return this.aquecendo
@@ -974,12 +980,13 @@ class Sessao {
     // o que já aconteceu NESTE turno (texto escrito e ferramentas concluídas): se o processo cair, a retomada conta isso ao agente novo
     const feitos = []
     let parcial = ''
-    const emitirOriginal = this.emitir
-    this.emitir = (e) => {
+    const emitirOriginal = this._emitir || (() => {})
+    const embrulho = (e) => {
       if (e && e.texto) parcial += e.texto
       if (e && e.ferramenta && e.ferramenta.status === 'completed' && e.ferramenta.titulo) feitos.push(String(e.ferramenta.titulo).slice(0, 120) + (e.ferramenta.conteudo ? ' -> ' + String(e.ferramenta.conteudo).replace(/\s+/g, ' ').slice(0, 200) : ''))
       emitirOriginal(e)
     }
+    this.emitir = embrulho
     const aquecimento = texto.startsWith('[aquecimento]')
     const guardarTurno = () => {
       if (aquecimento) return
@@ -1051,7 +1058,7 @@ class Sessao {
         }
       }
     } finally {
-      this.emitir = emitirOriginal
+      if (this._emitir === embrulho) this.emitir = emitirOriginal // se a tela trocou o canal no meio (nova pergunta), fica o novo
       this.pendenteDirecionar = null
       this.cancelandoDirecionar = false
     }

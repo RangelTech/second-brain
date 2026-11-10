@@ -7,28 +7,50 @@
   if (typeof module === 'object' && module.exports) module.exports = fabrica(require('./cerebro.js'))
   else raiz.SBAtividade = fabrica(raiz.SBCerebro)
 })(typeof self !== 'undefined' ? self : this, function (SBC) {
-  // categorias que aparecem como ícone (o núcleo "hermes" é o cérebro em si)
-  const ICONES = ['arquivos', 'web', 'navegador', 'terminal', 'skills', 'memoria', 'midia', 'agentes']
-  const ROTULO = { arquivos: 'Arquivos', web: 'Internet', navegador: 'Navegador', terminal: 'Terminal', skills: 'Skills', memoria: 'Memória', midia: 'Mídia', agentes: 'Agente auxiliar' }
+  // ícones em volta do cérebro. `pensar` e `escrever` não são ferramentas: são o estado de base (o cérebro nunca fica sem nada aceso)
+  const ICONES = ['pensar', 'escrever', 'skills', 'arquivos', 'documentos', 'planilhas', 'web', 'navegador', 'redes', 'terminal', 'codigo', 'memoria', 'imagem', 'video', 'voz', 'pesquisa', 'tarefas', 'agentes']
+  const ROTULO = { pensar: 'Raciocínio', escrever: 'Escrevendo', skills: 'Skills', arquivos: 'Arquivos', documentos: 'Documentos', planilhas: 'Planilhas', web: 'Internet', navegador: 'Navegador',
+    redes: 'Redes sociais', terminal: 'Terminal', codigo: 'Código', memoria: 'Memória', imagem: 'Imagem', video: 'Vídeo', voz: 'Voz', pesquisa: 'Pesquisa', tarefas: 'Tarefas', agentes: 'Agente auxiliar' }
 
-  // categoria da ferramenta: a do cérebro, mais skill_view/skills_list (o Hermes chama assim) e as ferramentas do navegador integrado
+  // categoria da ferramenta pelo nome (e pelo arquivo/endereço que ela toca): só a categoria aparece, nada do conteúdo do usuário
   function categoriaDe(f) {
     const t = String((f && f.titulo) || '')
-    if (/skill_view|skills_list|skill_manage|\bskill\b/i.test(t)) return 'skills'
-    if (/^navegador_|navegador/i.test(t)) return 'navegador'
-    const c = SBC.categoriaDe(f)
-    return ICONES.includes(c) ? c : 'agentes'
+    const k = String((f && f.tipo) || '').toLowerCase()
+    const tl = t.toLowerCase()
+    if (/skill_view|skills_list|skill_manage|\bskills?\b/.test(tl)) return 'skills'
+    if (/memoria_|memory|lembr|recall/.test(tl)) return 'memoria'
+    if (/delegate|subagent|spawn|agente_/.test(tl)) return 'agentes'
+    if (/todo|kanban|cron|tarefa|agenda/.test(tl)) return 'tarefas'
+    if (/clonar_voz|trocar_voz|redublar|transcri|whisper|audio|áudio|\.(mp3|wav|ogg|m4a)\b/.test(tl)) return 'voz'
+    if (/gerar_video|video|vídeo|\.(mp4|mov|webm)\b|trocar_personagem/.test(tl)) return 'video'
+    if (/gerar_imagem|vision|imagem|image|\.(png|jpe?g|gif|webp|svg)\b|midia_detalhar|midia_conferir/.test(tl)) return 'imagem'
+    if (/navegador_|browser/.test(tl)) return /instagram|whatsapp|facebook|tiktok|twitter|x\.com|linkedin|youtube|messenger/.test(tl) ? 'redes' : 'navegador'
+    if (/instagram|whatsapp|facebook|tiktok|linkedin|youtube/.test(tl)) return 'redes'
+    if (/web_search|search_web|web_extract|fetch|http/.test(tl) || k === 'fetch') return 'web'
+    if (/session_search|search_files|grep|procur|busca/.test(tl) || k === 'search') return 'pesquisa'
+    if (/execute_code|python|\.(py|js|ts|html|css|json)\b/.test(tl)) return 'codigo'
+    if (/terminal|shell|powershell|bash|comando|execute/.test(tl) || k === 'execute') return 'terminal'
+    if (/\.(xlsx?|csv|ods)\b|planilha/.test(tl)) return 'planilhas'
+    if (/\.(pdf|docx?|pptx?|odt|txt|md|rtf)\b|documento/.test(tl)) return 'documentos'
+    if (/read_file|write_file|patch|arquivo|file|pasta/.test(tl) || ['read', 'edit', 'delete', 'move'].includes(k)) return 'arquivos'
+    if (k === 'think') return 'pensar'
+    return 'agentes'
   }
 
   // frase curta e sem jargão para o que está acontecendo; `rotulo`/`limpo` vêm do app (rotuloFerr/tituloLimpo)
+  // nome interno do MCP (mcp__editor_navegador_7860dfd8__navegador_abrir) nunca aparece para o cliente
+  const semMcp = (t) => String(t || '').replace(/mcp__[A-Za-z0-9_]+?__/g, '').replace(/^editor_[a-z]+_[0-9a-f]{8}_?/i, '')
   function fraseDaFerramenta(f, rotulo, limpo) {
+    f = { ...f, titulo: semMcp(f && f.titulo) }
     const cat = categoriaDe(f)
     const alvo = limpo ? String(limpo(f.titulo) || '').slice(0, 48) : ''
     const base = rotulo ? rotulo(f) : ROTULO[cat]
     if (cat === 'skills') return alvo && !/^skills?_?(list|manage)?$/i.test(alvo) ? `Consultando a skill ${alvo}` : 'Consultando as suas skills…'
     if (cat === 'memoria') return 'Lembrando do que já conversamos'
-    if (cat === 'midia') return base
+    if (cat === 'imagem' || cat === 'video' || cat === 'voz') return base
     if (cat === 'terminal') return 'Rodando um comando…'
+    if (cat === 'codigo') return 'Rodando um código…'
+    if (cat === 'redes') return alvo ? `Abrindo a rede social: ${alvo}` : 'Abrindo a rede social…'
     return alvo && cat !== 'terminal' ? `${base}: ${alvo}` : base
   }
 
@@ -63,11 +85,14 @@
   // acende a região do cérebro virada para o ícone dela e um feixe de 3 fios cresce até o ícone, com pacotes de luz indo e voltando.
   // Ao terminar, anel e faíscas no ícone e um clarão no cérebro. Brilho por sprites pré-desenhados com 'lighter' (sem shadowBlur, que é caro).
   const TAU = Math.PI * 2
-  const COR = { skills: '#ff9f5a', arquivos: '#7dde8a', web: '#6ea8ff', navegador: '#3fe0f5', terminal: '#ffd166', memoria: '#b58cff', midia: '#ff7ab8', agentes: '#e8eefc' }
-  const NOME = { skills: 'Skills', arquivos: 'Arquivos', web: 'Internet', navegador: 'Navegador', terminal: 'Código', memoria: 'Memória', midia: 'Mídia', agentes: 'Agente' }
-  const ORDEM = ['skills', 'arquivos', 'web', 'navegador', 'terminal', 'memoria', 'midia', 'agentes']
-  const BASE = '#59c8ff'
+  const COR = { pensar: '#c4a7ff', escrever: '#f2f6ff', skills: '#ff9f5a', arquivos: '#7dde8a', documentos: '#ffb4a2', planilhas: '#4fd69c', web: '#6ea8ff', navegador: '#3fe0f5',
+    redes: '#ff5fa2', terminal: '#ffe08a', codigo: '#f9a03f', memoria: '#b58cff', imagem: '#ff7ab8', video: '#ff4d6d', voz: '#7ae7ff', pesquisa: '#9bd1ff', tarefas: '#a8e6a1', agentes: '#e8eefc' }
+  const NOME = ROTULO
+  const ORDEM = ICONES
+  const BASE = '#59c8ff' // ativo (pergunta rodando): azul
   const NUCLEO = '#ff8a66'
+  const BASE_P = '#ffc861' // parado (sem pergunta): ambar, girando devagar
+  const NUCLEO_P = '#ffb347'
   const lerp = (a, b, k) => a + (b - a) * k
   const rgb = (hex) => {
     const v = parseInt(hex.slice(1), 16)
@@ -79,6 +104,7 @@
   }
 
   // o cérebro é o mesmo desenho sempre (semente fixa); calculado uma vez e reaproveitado por todos os cartões
+  const NC = 560 // neuronios do cortex (os primeiros NC pontos)
   let MODELO = null
   function modelo() {
     if (MODELO) return MODELO
@@ -86,7 +112,7 @@
     const rnd = () => ((sem = (sem + 0x6d2b79f5) >>> 0), (((sem ^ (sem >>> 15)) * (1 | sem)) >>> 0) / 4294967296)
     const P = []
     const ponto = (x, y, z, peso = 1) => P.push({ x, y, z, f: rnd() * TAU, peso })
-    for (let i = 0; i < 430; i++) {
+    for (let i = 0; i < NC; i++) {
       const lado = i % 2 ? 1 : -1
       const u = rnd() * TAU
       const v = Math.acos(2 * rnd() - 1)
@@ -180,6 +206,42 @@
     } else if (id === 'memoria') {
       cx.ellipse(0, -h * 0.55, h * 0.85, h * 0.32, 0, 0, TAU); cx.moveTo(-h * 0.85, -h * 0.55); cx.lineTo(-h * 0.85, h * 0.55)
       cx.ellipse(0, h * 0.55, h * 0.85, h * 0.32, 0, Math.PI, 0, true); cx.lineTo(h * 0.85, -h * 0.55); cx.moveTo(-h * 0.85, 0); cx.ellipse(0, 0, h * 0.85, h * 0.32, 0, Math.PI, 0, true); cx.stroke()
+    } else if (id === 'pensar') {
+      cx.arc(0, -h * 0.2, h * 0.62, Math.PI * 0.8, Math.PI * 2.2); cx.lineTo(h * 0.28, h * 0.55); cx.lineTo(-h * 0.28, h * 0.55); cx.closePath()
+      cx.moveTo(-h * 0.24, h * 0.8); cx.lineTo(h * 0.24, h * 0.8); cx.moveTo(-h * 0.12, h); cx.lineTo(h * 0.12, h); cx.stroke()
+    } else if (id === 'escrever') {
+      cx.moveTo(-h * 0.8, h * 0.8); cx.lineTo(-h * 0.6, h * 0.25); cx.lineTo(h * 0.45, -h * 0.8); cx.lineTo(h * 0.8, -h * 0.45); cx.lineTo(-h * 0.25, h * 0.6); cx.closePath()
+      cx.moveTo(h * 0.25, -h * 0.6); cx.lineTo(h * 0.6, -h * 0.25); cx.stroke()
+    } else if (id === 'documentos') {
+      cx.moveTo(-h * 0.7, -h); cx.lineTo(h * 0.2, -h); cx.lineTo(h * 0.7, -h * 0.5); cx.lineTo(h * 0.7, h); cx.lineTo(-h * 0.7, h); cx.closePath()
+      for (const yy of [-0.3, 0.05, 0.4, 0.72]) { cx.moveTo(-h * 0.4, h * yy); cx.lineTo(h * (yy > 0.6 ? 0.1 : 0.4), h * yy) }
+      cx.stroke()
+    } else if (id === 'planilhas') {
+      rr(-h, -h * 0.8, s, h * 1.6)
+      cx.moveTo(-h, -h * 0.27); cx.lineTo(h, -h * 0.27); cx.moveTo(-h, h * 0.27); cx.lineTo(h, h * 0.27); cx.moveTo(-h * 0.33, -h * 0.8); cx.lineTo(-h * 0.33, h * 0.8); cx.moveTo(h * 0.33, -h * 0.8); cx.lineTo(h * 0.33, h * 0.8); cx.stroke()
+    } else if (id === 'redes') {
+      cx.moveTo(-h * 0.9, -h * 0.5); cx.quadraticCurveTo(-h * 0.9, -h * 0.9, -h * 0.5, -h * 0.9); cx.lineTo(h * 0.5, -h * 0.9); cx.quadraticCurveTo(h * 0.9, -h * 0.9, h * 0.9, -h * 0.5)
+      cx.lineTo(h * 0.9, h * 0.25); cx.quadraticCurveTo(h * 0.9, h * 0.6, h * 0.5, h * 0.6); cx.lineTo(-h * 0.2, h * 0.6); cx.lineTo(-h * 0.6, h * 0.95); cx.lineTo(-h * 0.55, h * 0.6)
+      cx.quadraticCurveTo(-h * 0.9, h * 0.6, -h * 0.9, h * 0.25); cx.closePath(); cx.stroke()
+      cx.beginPath(); cx.moveTo(0, h * 0.32); cx.bezierCurveTo(-h * 0.55, -h * 0.05, -h * 0.3, -h * 0.65, 0, -h * 0.32); cx.bezierCurveTo(h * 0.3, -h * 0.65, h * 0.55, -h * 0.05, 0, h * 0.32); cx.fill()
+    } else if (id === 'codigo') {
+      cx.moveTo(-h * 0.35, -h * 0.8); cx.quadraticCurveTo(-h * 0.75, -h * 0.8, -h * 0.65, -h * 0.3); cx.quadraticCurveTo(-h * 0.6, 0, -h * 0.95, 0); cx.quadraticCurveTo(-h * 0.6, 0, -h * 0.65, h * 0.3); cx.quadraticCurveTo(-h * 0.75, h * 0.8, -h * 0.35, h * 0.8)
+      cx.moveTo(h * 0.35, -h * 0.8); cx.quadraticCurveTo(h * 0.75, -h * 0.8, h * 0.65, -h * 0.3); cx.quadraticCurveTo(h * 0.6, 0, h * 0.95, 0); cx.quadraticCurveTo(h * 0.6, 0, h * 0.65, h * 0.3); cx.quadraticCurveTo(h * 0.75, h * 0.8, h * 0.35, h * 0.8)
+      cx.moveTo(h * 0.15, -h * 0.45); cx.lineTo(-h * 0.15, h * 0.45); cx.stroke()
+    } else if (id === 'imagem') {
+      rr(-h, -h * 0.8, s, h * 1.6); cx.moveTo(-h, h * 0.55); cx.lineTo(-h * 0.35, -h * 0.05); cx.lineTo(h * 0.1, h * 0.4); cx.lineTo(h * 0.45, h * 0.05); cx.lineTo(h, h * 0.6); cx.stroke()
+      cx.beginPath(); cx.arc(h * 0.45, -h * 0.4, h * 0.14, 0, TAU); cx.fill()
+    } else if (id === 'video') {
+      rr(-h, -h * 0.8, s, h * 1.6); cx.moveTo(-h * 0.25, -h * 0.35); cx.lineTo(h * 0.45, 0); cx.lineTo(-h * 0.25, h * 0.35); cx.closePath(); cx.stroke()
+    } else if (id === 'voz') {
+      const barras = [0.25, 0.6, 1, 0.7, 0.4, 0.85, 0.3]
+      barras.forEach((v, i) => { const x0 = -h * 0.9 + i * h * 0.3; cx.moveTo(x0, -h * v * 0.85); cx.lineTo(x0, h * v * 0.85) })
+      cx.stroke()
+    } else if (id === 'pesquisa') {
+      cx.arc(-h * 0.15, -h * 0.15, h * 0.58, 0, TAU); cx.moveTo(h * 0.28, h * 0.28); cx.lineTo(h * 0.88, h * 0.88); cx.stroke()
+    } else if (id === 'tarefas') {
+      for (const yy of [-0.62, 0, 0.62]) { cx.moveTo(-h * 0.9, h * yy); cx.lineTo(-h * 0.7, h * (yy + 0.2)); cx.lineTo(-h * 0.4, h * (yy - 0.22)); cx.moveTo(-h * 0.1, h * yy); cx.lineTo(h * 0.9, h * yy) }
+      cx.stroke()
     } else if (id === 'midia') {
       rr(-h, -h * 0.8, s, h * 1.6); cx.moveTo(-h * 0.25, -h * 0.35); cx.lineTo(h * 0.45, 0); cx.lineTo(-h * 0.25, h * 0.35); cx.closePath(); cx.stroke()
     } else {
@@ -202,6 +264,8 @@
     const estouros = []
     const cx = semTela ? null : canvas.getContext('2d')
     let W = 0, H = 0, dpr = 1, clarao = 0, ult = 0, acum = 0, raf = 0, animando = false, fraseAtual = '', relogio = 0
+    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar', orb = null
+    const mix = (a, b, k) => { const x = rgb(a), y = rgb(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join('') }
     const agora = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000
 
     function tamanho() {
@@ -227,31 +291,35 @@
       const dt = Math.min(0.05, ult ? t - ult : 0.016)
       ult = t
       if (!W) tamanho()
-      cx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      const CX = W / 2, CY = H * 0.47
-      const ativas = ferr.filter((f) => f.ativo)
-      const energia = ativas.length ? 1 : 0.35
+      // geometria: a órbita dos ícones cabe INTEIRA no quadro (nada cortado) e sobra a faixa de baixo para a frase
+      const R0 = 22
+      const topo = R0 + 12, baixo = H - 40 - R0
+      const CX = W / 2, CY = (topo + baixo) / 2
+      const ativas = ferr.filter((f) => f.aceso)
+      const energia = (ativas.length ? 1 : 0.35) * (0.35 + 0.65 * kAtivo)
 
-      cx.globalCompositeOperation = 'source-over'
-      cx.globalAlpha = 1
-      const fundo = cx.createRadialGradient(CX, CY, 10, CX, CY, Math.max(W, H) * 0.75)
-      fundo.addColorStop(0, '#0f1a33'); fundo.addColorStop(0.5, '#080d1c'); fundo.addColorStop(1, '#04060d')
-      cx.fillStyle = fundo
-      cx.fillRect(0, 0, W, H)
+      // SEM FUNDO: o desenho acontece direto sobre a tela do chat (canvas transparente, sem quadro, sem borda)
+      kAtivo = lerp(kAtivo, alvoAtivo, 1 - Math.pow(0.08, dt))
+      const corBase = mix(BASE_P, BASE, kAtivo)
+      const corNucleo = mix(NUCLEO_P, NUCLEO, kAtivo)
+      cx.setTransform(1, 0, 0, 1, 0, 0)
+      cx.clearRect(0, 0, canvas.width, canvas.height)
+      cx.setTransform(dpr, 0, 0, dpr, 0, 0)
       cx.globalCompositeOperation = 'lighter'
-      luz('#5a3cff', CX + Math.cos(t * 0.11) * W * 0.26, CY + Math.sin(t * 0.13) * H * 0.2, W * 0.42, 0.1)
-      luz('#00b7ff', CX + Math.cos(t * 0.09 + 2) * W * 0.3, CY + Math.sin(t * 0.07 + 1) * H * 0.26, W * 0.38, 0.08)
-      for (const f of ativas) luz(f.cor, f.ix, f.iy, W * 0.2, 0.06 * f.liga)
+      for (const f of ativas) luz(f.cor, f.ix, f.iy, Math.min(W, H) * 0.28, 0.05 * f.liga)
       for (const d of M.poeira) {
+        if (kAtivo < 0.15 && d.f > 3) continue // parado: menos poeira
         const x = ((d.x + t * d.v * d.z) % 1) * W + Math.sin(t * 0.3 + d.f) * 6 * d.z
         const y = d.y * H + Math.cos(t * 0.25 + d.f) * 5 * d.z
-        luz('#9fc8ff', x, y, 1.2 + d.z * 2.2, (0.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 1.7 + d.f))) * d.z)
+        const borda = Math.min(x, W - x, y, H - y) / 40
+        if (borda <= 0) continue
+        luz(mix('#ffe2a8', '#9fc8ff', kAtivo), x, y, 1.2 + d.z * 2.2, (0.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 1.7 + d.f))) * d.z * (0.5 + 0.5 * kAtivo) * Math.min(1, borda))
       }
 
-      const yaw = reduzir ? 0.6 : t * 0.17 + Math.sin(t * 0.37) * 0.18
+      if (!reduzir) yaw += dt * (0.05 + 0.12 * kAtivo)
       const inc = -0.2 + (reduzir ? 0 : Math.sin(t * 0.29) * 0.06)
       const cy_ = Math.cos(yaw), sy_ = Math.sin(yaw), ci = Math.cos(inc), si = Math.sin(inc)
-      const S = Math.min(W * 0.6, H) * 0.4 * (1 + (reduzir ? 0 : 0.018 * Math.sin(t * 1.25)))
+      const S = Math.min(W * 0.55, baixo - topo + 30) * 0.46 * (1 + (reduzir ? 0 : (0.008 + 0.012 * kAtivo) * Math.sin(t * 1.25)))
       for (const p of P) {
         const x = p.x * cy_ - p.z * sy_
         const z0 = p.x * sy_ + p.z * cy_
@@ -261,16 +329,45 @@
         p.sx = CX + x * S * k; p.sy = CY - y * S * k; p.sz = z; p.k = k
       }
 
-      const rx = Math.min(W * 0.43, 320), ry = H * 0.375
+      const rx = Math.min(W / 2 - R0 - 14, 430), ry = (baixo - topo) / 2
+      const algumaFerr = ferr.some((f) => f.ativo > 0)
+      // ÓRBITA EM DUAS ALAS: os ícones ficam à esquerda e à direita do cérebro, numa curva suave (superelipse 0,7), com a faixa do meio
+      // livre (antes ficavam por cima do cérebro em cima e embaixo). Distribuídos por distância igual ao longo das alas.
+      const livre = Math.min(rx - R0 * 3, S * 1.3 + R0) // meia largura da faixa do cérebro
+      if (!orb || orb.rx !== rx || orb.ry !== ry || Math.abs(orb.livre - livre) > 2) {
+        const sup = (a) => {
+          const c = Math.cos(a), s2 = Math.sin(a)
+          return [Math.sign(c) * Math.pow(Math.abs(c), 0.7) * rx, Math.sign(s2) * Math.pow(Math.abs(s2), 0.7) * ry]
+        }
+        const N = 1440, pts = []
+        for (let k = 0; k < N; k++) pts.push(sup((k / N) * TAU))
+        let total = 0
+        const seg = [] // [x, y, comprimento acumulado] só dos pontos fora da faixa do cérebro
+        for (let k = 0; k < N; k++) {
+          const [x, y] = pts[k]
+          if (Math.abs(x) < livre) continue
+          const ant = seg[seg.length - 1]
+          if (ant && Math.hypot(x - ant[0], y - ant[1]) < 30) total += Math.hypot(x - ant[0], y - ant[1])
+          seg.push([x, y, total])
+        }
+        const pos = ferr.map((f) => {
+          const alvo = ((f.i + 0.5) / ferr.length) * total
+          let k = 0
+          while (k < seg.length - 1 && seg[k][2] < alvo) k++
+          return [seg[k][0], seg[k][1]]
+        })
+        orb = { rx, ry, livre, pos }
+      }
       for (const f of ferr) {
-        const a = -Math.PI / 2 + (f.i / ferr.length) * TAU + 0.39 + Math.sin(t * 0.21 + f.i) * 0.035
-        f.ix = CX + Math.cos(a) * rx
-        f.iy = CY + Math.sin(a) * ry + Math.sin(t * 0.9 + f.i * 1.7) * 3
-        f.liga = lerp(f.liga, f.ativo ? 1 : 0, 1 - Math.pow(0.0015, dt))
+        f.ix = CX + orb.pos[f.i][0] + Math.sin(t * 0.21 + f.i) * 1.5
+        f.iy = CY + orb.pos[f.i][1] + Math.sin(t * 0.9 + f.i * 1.7) * 2
+        const aceso = f.ativo > 0 || (alvoAtivo > 0 && !algumaFerr && f.id === base)
+        f.aceso = aceso
+        f.liga = lerp(f.liga, aceso ? 1 : 0, 1 - Math.pow(0.0015, dt))
         if (f.liga > 0.01) {
           const dx = f.ix - CX, dy = f.iy - CY, n = Math.hypot(dx, dy) || 1
           let melhor = -1e9, mi = 0
-          for (let i = 0; i < 430; i++) {
+          for (let i = 0; i < NC; i++) {
             const p = P[i]
             const v = ((p.sx - CX) * dx + (p.sy - CY) * dy) / n + p.sz * 14
             if (v > melhor) { melhor = v; mi = i }
@@ -299,20 +396,20 @@
         const calor = Math.min(a.calor, b.calor)
         cx.globalAlpha = 1
         if (calor > 0.06) { cx.strokeStyle = rgba(ferr[a.cor].cor, 0.18 + calor * 0.55); cx.lineWidth = 0.7 + calor * 1.1 }
-        else { cx.strokeStyle = rgba(BASE, (0.05 + prof * 0.2) * (0.75 + energia * 0.4) + clarao * 0.2); cx.lineWidth = 0.6 }
+        else { cx.strokeStyle = rgba(corBase, (0.05 + prof * 0.2) * (0.75 + energia * 0.4) + clarao * 0.2); cx.lineWidth = 0.6 }
         cx.beginPath(); cx.moveTo(a.sx, a.sy); cx.lineTo(b.sx, b.sy); cx.stroke()
       }
-      luz(NUCLEO, CX, CY, S * (0.5 + 0.05 * Math.sin(t * 2.2)), 0.16 + energia * 0.1 + clarao * 0.25)
+      luz(corNucleo, CX, CY, S * (0.5 + 0.05 * Math.sin(t * 2.2)), 0.14 + energia * 0.1 + clarao * 0.25)
       for (const p of P) {
         const prof = (p.sz + 1.1) / 2.2
         const pisca = 0.5 + 0.5 * Math.sin(t * (1.4 + p.peso) + p.f)
         const r = (2.2 + prof * 4.2 + pisca * 1.6) * p.k * p.peso
-        luz(BASE, p.sx, p.sy, r, (0.16 + prof * 0.5) * (0.55 + pisca * 0.45) + clarao * 0.5)
+        luz(corBase, p.sx, p.sy, r, (0.16 + prof * 0.5) * (0.55 + pisca * 0.45) + clarao * 0.5)
         if (p.calor > 0.03) luz(ferr[p.cor].cor, p.sx, p.sy, r * (1.5 + p.calor * 1.4), p.calor * (0.55 + prof * 0.45))
       }
 
       if (!reduzir) {
-        acum += dt * (ativas.length ? 46 : 18)
+        acum += dt * (2 + kAtivo * (ativas.length ? 50 : 22) + (base === 'pensar' && !algumaFerr ? 26 * kAtivo : 0))
         while (acum > 1) {
           acum--
           pulsos.push({ e: (Math.random() * M.L.length) | 0, f: 0, inv: Math.random() < 0.5, saltos: 0, v: 2.2 + Math.random() * 2 })
@@ -333,7 +430,7 @@
           continue
         }
         const prof = (lerp(a.sz, b.sz, q.f) + 1.1) / 2.2
-        luz(Math.max(a.calor, b.calor) > 0.1 ? ferr[a.cor].cor : '#ffffff', lerp(a.sx, b.sx, q.f), lerp(a.sy, b.sy, q.f), 3 + prof * 4, 0.35 + prof * 0.5)
+        luz(Math.max(a.calor, b.calor) > 0.1 ? ferr[a.cor].cor : kAtivo > 0.5 ? '#ffffff' : '#fff1cc', lerp(a.sx, b.sx, q.f), lerp(a.sy, b.sy, q.f), 3 + prof * 4, 0.35 + prof * 0.5)
       }
       if (pulsos.length > 400) pulsos.splice(0, pulsos.length - 400)
 
@@ -361,7 +458,7 @@
         }
         f.A = A
         f.D = D
-        if (f.ativo && t > f.prox) {
+        if (f.aceso && t > f.prox) {
           f.prox = t + 0.11 + Math.random() * 0.1
           pacotes.push({ f, fio: (Math.random() * 3) | 0, p: 0, volta: Math.random() < 0.38, v: 0.85 + Math.random() * 0.5 })
         }
@@ -382,12 +479,12 @@
 
       cx.globalCompositeOperation = 'source-over'
       for (const f of ferr) {
-        const on = f.liga, R = 19 + on * 5
+        const on = f.liga, R = R0 + on * 4
         cx.globalAlpha = 1
         cx.beginPath(); cx.arc(f.ix, f.iy, R, 0, TAU)
-        cx.fillStyle = on > 0.05 ? rgba(f.cor, 0.1 + on * 0.1) : 'rgba(140,170,220,0.045)'
+        cx.fillStyle = on > 0.05 ? rgba(f.cor, 0.1 + on * 0.1) : 'rgba(150,160,190,0.04)'
         cx.fill()
-        cx.strokeStyle = on > 0.05 ? rgba(f.cor, 0.35 + on * 0.55) : 'rgba(140,170,220,0.16)'
+        cx.strokeStyle = on > 0.05 ? rgba(f.cor, 0.35 + on * 0.55) : 'rgba(170,175,200,0.13)'
         cx.lineWidth = 1 + on * 0.6
         cx.stroke()
         if (on > 0.05) {
@@ -398,17 +495,17 @@
             cx.globalAlpha = (1 - ph) * 0.5 * on
             cx.strokeStyle = f.cor
             cx.lineWidth = 1.2
-            cx.beginPath(); cx.arc(f.ix, f.iy, R + ph * 26, 0, TAU); cx.stroke()
+            cx.beginPath(); cx.arc(f.ix, f.iy, R + ph * 14, 0, TAU); cx.stroke()
           }
           cx.globalCompositeOperation = 'source-over'
         }
-        icone(cx, f.id, f.ix, f.iy, 15 + on * 3, on > 0.05 ? '#ffffff' : '#93a6c8', 0.5 + on * 0.5)
+        icone(cx, f.id, f.ix, f.iy, 18 + on * 3, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
         if (on > 0.3) {
           cx.globalAlpha = Math.min(1, (on - 0.3) * 2)
           cx.fillStyle = f.cor
           cx.font = '600 11px "Segoe UI",system-ui,sans-serif'
           cx.textAlign = 'center'
-          cx.fillText(f.rotulo, f.ix, f.iy + R + 15)
+          cx.fillText(f.rotulo, f.ix, f.iy > CY ? f.iy - R - 8 : f.iy + R + 16) // rótulo do lado de dentro, nunca fora do quadro
         }
       }
 
@@ -429,19 +526,14 @@
 
       cx.globalCompositeOperation = 'source-over'
       cx.globalAlpha = 1
-      const vin = cx.createRadialGradient(CX, CY, Math.min(W, H) * 0.35, CX, CY, Math.max(W, H) * 0.72)
-      vin.addColorStop(0, 'rgba(0,0,0,0)')
-      vin.addColorStop(1, 'rgba(0,0,0,0.62)')
-      cx.fillStyle = vin
-      cx.fillRect(0, 0, W, H)
     }
 
     function chip() {
       if (!chipEl) return
-      const a = ferr.filter((f) => f.ativo).pop()
-      chipEl.style.setProperty('--c', a ? a.cor : '#9fd0ff')
+      const a = ferr.filter((f) => f.ativo).pop() || (alvoAtivo ? porId[base] : null)
+      chipEl.style.setProperty('--c', a ? a.cor : '#ffc861')
       const b = chipEl.querySelector('b')
-      if (b) b.textContent = a ? a.rotulo : 'Pensando'
+      if (b) b.textContent = a ? a.rotulo : 'Em repouso'
     }
 
     function evento(cat, estado) {
@@ -493,8 +585,24 @@
       if (!semTela) cancelAnimationFrame(raf)
     }
 
+    // 'ativo' = pergunta rodando (azul, sinapses); 'parado' = sem pergunta (ambar, girando devagar). Nunca some: so muda de estado.
+    function modo(m) {
+      alvoAtivo = m === 'ativo' ? 1 : 0
+      if (!alvoAtivo) for (const f of ferr) f.ativo = 0
+      chip()
+    }
+    // estado de base enquanto nenhuma ferramenta roda: 'pensar' (raciocinio) ou 'escrever' (escrevendo a resposta)
+    function definirBase(b) {
+      if (!porId[b] || b === base) return
+      base = b
+      chip()
+    }
+    function limpar() {
+      for (const f of ferr) f.ativo = 0
+      chip()
+    }
     return {
-      evento, pensar, iniciar, parar, tamanho, passo,
+      evento, pensar, iniciar, parar, tamanho, passo, modo, base: definirBase, limpar, estado: () => ({ ativo: alvoAtivo, base }),
       ativas: () => new Map(ferr.filter((f) => f.ativo).map((f) => [f.id, f.ativo]).concat(ferr.filter((f) => !f.ativo && f.liga >= 0).map((f) => [f.id, f.ativo]))),
       particulas: () => pacotes.length + estouros.length + (ferr.some((f) => f.ativo) ? 1 : 0),
       frase: () => fraseAtual,
