@@ -376,6 +376,14 @@ function aplicarSeguranca(home, nivel) {
   } catch {}
 }
 
+// plugins do Hermes que o produto nao usa (medido em 10/11/2026: 63 descobertos, 59 ligados, ~3 s de partida e checks a cada turno)
+const PLUGINS_FORA = [
+  'browser-browser-use', 'browser-browserbase', 'browser-firecrawl', 'computer_use', 'config_backends', 'cron_providers', 'dashboard_auth', 'delegation',
+  'disk-cleanup', 'google_meet', 'hermes-achievements', 'image_gen', 'kanban', 'security-guidance', 'teams_pipeline', 'video_gen',
+  'deepinfra', 'fal', 'krea', 'meta-ai-image-gen', 'openai', 'openai-codex', 'openrouter', 'xai',
+  'web-brave-free', 'web-ddgs', 'web-exa', 'web-firecrawl', 'web-keenable', 'web-openai-native', 'web-parallel', 'web-perplexity', 'web-searxng', 'web-tavily', 'web-xai',
+  'platforms', 'model-providers', 'context_engine', 'nous', 'default', 'web', 'browser', 'memory', 'cron', 'dashboard',
+]
 function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
   const home = prepararBase(app)
   aplicarSeguranca(home, nivel)
@@ -405,6 +413,11 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
     '  target_ratio: 0.15',
     'agent:',
     `  reasoning_effort: ${JSON.stringify(raciocinio || 'none')}`,
+    '  environment_probe: false', // sondagem do toolchain da maquina a cada partida: nao entra no nosso prompt
+    // PARTIDA: o Hermes descobre e carrega 59 plugins (provedores de imagem, video, busca, navegador externo, Discord, Feishu...) e nenhum serve ao
+    // Segundo Cerebro: imagem, video, navegador e memoria sao os NOSSOS servidores MCP. Cada plugin e um import e um check_fn na partida e no 1o turno.
+    'plugins:',
+    `  disabled: ${JSON.stringify(PLUGINS_FORA)}`,
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     ...(process.env.SB_TOOLSETS_OFF ? [`  disabled_toolsets: ${JSON.stringify(process.env.SB_TOOLSETS_OFF.split(',').map((s) => s.trim()).filter(Boolean))}`] : []),
     // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
@@ -906,7 +919,32 @@ class Sessao {
   // reenvia o mesmo pedido, sem limite de tentativas nem de tempo total — só um pedido explícito de parar (cancelar())
   // interrompe o laço. Falha de UMA ferramenta dentro de uma sessão viva (ex.: comando sem um pacote) não entra aqui:
   // isso o próprio modelo já resolve normalmente, com o processo de pé; isto só cobre o processo inteiro caindo.
+  // AQUECIMENTO REAL: o session/new do Hermes NAO constroi o agente nem abre os servidores MCP; isso so acontece no 1o session/prompt
+  // (medido: 36 s entre o prompt e a 1a chamada ao modelo numa sessao "pronta"). Um turno minimo, sem tela, paga esse custo antes da pessoa
+  // perguntar. O prompt de sistema vai junto, entao o cache de prefixo do servidor tambem esquenta. O historico do chat entra do mesmo jeito.
+  async aquecer() {
+    if (this.aquecendo) return this.aquecendo
+    this.aquecendo = (async () => {
+      await this.pronta
+      if (!this.primeira || this.turno || this.morto) return
+      const guardado = this.emitir
+      this.emitir = () => {}
+      const t0 = Date.now()
+      try {
+        this.ativo = true
+        await this._perguntar('[aquecimento] Responda apenas: ok', [])
+        registrar(this.app, `agente aquecido (1o turno) em ${((Date.now() - t0) / 1000).toFixed(1)} s`)
+      } catch (e) {
+        registrar(this.app, 'aquecimento falhou: ' + (e.message || e))
+      } finally {
+        this.ativo = false
+        this.emitir = guardado
+      }
+    })().finally(() => (this.aquecendo = null))
+    return this.aquecendo
+  }
   async perguntar(texto, anexos = []) {
+    if (this.aquecendo) await this.aquecendo // a pergunta real espera o aquecimento terminar (ele e curto) em vez de enfileirar atras dele
     this.ativo = true
     clearTimeout(this.ocioso)
     try {
@@ -940,7 +978,9 @@ class Sessao {
       if (e && e.ferramenta && e.ferramenta.status === 'completed' && e.ferramenta.titulo) feitos.push(String(e.ferramenta.titulo).slice(0, 120) + (e.ferramenta.conteudo ? ' -> ' + String(e.ferramenta.conteudo).replace(/\s+/g, ' ').slice(0, 200) : ''))
       emitirOriginal(e)
     }
+    const aquecimento = texto.startsWith('[aquecimento]')
     const guardarTurno = () => {
+      if (aquecimento) return
       this.turnosVivos = ((this.turnosVivos || '') + '\nUsuário: ' + texto.slice(0, 2000) + '\nAssistente: ' + parcial.slice(0, 2000)).slice(-12000)
     }
     let tentativa = 0

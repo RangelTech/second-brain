@@ -761,7 +761,8 @@ app.whenReady().then(() => {
       if (!embed.estado().pronto) return { ok: false }
       aquecidos.set(id, Date.now())
       await garantirAgente()
-      await sessaoDoChat(id, alvo, { onDelta: () => {}, pedirPermissao: async () => 'negar' }, '')
+      const sessao = await sessaoDoChat(id, alvo, { onDelta: () => {}, pedirPermissao: async () => 'negar' }, '')
+      sessao.aquecer?.() // 1o turno em segundo plano: agente construido, MCPs abertos, cache do servidor quente
       return { ok: true }
     } catch (e) {
       registrarAgente(app, 'aquecer: ' + (e.message || e))
