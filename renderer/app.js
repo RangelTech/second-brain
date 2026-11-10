@@ -1832,23 +1832,22 @@
     else abrir([...chats].sort(ordem)[0].id)
     // O agente (Hermes) sobe sozinho assim que existe um chat novo e vazio: ao abrir o app, ao entrar na conta e em "Nova conversa".
     // Sem isso a 1ª pergunta esperava 10 a 15 s pela partida. O main só aquece com conta entrada e motor pronto (senão devolve ok:false e tentamos de novo).
-    let tentativasAquecer = 0
+    // Vale para QUALQUER chat que esteja na tela (novo ou antigo): o agente dele fica pronto antes da pergunta e continua quente enquanto o chat
+    // estiver aberto (o main recomeça o cronômetro de ociosa a cada pedido e sobe de novo se a sessão tiver caído). Só pausa com a janela oculta.
     const aquecerAgora = async () => {
       const ca = chatAtual()
-      if (!ca || ca.msgs.length > 0 || !cfg.ativo || aquecidos.has(ca.id)) return aquecidos.has(ca && ca.id) || (ca && ca.msgs.length > 0)
+      if (!ca || !cfg.ativo || document.hidden || respostas.has(ca.id)) return false
       try {
         const r = await window.sb.aquecer?.({ id: ca.id, alvo: cfg.ativo })
         if (r && r.ok) aquecidos.add(ca.id)
       } catch {}
       return false
     }
-    setInterval(async () => {
-      if (tentativasAquecer > 400) return
-      tentativasAquecer++
-      await aquecerAgora()
-    }, 8000)
-    setTimeout(aquecerAgora, 1500)
+    setInterval(aquecerAgora, 8000)
+    for (const ms of [300, 1500, 3500]) setTimeout(aquecerAgora, ms) // logo ao abrir o app, sem esperar o primeiro ciclo
     $('novo').addEventListener('click', () => setTimeout(aquecerAgora, 400))
+    $('lista')?.addEventListener('click', () => setTimeout(aquecerAgora, 400)) // trocou de conversa: aquece a que abriu
+    document.addEventListener('visibilitychange', () => !document.hidden && aquecerAgora())
   }
   // alterações feitas por outra tela (outro computador, a web ou outra pessoa do mesmo login)
   window.sb.aoChatsMudou((d) => {

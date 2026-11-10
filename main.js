@@ -753,7 +753,10 @@ app.whenReady().then(() => {
     try {
       if (!id || !alvo || cfg.soConversa || !cfg.unlimitedEmail || cfg.aquecerAgente === false) return { ok: false }
       const ex = sessoes.get(id)
-      if (ex && !ex.morto) return { ok: true, ja: true }
+      if (ex && !ex.morto) {
+        ex.tocar?.() // chat na tela: não deixa a sessão quente morrer por ociosidade
+        return { ok: true, ja: true }
+      }
       if (Date.now() - (aquecidos.get(id) || 0) < 60000) return { ok: true }
       if (!embed.estado().pronto) return { ok: false }
       aquecidos.set(id, Date.now())

@@ -147,15 +147,41 @@ function limparGitPreso(app, minIdadeMs = 8000, trecho = 'hermes') {
     limpandoGit = false
   }
 }
-// liga o vigia enquanto algo está subindo; devolve a função que desliga
-function vigiarGitPreso(app, aposMs = 8000, passoMs = 4000) {
+// liga o vigia enquanto algo está subindo; devolve a função que desliga.
+// O Python do Hermes desiste do git aos 3 s, então um git do Hermes com mais de ~3,5 s JÁ está pendurado: não adianta esperar mais. Antes o vigia só
+// agia aos 8 s e conferia de 4 em 4 s, abrindo um PowerShell novo a cada vez (1 a 2 s cada): a partida travada custava 15 a 20 s. Agora UM PowerShell
+// fica em laço (a cada 0,7 s) enquanto a sessão sobe e encerra o git pendurado na hora: a mesma partida destrava em ~4 s.
+const GIT_PRESO_MS = +process.env.SB_GIT_PRESO_MS || 3500
+function vigiarGitPreso(app, aposMs = GIT_PRESO_MS, trecho = 'hermes') {
   if (process.platform !== 'win32') return () => {}
-  const t0 = Date.now()
-  const timer = setInterval(() => {
-    if (Date.now() - t0 >= aposMs) limparGitPreso(app, aposMs)
-  }, passoMs)
-  timer.unref?.()
-  return () => clearInterval(timer)
+  const ps =
+    `$lim=[timespan]::FromMilliseconds(${Math.max(1000, aposMs | 0)});$t='*${String(trecho).replace(/[^A-Za-z0-9_-]/g, '')}*';` +
+    `while ($true) { Get-CimInstance Win32_Process -Filter "Name='git.exe'" | Where-Object { ((Get-Date) - $_.CreationDate) -gt $lim } | ForEach-Object { ` +
+    `$pp=Get-CimInstance Win32_Process -Filter ('ProcessId=' + $_.ParentProcessId) -ErrorAction SilentlyContinue; ` +
+    `if (($_.ExecutablePath -like $t) -or ($pp -and ((([string]$pp.ExecutablePath) + ' ' + ([string]$pp.CommandLine)) -like $t))) { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; [Console]::Out.WriteLine($_.ProcessId) } }; Start-Sleep -Milliseconds 700 }`
+  let filho = null
+  try {
+    filho = require('child_process').spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+    filho.stdout.on('data', (d) => {
+      const pids = String(d).split(/\s+/).filter(Boolean)
+      if (pids.length) registrar(app, 'git preso do Hermes encerrado (pid ' + pids.join(', ') + '): o session/new volta a responder')
+    })
+    filho.on('error', () => {})
+    filho.unref?.()
+  } catch {}
+  // nunca fica para trás: desliga quando a partida termina e, por garantia, aos 10 min
+  const teto = setTimeout(() => {
+    try {
+      filho?.kill()
+    } catch {}
+  }, 10 * 60 * 1000)
+  teto.unref?.()
+  return () => {
+    clearTimeout(teto)
+    try {
+      filho?.kill()
+    } catch {}
+  }
 }
 const montagens = new Map() // HERMES_HOME -> promessa da montagem em andamento
 function assinaturaBin(bin) {
@@ -1018,6 +1044,10 @@ class Sessao {
   // Sessão ociosa por muito tempo (aquecida e sem uso) encerra para não deixar processo à toa. NUNCA derruba uma sessão com trabalho em andamento:
   // se há turno (ou retomada) em curso, só adia. Antes disso o cronômetro era rearmado ao relançar o agente no meio de uma tarefa e matava o Hermes
   // no meio do trabalho (taskkill /F sai com código 1: era o "agente saiu codigo=1" a cada ~10 min em tarefas longas).
+  // o chat está aberto na tela: a sessão continua quente (o cronômetro de ociosa recomeça)
+  tocar() {
+    if (!this.morto && this.ocioso) this.agendarOcioso()
+  }
   agendarOcioso() {
     clearTimeout(this.ocioso)
     this.ocioso = setTimeout(() => {
@@ -1040,4 +1070,4 @@ class Sessao {
   }
 }
 
-module.exports = { caminhosHermes, MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
