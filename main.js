@@ -23,6 +23,7 @@ const { Sessao, ambienteMontado, prepararBase, definirPacote, localizarBinario, 
 const skillsMod = require('./skills')
 const remotoMod = require('./remoto')
 const hermesInstalarMod = require('./hermes-instalar')
+const relatorioInstalacao = require('./relatorio-instalacao')
 const atualizadorMod = require('./atualizador')
 const { conversaDeTeste } = require('./autoteste')
 const skillsRepoMod = require('./skills-repo')
@@ -386,13 +387,15 @@ app.whenReady().then(() => {
         const r = await verificarAgente(anotar)
         if (!r.ok) {
           anotar('falhou: ' + r.motivo)
+          await relatorioInstalacao.enviar({ versao: app.getVersion(), logArq, codigo: 3 })
           return app.exit(3)
         }
         anotar('agente pronto e testado')
         app.exit(0)
       })
-      .catch((e) => {
+      .catch(async (e) => {
         anotar('falhou: ' + e.message)
+        await relatorioInstalacao.enviar({ versao: app.getVersion(), logArq, codigo: 1 })
         app.exit(1)
       })
     return
