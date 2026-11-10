@@ -701,6 +701,12 @@ app.whenReady().then(() => {
     .catch((e) => {
       console.error('[hermes]', e.message)
       avisarPreparo('')
+      // falha ao preparar o agente com o app aberto: grava no preparo.log e avisa a equipe (o log so existia no PC do cliente)
+      try {
+        const logArq = path.join(app.getPath('userData'), 'preparo.log')
+        fs.appendFileSync(logArq, new Date().toISOString() + ' falhou (app aberto): ' + String(e.message).slice(0, 400) + '\n')
+        relatorioInstalacao.enviar({ versao: app.getVersion(), logArq, codigo: 'app' })
+      } catch {}
     })
   ipcMain.handle('chat:permissao-resp', (_e, { req, resposta }) => permissoes.get(req)?.(resposta))
   // Aquecimento: a partida do Hermes leva 10 a 15 s; quem começa a digitar num chat novo já deixa a sessão subindo, e a 1ª pergunta não espera.
