@@ -721,6 +721,18 @@ app.whenReady().then(() => {
       janela?.webContents.send('hermes:preparando', t)
     } catch {}
   }
+  // ensaio visual da tela de preparo (nao depende de preparar de verdade): SB_TESTE_PREPARO=<segundos>
+  if (process.env.SB_TESTE_PREPARO) {
+    const etapas = ['baixando o instalador', 'ffmpeg', 'node', 'python', 'ripgrep', 'montando o ambiente']
+    let n = 0
+    const iv = setInterval(() => {
+      if (n >= +process.env.SB_TESTE_PREPARO) {
+        clearInterval(iv)
+        return avisarPreparo('')
+      }
+      avisarPreparo(`Preparando o agente pela primeira vez (${etapas[Math.floor(n++ / 3) % etapas.length]}). Leva alguns minutos e acontece uma vez só…`)
+    }, 1000)
+  }
   garantirAgente(MODO_SERVIDOR ? undefined : avisarPreparo)
     .then(() => avisarPreparo(''))
     .catch((e) => {

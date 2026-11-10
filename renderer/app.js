@@ -508,7 +508,7 @@
     if (m.role === 'user') {
       d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
     } else {
-      d.innerHTML = `${QUEM}</div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}<div class="partes"></div>`
+      d.innerHTML = `${QUEM}</div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
       renderPartes(d.querySelector('.partes'), partesDe(m))
       for (const a of m.midias || []) d.appendChild(midia(a))
     }
@@ -889,29 +889,36 @@
   function montarVivo(r) {
     const d = document.createElement('div')
     d.className = 'msg assistant'
-    d.innerHTML = `${QUEM}</div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span><button class="atv-seta" type="button" aria-expanded="false" aria-label="Ver o que está sendo feito" title="Ver o que está sendo feito">›</button></div><div class="atv-log" hidden></div><details class="raciocinio" hidden><summary>Raciocínio</summary><div class="rtxt"></div></details><div class="aviso" hidden></div><div class="partes"></div>`
+    // a resposta cresce de cima para baixo e a atividade fica NO RODAPÉ da mensagem: o pensamento acompanha o fim do texto, sempre à vista
+    d.innerHTML = `${QUEM}</div><div class="aviso" hidden></div><div class="partes"></div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span><button class="atv-seta" type="button" aria-expanded="false" aria-label="Ver o que está sendo feito" title="Ver o que está sendo feito">›</button></div><div class="sin-cartao" hidden><canvas class="sin-canvas" aria-hidden="true"></canvas><div class="sin-frase" aria-live="off"></div></div>`
     r.el = d
     const seta = d.querySelector('.atv-seta')
-    const caixa = d.querySelector('.atv-log')
-    seta.onclick = () => {
-      r.logAberto = !r.logAberto
-      caixa.hidden = !r.logAberto
-      seta.setAttribute('aria-expanded', String(!!r.logAberto))
-      seta.classList.toggle('aberta', !!r.logAberto)
-      pintarLog(r)
+    const cartao = d.querySelector('.sin-cartao')
+    const SA = window.SBAtividade
+    const abrir = (sim) => {
+      cartao.hidden = !sim
+      seta.setAttribute('aria-expanded', String(!!sim))
+      seta.classList.toggle('aberta', !!sim)
+      if (!r.card) return
+      if (sim) {
+        r.card.iniciar()
+        r.card.tamanho()
+      } else r.card.parar()
     }
-    if (r.logAberto) {
-      caixa.hidden = false
-      seta.classList.add('aberta')
-      seta.setAttribute('aria-expanded', 'true')
-      pintarLog(r)
-    }
-    if (r.raz) {
-      const det = d.querySelector('.raciocinio')
-      det.hidden = false
-      det.open = true
-      det.querySelector('.rtxt').textContent = r.raz
-    }
+    if (SA) {
+      const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+      r.card?.parar()
+      r.card = SA.criarCartao(d.querySelector('.sin-canvas'), d.querySelector('.sin-frase'), { reduzir })
+      // o que já estava em andamento quando a tela foi redesenhada volta aceso
+      for (const cat of r.cats?.values() || []) r.card.evento(cat, 'inicio')
+      if (r.frase) r.card.pensar(r.frase)
+      seta.onclick = () => {
+        const sim = cartao.hidden // vai abrir?
+        SA.lembrar(sim) // quem fecha uma vez não vê abrir de novo em nenhum chat
+        abrir(sim)
+      }
+      abrir(SA.aberto())
+    } else seta.hidden = true
     if (r.aviso) {
       const a = d.querySelector('.aviso')
       a.hidden = false
@@ -929,7 +936,7 @@
     if (!c.tituloManual && (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat')) c.titulo = texto.slice(0, 42)
     c.em = Date.now()
     salvar()
-    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', log: [{ ms: 0, txt: 'Enviando o pedido ao agente…' }], retomadas, texto, anexosEnviados: anexos })
+    respostas.set(c.id, { id: c.id, el: null, partes: [], raz: '', aviso: '', midias: [], perms: [], inicio: Date.now(), ultimo: Date.now(), fase: 'Aguardando o modelo…', frase: 'Pensando…', log: [{ ms: 0, txt: 'Enviando o pedido ao agente…' }], retomadas, texto, anexosEnviados: anexos })
     if (!relogio) relogio = setInterval(tiquetaque, 1000)
     if (c.id === atual) desenhar()
     alternarBotao(respostas.has(atual))
@@ -1086,7 +1093,8 @@
       const parado = Date.now() - r.ultimo
       at.querySelector('.tempo').textContent = fmtTempo(Date.now() - r.inicio)
       // nunca falamos de "sinal" ou "silêncio" ao cliente: etapa longa é etapa longa, e o relógio mostra que está andando
-      const faseMostrada = parado > 45000 && !/ação longa|Compactando/.test(r.fase) ? 'Trabalhando numa etapa longa…' : r.fase
+      // com o cartão de atividade, a frase de pensamento mostra o que está acontecendo; a linha só diz que está trabalhando (nunca "etapa longa" genérico)
+      const faseMostrada = window.SBAtividade ? 'Trabalhando' : parado > 45000 && !/ação longa|Compactando/.test(r.fase) ? 'Trabalhando numa etapa longa…' : r.fase
       at.querySelector('.atv-txt').textContent = faseMostrada
       at.classList.remove('demora')
       const extra = at.querySelector('.atv-extra')
@@ -1103,6 +1111,12 @@
     }
     window.sb.parar(atual)
   })
+  // frase de pensamento do cartão de atividade: uma só, trocada no mesmo lugar (a ferramenta em uso tem prioridade sobre o raciocínio)
+  function definirFrase(r, txt, forcar) {
+    if (!txt || (!forcar && r.cats && r.cats.size)) return // com ferramenta em andamento, ela manda na frase
+    r.frase = txt
+    r.card?.pensar(txt)
+  }
   function sinal(r, fase) {
     r.ultimo = Date.now()
     if (fase) {
@@ -1137,6 +1151,7 @@
       r.raz += d.raciocinio
       sinal(r, 'Pensando… (' + Math.round(r.raz.length / 4) + ' palavras)')
       anotar(r, 'Pensando… ' + String(r.raz).replace(/\s+/g, ' ').trim().slice(-110))
+      if (window.SBAtividade) definirFrase(r, window.SBAtividade.fraseDoRaciocinio(r.raz))
       if (visivel(r)) {
         const det = r.el.querySelector('.raciocinio')
         det.hidden = false
@@ -1155,10 +1170,12 @@
         // o servidor está escrevendo uma ação inteira (só aparece quando termina): sinal de vida com o tempo real de espera
         r.esperaDesde = r.esperaDesde || Date.now() - p.seg * 1000
         sinal(r, p.seg < 12 ? `Aguardando o modelo… ${p.seg} s` : `O modelo está escrevendo uma ação longa (um arquivo, por exemplo) · ${fmtTempo(p.seg * 1000)} · a tela só mostra quando ela termina`)
+        definirFrase(r, p.seg < 12 ? 'Pensando…' : 'Montando uma ação longa, como um arquivo…')
         return
       }
       r.esperaDesde = 0
       const oque = p.tipo === 'ferramenta' ? 'uma ação longa (provavelmente um arquivo)' : p.tipo === 'raciocinio' ? 'o raciocínio' : 'a resposta'
+      definirFrase(r, p.tipo === 'ferramenta' ? 'Escrevendo um arquivo…' : p.tipo === 'resposta' ? 'Escrevendo a resposta…' : '')
       if (!r.compactando) sinal(r, `Escrevendo ${oque} · ${nTokens(p.tokens)} tokens${p.tps ? ' · ' + p.tps + ' tok/s' : ''}`)
       else r.ultimo = Date.now()
     }
@@ -1196,6 +1213,23 @@
     if (d.ferramenta) {
       const f = d.ferramenta
       sinal(r, f.status === 'completed' || f.status === 'failed' ? 'Analisando o resultado…' : 'Executando ferramenta')
+      const SA = window.SBAtividade
+      if (SA && !INTERNA.test(f.titulo || '')) {
+        // sinapse até o ícone certo, em tempo real: acende quando a ferramenta começa e dá o "ok" (ou erro) quando termina
+        r.cats ||= new Map()
+        const cat = SA.categoriaDe(f)
+        const fim = f.status === 'completed' || f.status === 'failed'
+        if (!r.cats.has(f.id)) {
+          r.cats.set(f.id, cat)
+          r.card?.evento(cat, 'inicio')
+          definirFrase(r, SA.fraseDaFerramenta(f, rotuloFerr, tituloLimpo), true)
+        }
+        if (fim) {
+          const c = r.cats.get(f.id)
+          r.cats.delete(f.id)
+          r.card?.evento(c, f.status === 'failed' ? 'erro' : 'ok')
+        }
+      }
       const existente = r.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
       if (!INTERNA.test(f.titulo || '')) {
         const o = `${rotuloFerr(f)}${tituloLimpo(f.titulo) ? ': ' + tituloLimpo(f.titulo).slice(0, 70) : ''}`
@@ -1249,18 +1283,47 @@
     listar()
     try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Segundo Cérebro', { body: ok ? 'Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo.' }) } catch {}
   })
-  // primeira abertura: o agente está sendo preparado em segundo plano; aviso discreto, some sozinho quando termina
+  // o agente está sendo preparado (primeira abertura, ou depois de uma instalação que não terminou): tela de carregamento com o cérebro animado,
+  // o passo atual e o tempo, no lugar do chat. Impede a pessoa de mandar um pedido que ficaria minutos "enviando"; some sozinha quando termina.
+  const preparo = { el: null, card: null, t0: 0, relogio: 0, ciclo: 0, i: 0 }
+  function fecharPreparo() {
+    clearInterval(preparo.relogio)
+    clearInterval(preparo.ciclo)
+    preparo.card?.parar()
+    preparo.el?.remove()
+    Object.assign(preparo, { el: null, card: null })
+  }
   window.sb.aoPreparando?.((t) => {
-    let p = document.getElementById('sb-preparando')
-    if (!t) return p?.remove()
-    if (!p) {
-      p = document.createElement('div')
-      p.id = 'sb-preparando'
-      p.setAttribute('role', 'status')
-      p.style.cssText = 'position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:9999;background:#2a1f14;color:#f3ece4;border:1px solid #5a4630;border-radius:999px;padding:8px 16px;font:13px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:90vw;text-align:center;pointer-events:none'
-      document.body.appendChild(p)
+    if (!t) return fecharPreparo()
+    const passo = String(t).replace(/^Preparando o agente pela primeira vez\s*/i, '').replace(/^\(|\)\.?.*$/g, '').replace(/\.\s*Leva.*$/i, '').trim()
+    if (!preparo.el) {
+      const el = document.createElement('div')
+      el.id = 'sb-preparando'
+      el.setAttribute('role', 'status')
+      el.className = 'sb-preparando'
+      el.innerHTML = '<div class="sbp-caixa"><canvas class="sbp-canvas" aria-hidden="true"></canvas><h2>Preparando o seu assistente</h2><p class="sbp-passo"></p><p class="sbp-dica">Isso acontece só na primeira vez e leva alguns minutos. Pode deixar o aplicativo aberto: ele avisa quando terminar.</p><p class="sbp-tempo"></p></div>'
+      document.body.appendChild(el)
+      preparo.el = el
+      preparo.t0 = Date.now()
+      const SA = window.SBAtividade
+      if (SA) {
+        const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+        preparo.card = SA.criarCartao(el.querySelector('.sbp-canvas'), { textContent: '', classList: { add() {}, remove() {} } }, { reduzir })
+        preparo.card.iniciar()
+        preparo.i = 0
+        // enquanto prepara, os ícones acendem um de cada vez (o cérebro "conectando" tudo)
+        preparo.ciclo = setInterval(() => {
+          const cat = SA.ICONES[preparo.i++ % SA.ICONES.length]
+          preparo.card.evento(cat, 'inicio')
+          setTimeout(() => preparo.card?.evento(cat, 'ok'), 1400)
+        }, 1500)
+      }
+      preparo.relogio = setInterval(() => {
+        const q = el.querySelector('.sbp-tempo')
+        if (q) q.textContent = fmtTempo(Date.now() - preparo.t0)
+      }, 1000)
     }
-    p.textContent = t
+    preparo.el.querySelector('.sbp-passo').textContent = passo ? passo.charAt(0).toUpperCase() + passo.slice(1) + '…' : 'Começando…'
   })
   // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)
   if (window.__sbRaw && window.sb.atualizacao) {

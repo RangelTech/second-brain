@@ -346,3 +346,21 @@
 .briefing{margin-top:8px;font-size:13px;color:var(--mut)}
 .briefing summary{cursor:pointer}
 .briefing pre{white-space:pre-wrap;margin:6px 0 0;padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--bd);font:12.5px/1.5 var(--sans);color:var(--fg)}
+
+/* ---- cartão de atividade ao vivo (Spec 25 §15): cérebro com sinapses + frase de pensamento, no RODAPÉ da resposta ---- */
+.msg.assistant .atividade{margin:10px 0 6px}
+.sin-cartao{max-width:460px;margin:0 0 10px;border:1px solid var(--bd,#3a332b);border-radius:12px;background:radial-gradient(ellipse at 50% 40%,rgba(34,54,84,.55),rgba(10,16,32,.55) 75%);overflow:hidden}
+.sin-cartao[hidden]{display:none}
+.sin-canvas{display:block;width:100%;height:150px}
+.sin-frase{min-height:22px;padding:2px 14px 12px;text-align:center;font-size:13px;color:#b9cfe6;transition:opacity .16s ease,transform .16s ease}
+.sin-frase.troca{opacity:0;transform:translateY(3px)}
+@media (prefers-reduced-motion:reduce){.sin-frase{transition:none}}
+
+/* ---- tela de preparo do assistente (primeira abertura) ---- */
+.sb-preparando{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(18,16,14,.94);backdrop-filter:blur(3px)}
+.sbp-caixa{width:min(440px,90vw);text-align:center;color:var(--fg,#ece9e4)}
+.sbp-caixa h2{margin:6px 0 6px;font-size:20px;font-weight:600}
+.sbp-canvas{display:block;width:100%;height:190px;border-radius:14px;background:radial-gradient(ellipse at 50% 40%,rgba(34,54,84,.55),rgba(10,16,32,.55) 75%)}
+.sbp-passo{margin:0 0 10px;min-height:20px;color:#b9cfe6;font-size:14px}
+.sbp-dica{margin:0 0 6px;color:var(--mut,#a39e96);font-size:13px;line-height:1.5}
+.sbp-tempo{margin:0;color:var(--mut,#a39e96);font-size:13px;font-variant-numeric:tabular-nums}
