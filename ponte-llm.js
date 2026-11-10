@@ -52,6 +52,23 @@ function semPensar(texto) {
   return texto
 }
 
+// Ferramentas que o modelo nunca deve ver. search_files: o modelo ignora a dica do prompt e roda `search_files *` na pasta de trabalho
+// (medido em 10/11/2026: 76 s e 132 s numa pasta de 2,8 GB; o mesmo com `terminal` leva 2 s). O Hermes so desliga por toolset inteiro
+// (`file` levaria read/write junto), entao a ponte tira a ferramenta da lista `tools` do pedido: para o modelo ela nao existe.
+const FERRAMENTAS_FORA = new Set((process.env.SB_FERRAMENTAS_FORA || 'search_files').split(',').map((s) => s.trim()).filter(Boolean))
+function tirarFerramentas(texto) {
+  if (!FERRAMENTAS_FORA.size) return texto
+  try {
+    const j = JSON.parse(texto)
+    if (!Array.isArray(j.tools)) return texto
+    const antes = j.tools.length
+    j.tools = j.tools.filter((t) => !FERRAMENTAS_FORA.has(t && t.function && t.function.name))
+    return j.tools.length === antes ? texto : JSON.stringify(j)
+  } catch {
+    return texto
+  }
+}
+
 function criar({ destino, aoProgresso, registrar = () => {} }) {
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
@@ -188,7 +205,7 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
         let corpo = Buffer.concat(partes)
         const n = normalizarEditor(corpo.toString('utf8'))
         if (n.pares.size) pares = n.pares
-        corpo = Buffer.from(semPensar(n.pares.size ? n.texto : corpo.toString('utf8')), 'utf8')
+        corpo = Buffer.from(tirarFerramentas(semPensar(n.pares.size ? n.texto : corpo.toString('utf8'))), 'utf8')
         up.setHeader('content-length', corpo.length)
         up.end(corpo)
       })
@@ -209,4 +226,4 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
   }
 }
 
-module.exports = { semPensar, criar, SEP, normalizarEditor, restaurarEditor }
+module.exports = { semPensar, criar, SEP, normalizarEditor, restaurarEditor, tirarFerramentas }

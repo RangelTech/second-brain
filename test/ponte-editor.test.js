@@ -69,3 +69,12 @@ test('ponte: servidor recebe o sufixo fixo e o Hermes recebe o nome real de volt
     http.globalAgent.destroy()
   }
 })
+
+test('tirarFerramentas: search_files some da lista tools do pedido; o resto fica igual', () => {
+  const corpo = JSON.stringify({ model: 'x', tools: [{ type: 'function', function: { name: 'read_file' } }, { type: 'function', function: { name: 'search_files' } }, { type: 'function', function: { name: 'terminal' } }], messages: [] })
+  const j = JSON.parse(ponte.tirarFerramentas(corpo))
+  assert.deepEqual(j.tools.map((t) => t.function.name), ['read_file', 'terminal'])
+  const sem = '{"model":"x","messages":[]}'
+  assert.equal(ponte.tirarFerramentas(sem), sem)
+  assert.equal(ponte.tirarFerramentas('nao e json'), 'nao e json')
+})

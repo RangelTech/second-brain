@@ -419,6 +419,8 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
     'plugins:',
     `  disabled: ${JSON.stringify(PLUGINS_FORA)}`,
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
+    // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
+    // (so aceita nome de TOOLSET; `search_files` sozinha e tirada pela ponte-llm.js, porque o toolset `file` levaria read/write junto)
     ...(process.env.SB_TOOLSETS_OFF ? [`  disabled_toolsets: ${JSON.stringify(process.env.SB_TOOLSETS_OFF.split(',').map((s) => s.trim()).filter(Boolean))}`] : []),
     // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
     // com a conta do Unlimited, a visão vai direto a ele. Sem a conta, o Hermes decide sozinho.
