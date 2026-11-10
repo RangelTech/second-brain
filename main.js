@@ -162,6 +162,17 @@ let remoto = null // acesso web remoto (spec 21 §12)
 const hermesInstalar = hermesInstalarMod.criar({ app, localizar: () => localizarBinario(app) })
 // Teste de instalação: uma conversa de verdade com o agente (modelo local de mentira). Passou uma vez, não repete.
 const marcaTeste = () => path.join(app.getPath('userData'), 'teste-instalacao.ok')
+function limparAgenteQuebrado(anotar = () => {}) {
+  const dados = app.getPath('userData')
+  const alvos = [path.join(dados, 'hermes'), path.join(dados, 'hermes-home', 'installs'), path.join(dados, 'hermes-home', 'environments'), path.join(dados, 'hermes-home', 'pronto.ok')]
+  for (const a of alvos) {
+    try {
+      fs.rmSync(a, { recursive: true, force: true })
+    } catch (e) {
+      anotar('nao consegui apagar ' + path.basename(a) + ': ' + e.message)
+    }
+  }
+}
 async function verificarAgente(anotar = () => {}) {
   if (fs.existsSync(marcaTeste())) return { ok: true, jaFeito: true }
   const pasta = path.join(app.getPath('documents'), 'Segundo Cerebro')
@@ -180,6 +191,17 @@ async function verificarAgente(anotar = () => {}) {
     })
     anotar(r.ok ? 'teste de conversa passou' : `teste de conversa falhou (tentativa ${i}): ${r.motivo}`)
     if (r.ok) break
+    if (i === 1) {
+      // instalacao anterior quebrada (ex.: abortada no meio): o instalador troca os arquivos do programa mas nao toca na pasta de dados, entao o Hermes
+      // meio instalado continuaria la. Apaga SO o agente e o ambiente dele (conversas, memoria e skills ficam) e instala de novo do zero.
+      anotar('refazendo o agente do zero (apagando a instalacao quebrada)')
+      limparAgenteQuebrado(anotar)
+      try {
+        await hermesInstalar.garantir((t) => anotar(t))
+      } catch (e) {
+        anotar('reinstalar o agente falhou: ' + e.message)
+      }
+    }
   }
   if (r.ok) {
     try {
