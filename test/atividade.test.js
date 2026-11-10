@@ -22,7 +22,7 @@ test('a frase de pensamento é curta, em português e sem jargão', () => {
   const limpo = (t) => String(t).replace(/^[a-z_]+:\s*/i, '')
   assert.equal(A.fraseDaFerramenta({ titulo: 'read_file: tabela.csv', tipo: 'read' }, rotulo, limpo), 'Lendo arquivo: tabela.csv')
   assert.equal(A.fraseDaFerramenta({ titulo: 'skill_view: video-curto', tipo: 'other' }, rotulo, limpo), 'Consultando a skill video-curto')
-  assert.equal(A.fraseDaFerramenta({ titulo: 'skills_list', tipo: 'other' }, rotulo, () => ''), 'Consultando as skills')
+  assert.equal(A.fraseDaFerramenta({ titulo: 'skills_list', tipo: 'other' }, rotulo, (x) => x), 'Consultando as suas skills…')
   assert.equal(A.fraseDoRaciocinio('Primeiro vou ver as skills. Depois abro o arquivo do cliente e monto o resumo.'), 'Depois abro o arquivo do cliente e monto o resumo.')
   assert.equal(A.fraseDoRaciocinio('   '), '')
 })

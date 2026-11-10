@@ -24,7 +24,7 @@
     const cat = categoriaDe(f)
     const alvo = limpo ? String(limpo(f.titulo) || '').slice(0, 48) : ''
     const base = rotulo ? rotulo(f) : ROTULO[cat]
-    if (cat === 'skills') return alvo ? `Consultando a skill ${alvo}` : 'Consultando as skills'
+    if (cat === 'skills') return alvo && !/^skills?_?(list|manage)?$/i.test(alvo) ? `Consultando a skill ${alvo}` : 'Consultando as suas skills…'
     if (cat === 'memoria') return 'Lembrando do que já conversamos'
     if (cat === 'midia') return base
     if (cat === 'terminal') return 'Rodando um comando…'
