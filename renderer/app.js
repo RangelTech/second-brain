@@ -22,16 +22,42 @@
 
   // na versão web o arquivo gerado fica no computador (ou na VM) do cliente: "abrir" vira baixar pelo navegador
   const ehWeb = !!window.__sbWeb
+  const b64 = (s) => {
+    const bin = atob(s)
+    const u = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i)
+    return u
+  }
+  // lê um arquivo do computador/VM em pedaços de 4 MB (web) ou de uma vez (sem leitura em pedaços); `max` desiste de arquivos maiores
+  async function lerInteiro(caminho, aoAndar, max = Infinity) {
+    if (!window.sb.lerArquivoPedaco) {
+      const r = await window.sb.lerArquivo(caminho)
+      return r && r.ok ? b64(r.base64) : null
+    }
+    const partes = []
+    let ini = 0, total = 1
+    while (ini < total) {
+      const r = await window.sb.lerArquivoPedaco({ p: caminho, ini, tam: 4 * 1024 * 1024 })
+      if (!r || !r.ok) return null
+      total = r.total
+      if (total > max) return null
+      partes.push(b64(r.base64))
+      ini += r.n || 0
+      if (!r.n) break
+      aoAndar?.(Math.round((ini / total) * 100))
+    }
+    const tudo = new Uint8Array(partes.reduce((a, p) => a + p.length, 0))
+    let k = 0
+    for (const p of partes) (tudo.set(p, k), (k += p.length))
+    return tudo
+  }
   async function baixarArquivo(caminho, el) {
     const nome = String(caminho).split(/[\\/]/).pop() || 'arquivo'
     const antes = el && el.innerHTML
     if (el) el.textContent = 'Preparando…'
     try {
-      const r = await window.sb.lerArquivo(caminho)
-      if (!r || !r.ok) throw new Error('nao-achei')
-      const bin = atob(r.base64)
-      const bytes = new Uint8Array(bin.length)
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const bytes = await lerInteiro(caminho, (pct) => el && (el.textContent = `Baixando ${pct}%`))
+      if (!bytes) throw new Error('nao-achei')
       const url = URL.createObjectURL(new Blob([bytes]))
       const a = document.createElement('a')
       a.href = url
@@ -525,11 +551,11 @@
     if (tipo === 'arq') d.innerHTML = `<div class="anexo-msg">${IC.file}${esc(nomeArq(caminho))}</div>${acoes}`
     else {
       d.innerHTML = `<div class="mut">${esc(nomeArq(caminho))}</div>${acoes}`
-      window.sb.lerArquivo(caminho).then((r) => {
-        if (!r.ok) return
+      lerInteiro(caminho, null, ehWeb ? 60 * 1024 * 1024 : Infinity).then((bytes) => {
+        if (!bytes) return
         const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', webm: tipo === 'video' ? 'video/webm' : 'audio/webm', m4a: 'audio/mp4', mp4: 'video/mp4', mov: 'video/quicktime' }[ext]
         const el = document.createElement(tipo === 'img' ? 'img' : tipo)
-        el.src = `data:${mime};base64,${r.base64}`
+        el.src = URL.createObjectURL(new Blob([bytes], { type: mime }))
         if (tipo !== 'img') el.controls = true
         el.className = 'midia-el'
         d.insertBefore(el, d.firstChild)
@@ -645,12 +671,13 @@
   function desenharAnexos() {
     const el = $('anexos')
     el.hidden = anexosPendentes.length === 0
-    el.innerHTML = anexosPendentes.map((a, i) => `<span class="chip-anexo">${a.tipo === 'audio' ? IC.mic : IC.clip}${esc(a.nome)}<button data-rm="${i}" aria-label="Remover anexo">${IC.x}</button></span>`).join('')
+    el.innerHTML = anexosPendentes.map((a, i) => `<span class="chip-anexo${a.enviando ? ' enviando' : ''}">${a.tipo === 'audio' ? IC.mic : IC.clip}${esc(a.nome)}${a.enviando ? ` <b class="pct">${a.pct || 0}%</b>` : ''}<button data-rm="${i}" aria-label="Remover anexo">${IC.x}</button></span>`).join('')
   }
+  // Web: arquivo vai em pedaços de 4 MB (uma mensagem só passava do teto da ponte e derrubava a conexão em vídeo). Desktop: o app copia do disco.
+  const PEDACO = 4 * 1024 * 1024
   async function adicionarArquivo(arquivo) {
     if (!chatAtual()) criarChat()
     const chat = atual
-    let caminho
     const original = (() => {
       try {
         return window.sb.caminhoDe(arquivo)
@@ -658,9 +685,27 @@
         return ''
       }
     })()
-    if (original) caminho = await window.sb.anexar({ chat, nome: arquivo.name, caminho: original })
-    else caminho = await window.sb.anexar({ chat, nome: arquivo.name, bytes: new Uint8Array(await arquivo.arrayBuffer()) })
-    anexosPendentes.push({ nome: arquivo.name, caminho, tipo: arquivo.type.startsWith('audio') ? 'audio' : 'arquivo' })
+    const item = { nome: arquivo.name, caminho: '', tipo: arquivo.type.startsWith('audio') ? 'audio' : 'arquivo', enviando: true, pct: 0 }
+    anexosPendentes.push(item)
+    desenharAnexos()
+    try {
+      if (original) item.caminho = await window.sb.anexar({ chat, nome: arquivo.name, caminho: original })
+      else if (arquivo.size > PEDACO && window.sb.anexoInicio) {
+        const { id } = await window.sb.anexoInicio({ chat, nome: arquivo.name })
+        for (let ini = 0; ini < arquivo.size; ini += PEDACO) {
+          if (!anexosPendentes.includes(item)) return // removeu no meio do envio
+          await window.sb.anexoPedaco({ id, bytes: new Uint8Array(await arquivo.slice(ini, ini + PEDACO).arrayBuffer()) })
+          item.pct = Math.min(99, Math.round(((ini + PEDACO) / arquivo.size) * 100))
+          desenharAnexos()
+        }
+        item.caminho = await window.sb.anexoFim({ id })
+      } else item.caminho = await window.sb.anexar({ chat, nome: arquivo.name, bytes: new Uint8Array(await arquivo.arrayBuffer()) })
+      item.enviando = false
+    } catch (e) {
+      const k = anexosPendentes.indexOf(item)
+      if (k >= 0) anexosPendentes.splice(k, 1)
+      aviso('Não consegui anexar ' + arquivo.name + '. Tente de novo.')
+    }
     desenharAnexos()
   }
   $('anexar').onclick = () => $('arquivo-input').click()
@@ -889,8 +934,10 @@
   function montarVivo(r) {
     const d = document.createElement('div')
     d.className = 'msg assistant'
-    // a resposta cresce de cima para baixo e a atividade fica NO RODAPÉ da mensagem: o pensamento acompanha o fim do texto, sempre à vista
-    d.innerHTML = `${QUEM}</div><div class="aviso" hidden></div><div class="partes"></div><div class="atividade"><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span><button class="atv-seta" type="button" aria-expanded="false" aria-label="Ver o que está sendo feito" title="Ver o que está sendo feito">›</button></div><div class="sin-cartao" hidden><canvas class="sin-canvas" aria-hidden="true"></canvas><div class="sin-frase" aria-live="off"></div></div>`
+    // Enquanto o agente trabalha, o "pensamento" é o cérebro animado (Spec 25 §15): no topo da mensagem, grande, com a ferramenta em uso e uma frase
+    // que troca no mesmo lugar. O que o agente for escrevendo aparece embaixo; quando a resposta final chega, esta mensagem viva é trocada pela
+    // definitiva e o cérebro some. A setinha recolhe (aberto por padrão; quem fecha uma vez, fica fechado em todo chat).
+    d.innerHTML = `${QUEM}</div><div class="atividade"><button class="atv-seta" type="button" aria-expanded="false" aria-label="Mostrar ou esconder o pensamento" title="Mostrar ou esconder o pensamento">›</button><span class="ponto-vivo"></span><span class="atv-txt">${esc(r.fase)}</span><span class="tempo">${fmtTempo(Date.now() - r.inicio)}</span><span class="atv-extra"></span></div><div class="sin-cartao" hidden><canvas class="sin-canvas" aria-hidden="true"></canvas><div class="sin-hud"><span class="sin-chip"><i></i><b>Pensando</b></span><span class="sin-frase" aria-live="off"></span></div></div><div class="aviso" hidden></div><div class="partes"></div>`
     r.el = d
     const seta = d.querySelector('.atv-seta')
     const cartao = d.querySelector('.sin-cartao')
@@ -902,19 +949,19 @@
       if (!r.card) return
       if (sim) {
         r.card.iniciar()
-        r.card.tamanho()
+        requestAnimationFrame(() => r.card?.tamanho())
       } else r.card.parar()
     }
     if (SA) {
       const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
       r.card?.parar()
-      r.card = SA.criarCartao(d.querySelector('.sin-canvas'), d.querySelector('.sin-frase'), { reduzir })
+      r.card = SA.criarCartao(d.querySelector('.sin-canvas'), d.querySelector('.sin-frase'), { reduzir, chipEl: d.querySelector('.sin-chip') })
       // o que já estava em andamento quando a tela foi redesenhada volta aceso
       for (const cat of r.cats?.values() || []) r.card.evento(cat, 'inicio')
-      if (r.frase) r.card.pensar(r.frase)
+      r.card.pensar(r.frase || 'Pensando…')
       seta.onclick = () => {
         const sim = cartao.hidden // vai abrir?
-        SA.lembrar(sim) // quem fecha uma vez não vê abrir de novo em nenhum chat
+        SA.lembrar(sim)
         abrir(sim)
       }
       abrir(SA.aberto())
@@ -946,6 +993,7 @@
 
   async function enviar() {
     const t = $('texto').value.trim()
+    if (anexosPendentes.some((x) => x.enviando)) return aviso('Espere o anexo terminar de carregar para enviar.')
     if (respostas.has(atual)) {
       if (!t && !anexosPendentes.length) {
         const rr = respostas.get(atual)

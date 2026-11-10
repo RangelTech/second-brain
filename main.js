@@ -840,6 +840,53 @@ app.whenReady().then(() => {
     else fs.writeFileSync(destino, Buffer.from(bytes))
     return destino
   })
+  // Anexo em PEDAÇOS (versão web): o arquivo inteiro numa mensagem só passava do teto da ponte (40 MB, e em base64 vira 33% maior) e um vídeo
+  // derrubava a conexão. A tela manda pedaços de 4 MB e o app vai gravando no disco do computador/VM do cliente.
+  const uploads = new Map() // id -> { destino, t }
+  const dirAnexos = (chat) => {
+    const dir = path.join(app.getPath('userData'), 'conversas', String(chat || 'sem-chat').replace(/[^\w.-]/g, '_'), 'anexos')
+    fs.mkdirSync(dir, { recursive: true })
+    return dir
+  }
+  ipcMain.handle('anexo:inicio', (_e, { chat, nome }) => {
+    for (const [k, u] of uploads) if (Date.now() - u.t > 60 * 60 * 1000) uploads.delete(k) // upload abandonado há 1 h
+    const limpo = String(nome || 'arquivo').replace(/[\/:*?"<>|]/g, '_')
+    const destino = path.join(dirAnexos(chat), Date.now().toString(36) + '-' + limpo)
+    fs.writeFileSync(destino, '')
+    const id = require('crypto').randomBytes(9).toString('hex')
+    uploads.set(id, { destino, t: Date.now() })
+    return { id }
+  })
+  ipcMain.handle('anexo:pedaco', (_e, { id, bytes }) => {
+    const u = uploads.get(id)
+    if (!u) throw new Error('envio do anexo não encontrado')
+    fs.appendFileSync(u.destino, Buffer.from(bytes))
+    u.t = Date.now()
+    return true
+  })
+  ipcMain.handle('anexo:fim', (_e, { id }) => {
+    const u = uploads.get(id)
+    if (!u) throw new Error('envio do anexo não encontrado')
+    uploads.delete(id)
+    return u.destino
+  })
+  // leitura em pedaços (web): baixar um vídeo grande e mostrar a prévia sem uma mensagem gigante pela ponte
+  ipcMain.handle('arquivo:lerPedaco', (_e, { p, ini = 0, tam = 4 * 1024 * 1024 }) => {
+    try {
+      const total = fs.statSync(p).size
+      const n = Math.max(0, Math.min(tam, 8 * 1024 * 1024, total - ini))
+      const buf = Buffer.alloc(n)
+      const fd = fs.openSync(p, 'r')
+      try {
+        fs.readSync(fd, buf, 0, n, ini)
+      } finally {
+        fs.closeSync(fd)
+      }
+      return { ok: true, base64: buf.toString('base64'), total, ini, n }
+    } catch {
+      return { ok: false }
+    }
+  })
   ipcMain.handle('arquivo:abrir', (_e, p) => (fs.existsSync(p) ? shell.openPath(p) : 'Arquivo não encontrado'))
   ipcMain.handle('arquivo:mostrar', (_e, p) => (shell.showItemInFolder(p), true))
   ipcMain.handle('arquivo:ler', (_e, p) => {
