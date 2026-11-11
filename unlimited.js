@@ -142,6 +142,18 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
         return { ok: false, erro: 'Sem conexão com o servidor.' }
       }
     },
+    // saldos de crédito, pacotes de compra (checkout com o e-mail da conta) e próximo plano: alimenta o pop-up de limite estourado (Spec 24)
+    creditos: async () => {
+      const c = cfgGet()
+      if (!c.unlimitedChave) return { ok: false }
+      try {
+        const r = await fetch(BASE() + '/credits', { headers: { Authorization: 'Bearer ' + decifrar(c.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
+        if (r.status !== 200) return { ok: false, status: r.status }
+        return { ok: true, ...(await r.json()) }
+      } catch {
+        return { ok: false }
+      }
+    },
     sair: () => {
       clearTimeout(timer)
       cfgSet({ unlimitedChave: undefined, unlimitedLigado: false, unlimitedEmail: undefined, unlimitedPlano: undefined, unlimitedPacote: undefined })

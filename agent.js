@@ -521,6 +521,13 @@ function mcpsExternos(app, reservados = []) {
   }
   return out
 }
+// O servidor recusou a mídia porque a cota do plano acabou: "...a cota de imagens|vídeos|áudios do seu plano neste mês...". Devolve o tipo de crédito ou null.
+const KIND_DE_COTA = { imagens: 'image', 'vídeos': 'video', 'áudios': 'audio' }
+function kindDeCotaDeMidia(texto) {
+  const m = /cota de (imagens|vídeos|áudios) do seu plano/i.exec(texto || '')
+  return m ? KIND_DE_COTA[m[1].toLowerCase()] || null : null
+}
+
 class Sessao {
   // Canal de eventos para a tela. Durante o AQUECIMENTO (turno invisível) tudo é descartado pelo `mudo`, sem trocar o canal: antes o aquecimento
   // trocava o canal por um mudo e, se a pergunta real chegasse no meio, devolvia o mudo no fim e a resposta inteira sumia (achado em 10/11/2026).
@@ -693,6 +700,7 @@ class Sessao {
       const quando = dataRenova && !isNaN(dataRenova) ? ` Renova em ${dataRenova.toLocaleString('pt-BR')}.` : '' // data ausente ou ilegível: não mostra "Invalid Date"
       if (!this.avisouLimite) {
         this.avisouLimite = true
+        this.emitir({ creditos: { kind: 'tokens' } }) // pop-up de comprar crédito ou assinar o próximo plano (Spec 24)
         this.emitir({ texto: `⛔ O limite de uso do Unlimited acabou nesta janela${lim ? ` (${Number(lim[2]).toLocaleString('pt-BR')} tokens)` : ''}.${quando} Peça ao suporte para liberar mais ou aguarde a renovação. Nada foi perdido: assim que voltar, é só pedir de novo.` })
       }
       return true
@@ -718,6 +726,8 @@ class Sessao {
         .map((c) => c.content?.text || c.text || (c.type === 'diff' ? `${c.path}\n${c.newText || ''}` : ''))
         .filter(Boolean)
         .join('\n')
+      const cota = kindDeCotaDeMidia(conteudo)
+      if (cota && !this.cotasAvisadas?.has(cota)) (this.cotasAvisadas ||= new Set()).add(cota), this.emitir({ creditos: { kind: cota } })
       this.emitir({
         ferramenta: {
           id: u.toolCallId,
@@ -980,6 +990,7 @@ class Sessao {
     clearTimeout(this.ocioso)
     this.limiteUso = false
     this.avisouLimite = false
+    this.cotasAvisadas = null
     this.pedidoParar = false
     await this.pronta
     if (this.pedidoParar) throw new Error('Interrompido.') // o usuário parou enquanto o agente ainda subia (ex.: 1ª montagem do ambiente)
@@ -1134,4 +1145,4 @@ class Sessao {
   }
 }
 
-module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

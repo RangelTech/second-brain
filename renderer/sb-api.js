@@ -82,6 +82,7 @@
       unlimitedRecusar: () => invoke('unlimited:recusar'),
       unlimitedEntrar: (email, senha) => invoke('unlimited:entrar', { email, senha }),
       unlimitedEsqueci: (email) => invoke('unlimited:esqueci', email),
+      creditos: () => invoke('creditos:opcoes'), // saldos, pacotes de crédito e próximo plano (pop-up de limite estourado)
       contaUso: () => invoke('conta:uso'),
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),
