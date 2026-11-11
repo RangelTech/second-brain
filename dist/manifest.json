@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Segundo Cérebro no Chrome",
+  "description": "Deixa o Segundo Cérebro usar o seu Chrome, com as suas contas já abertas. Sem login aqui: a conta vem do aplicativo ou do site.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Jz7p9p0SeDqrk5Fq4thwEz11fa/04vrt57RZ4jRhsOYfbtdQjOKm2qZCFk7ePXTLEG+Scz41WDL6Uox47WOpqsSIjdFhzErm1QBG674lkOjuJgYRCgphd1LX3QBwoTvQ8z9mpleP6AUdzd3gGlYfxjG2Udw6exu9F6gYhKVe/D68exD/jTUImIBlfPM/l0IJEU9o52RmKkxHWcDysDHu5aeayokKtd5VIzd5LWwm7kGnobVjQKe4clNkeFGDvdGuHaXSen3RL0Msg1/4GM1k4zVm2zAOKxbrjtA8i/vTDWtk5sw87KzyiQGLEVEbZBFCsFJa3P8VRiM6IouqLlwKQIDAQAB",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Segundo Cérebro",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "alarms",
+    "debugger",
+    "tabGroups",
+    "webNavigation",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://remoto.rangeltech.net/*"
+      ],
+      "js": [
+        "content-remoto.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
