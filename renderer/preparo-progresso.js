@@ -68,6 +68,9 @@
   function traduzir(passo) {
     const limpo = String(passo || '').replace(/[.…]+\s*$/g, '').replace(/\.{2,}/g, '').trim()
     for (const [re, t] of TRADUCAO) { const m = limpo.match(re); if (m) return typeof t === 'function' ? t(m) : t }
+    // texto do instalador sem tradução (inglês: "Reload your shell…", "Install complete! [detached @ …]"): o cliente vê uma frase em português
+    if (/^(ffmpeg|node|python|ripgrep|git|uv|npm|pnpm)$/i.test(limpo)) return 'instalando o ' + limpo.toLowerCase() // etapa conhecida (a barra usa o nome)
+    if (/[a-z]{3,}/i.test(limpo) && !/[áàâãéêíóôõúç]|\b(os|as|de|do|da|dos|das|com|para|agente|ambiente|instalando|baixando|copiando|conferindo|preparando|montando|pacotes)\b/i.test(limpo)) return 'preparando o agente'
     return limpo
   }
   return { estimar, textoRestante, esperadoMs, traduzir, PISOS }
