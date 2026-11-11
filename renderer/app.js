@@ -249,6 +249,13 @@
     $('texto').focus()
   }
   function criarChat() {
+    // já existe uma conversa vazia: abre ela em vez de empilhar várias "Nova conversa" sem nada na lista (visto no QA do Mac)
+    const vazia = chats.find((x) => !x.msgs.length && !x.tituloManual)
+    if (vazia) {
+      vazia.em = Date.now()
+      salvar()
+      return abrir(vazia.id)
+    }
     const c = { id: novoId(), titulo: 'Nova conversa', msgs: [], em: Date.now() }
     chats.push(c)
     salvar()

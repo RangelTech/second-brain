@@ -214,6 +214,7 @@
 .corpo a{text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 
 /* ---------- navegador integrado ---------- */
+.chip-topo[hidden]{display:none}
 .chip-topo{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bd);background:transparent;border-radius:9px;color:var(--mut);padding:5px 11px;font-size:13px;height:32px}
 .chip-topo:hover{background:var(--card2);color:var(--fg)}
 .chip-topo.on{color:var(--ac2);border-color:#6a5548}
