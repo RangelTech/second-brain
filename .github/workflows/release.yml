@@ -110,7 +110,8 @@ jobs:
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgbm1 libasound2t64 || true
               chmod +x dist/Segundo-Cerebro-Linux.AppImage
               (cd dist && ./Segundo-Cerebro-Linux.AppImage --appimage-extract >/dev/null)
-              xvfb-run -a "$PWD/dist/squashfs-root/second-brain" --no-sandbox --preparar-agente ;;
+              SB_SEM_FERRAMENTAS_SISTEMA=1 xvfb-run -a "$PWD/dist/squashfs-root/second-brain" --no-sandbox --preparar-agente
+              echo "--- hermes-instalacao.log (final)"; tail -40 "$SB_DATA_DIR/hermes-instalacao.log" 2>/dev/null | cut -c1-240 || true ;;
             macOS)
               app=$(ls -d dist/mac-arm64/*.app 2>/dev/null | head -1)
               [ -n "$app" ] || app=$(ls -d dist/mac*/*.app | head -1)

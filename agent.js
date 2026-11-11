@@ -606,7 +606,7 @@ class Sessao {
     this.bin = bin
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }
     // macOS sem as ferramentas da Apple: o git portátil do app vai na frente do PATH (o agente usa git em skills e atualizações)
-    const gitExtra = require('./git-mac').caminhoExtra(app)
+    const gitExtra = require('./ferramentas').caminhoExtra(app)
     if (gitExtra) this.env.PATH = gitExtra + path.delimiter + (this.env.PATH || '')
     this.subir()
     this.pronta = this.iniciar()

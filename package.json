@@ -50,7 +50,7 @@
       "native-host.js",
       "editor-video.js",
       "partida-direta.js",
-      "git-mac.js",
+      "ferramentas.js",
       "mcp-editor.js",
       "hermes-instalar.js",
       "relatorio-instalacao.js",
