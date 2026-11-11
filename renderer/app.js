@@ -210,7 +210,7 @@
       b.tabIndex = 0
       b.setAttribute('role', 'button')
       b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
-      b.onclick = (e) => {
+      b.onclick = async (e) => {
         if (e.target.closest('.fixar')) {
           c.fixado = !c.fixado
           salvar()
@@ -219,7 +219,7 @@
         }
         if (e.target.closest('.ren')) return renomear(c, b)
         if (e.target.closest('.apagar')) {
-          if (c.msgs.length && !window.confirm('Apagar esta conversa?')) return
+          if (c.msgs.length && !(await window.sbConfirmar('Apagar esta conversa?', { sim: 'Apagar', perigo: true }))) return
           chats = chats.filter((x) => x.id !== c.id)
           apagadasPend.add(c.id)
           if (atual === c.id) atual = null
@@ -1700,7 +1700,7 @@
     const b = e.target.closest('[data-modo]')
     if (!b) return
     const id = b.dataset.modo
-    if (id === 'ignorar' && !window.confirm('Modo "Ignorar permissões": o agente deixa de pedir confirmação e pode apagar ou alterar qualquer arquivo e rodar qualquer comando no seu computador.\n\nLigar mesmo assim?')) return
+    if (id === 'ignorar' && !(await window.sbConfirmar('O agente deixa de pedir confirmação e pode apagar ou alterar qualquer arquivo e rodar qualquer comando no seu computador.', { titulo: 'Ligar o modo "Ignorar permissões"?', sim: 'Ligar', perigo: true }))) return
     cfg = await window.sb.salvarCfg({ modoPermissao: id })
     pintarPermissao()
     fecharMenuPerm()
@@ -1928,7 +1928,7 @@
       const est = await window.sb.acessoWeb?.estado?.()
       if (!est || est.ok === false || est.ativo !== false) return
       await window.sb.salvarCfg({ acessoWebPerguntado: true })
-      if (confirm('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em remoto.rangeltech.net, com este computador ligado. Você pode desligar quando quiser em Configurações.')) await window.sb.acessoWeb.ativar(true)
+      if (await window.sbConfirmar('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em remoto.rangeltech.net, com este computador ligado. Você pode desligar quando quiser em Configurações.', { sim: 'Quero', nao: 'Agora não' })) await window.sb.acessoWeb.ativar(true)
     } catch {}
   }
   $('login-esqueci').onclick = async () => {
@@ -1945,7 +1945,7 @@
   $('abrir-conta').onclick = async () => {
     cfg = await window.sb.cfg()
     if (cfg.unlimitedEmail) {
-      if (confirm(`Sair da conta ${cfg.unlimitedEmail}? O app deixa de usar o Unlimited neste computador até você entrar de novo.`)) {
+      if (await window.sbConfirmar(`Sair da conta ${cfg.unlimitedEmail}?\n\nO app deixa de usar o Unlimited neste computador até você entrar de novo.`, { sim: 'Sair' })) {
         await window.sb.unlimitedSair()
         cfg = await window.sb.cfg()
         pintarConta()
