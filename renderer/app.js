@@ -1743,6 +1743,36 @@
     webNavTimer = setInterval(atualizar, 1500)
   }
   $('abrir-nav').onclick = () => navAbrir(!navAberto)
+  // Editor de vídeo (spec 25 §21): botão ao lado do Navegador, só quando o editor está liberado nesta máquina. Abre a janela própria do editor
+  // (se não estiver instalado, instala em silêncio antes, ~1 min). A IA edita ao vivo o projeto aberto nessa janela.
+  ;(async () => {
+    const E = window.sb.editor
+    const b = $('abrir-editor')
+    if (!E || !b || ehWeb) return // pela web a janela abriria no computador remoto, fora da vista: na web o resultado aparece no chat
+    const est = await E.estado().catch(() => null)
+    if (!est || !est.habilitado || !est.suportado) return
+    b.hidden = false
+    b.onclick = async () => {
+      if (b.classList.contains('carregando')) return
+      b.classList.add('carregando')
+      const rot = b.querySelector('span')
+      try {
+        const agora = await E.estado()
+        if (!agora.instalado) {
+          rot.textContent = 'Instalando…'
+          const r = await E.instalar()
+          if (!r || !r.ok) throw new Error((r && r.erro) || 'não consegui instalar o editor')
+        }
+        rot.textContent = 'Abrindo…'
+        await E.abrir()
+      } catch (e) {
+        alert('Editor de vídeo: ' + (e.message || e))
+      } finally {
+        rot.textContent = 'Editor'
+        b.classList.remove('carregando')
+      }
+    }
+  })()
   cerebroInstalar()
   $('nav-fechar').onclick = () => navAbrir(false)
   // janela própria: o navegador sai do painel e vai para uma janela grande (a mesma vista e as mesmas abas; o agente continua controlando)

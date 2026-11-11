@@ -120,6 +120,13 @@
         aoAbrirPainel: (fn) => on('navegador:abrir-painel', () => fn()),
         aoReposicionar: (fn) => on('navegador:reposicionar', () => fn()),
       },
+      // editor de vídeo (spec 25 §21): janela própria, como o navegador destacado
+      editor: {
+        estado: () => invoke('editor:estado'),
+        instalar: () => invoke('editor:instalar'),
+        abrir: (projeto) => invoke('editor:abrir', projeto),
+        aoProgresso: (fn) => on('editor:progresso', fn),
+      },
       aoErro: (fn) => on('chat:erro', fn),
     }
   }
