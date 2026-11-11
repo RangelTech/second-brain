@@ -154,7 +154,7 @@ const sessoes = new Map()
 // Ponte entre o Hermes e o roteador: repassa tudo e conta o que o modelo já gerou, para a tela mostrar progresso de verdade
 const ponteLLM = require('./ponte-llm').criar({
   destino: () => embed.estado().origem,
-  aoProgresso: (chat, info) => sessoes.get(chat)?.emitir?.({ progresso: info }),
+  aoProgresso: (chat, info) => (sessoes.get(chat) || sessoes.get(vagaChat.get(chat)))?.emitir?.({ progresso: info }),
   registrar: (linha) => registrarAgente(app, linha),
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
@@ -327,24 +327,93 @@ async function iasDoApp() {
 // (matarGatewayOrfao) e cada chat seguinte pagava 11 a 13 s para subir tudo de novo. Uma sessão fixa, sem conversa, fica de pé enquanto o app estiver aberto:
 // com ela o gateway nunca fica órfão, e `session/new` de um chat novo cai para ~2 s. Custo: um processo parado (medir). Desliga com cfg.ancoraAgente=false,
 // e não sobe se a máquina tem pouca memória livre (VM pequena).
-const ANCORA_ID = 'ancora-gateway'
+const ANCORA_ID = 'ancora-gateway' // nome antigo, mantido só para o filtro do roteador (nenhuma sessão nasce mais com ele)
 const MEMORIA_MIN_ANCORA = 1.2 * 1024 * 1024 * 1024
+// SESSÃO RESERVA (Spec 26): a partida do Hermes (Python + importações + agente + 1º turno) leva 10 a 20 s. O app mantém UMA sessão já de pé e
+// aquecida, sem conversa. A conversa que precisar do agente a ADOTA na hora (a pergunta sai em segundos) e o app sobe outra reserva em segundo plano.
+// Ela também faz o papel da antiga âncora: com ela de pé o gateway do Hermes nunca fica órfão. A identidade da conversa não fica presa ao processo:
+// a reserva nasce como "reserva-N" e, na adoção, o app grava no arquivo da vaga de qual conversa ela passou a ser (memória e mídia leem dali) e a
+// ponte do modelo traduz a vaga pela tabela vagaChat. Desliga com cfg.ancoraAgente=false; não sobe com pouca memória livre (VM pequena).
+const vagaChat = new Map() // 'reserva-N' -> id da conversa que adotou
+// Pedido do Lucas (11/11/2026): SEMPRE DUAS sessões prontas. Uma conversa usa uma, a outra continua pronta e o app já sobe a próxima.
+// Sobem uma de cada vez (a seguinte só depois da anterior aquecida), para não disputarem a máquina na abertura do app.
+const RESERVAS_ALVO = () => Math.max(0, Math.min(4, Number.isFinite(+cfg.reservasAgente) ? +cfg.reservasAgente : 2))
+const reservas = [] // sessões prontas (ou subindo), sem conversa
+let reservaSubindo = null // promessa da reserva que está sendo criada agora (uma por vez)
+let nReserva = 0
+const pastaVagas = () => path.join(app.getPath('userData'), 'vagas')
+try {
+  fs.rmSync(pastaVagas(), { recursive: true, force: true })
+} catch {}
+function reservaServe(r, alvo, nivel) {
+  return r && !r.morto && r.modelo === alvo && r.pasta === cfg.pasta && r.racio === cfg.raciocinio && r.nivel === nivel
+}
 function manterAncora(alvo, nivel) {
   try {
     if (cfg.ancoraAgente === false || cfg.soConversa || !cfg.unlimitedEmail || !alvo) return
-    const a = sessoes.get(ANCORA_ID)
-    if (a && !a.morto) return
+    // configuração mudou (modelo, raciocínio, segurança ou pasta) ou o processo caiu: essas reservas não servem mais
+    for (let i = reservas.length - 1; i >= 0; i--) {
+      if (!reservaServe(reservas[i], alvo, nivel)) {
+        const velha = reservas.splice(i, 1)[0]
+        try {
+          velha.encerrar()
+        } catch {}
+      }
+    }
+    if (reservaSubindo || reservas.length >= RESERVAS_ALVO()) return
     if (os.freemem() < MEMORIA_MIN_ANCORA) return
-    Promise.resolve(chaveLocal()).then(async (chave) => {
-      if (sessoes.get(ANCORA_ID) && !sessoes.get(ANCORA_ID).morto) return
-      await ponteLLM.iniciar()
-      const s = new Sessao({ app, id: ANCORA_ID, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: chave + require('./ponte-llm').SEP + ANCORA_ID, raciocinio: cfg.raciocinio, nivel, emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => 'manual', midia: null })
-      s.fixa = true
-      s.modelo = alvo; s.racio = cfg.raciocinio; s.nivel = nivel; s.historico = ''
-      sessoes.set(ANCORA_ID, s)
-      s.pronta.then(() => registrarAgente(app, 'âncora do gateway pronta (mantém o Hermes aquecido entre chats)')).catch(() => sessoes.delete(ANCORA_ID))
-    }).catch((e) => registrarAgente(app, 'âncora do gateway: ' + (e.message || e)))
+    const id = 'reserva-' + ++nReserva
+    reservaSubindo = Promise.resolve(chaveLocal())
+      .then(async (chave) => {
+        await ponteLLM.iniciar()
+        fs.mkdirSync(pastaVagas(), { recursive: true })
+        const vagaArq = path.join(pastaVagas(), id + '.txt')
+        fs.writeFileSync(vagaArq, '')
+        const s = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: chave + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp(), vagaArq })
+        s.fixa = true
+        s.reserva = true
+        s.modelo = alvo; s.racio = cfg.raciocinio; s.nivel = nivel; s.historico = ''
+        reservas.push(s)
+        // a próxima reserva só começa depois desta pronta e aquecida
+        s.pronta
+          .then(() => s.aquecer?.())
+          .then(() => registrarAgente(app, `sessão reserva ${id} pronta e aquecida (${reservas.length} na espera)`))
+          .catch(() => {
+            const i = reservas.indexOf(s)
+            if (i >= 0) reservas.splice(i, 1)
+          })
+          .finally(() => {
+            if (reservaSubindo === subindo) reservaSubindo = null
+            setTimeout(() => manterAncora(alvo, nivel), 500)
+          })
+        return s
+      })
+      .catch((e) => {
+        registrarAgente(app, 'sessão reserva: ' + (e.message || e))
+        if (reservaSubindo === subindo) reservaSubindo = null
+        return null
+      })
+    const subindo = reservaSubindo
   } catch {}
+}
+// A conversa `chat` leva uma reserva que sirva para a configuração atual (a mais adiantada). Devolve a sessão ou null.
+async function adotarReserva(chat, alvo, nivel) {
+  if (!reservas.some((r) => reservaServe(r, alvo, nivel)) && reservaSubindo) await reservaSubindo.catch(() => null) // a 1ª está nascendo: espera em vez de subir outra
+  const servem = reservas.filter((r) => reservaServe(r, alvo, nivel))
+  const r = servem.find((x) => !x.primeira) || servem.find((x) => !x.iniciandoAgora) || servem[0]
+  if (!r) return null
+  reservas.splice(reservas.indexOf(r), 1)
+  try {
+    fs.writeFileSync(r.vagaArq, chat)
+  } catch {}
+  vagaChat.set(r.id, chat)
+  r.vaga = r.id
+  r.id = chat
+  r.fixa = false
+  r.reserva = false
+  r.agendarOcioso()
+  registrarAgente(app, `conversa ${String(chat).slice(0, 8)} adotou a sessão reserva ${r.vaga} (${reservas.length} ainda na espera)`)
+  return r
 }
 // ---- editor de vídeo (spec 25 §21): instalação silenciosa sob pedido, janela do editor e corte de silêncio; o motor fala com o Hermes pelo próprio MCP
 const editorVideo = require('./editor-video')
@@ -384,6 +453,17 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
+  if (!reservas.length) manterAncora(alvo, nivel) // sem reserva ainda (app acabou de abrir): cria e adota a mesma, em vez de subir duas sessões ao mesmo tempo
+  const adotada = await adotarReserva(id, alvo, nivel)
+  if (adotada) {
+    if (adotada.primeira) adotada.historico = historico // ainda não aqueceu: o resumo vai no 1º turno, como numa sessão nova
+    else if (historico) adotada.historicoPendente = historico
+    adotada.emitir = contexto.onDelta
+    adotada.pedirPermissao = contexto.pedirPermissao
+    sessoes.set(id, adotada)
+    manterAncora(alvo, nivel) // já sobe a próxima reserva
+    return adotada
+  }
   await ponteLLM.iniciar()
   const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
   sessao.modelo = alvo
@@ -391,7 +471,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   sessao.nivel = nivel
   sessao.historico = historico
   sessoes.set(id, sessao)
-  if (id !== ANCORA_ID) manterAncora(alvo, nivel) // o primeiro chat também sobe a âncora do gateway
+  manterAncora(alvo, nivel) // o primeiro chat também sobe a reserva (que mantém o gateway vivo)
   return sessao
 }
 async function responder(alvo, msgs, ctx) {
@@ -1095,5 +1175,6 @@ app.on('window-all-closed', () => {
   nav?.fechar()
   remoto?.parar()
   for (const x of sessoes.values()) x.encerrar()
+  for (const r of reservas.splice(0)) r.encerrar()
   if (process.platform !== 'darwin') app.quit()
 })

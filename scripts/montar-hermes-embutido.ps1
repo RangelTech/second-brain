@@ -52,20 +52,20 @@ Copy-Item $sete (Join-Path $saida '7za.exe') -Force
 # o que e do ambiente (installs, environments, bin, install_id). No PC do cliente isso e descompactado e o agente ja nasce pronto, sem baixar nada (instalacao em
 # poucos minutos). Qualquer falha aqui NAO derruba o instalador: ele so deixa de levar o ambiente (o app monta pela internet, como antes).
 try {
-    $home = 'C:\SegundoCerebro\d'
-    Remove-Item -Recurse -Force $home -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Force $home | Out-Null
+    $casa = 'C:\SegundoCerebro\d'
+    Remove-Item -Recurse -Force $casa -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force $casa | Out-Null
     $t1 = Get-Date
-    & node (Join-Path (Get-Location) 'scripts\montar-ambiente.js') (Join-Path $raiz 'bin\hermes-acp.exe') $home 40
+    & node (Join-Path (Get-Location) 'scripts\montar-ambiente.js') (Join-Path $raiz 'bin\hermes-acp.exe') $casa 40
     if ($LASTEXITCODE -ne 0) { throw "montar-ambiente falhou (codigo $LASTEXITCODE)" }
     "ambiente montado em $([int]((Get-Date) - $t1).TotalMinutes) min"
     foreach ($d in 'cache', 'logs', 'sessions', 'memories', 'backups', 'image_cache', 'audio_cache', 'telemetry', 'pairing', 'cron', 'kanban', 'state', 'runtime', 'platforms', 'plugins', 'hooks', 'gateway', 'skills', 'source-checks', 'pending_messages', 'plugin-update-checks', '.curator_backups') {
-        Remove-Item -Recurse -Force (Join-Path $home $d) -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force (Join-Path $casa $d) -ErrorAction SilentlyContinue
     }
-    Get-ChildItem $home -File -Force | Where-Object { $_.Name -ne 'install_id' } | Remove-Item -Force -ErrorAction SilentlyContinue
-    "ambiente em disco: {0} MB" -f [int]((Get-ChildItem $home -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB)
+    Get-ChildItem $casa -File -Force | Where-Object { $_.Name -ne 'install_id' } | Remove-Item -Force -ErrorAction SilentlyContinue
+    "ambiente em disco: {0} MB" -f [int]((Get-ChildItem $casa -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB)
     $arqHome = Join-Path $saida 'home-win32-x64.7z'
-    Push-Location $home
+    Push-Location $casa
     & $sete a -t7z -m0=lzma2 -mx=5 -mmt=on -bso0 -bsp0 $arqHome '*'
     if ($LASTEXITCODE -ne 0) { throw "7za do ambiente falhou (codigo $LASTEXITCODE)" }
     Pop-Location

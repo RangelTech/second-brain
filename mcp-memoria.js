@@ -7,6 +7,13 @@ const fs = require('fs')
 
 const ARQ = process.env.SB_MEMORIA_ARQ || ''
 const ATUAL = process.env.SB_MEMORIA_CHAT || ''
+// sessão reserva (Spec 26): o processo nasce sem conversa e o app grava aqui de qual conversa ele passou a ser
+const chatAtual = () => {
+  try {
+    if (process.env.SB_VAGA_ARQ) return fs.readFileSync(process.env.SB_VAGA_ARQ, 'utf8').trim() || ATUAL
+  } catch {}
+  return ATUAL
+}
 const TRECHO_MAX = 700
 const PARADAS = new Set('a o as os um uma uns umas de do da dos das em no na nos nas por para com sem que e ou mas se eu tu ele ela nos voce voces me te lhe meu minha seu sua isso isto aquilo esse essa este esta aquele aquela ja foi ser era tem ter vai vou como mais muito pra pro the and for you'.split(' '))
 
@@ -70,7 +77,7 @@ function buscar(consulta, { limite = 6, incluirAtual = false } = {}) {
   const agora = Date.now()
   const pontos = []
   for (const d of docs) {
-    if (!incluirAtual && d.chat === ATUAL) continue
+    if (!incluirAtual && d.chat === chatAtual()) continue
     const freq = new Map()
     for (const t of d.tk) freq.set(t, (freq.get(t) || 0) + 1)
     let s = 0

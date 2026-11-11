@@ -3,6 +3,13 @@
 // trabalho e devolve o caminho. Roda com o Node do Electron (ELECTRON_RUN_AS_NODE=1), sem dependências.
 const readline = require('readline')
 const fs = require('fs')
+// sessão reserva (Spec 26): a conversa dona deste processo pode ser definida depois que ele nasce
+const chatAtual = () => {
+  try {
+    if (process.env.SB_VAGA_ARQ) return fs.readFileSync(process.env.SB_VAGA_ARQ, 'utf8').trim() || process.env.SB_MIDIA_CHAT || ''
+  } catch {}
+  return process.env.SB_MIDIA_CHAT || ''
+}
 const path = require('path')
 const { detalhar, formatarSaida, conferirTroca, formatarConferencia } = require('./midia-detalhar')
 
@@ -226,7 +233,7 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono,
   if (assincrono) {
     // job pesado (vídeo em alta, troca de personagem): o agente não fica preso esperando a GPU. O app acompanha, baixa e avisa no chat (concluirPendentes).
     try {
-      fs.writeFileSync(path.join(PASTA, '.midia', `pendente-${id}.json`), JSON.stringify({ id, tipo, salvar: salvar || tipo, nome: nome || '', prompt: String(prompt || '').slice(0, 3500), chat: process.env.SB_MIDIA_CHAT || '', t0: Date.now() }))
+      fs.writeFileSync(path.join(PASTA, '.midia', `pendente-${id}.json`), JSON.stringify({ id, tipo, salvar: salvar || tipo, nome: nome || '', prompt: String(prompt || '').slice(0, 3500), chat: chatAtual(), t0: Date.now() }))
     } catch (e) {
       throw new Error(MSG_FALHA + ' (não consegui registrar o acompanhamento)')
     }

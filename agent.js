@@ -548,9 +548,10 @@ class Sessao {
   set emitir(f) {
     this._emitir = f
   }
-  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel }) {
+  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, vagaArq }) {
     this.app = app
     this.id = id
+    this.vagaArq = vagaArq || null // sessão reserva: arquivo onde o app grava a conversa que adotou este processo
     this.pasta = pasta
     this.modo = modo || (() => 'manual') // 'manual' | 'editar' | 'auto' | 'ignorar'
     this.navegador = navegador || null // { url, token }: servidor local das ferramentas do navegador integrado
@@ -790,7 +791,7 @@ class Sessao {
     const TENTATIVAS = montado ? 5 : 3
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
       try {
-        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : this.direta ? 30000 : montado ? (tentativa === 1 ? 90000 : 60000) : tentativa === 1 ? 240000 : 90000
+        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : montado ? (tentativa === 1 ? 90000 : 60000) : tentativa === 1 ? 240000 : 90000
         const t0 = Date.now()
         await this.comPrazo(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }), prazo)
         const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: this.servidoresMcp() }), prazo)
@@ -943,7 +944,7 @@ class Sessao {
         env: [
           { name: 'ELECTRON_RUN_AS_NODE', value: '1' },
           { name: 'SB_MEMORIA_ARQ', value: this.memoria.arquivo },
-          { name: 'SB_MEMORIA_CHAT', value: this.id },
+          { name: 'SB_MEMORIA_CHAT', value: this.id }, ...(this.vagaArq ? [{ name: 'SB_VAGA_ARQ', value: this.vagaArq }] : []),
         ],
       })
     }
@@ -959,7 +960,7 @@ class Sessao {
           { name: 'SB_MIDIA_CHAVE', value: this.midia.chave },
           { name: 'SB_MIDIA_PASTA', value: this.pasta },
           { name: 'SB_MIDIA_PREFS', value: JSON.stringify(this.midia.prefs || {}) },
-          { name: 'SB_MIDIA_CHAT', value: this.id },
+          { name: 'SB_MIDIA_CHAT', value: this.id }, ...(this.vagaArq ? [{ name: 'SB_VAGA_ARQ', value: this.vagaArq }] : []),
           ...['SB_MIDIA_MOCK', 'SB_MIDIA_MOCK_ARQ', 'SB_MIDIA_MOCK_IMG'].filter((k) => process.env[k]).map((k) => ({ name: k, value: process.env[k] })), // simulação para desenvolver a tela
         ],
       })
@@ -1039,6 +1040,12 @@ class Sessao {
     let corpo = texto
     if (anexos.length) corpo += '\n\nArquivos anexados (use as ferramentas para ler):\n' + anexos.map((a) => `- ${a}`).join('\n')
     const corpoPuro = corpo
+    if (!this.primeira && this.historicoPendente && !texto.startsWith('[aquecimento]')) {
+      // sessão reserva adotada por uma conversa que já tinha mensagens: o resumo entra na primeira pergunta real
+      const nl = String.fromCharCode(10)
+      corpo = 'Conversa até aqui (continue dela):' + nl + this.historicoPendente + nl + nl + '---' + nl + corpo
+      this.historicoPendente = null
+    }
     if (this.primeira) {
       const nl = String.fromCharCode(10)
       const hist = this.historico ? nl + nl + 'Conversa até aqui (continue dela):' + nl + this.historico : ''
