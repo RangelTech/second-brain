@@ -21,6 +21,8 @@
       aoMidiaPronta: (fn) => on('midia:pronta', fn),
       aoFim: (fn) => on('chat:fim', fn),
       aoPreparando: (fn) => on('hermes:preparando', fn), // texto da preparação do agente na primeira abertura ('' = pronto)
+      carregando: () => invoke('app:carregando'), // tela de carregamento da abertura: { ativo, comecou, prontas, alvo, decorrido, max }
+      aoCarregando: (fn) => on('app:carregando', fn),
       aoRetomar: (fn) => on('conexao:retomada', fn), // só a versão web emite: a conexão caiu e voltou
       routerEstado: () => invoke('router:estado'),
       api: (metodo, rota, corpo) => invoke('router:api', { metodo, rota, corpo }),

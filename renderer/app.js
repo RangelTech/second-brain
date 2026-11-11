@@ -1441,6 +1441,55 @@
     preparo.texto = passoPt
     pintarProgresso()
   })
+  // TELA DE CARREGAMENTO DA ABERTURA (spec 27 §5): o app recém-aberto cobre a tela com o cérebro e a barra até as sessões do agente estarem
+  // aquecidas (no máximo 40 s; o main decide quando liberar). Fica embaixo da tela de preparo da 1ª instalação, então as duas emendam numa só.
+  // Só no app instalado: na web a VM já está de pé.
+  if (window.__sbRaw && !window.__sbRaw.abrirExterno && window.sb.carregando) {
+    const carga = { el: null, card: null, ciclo: 0, pct: 0, i: 0 }
+    const fecharCarga = () => {
+      const el = carga.el
+      if (!el) return
+      carga.el = null
+      clearInterval(carga.ciclo)
+      try { el.querySelector('.sbp-barra > i').style.width = '100%'; el.querySelector('.sbp-pct').textContent = '100%'; el.querySelector('.sbp-resta').textContent = 'pronto' } catch {}
+      setTimeout(() => { el.classList.add('sbp-saindo'); setTimeout(() => { carga.card?.parar(); el.remove() }, 700) }, 350)
+    }
+    const pintarCarga = (e) => {
+      if (!e || !e.ativo) return fecharCarga()
+      if (!carga.el) {
+        const el = document.createElement('div')
+        el.id = 'sb-carregando'
+        el.setAttribute('role', 'status')
+        el.className = 'sb-preparando sb-carregando'
+        el.innerHTML = '<canvas class="sbp-canvas" aria-hidden="true"></canvas><div class="sbp-caixa"><h2>Carregando…</h2><p class="sbp-passo">Deixando o seu assistente pronto para responder rápido.</p><div class="sbp-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Carregando"><i></i></div><div class="sbp-linha"><b class="sbp-pct">0%</b><span class="sbp-resta">alguns segundos</span></div></div>'
+        document.body.appendChild(el)
+        carga.el = el
+        const SA = window.SBAtividade
+        if (SA) {
+          const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+          carga.card = SA.criarCartao(el.querySelector('.sbp-canvas'), { textContent: '', classList: { add() {}, remove() {} } }, { reduzir })
+          carga.card.iniciar()
+          carga.ciclo = setInterval(() => {
+            const cat = SA.ICONES[carga.i++ % SA.ICONES.length]
+            carga.card?.evento(cat, 'inicio')
+            setTimeout(() => carga.card?.evento(cat, 'ok'), 900)
+          }, 1000)
+        }
+      }
+      // percentual: o maior entre as sessões prontas e o tempo (curva até ~30 s), sem nunca voltar e sem chegar a 100 antes de liberar
+      const porSessao = e.alvo ? (e.prontas / e.alvo) * 100 : 0
+      const porTempo = e.comecou ? 95 * (1 - Math.exp(-(e.decorrido / 30000) * 2.2)) : 4
+      carga.pct = Math.min(97, Math.max(carga.pct, porSessao, porTempo))
+      const p = Math.round(carga.pct)
+      carga.el.querySelector('.sbp-barra > i').style.width = p + '%'
+      carga.el.querySelector('.sbp-barra').setAttribute('aria-valuenow', String(p))
+      carga.el.querySelector('.sbp-pct').textContent = p + '%'
+      const resta = e.comecou ? Math.max(0, Math.round((Math.min(e.max || 40000, 30000) - e.decorrido) / 1000)) : 0
+      carga.el.querySelector('.sbp-resta').textContent = resta > 2 ? 'cerca de ' + resta + ' s' : 'quase lá'
+    }
+    window.sb.aoCarregando?.(pintarCarga)
+    Promise.resolve(window.sb.carregando()).then(pintarCarga).catch(() => {})
+  }
   // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)
   if (window.__sbRaw && window.sb.atualizacao) {
     const desenharAtualizacao = (e) => {

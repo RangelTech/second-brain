@@ -384,7 +384,9 @@ function manterAncora(alvo, nivel) {
             // so descarta se o processo morreu ou nao subiu. Falha do TURNO de aquecimento (o modelo responde curto e o Hermes conta como 'nao respondeu',
             // visto em todas as VMs: 0 aquecimentos ok desde 04/11) nao invalida a sessao: o agente e as ferramentas ja foram montados.
             if (s.morto || s.falhouIniciar) throw new Error('a sessao nao subiu')
+            s.aquecida = true
             falhasReserva = 0
+            avisarCarregamento()
             registrarAgente(app, `sessão reserva ${id} pronta e aquecida (${reservas.length} na espera)`)
           })
           .catch((e) => {
@@ -417,6 +419,69 @@ function manterAncora(alvo, nivel) {
     const subindo = reservaSubindo
   } catch {}
 }
+// TELA DE CARREGAMENTO NA ABERTURA (spec 27 §5, pedido do Lucas 11/11/2026): é melhor o cliente ver um carregamento curto ao abrir do que mandar a
+// 1ª mensagem e esperar. Toda abertura a frio do app (desktop) cobre a tela até TRÊS sessões do agente estarem aquecidas (contando a que o chat
+// aberto já adotou). Nunca prende: libera em 40 s no máximo; com 1 pronta libera aos 30 s; libera na hora se não há o que esperar (sem conta,
+// só conversa, reservas desligadas/pausadas, pouca memória, agente que não preparou). O relógio só começa depois do preparo do agente (1ª instalação).
+const carregamento = { ativo: !MODO_SERVIDOR && process.env.SB_CARREGAMENTO !== '0', t0: 0, fim: false, motivo: '' }
+const CARREGAMENTO_ALVO = 3
+const CARREGAMENTO_MAX_MS = 40000
+const CARREGAMENTO_UM_MS = 30000
+function sessoesAquecidas() {
+  let n = 0
+  for (const s of reservas) if (s.aquecida && !s.morto) n++
+  for (const s of sessoes.values()) if (s.aquecida && !s.morto) n++
+  return n
+}
+function estadoCarregamento() {
+  if (!carregamento.ativo) return { ativo: false }
+  if (!cfg.unlimitedEmail) return { ativo: false, aguardandoConta: true }
+  const prontas = sessoesAquecidas()
+  const alvo = Math.min(CARREGAMENTO_ALVO, Math.max(1, RESERVAS_ALVO()))
+  const decorrido = carregamento.t0 ? Date.now() - carregamento.t0 : 0
+  return { ativo: !carregamento.fim, comecou: !!carregamento.t0, prontas, alvo, decorrido, max: CARREGAMENTO_MAX_MS }
+}
+function liberarCarregamento(motivo) {
+  if (!carregamento.ativo || carregamento.fim) return
+  carregamento.fim = true
+  carregamento.motivo = motivo
+  clearInterval(carregamento.relogio)
+  try {
+    registrarAgente(app, `tela de carregamento liberada em ${((Date.now() - (carregamento.t0 || Date.now())) / 1000).toFixed(1)} s: ${motivo} (${sessoesAquecidas()} sessões prontas)`)
+  } catch {}
+  try {
+    janela?.webContents.send('app:carregando', { ativo: false })
+  } catch {}
+}
+function avisarCarregamento() {
+  if (!carregamento.ativo || carregamento.fim || !carregamento.t0) return
+  // ainda sem conta: a tela de login fica visível (a de carregamento some) e o relógio recomeça; ao entrar, o carregamento cobre a 1ª vez do cliente
+  if (!cfg.unlimitedEmail) {
+    carregamento.t0 = Date.now()
+    try {
+      janela?.webContents.send('app:carregando', { ativo: false, aguardandoConta: true })
+    } catch {}
+    return
+  }
+  const e = estadoCarregamento()
+  if (e.prontas >= e.alvo) return liberarCarregamento('sessões prontas')
+  if (e.decorrido >= CARREGAMENTO_MAX_MS) return liberarCarregamento('limite de tempo')
+  if (e.prontas >= 1 && e.decorrido >= CARREGAMENTO_UM_MS) return liberarCarregamento('uma sessão pronta aos 30 s')
+  // nada vai subir: reservas desligadas ou pausadas, pouca memória, sem conta (a tela de login aparece)
+  const nadaSubindo = !reservaSubindo && !reservas.length && e.prontas === 0
+  if (cfg.ancoraAgente === false || cfg.soConversa || RESERVAS_ALVO() === 0) return liberarCarregamento('sem sessões para esperar')
+  if (nadaSubindo && e.decorrido > 8000 && (Date.now() < reservaPausadaAte || os.freemem() < MEMORIA_MIN_ANCORA)) return liberarCarregamento('máquina sem memória livre para as sessões')
+  try {
+    janela?.webContents.send('app:carregando', e)
+  } catch {}
+}
+function comecarCarregamento() {
+  if (!carregamento.ativo || carregamento.fim || carregamento.t0) return
+  carregamento.t0 = Date.now()
+  carregamento.relogio = setInterval(avisarCarregamento, 500)
+  avisarCarregamento()
+}
+ipcMain.handle('app:carregando', () => estadoCarregamento())
 // A conversa `chat` leva uma reserva que sirva para a configuração atual (a mais adiantada). Devolve a sessão ou null.
 async function adotarReserva(chat, alvo, nivel) {
   if (!reservas.some((r) => reservaServe(r, alvo, nivel)) && reservaSubindo) await reservaSubindo.catch(() => null) // a 1ª está nascendo: espera em vez de subir outra
@@ -1021,6 +1086,7 @@ app.whenReady().then(() => {
   garantirAgente(MODO_SERVIDOR ? undefined : avisarPreparo)
     .then(() => {
       avisarPreparo('')
+      comecarCarregamento() // agente pronto: agora espera as sessões aquecerem (tela de carregamento)
       // EXTRAS em segundo plano (pedido do Lucas, 11/11/2026): o essencial (agente) fica pronto com a tela bonita; o resto baixa em paralelo, sem tela.
       // Hoje: o editor de vídeo, quando liberado nesta máquina e ainda não instalado.
       setTimeout(() => {
@@ -1034,6 +1100,7 @@ app.whenReady().then(() => {
     .catch((e) => {
       console.error('[hermes]', e.message)
       avisarPreparo('')
+      liberarCarregamento('agente não preparou')
       // falha ao preparar o agente com o app aberto: grava no preparo.log e avisa a equipe (o log so existia no PC do cliente)
       try {
         const logArq = path.join(app.getPath('userData'), 'preparo.log')
