@@ -578,7 +578,12 @@
       const maior = Math.max(1, ...lista.map((l) => l.tokens))
       const tot = lista.reduce((s, l) => s + l.tokens, 0)
       const ped = lista.reduce((s, l) => s + l.pedidos, 0)
-      const modelos = Object.entries((st && st.byModel) || {}).map(([m, v]) => ({ m: (v.meta && v.meta.rawModel) || m.split('|')[0], p: nomeDe(m.split('|')[1] || (v.meta && v.meta.provider)), n: v.requests || 0, t: (v.promptTokens || 0) + (v.completionTokens || 0) })).filter((x) => x.n).sort((a, b) => b.t - a.t).slice(0, 8)
+      const modelos = Object.entries((st && st.byModel) || {}).map(([m, v]) => {
+        const mm = String(m).match(/^(.*?) \((.+)\)$/) // o roteador chama de "modelo (provedor)"; mostra o modelo e resolve o nome do provedor
+        const modelo = (v.meta && v.meta.rawModel) || (mm ? mm[1] : String(m).split('|')[0])
+        const prov = mm ? mm[2] : String(m).split('|')[1] || (v.meta && v.meta.provider)
+        return { m: modelo, p: nomeDe(prov), n: v.requests || 0, t: (v.promptTokens || 0) + (v.completionTokens || 0) }
+      }).filter((x) => x.n).sort((a, b) => b.t - a.t).slice(0, 8)
       alvo.innerHTML = `<div class="uso-total mut">${nt(tot)} tokens em ${ped} pedidos</div>
         <div class="uso-lista">${lista.map((l) => `<div class="uso-linha"><div class="uso-nome"><b>${esc(l.nome)}</b><span class="mut">${l.pedidos} pedidos · ${nt(l.entrada)} enviados · ${nt(l.saida)} recebidos${l.custo > 0.005 ? ' · ~US$ ' + l.custo.toFixed(2) + ' no preço de tabela' : ''}</span></div>
           <div class="uso-barra"><i style="width:${Math.max(3, Math.round((l.tokens / maior) * 100))}%"></i></div><div class="uso-tok">${nt(l.tokens)}</div></div>`).join('')}</div>
