@@ -10,7 +10,7 @@ const { spawn, execFile } = require('child_process')
 // Origens da release, em ordem: o fork com o nome do Segundo Cérebro (RangelTech/segundo-cerebro-editor) e, se ele ainda não tiver release, o Concat
 // oficial (mesmo motor, só muda o nome da janela). O hash vem SEMPRE do SHA256SUMS da própria release; o do Concat oficial também é fixo aqui.
 const ORIGENS = [
-  { repo: 'RangelTech/segundo-cerebro-editor', tag: 'v0.2.9-sc.2', win32: { arquivo: 'SegundoCerebroEditor-0.2.10-windows-x86_64-setup.exe', sha256: '', exe: 'concat.exe' } },
+  { repo: 'RangelTech/segundo-cerebro-editor', tag: 'v0.2.10-sc.3', win32: { arquivo: 'SegundoCerebroEditor-0.2.10-windows-x86_64-setup.exe', sha256: '', exe: 'concat.exe' } },
   { repo: 'jub0t/Concat', tag: 'v0.2.9', win32: { arquivo: 'Concat-0.2.9-windows-x86_64-setup.exe', sha256: 'bc3e994a592d46c9dce037bf0b41e329de7b3821c25bc27717a8e0d5d34d1a0a', exe: 'concat.exe' } },
 ]
 const ORIGEM = { win32: ORIGENS[0].win32 } // só o nome do executável e o suporte por sistema são lidos daqui
