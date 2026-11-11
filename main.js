@@ -46,12 +46,18 @@ process.on('uncaughtException', (e) => {
   } catch {}
 })
 const HOME = app.getPath('home')
+// Pasta de trabalho padrão. macOS: na pasta pessoal, FORA de Documentos/Mesa/Downloads, que o macOS protege. O Hermes sobe o gateway pelo
+// osascript, então cada acesso a pasta protegida vira um pedido "osascript deseja ter acesso…" que o cliente não entende (QA 11/11/2026).
+// Quem já tem a pasta em Documentos continua nela (só muda o padrão).
+function pastaTrabalhoPadrao() {
+  return process.platform === 'darwin' ? path.join(app.getPath('home'), 'Segundo Cerebro') : path.join(app.getPath('documents'), 'Segundo Cerebro')
+}
 const PADRAO = {
   ativo: '',
   soConversa: false,
   modoPermissao: 'manual', // manual | editar | auto | ignorar
   raciocinio: 'none',
-  pasta: path.join(app.getPath('documents'), 'Segundo Cerebro'),
+  pasta: pastaTrabalhoPadrao(),
   hermesHome: path.join(HOME, 'hermes'),
   atualizarAuto: false,
 }
@@ -178,7 +184,7 @@ function limparAgenteQuebrado(anotar = () => {}) {
 }
 async function verificarAgente(anotar = () => {}) {
   if (fs.existsSync(marcaTeste())) return { ok: true, jaFeito: true }
-  const pasta = path.join(app.getPath('documents'), 'Segundo Cerebro')
+  const pasta = pastaTrabalhoPadrao()
   fs.mkdirSync(pasta, { recursive: true })
   let r
   for (let i = 1; i <= 2; i++) {
