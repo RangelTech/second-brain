@@ -1,6 +1,7 @@
 // Agente de verdade: cliente ACP (Agent Client Protocol) falando com o Hermes por stdio.
 // Um processo por conversa, com sessão contínua, cancelamento e permissões mostradas na tela.
 const { spawn, execFileSync } = require('child_process')
+const partidaDireta = require('./partida-direta')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -626,8 +627,14 @@ class Sessao {
     // .cmd/.bat (só em teste/dev: nunca o .exe real) não roda com spawn puro no Windows (EINVAL) sem passar pelo shell
     const viaShell = /\.(cmd|bat)$/i.test(this.bin)
     matarGatewayOrfao(this.app, this.env.HERMES_HOME)
-    const filho = spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true, shell: viaShell, detached: process.platform !== 'win32' })
+    // partida direta (sem o lançador, ~7 s mais rápida): só com o ambiente já montado e enquanto não falhou nesta sessão
+    const direta = !viaShell && !this.semDireta && ambienteMontado(this.env.HERMES_HOME, this.bin) ? partidaDireta.resolver(this.env.HERMES_HOME, this.bin, this.env) : null
+    this.direta = !!direta
+    const filho = direta
+      ? spawn(direta.cmd, direta.args, { cwd: this.pasta, env: direta.env, windowsHide: true, detached: process.platform !== 'win32' })
+      : spawn(this.bin, [], { cwd: this.pasta, env: this.env, windowsHide: true, shell: viaShell, detached: process.platform !== 'win32' })
     this.filho = filho
+    this.morto = false
     if (filho.pid) anotarPid(this.app, filho.pid)
     if (filho.pid) sessoesVivas.add(filho.pid)
     filho.stdout.on('data', (d) => this.aoDados(d))
@@ -783,13 +790,14 @@ class Sessao {
     const TENTATIVAS = montado ? 5 : 3
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
       try {
-        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : montado ? (tentativa === 1 ? 90000 : 60000) : tentativa === 1 ? 240000 : 90000
+        const prazo = process.env.SB_TESTE_PRAZO ? +process.env.SB_TESTE_PRAZO : this.direta ? 30000 : montado ? (tentativa === 1 ? 90000 : 60000) : tentativa === 1 ? 240000 : 90000
         const t0 = Date.now()
         await this.comPrazo(this.chamar('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } } }), prazo)
         const r = await this.comPrazo(this.chamar('session/new', { cwd: this.pasta, mcpServers: this.servidoresMcp() }), prazo)
         this.sid = r.sessionId
-        registrar(this.app, `agente pronto em ${((Date.now() - t0) / 1000).toFixed(1)} s (tentativa ${tentativa})`)
+        registrar(this.app, `agente pronto em ${((Date.now() - t0) / 1000).toFixed(1)} s (tentativa ${tentativa}${this.direta ? ', partida direta' : ''})`)
         marcarMontado(this.env.HERMES_HOME, this.bin)
+        if (!this.direta && !this.semDireta) partidaDireta.preparar(this.env.HERMES_HOME, this.bin, this.env, (l) => registrar(this.app, l)).catch(() => {})
         // sessão aquecida e ainda sem uso: não fica de pé para sempre (perguntar() cancela este timer ao começar um turno)
         clearTimeout(this.ocioso)
         this.agendarOcioso()
@@ -797,6 +805,20 @@ class Sessao {
       } catch (e) {
         ultimo = e
         registrar(this.app, `iniciar falhou (tentativa ${tentativa}): ${e.message}`)
+        if (this.direta) {
+          // a partida direta falhou: volta ao lançador nesta sessão e descarta o atalho (ele é refeito depois de uma partida boa)
+          registrar(this.app, 'partida direta falhou; voltando ao lançador')
+          this.semDireta = true
+          partidaDireta.invalidar(this.env.HERMES_HOME)
+          const antigoD = this.filho
+          this.pendentes.clear()
+          try {
+            matarArvorePoupandoGateway(antigoD.pid, this.env.HERMES_HOME)
+          } catch {}
+          sessoesVivas.delete(antigoD.pid)
+          this.subir()
+          continue
+        }
         if (e.message !== 'prazo') throw e
         if (tentativa < TENTATIVAS) this.emitir({ aviso: 'Preparando o agente… só um instante.' })
         const antigo = this.filho
