@@ -46,3 +46,24 @@ if ($LASTEXITCODE -ne 0) { throw "7za falhou (codigo $LASTEXITCODE)" }
 Pop-Location
 Copy-Item $sete (Join-Path $saida '7za.exe') -Force
 "pacote: {0} MB" -f [int]((Get-Item $arq).Length / 1MB)
+
+# Cache de pacotes do uv (opcional, 2o pacote): monta o ambiente Python numa pasta descartavel so para encher o cache, e o compacta. No PC do cliente o
+# ambiente e montado a partir dele, sem baixar nada. Qualquer falha aqui NAO derruba o instalador: ele so deixa de levar o cache (os pacotes sao baixados na 1a conversa).
+try {
+    $cache = Join-Path $env:TEMP 'sb-uv-cache'
+    Remove-Item -Recurse -Force $cache -ErrorAction SilentlyContinue
+    $t1 = Get-Date
+    & node (Join-Path (Get-Location) 'scripts\aquecer-cache-uv.js') (Join-Path $raiz 'bin\hermes-acp.exe') $cache 30
+    if ($LASTEXITCODE -ne 0) { throw "aquecer-cache-uv falhou (codigo $LASTEXITCODE)" }
+    "cache montado em $([int]((Get-Date) - $t1).TotalMinutes) min"
+    $arqCache = Join-Path $saida 'uv-cache.7z'
+    Push-Location $cache
+    & $sete a -t7z -m0=lzma2 -mx=5 -mmt=on -bso0 -bsp0 $arqCache '*'
+    if ($LASTEXITCODE -ne 0) { throw "7za do cache falhou (codigo $LASTEXITCODE)" }
+    Pop-Location
+    "cache de pacotes: {0} MB" -f [int]((Get-Item $arqCache).Length / 1MB)
+} catch {
+    Write-Warning "sem cache de pacotes no instalador: $_"
+    Remove-Item -Force (Join-Path $saida 'uv-cache.7z') -ErrorAction SilentlyContinue
+    try { Pop-Location } catch {}
+}

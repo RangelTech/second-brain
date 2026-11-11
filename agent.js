@@ -562,6 +562,9 @@ class Sessao {
     if (!fs.existsSync(path.join(home, 'installs'))) emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
     this.bin = bin
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }
+    // instalador completo: a primeira montagem do ambiente usa o cache de pacotes que veio junto (sem internet). Se falhar, a retomada baixa como sempre.
+    const uvCache = caminhosHermes.cacheUv()
+    if (uvCache && !ambienteMontado(home, bin)) Object.assign(this.env, { UV_CACHE_DIR: uvCache, UV_OFFLINE: '1' })
     this.subir()
     this.pronta = this.iniciar()
     this.pronta.catch(() => {}) // quem usa trata o erro; evita aviso de rejeição sem tratamento
@@ -819,6 +822,10 @@ class Sessao {
       await m
     } catch (e) {
       registrar(this.app, 'montagem do ambiente falhou: ' + e.message + (dono ? '' : ' (outro chat montava)'))
+      if (this.env.UV_OFFLINE) {
+        delete this.env.UV_OFFLINE // o cache do instalador não bastou: a próxima tentativa baixa da internet
+        registrar(this.app, 'montagem offline falhou; a próxima tentativa usa a internet')
+      }
       // não derruba o chat: segue para as tentativas normais abaixo (que reiniciam o processo e tentam de novo)
     }
     // o processo que montou foi encerrado ao fim da montagem; todos sobem um novo para a sessão de verdade

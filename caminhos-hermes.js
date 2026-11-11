@@ -37,7 +37,7 @@ function embutido() {
     return false
   }
 }
-const RAIZ_FIXA = () => process.env.SB_HERMES_RAIZ || 'C:\SegundoCerebro\hermes'
+const RAIZ_FIXA = () => process.env.SB_HERMES_RAIZ || 'C:\\SegundoCerebro\\hermes'
 
 function curto(dados) {
   const id = crypto.createHash('sha1').update(String(dados).toLowerCase()).digest('hex').slice(0, 6) // varios usuarios no mesmo PC nao se misturam
@@ -45,7 +45,7 @@ function curto(dados) {
   for (const b of bases) {
     const raiz = path.join(b, id, 'h')
     if (raiz.length > (+process.env.SB_MAX_BASE || MAX_BASE)) continue
-    if (embutido() && b === 'C:\SegundoCerebro' && gravavel(path.join(b, id))) return { raiz: RAIZ_FIXA(), home: path.join(b, id, 'd'), modo: 'embutido' }
+    if (embutido() && b === 'C:\\SegundoCerebro' && gravavel(path.join(b, id))) return { raiz: RAIZ_FIXA(), home: path.join(b, id, 'd'), modo: 'embutido' }
     if (gravavel(path.join(b, id))) return { raiz, home: path.join(b, id, 'd'), modo: 'curto' }
   }
   return null
@@ -78,6 +78,15 @@ function decidir(app) {
 
 const raizAgente = (app) => decidir(app).raiz
 const homeAgente = (app) => decidir(app).home
+// Cache de pacotes do uv que vem no instalador completo (uv-cache.7z): o ambiente do Hermes e montado a partir dele, sem baixar nada (UV_OFFLINE).
+const cacheUv = () => {
+  const p = process.env.SB_UV_CACHE || (process.platform === 'win32' ? 'C:\\SegundoCerebro\\uv-cache' : '')
+  try {
+    return p && fs.existsSync(path.join(p, '.completo')) ? p : ''
+  } catch {
+    return ''
+  }
+}
 const esquecer = () => (memo = null) // so para testes
 
-module.exports = { raizAgente, homeAgente, decidir, esquecer, MAX_BASE, embutido }
+module.exports = { raizAgente, homeAgente, decidir, esquecer, MAX_BASE, embutido, cacheUv }

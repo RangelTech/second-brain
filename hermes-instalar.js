@@ -45,12 +45,38 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
       try {
         fs.rmSync(arq, { force: true }) // ja descompactado e conferido: o pacote nao precisa ocupar disco duas vezes
       } catch {}
+      await extrairCacheUv(pasta, sete)
       return true
     } catch (e) {
       try {
         fs.rmSync(raiz, { recursive: true, force: true })
       } catch {}
       falar('o agente embutido falhou (' + String(e.message).slice(0, 80) + '); baixando')
+      return false
+    }
+  }
+
+  // cache de pacotes do uv (opcional): se nao der certo o app so baixa os pacotes na primeira conversa, como antes
+  async function extrairCacheUv(pasta, sete) {
+    const arq = path.join(pasta, 'uv-cache.7z')
+    const destino = process.env.SB_UV_CACHE || path.join(path.dirname(RAIZ_EMBUTIDA()), 'uv-cache')
+    if (!fs.existsSync(arq)) return false
+    try {
+      falar('copiando os pacotes do agente')
+      fs.rmSync(destino, { recursive: true, force: true })
+      fs.mkdirSync(destino, { recursive: true })
+      const x = await executar(sete, ['x', arq, '-o' + destino, '-y', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
+      if (x.codigo !== 0) throw new Error('codigo ' + x.codigo)
+      fs.writeFileSync(path.join(destino, '.completo'), new Date().toISOString()) // so vale depois de terminar de descompactar
+      try {
+        fs.rmSync(arq, { force: true })
+      } catch {}
+      return true
+    } catch (e) {
+      try {
+        fs.rmSync(destino, { recursive: true, force: true })
+      } catch {}
+      falar('o cache de pacotes falhou (' + String(e.message).slice(0, 60) + '); os pacotes serao baixados')
       return false
     }
   }

@@ -53,7 +53,7 @@ jobs:
       - name: Montar o agente embutido (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        timeout-minutes: 40
+        timeout-minutes: 75
         run: ./scripts/montar-hermes-embutido.ps1
       # Assinatura do Windows: desligada até existir certificado (segredos WIN_CSC_LINK e WIN_CSC_KEY_PASSWORD).
       # hdiutil do macOS falha de vez em quando (disco ocupado ao montar a imagem): repete o empacotamento até 3 vezes.
