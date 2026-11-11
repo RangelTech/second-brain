@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.6.60",
+  "version": "0.6.61",
   "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
@@ -19,7 +19,7 @@
     "router:fetch": "node scripts/baixar-router.mjs",
     "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true",
     "dist:ci:portatil": "electron-builder --win portable --publish never -c.win.signAndEditExecutable=true",
-    "dist:ci:nsis": "electron-builder --win nsis --publish never -c.win.signAndEditExecutable=true",
+    "dist:ci:nsis": "electron-builder --win nsis --publish never -c.win.signAndEditExecutable=true -c.compression=store",
     "modelo:voz": "node scripts/baixar-modelo-voz.js",
     "icone:dev": "node scripts/icone-dev.js"
   },
