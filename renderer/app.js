@@ -1425,8 +1425,9 @@
         pintarProgresso()
       }, 1000)
     }
-    preparo.el.querySelector('.sbp-passo').textContent = passo ? passo.charAt(0).toUpperCase() + passo.slice(1) + '…' : 'Começando…'
-    preparo.texto = passo
+    const passoPt = window.SBPreparo ? window.SBPreparo.traduzir(passo) : passo
+    preparo.el.querySelector('.sbp-passo').textContent = passoPt ? passoPt.charAt(0).toUpperCase() + passoPt.slice(1) + '…' : 'Começando…'
+    preparo.texto = passoPt
     pintarProgresso()
   })
   // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)

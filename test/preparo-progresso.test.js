@@ -34,3 +34,12 @@ test('texto do tempo restante', () => {
   assert.strictEqual(P.textoRestante(60000), 'cerca de 1 minuto')
   assert.strictEqual(P.textoRestante(5 * 60000), 'cerca de 5 minutos')
 })
+
+test('traduz os passos do instalador e tira pontos repetidos', () => {
+  assert.strictEqual(P.traduzir('Preparing Node dependencies......'), 'preparando as dependências do Node')
+  assert.strictEqual(P.traduzir('Installing packages…'), 'instalando os pacotes')
+  assert.strictEqual(P.traduzir('baixando o instalador'), 'baixando o instalador')
+})
+test('o tempo esperado com download reflete a medição real (mais de 10 min)', () => {
+  assert.ok(P.esperadoMs('baixando o instalador') >= 600000)
+})

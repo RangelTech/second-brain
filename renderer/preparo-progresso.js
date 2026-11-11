@@ -17,6 +17,7 @@
     [/python/i, 34],
     [/ripgrep|uv\b/i, 44],
     [/git/i, 52],
+    [/node dep|dependências do node|pnpm/i, 55],
     [/ambiente|pacotes|depend/i, 66],
     [/pronto|verific|testando/i, 85],
   ]
@@ -24,7 +25,7 @@
 
   function esperadoMs(texto, ultimaDuracaoMs) {
     const offline = /instalador que vem|copiando o agente|copiando os pacotes/i.test(texto || '')
-    const base = offline ? 150000 : 420000
+    const base = offline ? 150000 : 840000 // com download: medido em 11/11/2026 neste PC, mais de 16 min (pnpm/npm); o instalador completo evita isso
     if (ultimaDuracaoMs && ultimaDuracaoMs > 20000) return Math.round((base + ultimaDuracaoMs) / 2) // aprende com a última vez
     return base
   }
@@ -50,5 +51,24 @@
     const min = Math.round(s / 60)
     return min <= 1 ? 'cerca de 1 minuto' : `cerca de ${min} minutos`
   }
-  return { estimar, textoRestante, esperadoMs, PISOS }
+  // o instalador do agente escreve em inglês: mostra em português e sem pontos repetidos
+  const TRADUCAO = [
+    [/preparing node dependencies/i, 'preparando as dependências do Node'],
+    [/preparing (python|pip|uv) dependencies/i, 'preparando as dependências do Python'],
+    [/installing (python )?(packages|dependencies)/i, 'instalando os pacotes'],
+    [/installing node/i, 'instalando o Node'],
+    [/installing python/i, 'instalando o Python'],
+    [/installing (ffmpeg|ripgrep|git|uv)/i, (m) => 'instalando o ' + m[1].toLowerCase()],
+    [/downloading/i, 'baixando os componentes'],
+    [/cloning|checkout|repository/i, 'baixando o agente'],
+    [/building|compiling/i, 'montando o agente'],
+    [/browser/i, 'preparando as ferramentas de navegador'],
+    [/verifying|checking|testing/i, 'conferindo o agente'],
+  ]
+  function traduzir(passo) {
+    const limpo = String(passo || '').replace(/[.…]+\s*$/g, '').replace(/\.{2,}/g, '').trim()
+    for (const [re, t] of TRADUCAO) { const m = limpo.match(re); if (m) return typeof t === 'function' ? t(m) : t }
+    return limpo
+  }
+  return { estimar, textoRestante, esperadoMs, traduzir, PISOS }
 })
