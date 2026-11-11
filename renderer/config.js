@@ -2,7 +2,8 @@
 // As telas são nativas; os dados vêm do motor de provedores (rotas /api/* via window.sb.api).
 ;(() => {
   const CAT = (window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []
-  const POR_ID = Object.fromEntries(CAT.map((p) => [p.id, p]))
+  // id da conexão (claude) e apelido do roteador (cc) levam ao mesmo provedor: os modelos vêm marcados pelo apelido
+  const POR_ID = Object.fromEntries([...CAT.filter((p) => p.alias).map((p) => [p.alias, p]), ...CAT.map((p) => [p.id, p])])
   const UNLIMITED = { prefixo: 'unl', base: 'https://qwen.rangeltech.net/v1', modelo: 'qwen-abliterated', nome: 'Unlimited' }
   // Provedores com entrada por conta (assinatura) que o app sabe completar sozinho.
   const OAUTH_CODIGO = ['codex', 'claude', 'gemini-cli']

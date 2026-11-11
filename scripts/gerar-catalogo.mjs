@@ -44,6 +44,7 @@ const lista = grupos
     gratis: !!p.hasFree,
     modos: p.authModes || [],
     tipos: p.serviceKinds || null,
+    alias: p.alias && p.alias !== p.id ? p.alias : null, // os modelos do roteador vêm marcados pelo apelido (ex.: cc = Claude)
     logo: logos.has(p.id) ? p.id : logos.has(p.alias) ? p.alias : null,
   }))
 console.log('provedores:', lista.length, 'com logo:', lista.filter((p) => p.logo).length)

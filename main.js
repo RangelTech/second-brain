@@ -328,10 +328,22 @@ async function listarModelos() {
   const conex = (await embed.api('GET', '/api/providers')).json?.connections ?? []
   const ativos = conex.filter((c) => c.isActive !== false)
   const nos = new Map(((await embed.api('GET', '/api/provider-nodes')).json?.nodes ?? []).map((n) => [n.id, n]))
-  const catalogo = new Set(ativos.filter((c) => !nos.has(c.provider)).map((c) => c.provider))
-  if (catalogo.size) {
-    const mods = await embed.api('GET', '/api/models')
-    for (const m of mods.json?.models ?? []) if (catalogo.has(m.provider)) saida.push({ id: m.fullModel, nome: m.name || m.model, grupo: 'Modelos', provedor: m.provider })
+  // Modelos de provedores do catálogo (Claude, Codex, Gemini, Copilot...): a lista vem do PRÓPRIO roteador (/v1/models), que já filtra pelas
+  // conexões ativas e resolve os catálogos ao vivo. Antes o app cruzava /api/models (que marca cada modelo pelo APELIDO do provedor, ex. `cc`)
+  // com o id da conexão (`claude`): não batia e o Claude conectado não aparecia na tela de combos (achado em 10/11/2026).
+  const vistos = new Set(saida.map((x) => x.id))
+  const comCatalogo = ativos.some((c) => !nos.has(c.provider))
+  if (comCatalogo) {
+    const v = await embed.api('GET', '/v1/models').catch(() => null)
+    for (const m of v?.json?.data ?? []) {
+      const id = String(m.id || '')
+      const k = id.indexOf('/')
+      if (k <= 0 || m.owned_by === 'combo' || id.startsWith('unl/') || vistos.has(id)) continue
+      const prefixo = id.slice(0, k)
+      if ([...nos.values()].some((n) => n.prefix === prefixo)) continue // provedor compatível: listado abaixo, com o nome dele
+      vistos.add(id)
+      saida.push({ id, nome: m.name || id.slice(k + 1), grupo: 'Modelos', provedor: m.owned_by || prefixo })
+    }
   }
   // provedores compatíveis com OpenAI (inclui o Unlimited): modelos vêm do próprio servidor
   for (const c of ativos) {
