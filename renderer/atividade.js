@@ -298,7 +298,7 @@
       if (!W) tamanho()
       // geometria: o canvas é o FUNDO da tela do chat inteira; o cérebro fica grande no meio da área da conversa
       // (desconta o topo e a caixa de mensagem com a frase) e as orbes vagam em volta, sem sair da tela
-      const R0 = 32
+      const R0 = W < 640 ? 20 : 32 // celular: orbes menores (no telefone as de 32 px se amontoavam)
       const topo = Math.min(70, H * 0.1), baixo = H - Math.min(180, H * 0.24)
       const CX = W / 2, CY = (topo + baixo) / 2
       const ativas = ferr.filter((f) => f.aceso)
@@ -563,7 +563,7 @@
           }
           cx.globalCompositeOperation = 'source-over'
         }
-        icone(cx, f.id, f.ix, f.iy, 26 + on * 4, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
+        icone(cx, f.id, f.ix, f.iy, R0 * 0.8 + on * 4, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
         if (on > 0.3) {
           cx.globalAlpha = Math.min(1, (on - 0.3) * 2)
           cx.fillStyle = f.cor
