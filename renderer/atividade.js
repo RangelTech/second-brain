@@ -87,8 +87,11 @@
   const TAU = Math.PI * 2
   const COR = { pensar: '#c4a7ff', escrever: '#f2f6ff', skills: '#ff9f5a', arquivos: '#7dde8a', documentos: '#ffb4a2', planilhas: '#4fd69c', web: '#6ea8ff', navegador: '#3fe0f5',
     redes: '#ff5fa2', terminal: '#ffe08a', codigo: '#f9a03f', memoria: '#b58cff', imagem: '#ff7ab8', video: '#ff4d6d', voz: '#7ae7ff', pesquisa: '#9bd1ff', tarefas: '#a8e6a1', agentes: '#e8eefc' }
-  const NOME = ROTULO
-  const ORDEM = ICONES
+  const NOME = { ...ROTULO, codigo: 'Código', midia: 'Mídia' }
+  // 11 orbes vagando (o Lucas pediu menos); as categorias finas de categoriaDe caem na orbe mais próxima
+  const ORDEM = ['pensar', 'escrever', 'skills', 'arquivos', 'web', 'navegador', 'redes', 'codigo', 'midia', 'memoria', 'agentes']
+  const ORBE_DE = { terminal: 'codigo', documentos: 'arquivos', planilhas: 'arquivos', pesquisa: 'arquivos', imagem: 'midia', video: 'midia', voz: 'midia', tarefas: 'pensar' }
+  COR.midia = '#ff7ab8'
   const BASE = '#59c8ff' // ativo (pergunta rodando): azul
   const NUCLEO = '#ff8a66'
   const BASE_P = '#ffc861' // parado (sem pergunta): ambar, girando devagar
@@ -104,7 +107,7 @@
   }
 
   // o cérebro é o mesmo desenho sempre (semente fixa); calculado uma vez e reaproveitado por todos os cartões
-  const NC = 560 // neuronios do cortex (os primeiros NC pontos)
+  const NC = 430 // neurônios do córtex: a mesma densidade do protótipo aprovado
   let MODELO = null
   function modelo() {
     if (MODELO) return MODELO
@@ -264,7 +267,7 @@
     const estouros = []
     const cx = semTela ? null : canvas.getContext('2d')
     let W = 0, H = 0, dpr = 1, clarao = 0, ult = 0, acum = 0, raf = 0, animando = false, fraseAtual = '', relogio = 0
-    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar', orb = null
+    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar'
     const mix = (a, b, k) => { const x = rgb(a), y = rgb(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join('') }
     const agora = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000
 
@@ -291,9 +294,10 @@
       const dt = Math.min(0.05, ult ? t - ult : 0.016)
       ult = t
       if (!W) tamanho()
-      // geometria: a órbita dos ícones cabe INTEIRA no quadro (nada cortado) e sobra a faixa de baixo para a frase
+      // geometria: o canvas é o FUNDO da tela do chat inteira; o cérebro fica grande no meio da área da conversa
+      // (desconta o topo e a caixa de mensagem com a frase) e as orbes vagam em volta, sem sair da tela
       const R0 = 22
-      const topo = R0 + 12, baixo = H - 40 - R0
+      const topo = Math.min(70, H * 0.1), baixo = H - Math.min(180, H * 0.24)
       const CX = W / 2, CY = (topo + baixo) / 2
       const ativas = ferr.filter((f) => f.aceso)
       const energia = (ativas.length ? 1 : 0.35) * (0.35 + 0.65 * kAtivo)
@@ -319,7 +323,8 @@
       if (!reduzir) yaw += dt * (0.05 + 0.12 * kAtivo)
       const inc = -0.2 + (reduzir ? 0 : Math.sin(t * 0.29) * 0.06)
       const cy_ = Math.cos(yaw), sy_ = Math.sin(yaw), ci = Math.cos(inc), si = Math.sin(inc)
-      const S = Math.min(W * 0.55, baixo - topo + 30) * 0.46 * (1 + (reduzir ? 0 : (0.008 + 0.012 * kAtivo) * Math.sin(t * 1.25)))
+      const S = Math.min(W * 0.62, baixo - topo) * 0.55 * (1 + (reduzir ? 0 : (0.008 + 0.012 * kAtivo) * Math.sin(t * 1.25)))
+      const E = Math.max(1, S / 170)
       for (const p of P) {
         const x = p.x * cy_ - p.z * sy_
         const z0 = p.x * sy_ + p.z * cy_
@@ -329,38 +334,20 @@
         p.sx = CX + x * S * k; p.sy = CY - y * S * k; p.sz = z; p.k = k
       }
 
-      const rx = Math.min(W / 2 - R0 - 14, 430), ry = (baixo - topo) / 2
       const algumaFerr = ferr.some((f) => f.ativo > 0)
-      // ÓRBITA EM DUAS ALAS: os ícones ficam à esquerda e à direita do cérebro, numa curva suave (superelipse 0,7), com a faixa do meio
-      // livre (antes ficavam por cima do cérebro em cima e embaixo). Distribuídos por distância igual ao longo das alas.
-      const livre = Math.min(rx - R0 * 3, S * 1.3 + R0) // meia largura da faixa do cérebro
-      if (!orb || orb.rx !== rx || orb.ry !== ry || Math.abs(orb.livre - livre) > 2) {
-        const sup = (a) => {
-          const c = Math.cos(a), s2 = Math.sin(a)
-          return [Math.sign(c) * Math.pow(Math.abs(c), 0.7) * rx, Math.sign(s2) * Math.pow(Math.abs(s2), 0.7) * ry]
-        }
-        const N = 1440, pts = []
-        for (let k = 0; k < N; k++) pts.push(sup((k / N) * TAU))
-        let total = 0
-        const seg = [] // [x, y, comprimento acumulado] só dos pontos fora da faixa do cérebro
-        for (let k = 0; k < N; k++) {
-          const [x, y] = pts[k]
-          if (Math.abs(x) < livre) continue
-          const ant = seg[seg.length - 1]
-          if (ant && Math.hypot(x - ant[0], y - ant[1]) < 30) total += Math.hypot(x - ant[0], y - ant[1])
-          seg.push([x, y, total])
-        }
-        const pos = ferr.map((f) => {
-          const alvo = ((f.i + 0.5) / ferr.length) * total
-          let k = 0
-          while (k < seg.length - 1 && seg[k][2] < alvo) k++
-          return [seg[k][0], seg[k][1]]
-        })
-        orb = { rx, ry, livre, pos }
-      }
+      // ORBES VAGANDO: cada uma tem a sua região em volta do cérebro e passeia devagar (ângulo, distância e um desvio lento), sem ficar
+      // num círculo parado; a sinapse alcança a orbe onde ela estiver e a acompanha enquanto ela anda.
+      const rxO = Math.min(W / 2 - R0 - 24, S * 2.15), ryO = Math.min((baixo - topo) / 2 + 30, S * 1.3)
       for (const f of ferr) {
-        f.ix = CX + orb.pos[f.i][0] + Math.sin(t * 0.21 + f.i) * 1.5
-        f.iy = CY + orb.pos[f.i][1] + Math.sin(t * 0.9 + f.i * 1.7) * 2
+        if (!f.mov) f.mov = { a: (f.i / ferr.length) * TAU + 0.28, ph: f.i * 1.913, w1: 0.045 + ((f.i * 7) % 5) * 0.006, w2: 0.06 + ((f.i * 3) % 5) * 0.008 }
+        const m = f.mov
+        const vel = reduzir ? 0 : 1
+        const ang = m.a + 0.22 * Math.sin(t * m.w1 * vel + m.ph)
+        const rad = 0.8 + 0.16 * Math.sin(t * m.w2 * vel + m.ph * 0.7)
+        let x = CX + Math.cos(ang) * rxO * rad + 24 * Math.sin(t * 0.13 * vel + m.ph * 2)
+        let y = CY + Math.sin(ang) * ryO * rad + 16 * Math.cos(t * 0.11 * vel + m.ph)
+        f.ix = Math.max(R0 + 18, Math.min(W - R0 - 18, x))
+        f.iy = Math.max(R0 + 18, Math.min(H - R0 - 18, y))
         const aceso = f.ativo > 0 || (alvoAtivo > 0 && !algumaFerr && f.id === base)
         f.aceso = aceso
         f.liga = lerp(f.liga, aceso ? 1 : 0, 1 - Math.pow(0.0015, dt))
@@ -395,15 +382,15 @@
         const prof = ((a.sz + b.sz) / 2 + 1.1) / 2.2
         const calor = Math.min(a.calor, b.calor)
         cx.globalAlpha = 1
-        if (calor > 0.06) { cx.strokeStyle = rgba(ferr[a.cor].cor, 0.18 + calor * 0.55); cx.lineWidth = 0.7 + calor * 1.1 }
-        else { cx.strokeStyle = rgba(corBase, (0.05 + prof * 0.2) * (0.75 + energia * 0.4) + clarao * 0.2); cx.lineWidth = 0.6 }
+        if (calor > 0.06) { cx.strokeStyle = rgba(ferr[a.cor].cor, 0.18 + calor * 0.55); cx.lineWidth = (0.7 + calor * 1.1) * E }
+        else { cx.strokeStyle = rgba(corBase, (0.07 + prof * 0.24) * (0.75 + energia * 0.4) + clarao * 0.2); cx.lineWidth = 0.6 * E }
         cx.beginPath(); cx.moveTo(a.sx, a.sy); cx.lineTo(b.sx, b.sy); cx.stroke()
       }
       luz(corNucleo, CX, CY, S * (0.5 + 0.05 * Math.sin(t * 2.2)), 0.14 + energia * 0.1 + clarao * 0.25)
       for (const p of P) {
         const prof = (p.sz + 1.1) / 2.2
         const pisca = 0.5 + 0.5 * Math.sin(t * (1.4 + p.peso) + p.f)
-        const r = (2.2 + prof * 4.2 + pisca * 1.6) * p.k * p.peso
+        const r = (2.2 + prof * 4.2 + pisca * 1.6) * p.k * p.peso * E
         luz(corBase, p.sx, p.sy, r, (0.16 + prof * 0.5) * (0.55 + pisca * 0.45) + clarao * 0.5)
         if (p.calor > 0.03) luz(ferr[p.cor].cor, p.sx, p.sy, r * (1.5 + p.calor * 1.4), p.calor * (0.55 + prof * 0.45))
       }
@@ -430,7 +417,7 @@
           continue
         }
         const prof = (lerp(a.sz, b.sz, q.f) + 1.1) / 2.2
-        luz(Math.max(a.calor, b.calor) > 0.1 ? ferr[a.cor].cor : kAtivo > 0.5 ? '#ffffff' : '#fff1cc', lerp(a.sx, b.sx, q.f), lerp(a.sy, b.sy, q.f), 3 + prof * 4, 0.35 + prof * 0.5)
+        luz(Math.max(a.calor, b.calor) > 0.1 ? ferr[a.cor].cor : kAtivo > 0.5 ? '#ffffff' : '#fff1cc', lerp(a.sx, b.sx, q.f), lerp(a.sy, b.sy, q.f), (3 + prof * 4) * E, 0.35 + prof * 0.5)
       }
       if (pulsos.length > 400) pulsos.splice(0, pulsos.length - 400)
 
@@ -537,7 +524,7 @@
     }
 
     function evento(cat, estado) {
-      const f = porId[cat] || porId.agentes
+      const f = porId[ORBE_DE[cat] || cat] || porId.agentes
       if (estado === 'inicio') f.ativo++
       else {
         f.ativo = Math.max(0, f.ativo - 1)
@@ -593,6 +580,7 @@
     }
     // estado de base enquanto nenhuma ferramenta roda: 'pensar' (raciocinio) ou 'escrever' (escrevendo a resposta)
     function definirBase(b) {
+      b = ORBE_DE[b] || b
       if (!porId[b] || b === base) return
       base = b
       chip()

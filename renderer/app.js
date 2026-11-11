@@ -994,8 +994,9 @@
       SA.lembrar(sim) // quem fecha uma vez, fica fechado (inclusive depois de reiniciar)
       mostrar(sim)
     }
-    $('cv-fechar').onclick = () => (SA.lembrar(false), mostrar(false))
     window.addEventListener('resize', () => !el.hidden && CV.card.tamanho())
+    // o fundo acompanha a área do chat (abrir/fechar a lateral ou o navegador muda o tamanho sem 'resize' da janela)
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => !el.hidden && CV.card.tamanho()).observe(el)
     mostrar(SA.aberto())
     cerebroSincronizar()
   }

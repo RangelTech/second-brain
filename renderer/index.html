@@ -27,6 +27,7 @@
   </aside>
   <div class="cortina" id="cortina"></div>
   <main class="central">
+    <div class="cerebro-fundo" id="cerebro-vivo" aria-hidden="true"><canvas id="cv-canvas"></canvas><div class="vidro"></div></div>
     <header class="barra">
       <button class="btn-ic mostrar" id="mostrar" aria-label="Mostrar a barra lateral"><i data-ic="panel"></i></button>
       <div class="titulo" id="titulo">Nova conversa</div>
@@ -34,7 +35,7 @@
       <button class="chip-topo" id="abrir-nav" aria-label="Abrir ou fechar o navegador integrado" title="Navegador integrado"><i data-ic="globe"></i><span>Navegador</span></button>
     </header>
     <section class="conversa" id="conversa" aria-live="polite"></section>
-    <section class="cerebro-vivo" id="cerebro-vivo"><canvas id="cv-canvas" aria-hidden="true"></canvas><button class="cv-fechar" id="cv-fechar" type="button" aria-label="Esconder o cérebro" title="Esconder o cérebro (o botão Cérebro, no topo, mostra de novo)">×</button><div class="sin-hud"><span class="sin-chip" id="cv-chip"><i></i><b>Em repouso</b></span><span class="sin-frase" id="cv-frase"></span></div></section>
+    <div class="cerebro-hud" id="cerebro-hud" role="status"><span class="sin-chip" id="cv-chip"><i></i><b>Em repouso</b></span><span class="sin-frase" id="cv-frase"></span></div>
     <div class="boas-vindas" id="boas-vindas" hidden>
       <div><b>Bem-vindo ao Segundo Cérebro.</b><span> Para começar, conecte um provedor (por exemplo, o Unlimited).</span></div>
       <button class="primario" id="bv-ir">Conectar agora</button>
