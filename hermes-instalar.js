@@ -93,6 +93,8 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
     const home = require('./caminhos-hermes').raizAgente(app)
     fs.mkdirSync(home, { recursive: true })
     const win = process.platform === 'win32'
+    // macOS novo não tem git (só o atalho que pede as ferramentas da Apple): o app traz um git portátil antes do instalador oficial
+    const gitExtra = await require('./git-mac').garantir(app, falar)
     falar('baixando o instalador')
     const r = await fetch(`${RAIZ}/${REF}/scripts/install.${win ? 'ps1' : 'sh'}`, { signal: AbortSignal.timeout(60000) }).catch(() => null)
     if (!r || !r.ok) throw new Error('Não consegui baixar o instalador do agente. Confira a conexão com a internet e tente de novo.')
@@ -102,7 +104,9 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
       ? ['powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-NonInteractive', '-SkipBrowser', '-SkipComputerUse', '-HermesHome', home]]
       : ['bash', [script, '--non-interactive', '--skip-browser', '--skip-computer-use', '--hermes-home', home]]
     await new Promise((resolve, reject) => {
-      const filho = spawn(exe, args, { env: { ...process.env, HERMES_HOME: home }, windowsHide: true })
+      const env = { ...process.env, HERMES_HOME: home }
+      if (gitExtra) env.PATH = gitExtra + path.delimiter + (env.PATH || '')
+      const filho = spawn(exe, args, { env, windowsHide: true })
       const fim = []
       const todas = []
       const linhas = (d) => {
