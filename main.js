@@ -452,6 +452,15 @@ function criarJanela() {
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
   })
+  // a vista do navegador é uma camada nativa: quando a janela muda de tamanho ou de estado (maximizar, restaurar, encaixar), pede à tela para reenviar
+  // a posição do painel (a tela também confere a cada quadro; isto cobre a janela voltando de minimizada ou trocando de monitor)
+  let reposicionar = null
+  for (const ev of ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen', 'move', 'show']) {
+    janela.on(ev, () => {
+      clearTimeout(reposicionar)
+      reposicionar = setTimeout(() => { try { janela?.webContents.send('navegador:reposicionar') } catch {} }, 60)
+    })
+  }
   janela.loadFile(path.join(__dirname, 'renderer', 'index.html'))
   // eventos de estado do app também vão para quem está na versão web
   const enviarOriginal = janela.webContents.send.bind(janela.webContents)

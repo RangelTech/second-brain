@@ -64,3 +64,8 @@ test('esperar é sempre local e chrome_estado informa o estado', async () => {
   assert.match(e.link_extensao, /brain\.rangeltech\.net\/extensao/)
   assert.strictEqual(chamadas.length, 0)
 })
+
+test('a versão web não reposiciona a vista nativa do computador (bug: página do navegador por cima do chat)', () => {
+  const { IGNORADOS_NA_WEB } = require('../remoto.js')
+  for (const canal of ['navegador:limites', 'navegador:esconder-temp', 'navegador:mostrar']) assert.ok(IGNORADOS_NA_WEB.has(canal), canal)
+})

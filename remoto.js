@@ -11,6 +11,10 @@ const URL_PADRAO = process.env.SB_REMOTO_URL || 'https://remoto.rangeltech.net'
 const RENDERER = path.join(__dirname, 'renderer')
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' }
 // o que a tela web NÃO pode pedir ao app (abre janela, pasta ou programa no computador, ou mexe no próprio acesso web)
+// A versão web também chama estes canais (a tela é a mesma), mas eles mexem na camada NATIVA do navegador do computador: a posição, o tamanho e o
+// "esconder por modal" da vista seguem a geometria da tela do PRÓPRIO computador. Se valessem para o aparelho web, abrir o site no celular ou em
+// outro navegador reposicionava a vista do desktop com o tamanho dessa outra tela (a página do navegador ficava por cima do chat).
+const IGNORADOS_NA_WEB = new Set(['navegador:limites', 'navegador:esconder-temp', 'navegador:mostrar'])
 const BLOQUEADOS = new Set(['pasta:escolher', 'oauth:janela', 'extensao:conectar', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado', 'ditado:modelo', 'ditado:whisper', 'ditado:whisper-aquecer'])
 // eventos do app que a tela web também recebe (o resto vai só para quem fez a chamada)
 const EVENTOS_ESPELHADOS = new Set(['chats:mudou', 'skills:mudou', 'unlimited:estado', 'navegador:estado', 'navegador:abrir-painel', 'midia:pronta'])
@@ -79,6 +83,7 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
   async function chamar(m) {
     const ret = (o) => enviar({ t: 'ret', para: m.de, id: m.id, ...o })
     if (BLOQUEADOS.has(m.canal)) return ret({ ok: false, erro: 'Esta ação só pode ser feita no próprio computador.' })
+    if (IGNORADOS_NA_WEB.has(m.canal)) return ret({ ok: true, valor: null }) // a web mostra a página por captura; não mexe na vista do computador
     try {
       const sender = { send: (canal, dados) => enviar({ t: 'ev', canal, dados, para: m.de }) }
       const valor = await invocar(m.canal, reviver(m.args || []), sender)
@@ -234,4 +239,4 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
   }
 }
 
-module.exports = { criar }
+module.exports = { criar, IGNORADOS_NA_WEB, BLOQUEADOS }

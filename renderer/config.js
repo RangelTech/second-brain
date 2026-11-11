@@ -22,6 +22,7 @@
     uso: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     agente: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
     sobre: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+    chrome: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5h8M7.5 14.5 3.8 8M12.5 20.5l4-6.5"/></svg>',
     cota: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   }
   const ABAS = [
@@ -29,6 +30,7 @@
     { id: 'combo', nome: 'Combos', grupo: 'Modelos' },
     { id: 'uso', nome: 'Uso', grupo: 'Consumo' },
     { id: 'cota', nome: 'Cota', grupo: 'Consumo' },
+    { id: 'chrome', nome: 'Chrome', grupo: 'Aplicativo' },
     { id: 'sobre', nome: 'Sobre', grupo: 'Aplicativo' },
   ]
 
@@ -755,7 +757,49 @@
     if (S.aba === 'combo') return telaCombos()
     if (S.aba === 'uso') return telaUso()
     if (S.aba === 'cota') return telaCota()
+    if (S.aba === 'chrome') return telaChrome()
   }
+
+  // =====================================================================
+  // CHROME (extensão "Segundo Cérebro no Chrome")
+  // =====================================================================
+  async function telaChrome() {
+    const e = await window.sb.extensao.estado().catch(() => ({}))
+    const ponto = e.conectado ? (e.pausada ? '#8b8f98' : '#4caf7d') : '#e0a030'
+    const titulo = e.conectado ? (e.pausada ? 'Chrome conectado, mas pausado' : 'Chrome conectado') : 'Chrome não conectado'
+    const texto = e.conectado
+      ? (e.pausada ? 'A extensão está pausada. Clique no ícone dela no Chrome e em Continuar para o Segundo Cérebro voltar a usar o seu Chrome.' : `O Segundo Cérebro pode usar o seu Chrome${e.nome ? ' (' + esc(e.nome) + ')' : ''}, com as suas contas já abertas, quando você pedir "use o meu Chrome" ou quando a tarefa precisar delas.`)
+      : 'Instale a extensão uma vez e o Segundo Cérebro passa a poder usar o seu Chrome, com as suas contas (WhatsApp, Instagram, Gmail e outras) já abertas, e entrar no Claude e no ChatGPT sem copiar e colar endereço.'
+    $('.cfg-corpo').innerHTML = `
+      <div class="cfg-cab"><div><h1>Chrome</h1><p>Use o seu Chrome com o Segundo Cérebro. Neste aplicativo o padrão continua sendo o navegador de dentro dele; o Chrome entra quando você pedir.</p></div></div>
+      <div class="kpi" style="max-width:640px">
+        <span>Extensão do Chrome</span>
+        <b style="font-size:18px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${ponto};display:inline-block"></i>${titulo}</b>
+        <p class="mut" style="margin:8px 0 14px">${texto}</p>
+        ${e.conectado ? '' : `<ol class="mut" style="margin:0 0 14px;padding-left:18px;line-height:1.7">
+          <li>Baixe a extensão e extraia o arquivo numa pasta que você não vai apagar.</li>
+          <li>No Chrome, abra <b>chrome://extensions</b>, ligue o <b>Modo do desenvolvedor</b> e clique em <b>Carregar sem compactação</b>.</li>
+          <li>Volte aqui e toque em <b>Conectar o Chrome</b>.</li></ol>`}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="ch-baixar">${e.conectado ? 'Ver o passo a passo' : 'Baixar a extensão'}</button>
+          ${e.conectado ? '' : '<button class="btn-pri" id="ch-conectar">Conectar o Chrome</button>'}
+        </div>
+        <p class="mut" id="ch-msg" style="margin:10px 0 0;font-size:13px" hidden></p>
+      </div>`
+    $('#ch-baixar').onclick = () => window.sb.abrirExterno(e.link || 'https://brain.rangeltech.net/extensao/')
+    const c = $('#ch-conectar')
+    if (c) c.onclick = async () => {
+      c.disabled = true
+      const r = await window.sb.extensao.conectar().catch((x) => ({ ok: false, erro: String(x.message || x) }))
+      const m = $('#ch-msg')
+      m.hidden = false
+      m.textContent = r && r.ok ? 'Abri o site no seu navegador para parear a extensão. Em alguns segundos esta tela mostra "Chrome conectado".' : (r && r.erro) || 'Não consegui conectar agora.'
+      c.disabled = false
+    }
+    // o estado muda sozinho quando a extensão conecta
+    if (!chromeOuvindo) { chromeOuvindo = true; window.sb.extensao.aoEstado(() => { if (S.aba === 'chrome') telaChrome() }) }
+  }
+  let chromeOuvindo = false
 
   function montar() {
     raiz = document.getElementById('config')

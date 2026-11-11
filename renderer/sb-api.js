@@ -115,6 +115,7 @@
         favoritar: (f) => invoke('navegador:favoritar', f),
         aoEstado: (fn) => on('navegador:estado', fn),
         aoAbrirPainel: (fn) => on('navegador:abrir-painel', () => fn()),
+        aoReposicionar: (fn) => on('navegador:reposicionar', () => fn()),
       },
       aoErro: (fn) => on('chat:erro', fn),
     }

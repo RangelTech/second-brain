@@ -1633,7 +1633,7 @@
   let navUltimo = ''
   let navLaco = 0
   function navPos(forcar) {
-    if (!navAberto) return
+    if (!navAberto || window.__sbWeb) return // na web não há vista nativa: a página aparece por captura e a geometria desta tela não pode mexer na do computador
     const r = $('nav-host').getBoundingClientRect()
     const chave = [r.x, r.y, r.width, r.height].map((n) => Math.round(n)).join(',')
     if (forcar !== true && chave === navUltimo) return
@@ -1759,6 +1759,7 @@
     $('nav-vazio').hidden = !!e.url
   })
   NAV.aoAbrirPainel(() => navAbrir(true))
+  NAV.aoReposicionar(() => navPos(true))
   new ResizeObserver(() => navPos(true)).observe($('nav-host'))
   window.addEventListener('resize', () => navPos(true))
   document.addEventListener('visibilitychange', () => navPos(true))
