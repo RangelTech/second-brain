@@ -15,7 +15,7 @@ const chatAtual = () => {
   return ATUAL
 }
 const TRECHO_MAX = 700
-const PARADAS = new Set('a o as os um uma uns umas de do da dos das em no na nos nas por para com sem que e ou mas se eu tu ele ela nos voce voces me te lhe meu minha seu sua isso isto aquilo esse essa este esta aquele aquela ja foi ser era tem ter vai vou como mais muito pra pro the and for you'.split(' '))
+const PARADAS = new Set('a o as os um uma uns umas de do da dos das em no na nos nas por para com sem que e ou mas se eu tu ele ela nos voce voces me te lhe meu minha seu sua isso isto aquilo esse essa este esta aquele aquela ja foi ser era tem ter vai vou como mais muito pra pro the and for you lembra lembrar lembro lembrou lembre conversamos conversa conversas conversei falamos falei falou combinamos combinado resuma resumo resumir resume frase frases diga dizer sobre aquilo quando outro dia vez antes ontem semana passada tinha voce voces'.split(' '))
 
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const tokens = (s) => semAcento(s).split(/[^a-z0-9]+/).filter((t) => t.length > 1 && !PARADAS.has(t))
