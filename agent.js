@@ -270,7 +270,21 @@ function localizarBinario(app) {
     path.join(os.homedir(), 'hermes', 'bin', exe),
     path.join(os.homedir(), '.local', 'bin', 'hermes-acp'),
   ].filter(Boolean)
-  return candidatos.find((c) => fs.existsSync(c)) || null
+  return candidatos.find((c) => fs.existsSync(c) && atalhoValido(c)) || null
+}
+// O instalador oficial publica em ~/.local/bin um ATALHO de texto ("exec <caminho>/hermes-acp"). Se a instalação foi apagada ou abortada,
+// o atalho fica apontando para o nada: contar isso como "instalado" fazia o app nunca reinstalar (QA Linux 11/11/2026, "O agente encerrou").
+function atalhoValido(c) {
+  try {
+    const st = fs.statSync(c)
+    if (st.size > 8192) return true // binário de verdade
+    const txt = fs.readFileSync(c, 'utf8')
+    if (!txt.startsWith('#!')) return true
+    const alvos = txt.match(/(\/[^\s'"]+\/hermes-acp)\b/g) || []
+    return alvos.length === 0 || alvos.some((a) => fs.existsSync(a))
+  } catch {
+    return true
+  }
 }
 
 // HERMES_HOME próprio do app. Na primeira vez traz skills, memória e SOUL.md da instalação do piloto;
@@ -1249,4 +1263,4 @@ class Sessao {
   }
 }
 
-module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
