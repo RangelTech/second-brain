@@ -335,6 +335,23 @@ async function iasDoApp() {
 // e não sobe se a máquina tem pouca memória livre (VM pequena).
 const ANCORA_ID = 'ancora-gateway' // nome antigo, mantido só para o filtro do roteador (nenhuma sessão nasce mais com ele)
 const MEMORIA_MIN_ANCORA = process.env.SB_RESERVA_MEM_MIN ? +process.env.SB_RESERVA_MEM_MIN : 1.2 * 1024 * 1024 * 1024
+// Memória que o sistema entrega na hora. No macOS o os.freemem() conta só as páginas totalmente vazias (o macOS deixa quase toda a RAM
+// como cache) e dava ~100 MB num Mac de 6 GB ocioso: as reservas nunca subiam (QA 11/11/2026). Lá soma livre + inativa + especulativa +
+// reaproveitável do vm_stat. Medida guardada por 20 s.
+let memCache = { t: 0, v: 0 }
+function memoriaDisponivel() {
+  if (process.platform !== 'darwin') return os.freemem()
+  if (Date.now() - memCache.t < 20000) return memCache.v
+  let v = os.freemem()
+  try {
+    const s = require('child_process').execFileSync('vm_stat', { encoding: 'utf8', timeout: 3000 })
+    const pag = +(s.match(/page size of (\d+)/) || [])[1] || 4096
+    const n = (rotulo) => +((s.match(new RegExp('Pages ' + rotulo + ':\\s+(\\d+)')) || [])[1] || 0)
+    v = (n('free') + n('inactive') + n('speculative') + n('purgeable')) * pag
+  } catch {}
+  memCache = { t: Date.now(), v }
+  return v
+}
 // SESSÃO RESERVA (Spec 26): a partida do Hermes (Python + importações + agente + 1º turno) leva 10 a 20 s. O app mantém UMA sessão já de pé e
 // aquecida, sem conversa. A conversa que precisar do agente a ADOTA na hora (a pergunta sai em segundos) e o app sobe outra reserva em segundo plano.
 // Ela também faz o papel da antiga âncora: com ela de pé o gateway do Hermes nunca fica órfão. A identidade da conversa não fica presa ao processo:
@@ -370,7 +387,7 @@ function manterAncora(alvo, nivel) {
     }
     if (reservaSubindo || reservas.length >= RESERVAS_ALVO()) return
     if (Date.now() < reservaPausadaAte) return
-    if (os.freemem() < MEMORIA_MIN_ANCORA) return
+    if (memoriaDisponivel() < MEMORIA_MIN_ANCORA) return
     const id = 'reserva-' + ++nReserva
     reservaSubindo = Promise.resolve(chaveLocal())
       .then(async (chave) => {
@@ -476,7 +493,7 @@ function avisarCarregamento() {
   // nada vai subir: reservas desligadas ou pausadas, pouca memória, sem conta (a tela de login aparece)
   const nadaSubindo = !reservaSubindo && !reservas.length && e.prontas === 0
   if (cfg.ancoraAgente === false || cfg.soConversa || RESERVAS_ALVO() === 0) return liberarCarregamento('sem sessões para esperar')
-  if (nadaSubindo && e.decorrido > 8000 && (Date.now() < reservaPausadaAte || os.freemem() < MEMORIA_MIN_ANCORA)) return liberarCarregamento('máquina sem memória livre para as sessões')
+  if (nadaSubindo && e.decorrido > 8000 && (Date.now() < reservaPausadaAte || memoriaDisponivel() < MEMORIA_MIN_ANCORA)) return liberarCarregamento('máquina sem memória livre para as sessões')
   try {
     janela?.webContents.send('app:carregando', e)
   } catch {}
