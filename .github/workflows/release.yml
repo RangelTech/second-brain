@@ -110,13 +110,18 @@ jobs:
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgbm1 libasound2t64 || true
               chmod +x dist/Segundo-Cerebro-Linux.AppImage
               (cd dist && ./Segundo-Cerebro-Linux.AppImage --appimage-extract >/dev/null)
-              xvfb-run -a "$PWD/dist/squashfs-root/second-brain" --no-sandbox --preparar-agente ;;
+              SB_SEM_FERRAMENTAS_SISTEMA=1 xvfb-run -a "$PWD/dist/squashfs-root/second-brain" --no-sandbox --preparar-agente
+              echo "--- hermes-instalacao.log (final)"; tail -40 "$SB_DATA_DIR/hermes-instalacao.log" 2>/dev/null | cut -c1-240 || true ;;
             macOS)
               app=$(ls -d dist/mac-arm64/*.app 2>/dev/null | head -1)
               [ -n "$app" ] || app=$(ls -d dist/mac*/*.app | head -1)
               ls "$app/Contents/MacOS"
               export ELECTRON_ENABLE_LOGGING=1
-              "$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)" --preparar-agente 2>&1 | tail -60 || true
+              # MAC ZERADO (11/11/2026): o executor do GitHub tem as ferramentas da Apple e o git do Homebrew; um Mac de cliente nao tem.
+              # Sem o Homebrew no PATH e com as ferramentas apontando para o nada, o /usr/bin/git e o cc viram o atalho que falha, como num Mac novo.
+              env PATH=/usr/bin:/bin:/usr/sbin:/sbin DEVELOPER_DIR=/sb-sem-ferramentas SB_SEM_FERRAMENTAS_SISTEMA=1 \
+                "$app/Contents/MacOS/$(ls "$app/Contents/MacOS" | head -1)" --preparar-agente 2>&1 | tail -60 || true
+              echo "--- hermes-instalacao.log (final)"; tail -40 "$SB_DATA_DIR/hermes-instalacao.log" 2>/dev/null | cut -c1-240 || true
               ls ~/Library/Logs/DiagnosticReports 2>/dev/null | head -3
               for r in $(ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -1); do head -c 4000 "$r"; done ;;
           esac

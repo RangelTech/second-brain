@@ -50,6 +50,7 @@
       "native-host.js",
       "editor-video.js",
       "partida-direta.js",
+      "ferramentas.js",
       "mcp-editor.js",
       "hermes-instalar.js",
       "relatorio-instalacao.js",
@@ -89,7 +90,7 @@
       },
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "identity": null
+      "identity": "-"
     },
     "dmg": {
       "title": "Segundo Cérebro ${version}"

@@ -181,7 +181,7 @@
       await api('PUT', `/api/providers/${id}`, { isActive: c.isActive === false })
       await recarregar()
     } else if (acao === 'remover') {
-      if (!window.confirm(`Remover "${c.name || nomeProvedor(c.provider)}"? Os combos que usam este provedor deixam de funcionar.`)) return
+      if (!(await window.sbConfirmar(`Remover "${c.name || nomeProvedor(c.provider)}"?\n\nOs combos que usam este provedor deixam de funcionar.`, { sim: 'Remover', perigo: true }))) return
       await api('DELETE', `/api/providers/${id}`)
       await recarregar()
     }
@@ -842,7 +842,7 @@
           await window.sb.salvarCfg({ ativo: c.name })
           return desenharAba()
         }
-        if (acao === 'apagar' && window.confirm(`Apagar o combo "${c.name}"?`)) {
+        if (acao === 'apagar' && (await window.sbConfirmar(`Apagar o combo "${c.name}"?`, { sim: 'Apagar', perigo: true }))) {
           await api('DELETE', `/api/combos/${c.id}`)
           const novas = { ...S.estrategias }
           delete novas[c.name]

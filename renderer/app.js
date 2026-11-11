@@ -210,7 +210,7 @@
       b.tabIndex = 0
       b.setAttribute('role', 'button')
       b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
-      b.onclick = (e) => {
+      b.onclick = async (e) => {
         if (e.target.closest('.fixar')) {
           c.fixado = !c.fixado
           salvar()
@@ -219,7 +219,7 @@
         }
         if (e.target.closest('.ren')) return renomear(c, b)
         if (e.target.closest('.apagar')) {
-          if (c.msgs.length && !window.confirm('Apagar esta conversa?')) return
+          if (c.msgs.length && !(await window.sbConfirmar('Apagar esta conversa?', { sim: 'Apagar', perigo: true }))) return
           chats = chats.filter((x) => x.id !== c.id)
           apagadasPend.add(c.id)
           if (atual === c.id) atual = null
@@ -249,6 +249,13 @@
     $('texto').focus()
   }
   function criarChat() {
+    // já existe uma conversa vazia: abre ela em vez de empilhar várias "Nova conversa" sem nada na lista (visto no QA do Mac)
+    const vazia = chats.find((x) => !x.msgs.length && !x.tituloManual)
+    if (vazia) {
+      vazia.em = Date.now()
+      salvar()
+      return abrir(vazia.id)
+    }
     const c = { id: novoId(), titulo: 'Nova conversa', msgs: [], em: Date.now() }
     chats.push(c)
     salvar()
@@ -1441,6 +1448,55 @@
     preparo.texto = passoPt
     pintarProgresso()
   })
+  // TELA DE CARREGAMENTO DA ABERTURA (spec 27 §5): o app recém-aberto cobre a tela com o cérebro e a barra até as sessões do agente estarem
+  // aquecidas (no máximo 40 s; o main decide quando liberar). Fica embaixo da tela de preparo da 1ª instalação, então as duas emendam numa só.
+  // Só no app instalado: na web a VM já está de pé.
+  if (window.__sbRaw && !window.__sbRaw.abrirExterno && window.sb.carregando) {
+    const carga = { el: null, card: null, ciclo: 0, pct: 0, i: 0 }
+    const fecharCarga = () => {
+      const el = carga.el
+      if (!el) return
+      carga.el = null
+      clearInterval(carga.ciclo)
+      try { el.querySelector('.sbp-barra > i').style.width = '100%'; el.querySelector('.sbp-pct').textContent = '100%'; el.querySelector('.sbp-resta').textContent = 'pronto' } catch {}
+      setTimeout(() => { el.classList.add('sbp-saindo'); setTimeout(() => { carga.card?.parar(); el.remove() }, 700) }, 350)
+    }
+    const pintarCarga = (e) => {
+      if (!e || !e.ativo) return fecharCarga()
+      if (!carga.el) {
+        const el = document.createElement('div')
+        el.id = 'sb-carregando'
+        el.setAttribute('role', 'status')
+        el.className = 'sb-preparando sb-carregando'
+        el.innerHTML = '<canvas class="sbp-canvas" aria-hidden="true"></canvas><div class="sbp-caixa"><h2>Carregando…</h2><p class="sbp-passo">Deixando o seu assistente pronto para responder rápido.</p><div class="sbp-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Carregando"><i></i></div><div class="sbp-linha"><b class="sbp-pct">0%</b><span class="sbp-resta">alguns segundos</span></div></div>'
+        document.body.appendChild(el)
+        carga.el = el
+        const SA = window.SBAtividade
+        if (SA) {
+          const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+          carga.card = SA.criarCartao(el.querySelector('.sbp-canvas'), { textContent: '', classList: { add() {}, remove() {} } }, { reduzir })
+          carga.card.iniciar()
+          carga.ciclo = setInterval(() => {
+            const cat = SA.ICONES[carga.i++ % SA.ICONES.length]
+            carga.card?.evento(cat, 'inicio')
+            setTimeout(() => carga.card?.evento(cat, 'ok'), 900)
+          }, 1000)
+        }
+      }
+      // percentual: o maior entre as sessões prontas e o tempo (curva até ~30 s), sem nunca voltar e sem chegar a 100 antes de liberar
+      const porSessao = e.alvo ? (e.prontas / e.alvo) * 100 : 0
+      const porTempo = e.comecou ? 95 * (1 - Math.exp(-(e.decorrido / 30000) * 2.2)) : 4
+      carga.pct = Math.min(97, Math.max(carga.pct, porSessao, porTempo))
+      const p = Math.round(carga.pct)
+      carga.el.querySelector('.sbp-barra > i').style.width = p + '%'
+      carga.el.querySelector('.sbp-barra').setAttribute('aria-valuenow', String(p))
+      carga.el.querySelector('.sbp-pct').textContent = p + '%'
+      const resta = e.comecou ? Math.max(0, Math.round((Math.min(e.max || 40000, 30000) - e.decorrido) / 1000)) : 0
+      carga.el.querySelector('.sbp-resta').textContent = resta > 2 ? 'cerca de ' + resta + ' s' : 'quase lá'
+    }
+    window.sb.aoCarregando?.(pintarCarga)
+    Promise.resolve(window.sb.carregando()).then(pintarCarga).catch(() => {})
+  }
   // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)
   if (window.__sbRaw && window.sb.atualizacao) {
     const desenharAtualizacao = (e) => {
@@ -1651,7 +1707,7 @@
     const b = e.target.closest('[data-modo]')
     if (!b) return
     const id = b.dataset.modo
-    if (id === 'ignorar' && !window.confirm('Modo "Ignorar permissões": o agente deixa de pedir confirmação e pode apagar ou alterar qualquer arquivo e rodar qualquer comando no seu computador.\n\nLigar mesmo assim?')) return
+    if (id === 'ignorar' && !(await window.sbConfirmar('O agente deixa de pedir confirmação e pode apagar ou alterar qualquer arquivo e rodar qualquer comando no seu computador.', { titulo: 'Ligar o modo "Ignorar permissões"?', sim: 'Ligar', perigo: true }))) return
     cfg = await window.sb.salvarCfg({ modoPermissao: id })
     pintarPermissao()
     fecharMenuPerm()
@@ -1879,7 +1935,7 @@
       const est = await window.sb.acessoWeb?.estado?.()
       if (!est || est.ok === false || est.ativo !== false) return
       await window.sb.salvarCfg({ acessoWebPerguntado: true })
-      if (confirm('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em remoto.rangeltech.net, com este computador ligado. Você pode desligar quando quiser em Configurações.')) await window.sb.acessoWeb.ativar(true)
+      if (await window.sbConfirmar('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em remoto.rangeltech.net, com este computador ligado. Você pode desligar quando quiser em Configurações.', { sim: 'Quero', nao: 'Agora não' })) await window.sb.acessoWeb.ativar(true)
     } catch {}
   }
   $('login-esqueci').onclick = async () => {
@@ -1896,7 +1952,7 @@
   $('abrir-conta').onclick = async () => {
     cfg = await window.sb.cfg()
     if (cfg.unlimitedEmail) {
-      if (confirm(`Sair da conta ${cfg.unlimitedEmail}? O app deixa de usar o Unlimited neste computador até você entrar de novo.`)) {
+      if (await window.sbConfirmar(`Sair da conta ${cfg.unlimitedEmail}?\n\nO app deixa de usar o Unlimited neste computador até você entrar de novo.`, { sim: 'Sair' })) {
         await window.sb.unlimitedSair()
         cfg = await window.sb.cfg()
         pintarConta()

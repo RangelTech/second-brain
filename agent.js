@@ -124,6 +124,7 @@ function limparHermesPreso(app, home, exceto = []) {
 // morta no meio), o novo ESPERA ~60 s ele sair antes de assumir, e a partida estoura o prazo em ciclo. Sem nenhuma sessao ativa neste app, ele
 // nao tem cliente: pode ser encerrado com seguranca e o proximo sobe limpo em segundos.
 const sessoesVivas = new Set() // pids dos hermes-acp deste app que estao de pe
+let filaPartida = Promise.resolve() // uma sessão por vez faz o aperto de mão com o Hermes (ver iniciarComVigia)
 function matarGatewayOrfao(app, home) {
   if (sessoesVivas.size > 0) return false // outro chat usa o gateway: nao mexe
   try {
@@ -269,7 +270,21 @@ function localizarBinario(app) {
     path.join(os.homedir(), 'hermes', 'bin', exe),
     path.join(os.homedir(), '.local', 'bin', 'hermes-acp'),
   ].filter(Boolean)
-  return candidatos.find((c) => fs.existsSync(c)) || null
+  return candidatos.find((c) => fs.existsSync(c) && atalhoValido(c)) || null
+}
+// O instalador oficial publica em ~/.local/bin um ATALHO de texto ("exec <caminho>/hermes-acp"). Se a instalação foi apagada ou abortada,
+// o atalho fica apontando para o nada: contar isso como "instalado" fazia o app nunca reinstalar (QA Linux 11/11/2026, "O agente encerrou").
+function atalhoValido(c) {
+  try {
+    const st = fs.statSync(c)
+    if (st.size > 8192) return true // binário de verdade
+    const txt = fs.readFileSync(c, 'utf8')
+    if (!txt.startsWith('#!')) return true
+    const alvos = txt.match(/(\/[^\s'"]+\/hermes-acp)\b/g) || []
+    return alvos.length === 0 || alvos.some((a) => fs.existsSync(a))
+  } catch {
+    return true
+  }
 }
 
 // HERMES_HOME próprio do app. Na primeira vez traz skills, memória e SOUL.md da instalação do piloto;
@@ -395,8 +410,8 @@ function blocoSeguranca(nivel) {
 const MARCA_EST = ['<!-- sb-estilo:inicio -->', '<!-- sb-estilo:fim -->']
 function blocoEstilo() {
   const regras = [
-    'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente.',
-    'Nunca cite detalhes internos: ferramenta, tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
+    'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente, nem a frase curta antes de usar uma ferramenta (ex.: "Vou abrir a Wikipédia e ler o primeiro parágrafo.").',
+    'Nunca cite detalhes internos: nome de ferramenta (navegador_abrir, navegador_*, midia_gerar_imagem, terminal...), identificador de sessão ou de conversa (ex.: [@session:...], local-abc123...), tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Para falar de uma conversa antiga, use a data e o assunto ("na conversa de hoje às 19h sobre a Wikipédia"). Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
     'Não narre cada passo nem cada conferência. Faça o trabalho e entregue uma resposta curta: o que foi feito e onde está o arquivo.',
     'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure entre as suas skills a ferramenta que serve (liste e leia as skills), e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
   ]
@@ -605,6 +620,9 @@ class Sessao {
     if (!fs.existsSync(path.join(home, 'installs'))) emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
     this.bin = bin
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }
+    // macOS sem as ferramentas da Apple: o git portátil do app vai na frente do PATH (o agente usa git em skills e atualizações)
+    const gitExtra = require('./ferramentas').caminhoExtra(app)
+    if (gitExtra) this.env.PATH = gitExtra + path.delimiter + (this.env.PATH || '')
     this.subir()
     this.pronta = this.iniciar()
     this.pronta.catch(() => {
@@ -818,8 +836,22 @@ class Sessao {
     }
   }
   async iniciarComVigia() {
-    let ultimo
     if (!ambienteMontado(this.env.HERMES_HOME, this.bin)) await this.aguardarMontagem()
+    // FILA DE PARTIDA (QA macOS 11/11/2026): reserva + conversa aberta + aquecimento subiam juntos; numa máquina lenta o gateway do Hermes
+    // estourava o prazo de partida ("Gateway starting: deadline"), as sessões eram mortas e a pergunta virava "Não consegui responder agora".
+    // Uma sessão faz o aperto de mão por vez; a seguinte espera no máximo 2 min e então segue mesmo assim (nunca trava).
+    const anterior = filaPartida
+    let liberar
+    filaPartida = new Promise((r) => (liberar = r))
+    await Promise.race([anterior, new Promise((r) => setTimeout(r, 120000))])
+    try {
+      await this.handshakeComTentativas()
+    } finally {
+      liberar()
+    }
+  }
+  async handshakeComTentativas() {
+    let ultimo
     const montado = ambienteMontado(this.env.HERMES_HOME, this.bin)
     const TENTATIVAS = montado ? 5 : 3
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
@@ -853,7 +885,9 @@ class Sessao {
           this.subir()
           continue
         }
-        if (e.message !== 'prazo') throw e
+        // "Gateway starting: deadline": o gateway compartilhado ainda está subindo; é igual a estourar o prazo (tenta de novo)
+        if (e.message !== 'prazo' && !/gateway starting/i.test(e.message)) throw e
+        if (/gateway starting/i.test(e.message)) await new Promise((r) => setTimeout(r, 3000))
         if (tentativa < TENTATIVAS) this.emitir({ aviso: 'Preparando o agente… só um instante.' })
         const antigo = this.filho
         this.pendentes.clear()
@@ -1229,4 +1263,4 @@ class Sessao {
   }
 }
 
-module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }

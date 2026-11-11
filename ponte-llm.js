@@ -81,6 +81,11 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
     if (i >= 0) headers.authorization = auth.slice(0, i)
     const d = alvo()
     headers.host = d.host
+    // A ponte lê e reescreve o corpo (restaura nomes de ferramenta, conta tokens): resposta compactada viraria lixo com o cabeçalho
+    // "content-encoding: gzip" ainda lá. O Hermes novo (httpx) pede gzip/deflate e todo turno falhava com "Error -3 while decompressing
+    // data: incorrect header check" -> "Não consegui responder agora" (QA Linux 11/11/2026). Sempre pede sem compactação (é tudo local).
+    delete headers['accept-encoding']
+    headers['accept-encoding'] = 'identity'
     const t0 = Date.now()
     // medição (spec de contexto): com SB_DUMP_REQ_DIR o corpo de cada chamada de chat vai para um arquivo, só para analisar a composição do contexto
     if (process.env.SB_DUMP_REQ_DIR && req.method === 'POST' && /chat\/completions/.test(req.url)) {

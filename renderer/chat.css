@@ -214,6 +214,7 @@
 .corpo a{text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 
 /* ---------- navegador integrado ---------- */
+.chip-topo[hidden]{display:none}
 .chip-topo{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--bd);background:transparent;border-radius:9px;color:var(--mut);padding:5px 11px;font-size:13px;height:32px}
 .chip-topo:hover{background:var(--card2);color:var(--fg)}
 .chip-topo.on{color:var(--ac2);border-color:#6a5548}
@@ -373,6 +374,7 @@
 
 /* ---- tela de preparo do assistente (primeira abertura) ---- */
 .sb-preparando{position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center;background:#05070f;transition:opacity .6s}
+.sb-carregando{z-index:9998}
 .sb-preparando.sbp-saindo{opacity:0;pointer-events:none}
 .sbp-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#05070f}
 .sbp-caixa{position:relative;width:min(640px,92vw);margin:0 auto 7vh;text-align:center;color:var(--fg,#ece9e4);padding:20px 26px 16px;border-radius:22px;background:rgba(8,12,24,.55);border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);box-shadow:0 12px 44px rgba(0,0,0,.5)}

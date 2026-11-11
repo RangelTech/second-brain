@@ -67,7 +67,7 @@
 
   async function abrirSkill(caminho) {
     const ta = $('#sk-texto')
-    if (SK.aberta && ta && ta.value !== SK.original && !window.confirm('Há alterações não salvas. Descartar?')) return
+    if (SK.aberta && ta && ta.value !== SK.original && !(await window.sbConfirmar('Há alterações não salvas. Descartar?', { sim: 'Descartar', perigo: true }))) return
     const r = await window.sb.skills.ler(caminho)
     if (!r.ok) return window.alert(r.erro)
     SK.aberta = caminho
@@ -125,7 +125,7 @@
       if (SK.previa) $('#sk-prev').innerHTML = window.SBmd(ta.value)
     }
     $('#sk-apagar').onclick = async () => {
-      if (!window.confirm(`Apagar "${SK.aberta}"? Vai para a lixeira do sistema.`)) return
+      if (!(await window.sbConfirmar(`Apagar "${SK.aberta}"?\n\nVai para a lixeira do sistema.`, { sim: 'Apagar', perigo: true }))) return
       const r = await window.sb.skills.apagar(SK.aberta)
       if (!r.ok) return aviso($('#sk-msg'), 'err', r.erro)
       SK.aberta = null
@@ -219,7 +219,7 @@
     if (e.vinculado) {
       j.q('#rp-sinc').onclick = () => sincronizar()
       j.q('#rp-desv').onclick = async () => {
-        if (!window.confirm('Desvincular? As skills continuam aqui; só para de sincronizar com o GitHub.')) return
+        if (!(await window.sbConfirmar('Desvincular?\n\nAs skills continuam aqui; só para de sincronizar com o GitHub.', { sim: 'Desvincular' }))) return
         await window.sb.skills.repo.desvincular()
         j.fechar()
         pintarSelo()
