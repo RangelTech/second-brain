@@ -354,7 +354,7 @@
 .cerebro-fundo{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .cerebro-fundo[hidden]{display:none}
 .cerebro-fundo canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.cerebro-fundo .vidro{position:absolute;inset:0;background:rgba(31,29,26,.16);-webkit-backdrop-filter:blur(1.2px) saturate(1.2);backdrop-filter:blur(1.2px) saturate(1.2)}
+.cerebro-fundo .vidro{display:none} /* o fundo fica NÍTIDO: quem garante a leitura são os cartões de vidro das mensagens */
 .central>.barra,.central>.conversa,.central>.entrada,.central>.cerebro-hud,.central>.boas-vindas,.central>.acesso{position:relative;z-index:1}
 .central>.barra{background:transparent}
 .cerebro-hud{flex:none;display:flex;justify-content:center;align-items:center;gap:12px;padding:2px 20px 4px;min-height:30px}
@@ -368,7 +368,7 @@
 .sin-frase.sai{opacity:0;filter:blur(7px);transform:translateY(7px)}
 .chip-topo.ligado{color:var(--fg);border-color:#6a5a3c}
 /* com o navegador aberto a coluna do chat fica estreita: o cérebro continua no fundo dela */
-@media (max-width:720px){.sin-frase{font-size:12.5px;max-width:55%}.cerebro-fundo .vidro{background:rgba(31,29,26,.42)}}
+@media (max-width:720px){.sin-frase{font-size:12.5px;max-width:55%}}
 @media (prefers-reduced-motion:reduce){.sin-frase{transition:none}.sin-chip i{animation:none}}
 
 /* ---- tela de preparo do assistente (primeira abertura) ---- */
@@ -381,3 +381,19 @@
 .sbp-tempo{margin:0;color:var(--mut,#a39e96);font-size:13px;font-variant-numeric:tabular-nums}
 .chip-anexo.enviando{opacity:.75}
 .chip-anexo .pct{font-weight:600;font-variant-numeric:tabular-nums;margin-left:4px}
+
+/* ---- vidro líquido (pedido do Lucas, 10/11/2026): pergunta e resposta em cartões translúcidos sobre o cérebro do fundo ----
+   Desfoque e saturação do que está atrás, um véu escuro leve (não opaco), borda clara fina e um brilho no alto, como um vidro de verdade. */
+.msg.assistant{position:relative;padding:14px 20px 12px;border-radius:20px;
+  background:linear-gradient(145deg,rgba(255,255,255,.075) 0%,rgba(255,255,255,.025) 45%,rgba(255,255,255,.04) 100%),rgba(24,22,20,.38);
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.04),0 10px 34px rgba(0,0,0,.32);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5)}
+.msg.assistant::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(120% 60% at 18% 0%,rgba(255,255,255,.10),rgba(255,255,255,0) 60%)}
+.msg.user .corpo{position:relative;
+  background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.03)),rgba(52,49,45,.45);
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 26px rgba(0,0,0,.28);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5)}
+@media (max-width:720px){.msg.assistant{padding:12px 14px 10px;border-radius:16px}}

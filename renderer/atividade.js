@@ -107,7 +107,7 @@
   }
 
   // o cérebro é o mesmo desenho sempre (semente fixa); calculado uma vez e reaproveitado por todos os cartões
-  const NC = 430 // neurônios do córtex: a mesma densidade do protótipo aprovado
+  const NC = 860 // neurônios do córtex: a mesma densidade do protótipo aprovado
   let MODELO = null
   function modelo() {
     if (MODELO) return MODELO
@@ -132,14 +132,14 @@
       if (y < -0.12 && x > -0.35 && x < 0.55) z *= 1.14
       ponto(x, y + 0.06, z)
     }
-    for (let i = 0; i < 64; i++) {
+    for (let i = 0; i < 128; i++) {
       const u = rnd() * TAU
       const v = Math.acos(2 * rnd() - 1)
       const r = 0.3 * Math.cbrt(0.4 + rnd() * 0.6)
       ponto(-0.66 + Math.sin(v) * Math.cos(u) * r, -0.42 + Math.cos(v) * r * 0.72, Math.sin(v) * Math.sin(u) * r * 1.5, 0.8)
     }
-    for (let i = 0; i < 26; i++) {
-      const t = i / 25
+    for (let i = 0; i < 52; i++) {
+      const t = i / 51
       ponto(-0.36 + t * 0.08 + (rnd() - 0.5) * 0.09, -0.4 - t * 0.6, (rnd() - 0.5) * 0.11, 0.7)
     }
     const L = []
@@ -277,6 +277,7 @@
       dpr = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1)
       W = Math.max(240, r.width || 640)
       H = Math.max(160, r.height || 320)
+      if (W * H > 500000) dpr = Math.min(dpr, 1) // fundo de tela inteira: 1:1 já é nítido e a composição fica bem mais leve
       canvas.width = Math.round(W * dpr)
       canvas.height = Math.round(H * dpr)
     }
@@ -296,7 +297,7 @@
       if (!W) tamanho()
       // geometria: o canvas é o FUNDO da tela do chat inteira; o cérebro fica grande no meio da área da conversa
       // (desconta o topo e a caixa de mensagem com a frase) e as orbes vagam em volta, sem sair da tela
-      const R0 = 22
+      const R0 = 32
       const topo = Math.min(70, H * 0.1), baixo = H - Math.min(180, H * 0.24)
       const CX = W / 2, CY = (topo + baixo) / 2
       const ativas = ferr.filter((f) => f.aceso)
@@ -324,7 +325,7 @@
       const inc = -0.2 + (reduzir ? 0 : Math.sin(t * 0.29) * 0.06)
       const cy_ = Math.cos(yaw), sy_ = Math.sin(yaw), ci = Math.cos(inc), si = Math.sin(inc)
       const S = Math.min(W * 0.62, baixo - topo) * 0.55 * (1 + (reduzir ? 0 : (0.008 + 0.012 * kAtivo) * Math.sin(t * 1.25)))
-      const E = Math.max(1, S / 170)
+      const E = Math.max(1, Math.sqrt(S / 170))
       for (const p of P) {
         const x = p.x * cy_ - p.z * sy_
         const z0 = p.x * sy_ + p.z * cy_
@@ -369,30 +370,73 @@
         for (const f of ferr) {
           if (f.liga < 0.02) continue
           const a = P[f.ancora]
-          const q = Math.max(0, 1 - Math.hypot(p.x - a.x, p.y - a.y, p.z - a.z) / 0.62) * f.liga
+          const dx = p.x - a.x, dy = p.y - a.y, dz = p.z - a.z
+          if (dx > 0.62 || dx < -0.62 || dy > 0.62 || dy < -0.62 || dz > 0.62 || dz < -0.62) continue
+          const q = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy + dz * dz) / 0.62) * f.liga
           if (q > alvo) { alvo = q; cor = f.i }
         }
         p.cor = cor
         p.calor = lerp(p.calor, alvo, 1 - Math.pow(0.004, dt))
       }
 
+      // ligações em LOTES: traçar cada uma separada (1.500 strokes por quadro) derrubava para ~24 quadros por segundo; agrupadas por faixa de
+      // profundidade (frias) e por orbe (quentes), são uns 20 strokes por quadro, com o mesmo desenho
       cx.lineCap = 'round'
+      const FAIXAS = 6
+      const frias = Array.from({ length: FAIXAS }, () => [])
+      const quentes = new Map() // orbe -> [ligacoes]
       for (const l of M.L) {
         const a = P[l.a], b = P[l.b]
-        const prof = ((a.sz + b.sz) / 2 + 1.1) / 2.2
         const calor = Math.min(a.calor, b.calor)
-        cx.globalAlpha = 1
-        if (calor > 0.06) { cx.strokeStyle = rgba(ferr[a.cor].cor, 0.18 + calor * 0.55); cx.lineWidth = (0.7 + calor * 1.1) * E }
-        else { cx.strokeStyle = rgba(corBase, (0.07 + prof * 0.24) * (0.75 + energia * 0.4) + clarao * 0.2); cx.lineWidth = 0.6 * E }
-        cx.beginPath(); cx.moveTo(a.sx, a.sy); cx.lineTo(b.sx, b.sy); cx.stroke()
+        if (calor > 0.06) {
+          const k = a.cor * 10 + Math.min(9, (calor * 10) | 0)
+          if (!quentes.has(k)) quentes.set(k, [])
+          quentes.get(k).push(l)
+        } else {
+          const prof = ((a.sz + b.sz) / 2 + 1.1) / 2.2
+          frias[Math.max(0, Math.min(FAIXAS - 1, (prof * FAIXAS) | 0))].push(l)
+        }
+      }
+      cx.globalAlpha = 1
+      for (let f = 0; f < FAIXAS; f++) {
+        if (!frias[f].length) continue
+        const prof = (f + 0.5) / FAIXAS
+        cx.strokeStyle = rgba(corBase, (0.07 + prof * 0.24) * (0.75 + energia * 0.4) + clarao * 0.2)
+        cx.lineWidth = 0.6 * E
+        cx.beginPath()
+        for (const l of frias[f]) {
+          const a = P[l.a], b = P[l.b]
+          cx.moveTo(a.sx, a.sy)
+          cx.lineTo(b.sx, b.sy)
+        }
+        cx.stroke()
+      }
+      for (const [k, lista] of quentes) {
+        const calor = ((k % 10) + 0.5) / 10
+        cx.strokeStyle = rgba(ferr[Math.floor(k / 10)].cor, 0.18 + calor * 0.55)
+        cx.lineWidth = (0.7 + calor * 1.1) * E
+        cx.beginPath()
+        for (const l of lista) {
+          const a = P[l.a], b = P[l.b]
+          cx.moveTo(a.sx, a.sy)
+          cx.lineTo(b.sx, b.sy)
+        }
+        cx.stroke()
       }
       luz(corNucleo, CX, CY, S * (0.5 + 0.05 * Math.sin(t * 2.2)), 0.14 + energia * 0.1 + clarao * 0.25)
       for (const p of P) {
         const prof = (p.sz + 1.1) / 2.2
         const pisca = 0.5 + 0.5 * Math.sin(t * (1.4 + p.peso) + p.f)
         const r = (2.2 + prof * 4.2 + pisca * 1.6) * p.k * p.peso * E
-        luz(corBase, p.sx, p.sy, r, (0.16 + prof * 0.5) * (0.55 + pisca * 0.45) + clarao * 0.5)
-        if (p.calor > 0.03) luz(ferr[p.cor].cor, p.sx, p.sy, r * (1.5 + p.calor * 1.4), p.calor * (0.55 + prof * 0.45))
+        const alfa = (0.16 + prof * 0.5) * (0.55 + pisca * 0.45) + clarao * 0.5
+        if (prof < 0.42 && p.calor < 0.03 && clarao < 0.05) {
+          // neurônio do fundo do cérebro (quase apagado): um ponto simples, sem o brilho completo (metade do custo do quadro estava aqui)
+          cx.globalAlpha = Math.min(1, alfa * 1.6)
+          cx.fillStyle = corBase
+          const q = Math.max(1, r * 0.32)
+          cx.fillRect(p.sx - q / 2, p.sy - q / 2, q, q)
+        } else luz(corBase, p.sx, p.sy, r, alfa)
+        if (p.calor > 0.03 && prof > 0.35) luz(ferr[p.cor].cor, p.sx, p.sy, r * (1.5 + p.calor * 1.4), p.calor * (0.55 + prof * 0.45))
       }
 
       if (!reduzir) {
@@ -419,7 +463,7 @@
         const prof = (lerp(a.sz, b.sz, q.f) + 1.1) / 2.2
         luz(Math.max(a.calor, b.calor) > 0.1 ? ferr[a.cor].cor : kAtivo > 0.5 ? '#ffffff' : '#fff1cc', lerp(a.sx, b.sx, q.f), lerp(a.sy, b.sy, q.f), (3 + prof * 4) * E, 0.35 + prof * 0.5)
       }
-      if (pulsos.length > 400) pulsos.splice(0, pulsos.length - 400)
+      if (pulsos.length > 220) pulsos.splice(0, pulsos.length - 220)
 
       for (const f of ferr) {
         if (f.liga < 0.02 || !f.ax) continue
@@ -456,11 +500,11 @@
         q.p += dt * q.v
         if (q.p >= 1 || !f.fios || f.liga < 0.05) { pacotes.splice(i, 1); continue }
         const C = f.fios[q.fio]
-        for (let c = 0; c < 9; c++) {
-          const tt = q.p - c * 0.022
+        for (let c = 0; c < 6; c++) {
+          const tt = q.p - c * 0.033
           if (tt < 0) break
           const pos = bez(f.A, C, f.D, q.volta ? 1 - tt : tt)
-          luz(c === 0 || q.volta ? '#ffffff' : f.cor, pos.x, pos.y, (c === 0 ? 7 : 5.5) - c * 0.45, (1 - c / 9) * (c === 0 ? 0.95 : 0.5) * f.liga)
+          luz(c === 0 || q.volta ? '#ffffff' : f.cor, pos.x, pos.y, (c === 0 ? 7 : 5.5) - c * 0.6, (1 - c / 6) * (c === 0 ? 0.95 : 0.5) * f.liga)
         }
       }
 
@@ -486,11 +530,11 @@
           }
           cx.globalCompositeOperation = 'source-over'
         }
-        icone(cx, f.id, f.ix, f.iy, 18 + on * 3, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
+        icone(cx, f.id, f.ix, f.iy, 26 + on * 4, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
         if (on > 0.3) {
           cx.globalAlpha = Math.min(1, (on - 0.3) * 2)
           cx.fillStyle = f.cor
-          cx.font = '600 11px "Segoe UI",system-ui,sans-serif'
+          cx.font = '600 13px "Segoe UI",system-ui,sans-serif'
           cx.textAlign = 'center'
           cx.fillText(f.rotulo, f.ix, f.iy > CY ? f.iy - R - 8 : f.iy + R + 16) // rótulo do lado de dentro, nunca fora do quadro
         }
@@ -562,7 +606,7 @@
       const laco = () => {
         if (!animando) return
         // só desenha com a janela visível e o cartão na tela (vários chats trabalhando não pesam: só o da tela anima)
-        if (!document.hidden && canvas.isConnected && canvas.offsetParent !== null) quadro(agora())
+        if (!document.hidden && canvas.isConnected) quadro(agora()) // sem offsetParent: ele forçava recalcular o layout a cada quadro (19% do tempo); quem esconde chama parar()
         raf = requestAnimationFrame(laco)
       }
       raf = requestAnimationFrame(laco)

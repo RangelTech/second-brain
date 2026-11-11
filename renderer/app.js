@@ -980,6 +980,7 @@
     }
     const reduzir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
     CV.card = SA.criarCartao($('cv-canvas'), $('cv-frase'), { reduzir, chipEl: $('cv-chip') })
+    window.__sbCerebro = CV // diagnóstico (medir quadros por segundo nos testes); não muda nada na tela
     const mostrar = (sim) => {
       el.hidden = !sim
       bt.setAttribute('aria-pressed', String(!!sim))
