@@ -367,7 +367,7 @@ async function ferramentaEditor(nome, args) {
   }
   throw new Error('Ferramenta desconhecida: ' + nome)
 }
-ipcMain.handle('editor:estado', () => ({ instalado: editorVideo.instalado(app), suportado: editorVideo.suportado(), nome: editorVideo.NOME_EXIBIDO }))
+ipcMain.handle('editor:estado', () => ({ habilitado: editorVideo.habilitado(app), instalado: editorVideo.instalado(app), suportado: editorVideo.suportado(), nome: editorVideo.NOME_EXIBIDO }))
 ipcMain.handle('editor:instalar', async () => { try { await editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p)); return { ok: true } } catch (e) { return { ok: false, erro: String(e.message || e) } } })
 ipcMain.handle('editor:abrir', (_e, projeto) => { try { return editorVideo.abrirJanela(app, projeto || path.join(cfg.pasta, 'Videos')) } catch (e) { return { ok: false, erro: String(e.message || e) } } })
 

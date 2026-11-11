@@ -280,6 +280,16 @@ function prepararBase(app) {
   if (globais && ENTREGAR_PACOTE) sincronizarSkillsGlobais(globais, path.join(home, 'skills', 'rangeltech'))
   const essenciais = [path.join(process.resourcesPath || '', 'skills-globais', 'essenciais'), path.join(__dirname, 'skills-globais', 'essenciais')].find((p) => fs.existsSync(p))
   if (essenciais) sincronizarSkillsGlobais(essenciais, path.join(home, 'skills', 'essenciais')) // vai para TODOS os planos, inclusive o Lite
+  // editor de vídeo: a skill só chega ao Hermes com o editor ligado (editor-video.js `habilitado`); desligado, nada dele existe para o agente
+  try {
+    const ev = require('./editor-video')
+    const pastaEditorSkill = [path.join(process.resourcesPath || '', 'skills-globais', '_editor-de-video-desligado'), path.join(__dirname, 'skills-globais', '_editor-de-video-desligado')].find((p) => fs.existsSync(p))
+    const destino = path.join(home, 'skills', 'essenciais', 'editor-de-video')
+    if (pastaEditorSkill && ev.habilitado(app)) {
+      fs.mkdirSync(destino, { recursive: true })
+      fs.copyFileSync(path.join(pastaEditorSkill, 'SKILL.md'), path.join(destino, 'SKILL.md'))
+    } else if (fs.existsSync(destino)) fs.rmSync(destino, { recursive: true, force: true })
+  } catch {}
   return home
 }
 
@@ -938,7 +948,7 @@ class Sessao {
       const ev = require('./editor-video')
       const motor = ev.mcp(this.app, this.pasta)
       if (motor) lista.push(motor)
-      if (this.navegador && ev.suportado()) {
+      if (this.navegador && ev.suportado() && ev.habilitado(this.app)) {
         const shimEd = [path.join(process.resourcesPath || '', 'mcp-editor.js'), path.join(__dirname, 'mcp-editor.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-editor.js')
         lista.push({ name: 'editor-app', command: process.execPath, args: [shimEd], env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }, { name: 'SB_NAV_URL', value: this.navegador.url }, { name: 'SB_NAV_TOKEN', value: this.navegador.token }] })
       }

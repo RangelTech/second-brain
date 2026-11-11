@@ -13,13 +13,14 @@ test('instala só na nossa pasta, sem assistente: flags silenciosas do Inno Setu
 })
 test('o editor fica na pasta própria do Segundo Cérebro e o MCP só existe depois de instalado', () => {
   process.env.SB_EDITOR_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ed-'))
+  process.env.SB_EDITOR = '1'
   try {
     assert.strictEqual(E.mcp(fake, 'C:/trab'), null)
     fs.writeFileSync(E.caminhoExe(fake), 'x')
     const m = E.mcp(fake, 'C:/trab')
     assert.deepStrictEqual([m.name, m.args], ['editor', ['--mcp', 'auto']])
     assert.match(m.env[0].value, /trab/)
-  } finally { delete process.env.SB_EDITOR_DIR }
+  } finally { delete process.env.SB_EDITOR_DIR; delete process.env.SB_EDITOR }
 })
 test('trechos com som: junta os silêncios e deixa uma folga', () => {
   const log = 'silence_start: 3.0\nsilence_end: 6.0 | silence_duration: 3\nsilence_start: 8.0'
@@ -59,4 +60,22 @@ test('origens: o fork com o nome do Segundo Cérebro vem primeiro e o Concat ofi
   assert.match(E.ORIGENS[0].repo, /segundo-cerebro-editor/)
   assert.strictEqual(E.ORIGENS[1].repo, 'jub0t/Concat')
   assert.match(E.ORIGENS[1].win32.sha256, /^[0-9a-f]{64}$/)
+})
+
+test('editor desligado por padrão: sem MCP, sem instalação, sem janela, sem skill', async () => {
+  delete process.env.SB_EDITOR
+  const dirOff = fs.mkdtempSync(path.join(os.tmpdir(), 'ed-off-'))
+  const app = { getPath: () => dirOff }
+  assert.strictEqual(E.habilitado(app), false)
+  assert.strictEqual(E.mcp(app, 'C:/trab'), null)
+  await assert.rejects(E.instalar(app), /ainda não está disponível/)
+  assert.throws(() => E.abrirJanela(app, ''), /ainda não está disponível/)
+  const on = path.join(app.getPath('userData'), 'editor-video.on'); fs.writeFileSync(on, '1')
+  assert.strictEqual(E.habilitado(app), true)
+  process.env.SB_EDITOR = '0'; assert.strictEqual(E.habilitado(app), false); delete process.env.SB_EDITOR
+})
+test('a skill do editor não vai no pacote das skills essenciais', () => {
+  const root = path.join(__dirname, '..', 'skills-globais')
+  assert.ok(!fs.existsSync(path.join(root, 'essenciais', 'editor-de-video')))
+  assert.ok(fs.existsSync(path.join(root, '_editor-de-video-desligado', 'SKILL.md')))
 })

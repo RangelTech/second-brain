@@ -16,6 +16,14 @@ const ORIGENS = [
 const ORIGEM = { win32: ORIGENS[0].win32 } // só o nome do executável e o suporte por sistema são lidos daqui
 const NOME_EXIBIDO = 'Editor de vídeo do Segundo Cérebro'
 
+// INTERRUPTOR: o editor de vídeo só existe para o usuário quando ligado (variável SB_EDITOR=1 ou o arquivo `editor-video.on` na pasta de dados).
+// Desligado: o Hermes não recebe skill nem ferramentas, o app não instala nada e as telas não mostram o botão.
+function habilitado(app) {
+  if (process.env.SB_EDITOR === '1') return true
+  if (process.env.SB_EDITOR === '0') return false
+  try { return !!app && fs.existsSync(path.join(app.getPath('userData'), 'editor-video.on')) } catch { return false }
+}
+
 function pastaEditor(app) {
   if (process.env.SB_EDITOR_DIR) return process.env.SB_EDITOR_DIR
   if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'SegundoCerebroEditor')
@@ -77,6 +85,7 @@ function conferir(exe) {
 let andamento = null
 // instala em silêncio; `progresso({ etapa, fracao })` alimenta a tela e a resposta do Hermes
 function instalar(app, progresso = () => {}) {
+  if (!habilitado(app)) return Promise.reject(new Error('O editor de vídeo ainda não está disponível.'))
   if (!suportado()) return Promise.reject(new Error('O editor de vídeo ainda não está disponível neste sistema (por enquanto só no Windows).'))
   if (instalado(app)) return Promise.resolve({ ok: true, ja: true })
   if (andamento) return andamento
@@ -143,6 +152,7 @@ function prepararConfig() {
   return novo
 }
 function abrirJanela(app, projeto) {
+  if (!habilitado(app)) throw new Error('O editor de vídeo ainda não está disponível.')
   try { prepararConfig() } catch {}
   if (!instalado(app)) throw new Error('O editor ainda não foi instalado.')
   const args = projeto && fs.existsSync(projeto) ? ['--project', projeto] : []
@@ -153,7 +163,7 @@ function abrirJanela(app, projeto) {
 
 // servidor MCP do Concat para o Hermes: o próprio binário, em stdio. `auto` = usa a janela se estiver aberta, senão roda sozinho (headless)
 function mcp(app, pastaTrabalho) {
-  if (!instalado(app)) return null
+  if (!habilitado(app) || !instalado(app)) return null
   return {
     name: 'editor',
     command: caminhoExe(app),
@@ -207,4 +217,4 @@ async function cortarSilencio(arquivo, { limiar = -35, minimo = 0.6, saida } = {
   return { arquivo: out, duracaoAntes: duracao, duracaoDepois: novo, trechos: som.length, cortado: +(duracao - novo).toFixed(2) }
 }
 
-module.exports = { ORIGENS, ORIGEM, prepararConfig, configDir, NOME_EXIBIDO, pastaEditor, caminhoExe, instalado, suportado, instalar, abrirJanela, mcp, cortarSilencio, trechosComSom, sha256Arquivo }
+module.exports = { habilitado, ORIGENS, ORIGEM, prepararConfig, configDir, NOME_EXIBIDO, pastaEditor, caminhoExe, instalado, suportado, instalar, abrirJanela, mcp, cortarSilencio, trechosComSom, sha256Arquivo }
