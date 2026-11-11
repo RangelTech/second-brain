@@ -328,7 +328,7 @@ async function iasDoApp() {
 // com ela o gateway nunca fica órfão, e `session/new` de um chat novo cai para ~2 s. Custo: um processo parado (medir). Desliga com cfg.ancoraAgente=false,
 // e não sobe se a máquina tem pouca memória livre (VM pequena).
 const ANCORA_ID = 'ancora-gateway' // nome antigo, mantido só para o filtro do roteador (nenhuma sessão nasce mais com ele)
-const MEMORIA_MIN_ANCORA = 1.2 * 1024 * 1024 * 1024
+const MEMORIA_MIN_ANCORA = process.env.SB_RESERVA_MEM_MIN ? +process.env.SB_RESERVA_MEM_MIN : 1.2 * 1024 * 1024 * 1024
 // SESSÃO RESERVA (Spec 26): a partida do Hermes (Python + importações + agente + 1º turno) leva 10 a 20 s. O app mantém UMA sessão já de pé e
 // aquecida, sem conversa. A conversa que precisar do agente a ADOTA na hora (a pergunta sai em segundos) e o app sobe outra reserva em segundo plano.
 // Ela também faz o papel da antiga âncora: com ela de pé o gateway do Hermes nunca fica órfão. A identidade da conversa não fica presa ao processo:
@@ -345,8 +345,10 @@ const pastaVagas = () => path.join(app.getPath('userData'), 'vagas')
 try {
   fs.rmSync(pastaVagas(), { recursive: true, force: true })
 } catch {}
+let falhasReserva = 0
+let reservaPausadaAte = 0 // depois de 2 reservas seguidas que não sobem (máquina sem memória), para de tentar por 10 min
 function reservaServe(r, alvo, nivel) {
-  return r && !r.morto && r.modelo === alvo && r.pasta === cfg.pasta && r.racio === cfg.raciocinio && r.nivel === nivel
+  return r && !r.morto && !r.falhouIniciar && r.modelo === alvo && r.pasta === cfg.pasta && r.racio === cfg.raciocinio && r.nivel === nivel
 }
 function manterAncora(alvo, nivel) {
   try {
@@ -361,6 +363,7 @@ function manterAncora(alvo, nivel) {
       }
     }
     if (reservaSubindo || reservas.length >= RESERVAS_ALVO()) return
+    if (Date.now() < reservaPausadaAte) return
     if (os.freemem() < MEMORIA_MIN_ANCORA) return
     const id = 'reserva-' + ++nReserva
     reservaSubindo = Promise.resolve(chaveLocal())
@@ -377,10 +380,26 @@ function manterAncora(alvo, nivel) {
         // a próxima reserva só começa depois desta pronta e aquecida
         s.pronta
           .then(() => s.aquecer?.())
-          .then(() => registrarAgente(app, `sessão reserva ${id} pronta e aquecida (${reservas.length} na espera)`))
-          .catch(() => {
+          .then(() => {
+            if (s.aquecimentoFalhou || s.morto) throw new Error('aquecimento falhou')
+            falhasReserva = 0
+            registrarAgente(app, `sessão reserva ${id} pronta e aquecida (${reservas.length} na espera)`)
+          })
+          .catch((e) => {
+            // reserva que não subiu ou não aqueceu não vai para conversa nenhuma: sai da fila e é encerrada (a próxima sobe no finally)
             const i = reservas.indexOf(s)
-            if (i >= 0) reservas.splice(i, 1)
+            if (i >= 0) {
+              reservas.splice(i, 1)
+              try {
+                s.encerrar()
+              } catch {}
+            }
+            registrarAgente(app, `sessão reserva ${id} descartada: ${e.message || e}`)
+            if (++falhasReserva >= 2) {
+              reservaPausadaAte = Date.now() + 10 * 60000
+              falhasReserva = 0
+              registrarAgente(app, 'sessões reserva pausadas por 10 min (2 falhas seguidas)')
+            }
           })
           .finally(() => {
             if (reservaSubindo === subindo) reservaSubindo = null
@@ -399,7 +418,7 @@ function manterAncora(alvo, nivel) {
 // A conversa `chat` leva uma reserva que sirva para a configuração atual (a mais adiantada). Devolve a sessão ou null.
 async function adotarReserva(chat, alvo, nivel) {
   if (!reservas.some((r) => reservaServe(r, alvo, nivel)) && reservaSubindo) await reservaSubindo.catch(() => null) // a 1ª está nascendo: espera em vez de subir outra
-  const servem = reservas.filter((r) => reservaServe(r, alvo, nivel))
+  const servem = reservas.filter((r) => reservaServe(r, alvo, nivel) && !r.aquecimentoFalhou)
   const r = servem.find((x) => !x.primeira) || servem.find((x) => !x.iniciandoAgora) || servem[0]
   if (!r) return null
   reservas.splice(reservas.indexOf(r), 1)
@@ -450,7 +469,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
   const nivel = await nivelDeSeguranca()
-  if (existente && !existente.morto && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel) return existente
+  if (existente && !existente.morto && !existente.falhouIniciar && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
   if (!reservas.length) manterAncora(alvo, nivel) // sem reserva ainda (app acabou de abrir): cria e adota a mesma, em vez de subir duas sessões ao mesmo tempo

@@ -576,7 +576,9 @@ class Sessao {
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }
     this.subir()
     this.pronta = this.iniciar()
-    this.pronta.catch(() => {}) // quem usa trata o erro; evita aviso de rejeição sem tratamento
+    this.pronta.catch(() => {
+      this.falhouIniciar = true // quem usa trata o erro; a sessão não é reaproveitada (o app sobe outra)
+    })
     this.vigiarCompressao()
   }
 
@@ -1011,6 +1013,7 @@ class Sessao {
         await this._perguntar('[aquecimento] Responda apenas: ok', [])
         registrar(this.app, `agente aquecido (1o turno) em ${((Date.now() - t0) / 1000).toFixed(1)} s`)
       } catch (e) {
+        this.aquecimentoFalhou = true // sessão reserva com isto não é entregue a nenhuma conversa (é trocada por outra)
         registrar(this.app, 'aquecimento falhou: ' + (e.message || e))
       } finally {
         this.ativo = false
