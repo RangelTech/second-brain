@@ -233,7 +233,7 @@
     const dispositivo = OAUTH_DISPOSITIVO.includes(p.id)
     const j = janela(`
       <h3>${logoHtml(p.id)} Conectar ${esc(p.nome)}</h3>
-      ${suportado ? `<div class="passo" id="m-passo">Entre com a sua conta ${esc(p.nome)}. O login abre no navegador e o Segundo Cérebro guarda o acesso neste computador.</div>
+      ${suportado ? `<div class="passo" id="m-passo">Entre com a sua conta ${esc(p.nome)}. ${window.sb.oauthJanela ? 'O login abre numa janela do Segundo Cérebro' : 'O login abre no navegador'} e o acesso fica guardado neste computador.</div>
       <div id="m-area"></div>` : `<div class="alerta">A entrada por conta de ${esc(p.nome)} ainda não está disponível no Segundo Cérebro.${modoChave ? ' Você pode usar uma chave de API.' : ''}</div>`}
       <div class="alerta" id="m-msg" hidden></div>
       <div class="rodape-j"><button id="m-cancelar">Fechar</button>${modoChave ? '<button id="m-chave">Usar chave de API</button>' : ''}${suportado ? '<button class="btn-pri" id="m-ok">Entrar com a conta</button>' : ''}</div>`)
@@ -272,6 +272,28 @@
         const a = await api('GET', `/api/oauth/${p.id}/authorize?redirect_uri=${encodeURIComponent(REDIRECT)}`)
         if (a.status >= 300 || !a.json?.authUrl) throw new Error(erroDe(a))
         const auth = a.json
+        const trocar = (code, state) => api('POST', `/api/oauth/${p.id}/exchange`, { code, redirectUri: auth.redirectUri || REDIRECT, codeVerifier: auth.codeVerifier, state: state || auth.state })
+        if (window.sb.oauthJanela) {
+          // app no computador: o login abre numa janela do próprio app e o retorno é pego sozinho
+          j.q('#m-area').innerHTML = `<div class="passo">Entre na janela que abriu. Quando terminar, ela fecha sozinha e a conta aparece aqui.</div>`
+          btn.textContent = 'Aguardando você entrar…'
+          const r = await window.sb.oauthJanela({ url: auth.authUrl, retorno: auth.redirectUri || REDIRECT })
+          if (parado) return
+          if (!r || !r.ok) {
+            if (r && r.fechada) {
+              j.q('#m-area').innerHTML = ''
+              btn.disabled = false
+              btn.textContent = 'Entrar com a conta'
+              return aviso(msg, 'err', 'A janela de login foi fechada antes de terminar. Toque em Entrar com a conta para tentar de novo.')
+            }
+            throw new Error((r && r.erro) || 'Não deu para entrar.')
+          }
+          btn.textContent = 'Conectando…'
+          const t = await trocar(r.code, r.state)
+          if (t.status >= 300 || t.json?.success === false) throw new Error(erroDe(t))
+          j.fechar()
+          return recarregar()
+        }
         window.sb.abrirExterno(auth.authUrl)
         j.q('#m-area').innerHTML = `<div class="passo">Depois de entrar, o navegador vai mostrar uma página de erro em <b>localhost:8080</b>. Isso é esperado: copie o endereço completo dessa página e cole aqui.</div>
           <div class="campo" style="margin-top:8px"><label for="m-url">Endereço de retorno</label><input type="text" id="m-url" placeholder="http://localhost:8080/callback?code=…"></div>`
@@ -288,7 +310,7 @@
           } catch {}
           if (!code) return aviso(msg, 'err', 'Não achei o código nesse endereço. Cole o endereço completo.')
           btn.disabled = true
-          const t = await api('POST', `/api/oauth/${p.id}/exchange`, { code, redirectUri: auth.redirectUri || REDIRECT, codeVerifier: auth.codeVerifier, state: state || auth.state })
+          const t = await trocar(code, state)
           if (t.status >= 300 || t.json?.success === false) {
             aviso(msg, 'err', erroDe(t))
             btn.disabled = false

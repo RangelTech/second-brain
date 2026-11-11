@@ -26,6 +26,7 @@
       api: (metodo, rota, corpo) => invoke('router:api', { metodo, rota, corpo }),
       modelos: () => invoke('modelos:listar'),
       abrirExterno: (url) => (extras.abrirExterno ? extras.abrirExterno(url) : invoke('externo:abrir', url)),
+      oauthJanela: extras.abrirExterno ? null : (p) => invoke('oauth:janela', p), // na web o login volta para outro computador: segue copiar e colar
       anexar: (p) => invoke('anexo:salvar', p),
       anexoInicio: (p) => invoke('anexo:inicio', p),
       anexoPedaco: (p) => invoke('anexo:pedaco', p),

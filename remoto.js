@@ -11,7 +11,7 @@ const URL_PADRAO = process.env.SB_REMOTO_URL || 'https://remoto.rangeltech.net'
 const RENDERER = path.join(__dirname, 'renderer')
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' }
 // o que a tela web NÃO pode pedir ao app (abre janela, pasta ou programa no computador, ou mexe no próprio acesso web)
-const BLOQUEADOS = new Set(['pasta:escolher', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado', 'ditado:modelo', 'ditado:whisper', 'ditado:whisper-aquecer'])
+const BLOQUEADOS = new Set(['pasta:escolher', 'oauth:janela', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado', 'ditado:modelo', 'ditado:whisper', 'ditado:whisper-aquecer'])
 // eventos do app que a tela web também recebe (o resto vai só para quem fez a chamada)
 const EVENTOS_ESPELHADOS = new Set(['chats:mudou', 'skills:mudou', 'unlimited:estado', 'navegador:estado', 'navegador:abrir-painel', 'midia:pronta'])
 

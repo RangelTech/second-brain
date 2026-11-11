@@ -741,6 +741,16 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('modelos:listar', () => listarModelos().catch(() => []))
   ipcMain.handle('externo:abrir', (_e, url) => (/^https?:\/\//i.test(url) ? shell.openExternal(url) : false))
+  // login por conta numa janela do app: devolve { ok, code, state, url } sem a pessoa copiar o endereço de retorno
+  ipcMain.handle('oauth:janela', async (_e, { url, retorno } = {}) => {
+    if (!/^https:\/\//i.test(url || '') || !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(retorno || '')) return { ok: false, erro: 'Endereço inválido' }
+    try {
+      const r = await require('./oauth-janela').capturar({ BrowserWindow, url, retorno, pai: janela && !janela.isDestroyed() ? janela : null, userAgent: navegadorMod.userAgentChrome() })
+      return { ok: true, ...r }
+    } catch (e) {
+      return { ok: false, fechada: e.message === 'fechada', erro: e.message }
+    }
+  })
   const publica = () => {
     const { unlimitedChave, ...resto } = cfg
     return resto
