@@ -1,6 +1,6 @@
 // Agente de verdade: cliente ACP (Agent Client Protocol) falando com o Hermes por stdio.
 // Um processo por conversa, com sessão contínua, cancelamento e permissões mostradas na tela.
-const { spawn, execFileSync } = require('child_process')
+const { spawn, execFile, execFileSync } = require('child_process')
 const partidaDireta = require('./partida-direta')
 const fs = require('fs')
 const os = require('os')
@@ -11,7 +11,7 @@ const path = require('path')
 function matarArvore(pid) {
   if (!pid) return
   try {
-    if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 15000 })
+    if (process.platform === 'win32') execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, timeout: 15000 }, () => {}) // sem bloquear a janela
     else {
       try { process.kill(-pid, 'SIGKILL') } catch { process.kill(pid, 'SIGKILL') } // filho criado com detached: o grupo inteiro cai
     }
@@ -47,16 +47,41 @@ function pidDoGateway(home) {
     return g && g.kind === 'hermes-gateway' ? g.pid : 0
   } catch { return 0 }
 }
-function matarArvorePoupandoGateway(pid, home) {
-  if (!pid) return
-  const gw = pidDoGateway(home)
-  const alvos = [pid, ...descendentes(pid)].filter((p) => p !== gw)
-  for (const p of alvos.reverse()) { // folhas primeiro
-    try {
-      if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(p), '/F'], { stdio: 'ignore', windowsHide: true, timeout: 15000 })
-      else process.kill(p, 'SIGKILL')
-    } catch {}
+// Assíncrono de propósito: a versão síncrona (PowerShell + um taskkill por processo, segundos cada) rodava na thread principal do Electron e a
+// janela ficava "Não está respondendo" quando várias sessões eram encerradas seguidas (visto em 11/11/2026 com as sessões reserva).
+// Quem chama não precisa esperar; os testes esperam a promessa.
+const execFileP = (cmd, args, timeout) => new Promise((res) => execFile(cmd, args, { encoding: 'utf8', windowsHide: true, timeout }, (e, out) => res(e && !out ? '' : String(out || ''))))
+async function descendentesAsync(raiz) {
+  const linhas = process.platform === 'win32'
+    ? await execFileP('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId)" }'], 15000)
+    : await execFileP('ps', ['-eo', 'pid=,ppid='], 10000)
+  const filhos = new Map()
+  for (const l of linhas.split(/\r?\n/)) {
+    const [p, pp] = l.trim().split(/\s+/).map(Number)
+    if (!p || !pp) continue
+    if (!filhos.has(pp)) filhos.set(pp, [])
+    filhos.get(pp).push(p)
   }
+  const saida = []
+  const pilha = [raiz]
+  while (pilha.length) {
+    const x = pilha.pop()
+    for (const f of filhos.get(x) || []) { saida.push(f); pilha.push(f) }
+  }
+  return saida
+}
+function matarArvorePoupandoGateway(pid, home) {
+  if (!pid) return Promise.resolve()
+  const gw = pidDoGateway(home)
+  return descendentesAsync(pid)
+    .then(async (filhos) => {
+      const alvos = [pid, ...filhos].filter((p) => p !== gw)
+      for (const p of alvos.reverse()) { // folhas primeiro
+        if (process.platform === 'win32') await execFileP('taskkill', ['/PID', String(p), '/F'], 15000)
+        else try { process.kill(p, 'SIGKILL') } catch {}
+      }
+    })
+    .catch(() => {})
 }
 
 const vivo = (pid) => { try { process.kill(pid, 0); return true } catch { return false } }

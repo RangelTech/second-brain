@@ -335,9 +335,9 @@ const MEMORIA_MIN_ANCORA = process.env.SB_RESERVA_MEM_MIN ? +process.env.SB_RESE
 // a reserva nasce como "reserva-N" e, na adoção, o app grava no arquivo da vaga de qual conversa ela passou a ser (memória e mídia leem dali) e a
 // ponte do modelo traduz a vaga pela tabela vagaChat. Desliga com cfg.ancoraAgente=false; não sobe com pouca memória livre (VM pequena).
 const vagaChat = new Map() // 'reserva-N' -> id da conversa que adotou
-// Pedido do Lucas (11/11/2026): SEMPRE DUAS sessões prontas. Uma conversa usa uma, a outra continua pronta e o app já sobe a próxima.
+// Pedido do Lucas (11/11/2026): SEMPRE TRÊS sessões prontas. Uma conversa usa uma, a outra continua pronta e o app já sobe a próxima.
 // Sobem uma de cada vez (a seguinte só depois da anterior aquecida), para não disputarem a máquina na abertura do app.
-const RESERVAS_ALVO = () => Math.max(0, Math.min(4, Number.isFinite(+cfg.reservasAgente) ? +cfg.reservasAgente : 2))
+const RESERVAS_ALVO = () => Math.max(0, Math.min(4, Number.isFinite(+cfg.reservasAgente) ? +cfg.reservasAgente : 3))
 const reservas = [] // sessões prontas (ou subindo), sem conversa
 let reservaSubindo = null // promessa da reserva que está sendo criada agora (uma por vez)
 let nReserva = 0

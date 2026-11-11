@@ -37,7 +37,7 @@ test('encerrar a sessao poupa o gateway (neto) e mata o resto', { skip: !PY }, a
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hh-'))
   fs.writeFileSync(path.join(home, 'gateway.pid'), JSON.stringify({ pid: neto, kind: 'hermes-gateway' }))
   try {
-    matarArvorePoupandoGateway(pai, home)
+    await matarArvorePoupandoGateway(pai, home)
     await esperar(1500)
     assert.strictEqual(vivo(pai), false, 'pai deveria ter caido')
     assert.strictEqual(vivo(filho), false, 'filho deveria ter caido')
@@ -49,7 +49,7 @@ test('sem gateway registrado, a arvore inteira cai', { skip: !PY }, async () => 
   const { pai, filho, neto } = await criarArvore()
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hh-'))
   try {
-    matarArvorePoupandoGateway(pai, home)
+    await matarArvorePoupandoGateway(pai, home)
     await esperar(1500)
     assert.deepStrictEqual([vivo(pai), vivo(filho), vivo(neto)], [false, false, false])
   } finally { limpar(neto, filho, pai) }

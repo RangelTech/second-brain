@@ -37,8 +37,10 @@ test('sessao aquecida e SEM uso e encerrada depois do limite (comportamento pres
     await s.pronta
     const pid = s.filho.pid
     assert.equal(vivo(pid), true)
-    await esperar(2500)
-    assert.equal(vivo(pid), false, 'a sessao ociosa foi encerrada')
+    // o encerramento roda em segundo plano (nao trava a janela): da ate alguns segundos para a arvore cair
+    let morto = false
+    for (let i = 0; i < 28 && !morto; i++) { await esperar(250); morto = !vivo(pid) }
+    assert.equal(morto, true, 'a sessao ociosa foi encerrada')
   } finally { desligar(s) }
 })
 
