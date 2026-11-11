@@ -39,13 +39,19 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
       const x = await executar(sete, ['x', arq, '-o' + raiz, '-y', '-mmt=on', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
       if (x.codigo !== 0) throw new Error('descompactar falhou (codigo ' + x.codigo + ') ' + (x.saida || '').slice(-200))
       if (!fs.existsSync(bin)) throw new Error('hermes.exe nao apareceu depois de descompactar')
+      // PRIMEIRO o ambiente pronto, DEPOIS a conferência. O --version valida o ambiente de dependências: rodado antes de o ambiente estar no
+      // lugar ele SEMPRE falhava ("no dependency environment is committed"), o app apagava o agente embutido e baixava tudo da internet
+      // (medido no CI da 0.6.62 em 11/11/2026: 4 min copiando + 6 min baixando de novo; o ambiente pronto nunca era usado).
+      const okHome = await extrairHomePronto(pasta, sete, raiz)
       falar('conferindo o agente')
-      const v = await executar(bin, ['--version'], { timeoutMs: 120000, env: { ...process.env, HERMES_HOME: path.join(app.getPath('userData'), 'hermes-home') } })
-      if (v.codigo !== 0) throw new Error('hermes --version falhou (codigo ' + v.codigo + ') ' + (v.saida || '').slice(-300))
+      const homeTeste = okHome ? require('./caminhos-hermes').decidir(app).home : path.join(app.getPath('userData'), 'hermes-home')
+      const v = await executar(bin, ['--version'], { timeoutMs: 120000, env: { ...process.env, HERMES_HOME: homeTeste } })
+      // com o ambiente pronto no lugar, o agente TEM de subir; sem ele (outro usuário do PC), o --version falha por falta do ambiente, o que é
+      // esperado: o agente embutido fica e a primeira sessão monta o ambiente (bem mais rápido que baixar e instalar tudo de novo)
+      if (v.codigo !== 0 && okHome) throw new Error('hermes --version falhou (codigo ' + v.codigo + ') ' + (v.saida || '').slice(-300))
       try {
         fs.rmSync(arq, { force: true }) // ja descompactado e conferido: o pacote nao precisa ocupar disco duas vezes
       } catch {}
-      await extrairHomePronto(pasta, sete, raiz)
       return true
     } catch (e) {
       try {

@@ -45,19 +45,23 @@ test('com o pacote no instalador: descompacta, confere e nao baixa nada', async 
   assert.ok(fs.existsSync(path.join(raiz, 'bin', 'hermes.exe')))
 })
 
-test('Hermes que nao sobe depois de descompactar: apaga a pasta e tenta o download', async () => {
-  const { inst, raiz } = cenario({ versao: 1 })
-  // sem rede real nos testes: o download falha de forma controlada (fetch fora) e o erro sobe, mas a pasta ruim ja foi apagada
+test('sem ambiente pronto, --version falhar e esperado: o agente embutido fica e NAO baixa tudo de novo', async () => {
+  // antes: --version rodava antes do ambiente estar no lugar, sempre falhava, o app apagava o agente embutido e baixava tudo (CI 0.6.62: +6 min)
+  const { inst, raiz, chamadas } = cenario({ versao: 1 })
   const orig = global.fetch
+  let baixou = false
   global.fetch = async () => {
+    baixou = true
     throw new Error('sem rede')
   }
   try {
-    await assert.rejects(() => inst.garantir(() => {}), /instalador do agente/)
+    await inst.garantir(() => {})
   } finally {
     global.fetch = orig
   }
-  assert.ok(!fs.existsSync(raiz), 'pasta com Hermes quebrado foi removida')
+  assert.equal(baixou, false, 'nao foi buscar o instalador na internet')
+  assert.ok(fs.existsSync(path.join(raiz, 'bin', 'hermes.exe')), 'o agente embutido continua na pasta')
+  assert.deepEqual(chamadas.map((c) => c[0]), ['7za.exe', 'hermes.exe'])
 })
 
 test('sem pacote embutido: nao tenta descompactar (segue o download de sempre)', async () => {
