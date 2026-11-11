@@ -412,11 +412,7 @@ async function responder(alvo, msgs, ctx) {
         memoriaArquivo: path.join(app.getPath('userData'), 'chats.json'), chat: ctx.chat, skillsDir: path.join(caminhosHermes.homeAgente(app), 'skills'), usuario: os.userInfo().username,
       })
       const await_chave = await chaveLocal()
-      let r = await rapido(cfg.raciocinio)
-      if (r.estourou) { // pensou demais sem responder: refaz direto, sem raciocínio (segundos em vez de minutos)
-        ctx.onDelta?.({ aviso: 'Respondendo direto…' })
-        r = await rapido('none')
-      }
+      const r = await rapido(cfg.raciocinio)
       if (!r.escalar && String(r.texto || '').trim() && !roteador.afirmaArquivo(r.texto)) return r.texto
       // a resposta rapida afirmou ter criado um arquivo (invenção): desmente e faz de verdade pelo agente
       if (!r.escalar && roteador.afirmaArquivo(r.texto)) ctx.onDelta?.({ texto: '\n\n⚠ Correção: eu não criei nenhum arquivo ainda. Vou fazer de verdade agora.\n\n' })

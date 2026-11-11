@@ -36,7 +36,6 @@ const afirmaArquivo = (texto) => AFIRMA_ARQUIVO.test(String(texto || '')) && NOM
 
 // o modelo pode chamar usar_agente depois de já ter respondido (resposta completa + chamada à toa): nesse caso a resposta vale e o Hermes não roda de novo.
 // Só escala quando ainda não há resposta de verdade (nada escrito, ou só uma frase de preâmbulo como "Vou criar o arquivo").
-const TETO_RACIOCINIO = 5000 // caracteres de raciocínio sem nenhum texto de resposta
 const PREAMBULO_MAX = 160
 const deveEscalar = (textoJaEscrito) => String(textoJaEscrito || '').trim().length < PREAMBULO_MAX
 
@@ -133,7 +132,8 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
     messages: [{ role: 'system', content: sistema({ usuario, skills: resumoDeSkills(skillsDir), memoria: mem }) }, ...msgs.filter((m) => m.role !== 'system').slice(-24)],
   }
   // amostragem pensada para evitar loop de repetição (medida em 07/11/2026: 0 loops e 0 estouros em 12 respostas) e teto de tokens: resposta longa de verdade vai para o agente
-  const pensando = !!raciocinio && raciocinio !== 'none'
+  // o caminho rapido NUNCA raciocina (decisao do Lucas, 11/11/2026): medido, o modelo gastava os 6000 tokens pensando, devolvia vazio e so entao ia ao agente (2 min+). Quem raciocina e o agente (Hermes).
+  const pensando = false
   Object.assign(corpo, pensando ? { temperature: 1.0, top_p: 0.95, top_k: 20, presence_penalty: 0.5 } : { temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 0.8, repetition_penalty: 1.05 }, { max_tokens: 6000 })
   if (!pensando) corpo.chat_template_kwargs = { enable_thinking: false }
   const ctl = new AbortController()
@@ -151,14 +151,12 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
   let total = ''
   let escalar = false
   let loop = false
-  let estourou = false
-  let razChars = 0
   for (;;) {
     let lido
     try {
       lido = await leitor.read()
     } catch (e) {
-      if (loop || estourou) break // abortado de propósito (loop ou raciocínio longo demais)
+      if (loop) break // abortado de propósito por causa do loop
       throw e
     }
     const { done, value } = lido
@@ -168,7 +166,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
     while ((i = buf.indexOf('\n')) >= 0) {
       const linha = buf.slice(0, i).trim()
       buf = buf.slice(i + 1)
-      if (loop || estourou) break
+      if (loop) break
       if (!linha.startsWith('data:')) continue
       const dado = linha.slice(5).trim()
       if (dado === '[DONE]') continue
@@ -176,12 +174,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
         const d = JSON.parse(dado).choices?.[0]?.delta ?? {}
         if (d.tool_calls?.length && deveEscalar(total)) escalar = true
         const raz = d.reasoning_content ?? d.reasoning
-        if (raz) {
-          onDelta?.({ raciocinio: raz })
-          razChars += raz.length
-          // pensou demais sem escrever nada: corta e deixa quem chamou refazer sem raciocínio (antes esperava os 6000 tokens, ~2 min, e ainda escalava)
-          if (!total && razChars > TETO_RACIOCINIO) { estourou = true; ctl.abort() }
-        }
+        if (raz) onDelta?.({ raciocinio: raz })
         if (d.content && !escalar) {
           total += d.content
           onDelta?.({ texto: d.content })
@@ -195,7 +188,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
       } catch {}
     }
   }
-  return { escalar, texto: total, loop, estourou }
+  return { escalar, texto: total, loop }
 }
 
 module.exports = { classificar, deveEscalar, inicioDoLoop, afirmaArquivo, responderRapido, resumoDeSkills, memoriaRelevante }
