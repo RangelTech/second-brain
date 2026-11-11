@@ -381,7 +381,9 @@ function manterAncora(alvo, nivel) {
         s.pronta
           .then(() => s.aquecer?.())
           .then(() => {
-            if (s.aquecimentoFalhou || s.morto) throw new Error('aquecimento falhou')
+            // so descarta se o processo morreu ou nao subiu. Falha do TURNO de aquecimento (o modelo responde curto e o Hermes conta como 'nao respondeu',
+            // visto em todas as VMs: 0 aquecimentos ok desde 04/11) nao invalida a sessao: o agente e as ferramentas ja foram montados.
+            if (s.morto || s.falhouIniciar) throw new Error('a sessao nao subiu')
             falhasReserva = 0
             registrarAgente(app, `sessão reserva ${id} pronta e aquecida (${reservas.length} na espera)`)
           })
@@ -418,7 +420,7 @@ function manterAncora(alvo, nivel) {
 // A conversa `chat` leva uma reserva que sirva para a configuração atual (a mais adiantada). Devolve a sessão ou null.
 async function adotarReserva(chat, alvo, nivel) {
   if (!reservas.some((r) => reservaServe(r, alvo, nivel)) && reservaSubindo) await reservaSubindo.catch(() => null) // a 1ª está nascendo: espera em vez de subir outra
-  const servem = reservas.filter((r) => reservaServe(r, alvo, nivel) && !r.aquecimentoFalhou)
+  const servem = reservas.filter((r) => reservaServe(r, alvo, nivel))
   const r = servem.find((x) => !x.primeira) || servem.find((x) => !x.iniciandoAgora) || servem[0]
   if (!r) return null
   reservas.splice(reservas.indexOf(r), 1)

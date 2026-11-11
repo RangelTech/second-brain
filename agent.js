@@ -1010,7 +1010,7 @@ class Sessao {
       const t0 = Date.now()
       try {
         this.ativo = true
-        await this._perguntar('[aquecimento] Responda apenas: ok', [])
+        await this._perguntar('[aquecimento] Diga em uma frase curta que está pronto para ajudar.', [])
         registrar(this.app, `agente aquecido (1o turno) em ${((Date.now() - t0) / 1000).toFixed(1)} s`)
       } catch (e) {
         this.aquecimentoFalhou = true // sessão reserva com isto não é entregue a nenhuma conversa (é trocada por outra)

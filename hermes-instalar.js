@@ -36,7 +36,7 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
     try {
       falar('copiando o agente que vem no instalador')
       fs.mkdirSync(raiz, { recursive: true })
-      const x = await executar(sete, ['x', arq, '-o' + raiz, '-y', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
+      const x = await executar(sete, ['x', arq, '-o' + raiz, '-y', '-mmt=on', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
       if (x.codigo !== 0) throw new Error('descompactar falhou (codigo ' + x.codigo + ') ' + (x.saida || '').slice(-200))
       if (!fs.existsSync(bin)) throw new Error('hermes.exe nao apareceu depois de descompactar')
       falar('conferindo o agente')
@@ -68,7 +68,7 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
     try {
       falar('copiando o ambiente do agente')
       fs.mkdirSync(home, { recursive: true })
-      const x = await executar(sete, ['x', arq, '-o' + home, '-y', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
+      const x = await executar(sete, ['x', arq, '-o' + home, '-y', '-mmt=on', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
       if (x.codigo !== 0) throw new Error('codigo ' + x.codigo)
       fs.writeFileSync(path.join(home, '.dono'), dec.id || cam.idDoUsuario(app.getPath('userData')))
       const bin = path.join(raiz, 'bin', 'hermes-acp.exe')

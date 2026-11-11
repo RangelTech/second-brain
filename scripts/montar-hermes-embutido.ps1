@@ -27,6 +27,16 @@ $t0 = Get-Date
 "instalador oficial terminou (codigo $LASTEXITCODE) em $([int]((Get-Date) - $t0).TotalMinutes) min"
 if (-not (Test-Path (Join-Path $raiz 'bin\hermes-acp.exe'))) { throw 'o Hermes nao foi instalado (sem bin\hermes-acp.exe)' }
 
+# Enxuga o pacote: o cliente descompacta cada arquivo (e o antivirus confere um por um). Medido em 11/11/2026: o codigo do Hermes tem ~24 mil
+# arquivos e ~15 mil sao so de desenvolvimento (testes, site, app de desktop proprio do Hermes, lista de contribuidores). O app usa so o ACP.
+$agente = Join-Path $raiz 'hermes-agent'
+$antes = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object).Count
+foreach ($d in 'tests', 'contributors', 'website', 'evals', 'docker', 'apps\desktop') {
+    Remove-Item -Recurse -Force (Join-Path $agente $d) -ErrorAction SilentlyContinue
+}
+$depois = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object).Count
+"codigo do Hermes enxugado: $antes -> $depois arquivos"
+
 # o Hermes precisa subir no caminho fixo. O --version AQUI pode falhar porque o ambiente de dependencias so e montado no passo "Ambiente PRONTO" (abaixo):
 # so avisa; quem prova que o agente sobe e o montar-ambiente.js (ACP initialize) e o teste de instalacao do CI.
 $env:HERMES_HOME = Join-Path $env:TEMP 'sb-hermes-home-teste'
