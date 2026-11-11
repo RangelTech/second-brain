@@ -48,6 +48,8 @@
       "oauth-janela.js",
       "extensao-app.js",
       "native-host.js",
+      "editor-video.js",
+      "mcp-editor.js",
       "hermes-instalar.js",
       "relatorio-instalacao.js",
       "caminhos-hermes.js",
@@ -135,6 +137,10 @@
       {
         "from": "native-host.js",
         "to": "native-host.js"
+      },
+      {
+        "from": "mcp-editor.js",
+        "to": "mcp-editor.js"
       },
       {
         "from": "modelos",

@@ -346,6 +346,31 @@ function manterAncora(alvo, nivel) {
     }).catch((e) => registrarAgente(app, 'âncora do gateway: ' + (e.message || e)))
   } catch {}
 }
+// ---- editor de vídeo (spec 25 §21): instalação silenciosa sob pedido, janela do editor e corte de silêncio; o motor fala com o Hermes pelo próprio MCP
+const editorVideo = require('./editor-video')
+async function ferramentaEditor(nome, args) {
+  if (nome === 'estado') {
+    const pronto = editorVideo.instalado(app)
+    return { texto: JSON.stringify({ instalado: pronto, suportado: editorVideo.suportado(), pasta_projetos: path.join(cfg.pasta, 'Videos'), nome: editorVideo.NOME_EXIBIDO, dica: pronto ? 'Use as ferramentas do servidor "editor" (project_create, media_import, ...). Projetos dentro da pasta_projetos.' : 'Chame editor_instalar.' }) }
+  }
+  if (nome === 'instalar') {
+    const r = await editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p))
+    return { texto: r.ja ? 'O editor de vídeo já estava instalado.' : 'Editor de vídeo instalado. Peça ao usuário para abrir uma conversa nova para as ferramentas de edição aparecerem; nesta conversa só consigo cortar silêncio e abrir a janela.' }
+  }
+  if (nome === 'abrir_janela') {
+    editorVideo.abrirJanela(app, args.projeto ? path.resolve(String(args.projeto)) : '')
+    return { texto: 'Abri a janela do editor de vídeo para o usuário.' }
+  }
+  if (nome === 'cortar_silencio') {
+    const r = await editorVideo.cortarSilencio(String(args.arquivo || ''), { limiar: args.limiar_db, minimo: args.silencio_minimo_s })
+    return { texto: `Arquivo novo: ${r.arquivo}\nDuração: ${r.duracaoAntes.toFixed(1)} s -> ${r.duracaoDepois.toFixed(1)} s (cortei ${r.cortado} s de silêncio, ${r.trechos} trechos mantidos). Importe esse arquivo no projeto com media_import.` }
+  }
+  throw new Error('Ferramenta desconhecida: ' + nome)
+}
+ipcMain.handle('editor:estado', () => ({ instalado: editorVideo.instalado(app), suportado: editorVideo.suportado(), nome: editorVideo.NOME_EXIBIDO }))
+ipcMain.handle('editor:instalar', async () => { try { await editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p)); return { ok: true } } catch (e) { return { ok: false, erro: String(e.message || e) } } })
+ipcMain.handle('editor:abrir', (_e, projeto) => { try { return editorVideo.abrirJanela(app, projeto || path.join(cfg.pasta, 'Videos')) } catch (e) { return { ok: false, erro: String(e.message || e) } } })
+
 async function sessaoDoChat(id, alvo, contexto, historico) {
   // logo depois de entrar na conta, o app leva alguns segundos para ligá-la ao motor interno: a primeira mensagem espera
   // (em vez de sair com a chave ainda não aplicada e voltar "chave inválida")
@@ -553,6 +578,7 @@ app.whenReady().then(() => {
     janela: () => janela,
     avisar: (e) => janela?.webContents.send('navegador:estado', e),
     pedirPainel: () => janela?.webContents.send('navegador:abrir-painel'),
+    editor: (nome, args) => ferramentaEditor(nome, args),
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })

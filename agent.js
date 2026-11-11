@@ -940,6 +940,16 @@ class Sessao {
       })
     }
     lista.push(...mcpsExternos(this.app, lista.map((x) => x.name)))
+    // editor de vídeo: o motor (quando instalado) e as ferramentas do app (instalar, abrir janela, cortar silêncio)
+    try {
+      const ev = require('./editor-video')
+      const motor = ev.mcp(this.app, this.pasta)
+      if (motor) lista.push(motor)
+      if (this.navegador && ev.suportado()) {
+        const shimEd = [path.join(process.resourcesPath || '', 'mcp-editor.js'), path.join(__dirname, 'mcp-editor.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-editor.js')
+        lista.push({ name: 'editor-app', command: process.execPath, args: [shimEd], env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }, { name: 'SB_NAV_URL', value: this.navegador.url }, { name: 'SB_NAV_TOKEN', value: this.navegador.token }] })
+      }
+    } catch {}
     if (!this.navegador) return lista
     const shim = [path.join(process.resourcesPath || '', 'mcp-navegador.js'), path.join(__dirname, 'mcp-navegador.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-navegador.js')
     return [
