@@ -19,7 +19,7 @@
     const tl = t.toLowerCase()
     if (/skill_view|skills_list|skill_manage|\bskills?\b/.test(tl)) return 'skills'
     if (/memoria_|memory|lembr|recall/.test(tl)) return 'memoria'
-    if (/delegate|subagent|spawn|agente_/.test(tl)) return 'agentes'
+    if (/delegate|subagent|spawn|agente_|ias_perguntar|ias_disponiveis/.test(tl)) return 'agentes'
     if (/todo|kanban|cron|tarefa|agenda/.test(tl)) return 'tarefas'
     if (/clonar_voz|trocar_voz|redublar|transcri|whisper|audio|áudio|\.(mp3|wav|ogg|m4a)\b/.test(tl)) return 'voz'
     if (/gerar_video|video|vídeo|\.(mp4|mov|webm)\b|trocar_personagem/.test(tl)) return 'video'
@@ -47,6 +47,7 @@
     const base = rotulo ? rotulo(f) : ROTULO[cat]
     if (cat === 'skills') return alvo && !/^skills?_?(list|manage)?$/i.test(alvo) ? `Consultando a skill ${alvo}` : 'Consultando as suas skills…'
     if (cat === 'memoria') return 'Lembrando do que já conversamos'
+    if (/ias_perguntar/.test(f.titulo || '')) return 'Consultando outra IA…'
     if (cat === 'imagem' || cat === 'video' || cat === 'voz') return base
     if (cat === 'terminal') return 'Rodando um comando…'
     if (cat === 'codigo') return 'Rodando um código…'

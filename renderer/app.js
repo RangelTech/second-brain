@@ -263,11 +263,13 @@
   const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
   const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz)/.test((f && f.titulo) || '')
   const ROTULOS = [
-    [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
+    [/ias_perguntar/, 'Consultando outra IA'], [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
     [/navegador_|browser|web_?search|search_web/i, 'Pesquisando na web'], [/vision_analyze/, 'Olhando a imagem'],
     [/read_file|^read\b/i, 'Lendo arquivo'], [/write_file|patch|edit/i, 'Escrevendo arquivo'], [/terminal|execute|shell/i, 'Executando'],
   ]
-  const rotuloFerr = (f) => { const t = (f && f.titulo) || ''; const r = ROTULOS.find(([re]) => re.test(t)); return r ? r[1] : (ROTULO_FERR[(f && f.tipo) || 'other'] || 'Trabalhando') }
+  // o nome interno do MCP (mcp__editor_ias_xxxx__ias_perguntar) sai antes de procurar o rótulo: "editor" casava com /edit/ e virava "Escrevendo arquivo"
+  const semMcp = (t) => String(t || '').replace(/mcp__[A-Za-z0-9_]+?__/g, '')
+  const rotuloFerr = (f) => { const t = semMcp(f && f.titulo); const r = ROTULOS.find(([re]) => re.test(t)); return r ? r[1] : (ROTULO_FERR[(f && f.tipo) || 'other'] || 'Trabalhando') }
 
   function cartaoFerramenta(f) {
     const d = document.createElement('div')
@@ -277,7 +279,7 @@
   }
   // "read_file: C:\pasta\a.txt" -> "a.txt"; "terminal: ls -la" -> "ls -la"
   function tituloLimpo(t) {
-    let x = String(t || '').replace(/^[a-z_]+:\s*/i, '')
+    let x = semMcp(t).replace(/^[a-z_]+:\s*/i, '')
     if (/^[A-Za-z]:[\\/]/.test(x) || x.startsWith('/')) x = x.split(/[\\/]/).pop()
     return x.replace(/^[0-9a-z]{6,9}-(?=.+\.\w+$)/i, '')
   }

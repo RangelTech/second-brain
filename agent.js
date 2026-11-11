@@ -530,13 +530,14 @@ class Sessao {
   set emitir(f) {
     this._emitir = f
   }
-  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, nivel }) {
+  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel }) {
     this.app = app
     this.id = id
     this.pasta = pasta
     this.modo = modo || (() => 'manual') // 'manual' | 'editar' | 'auto' | 'ignorar'
     this.navegador = navegador || null // { url, token }: servidor local das ferramentas do navegador integrado
     this.memoria = memoria || null // { arquivo }: conversas do app, para a ferramenta de memória
+    this.ias = ias || null // { base, chave, lista }: outras IAs conectadas, para o Hermes escolher qual usar (Spec 25 §16)
     this.midia = midia || null // { base, chave }: API de imagens do servidor (Unlimited); some se o app ainda não tem chave
     this.emitir = emitir
     this.pedirPermissao = pedirPermissao
@@ -877,6 +878,20 @@ class Sessao {
   // ferramentas do navegador integrado: um servidor MCP (stdio) que repassa as chamadas ao app
   servidoresMcp() {
     const lista = []
+    if (this.ias && this.ias.lista && this.ias.lista.length) {
+      const shimIas = [path.join(process.resourcesPath || '', 'mcp-ias.js'), path.join(__dirname, 'mcp-ias.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-ias.js')
+      lista.push({
+        name: 'ias',
+        command: process.execPath,
+        args: [shimIas],
+        env: [
+          { name: 'ELECTRON_RUN_AS_NODE', value: '1' },
+          { name: 'SB_IAS_BASE', value: this.ias.base },
+          { name: 'SB_IAS_CHAVE', value: this.ias.chave || '' },
+          { name: 'SB_IAS_LISTA', value: JSON.stringify(this.ias.lista.slice(0, 60)) },
+        ],
+      })
+    }
     if (this.memoria) {
       const shimMem = [path.join(process.resourcesPath || '', 'mcp-memoria.js'), path.join(__dirname, 'mcp-memoria.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-memoria.js')
       lista.push({

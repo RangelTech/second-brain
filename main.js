@@ -254,6 +254,75 @@ async function nivelDeSeguranca() {
   } catch {}
   return nivelSeg.valor || 2
 }
+// UM COMBO POR PROVEDOR (pedido do Lucas, 10/11/2026): "claude", "chatgpt", "gemini", "unlimited"... criados e atualizados sozinhos a partir das
+// conexões ativas. O Hermes pede a IA pelo NOME do provedor e o roteador escolhe o modelo dentro do combo (com queda para o próximo se um falhar);
+// quem tem duas contas do mesmo provedor fica no mesmo combo e o roteador reveza. Combos criados pelo usuário nunca são alterados.
+const NOME_IA = { cc: 'claude', claude: 'claude', cx: 'chatgpt', codex: 'chatgpt', openai: 'chatgpt', gc: 'gemini', 'gemini-cli': 'gemini', gemini: 'gemini', gh: 'copilot', github: 'copilot', gcli: 'grok', xai: 'grok', unl: 'unlimited' }
+const TITULO_IA = { claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini', copilot: 'Copilot', grok: 'Grok', unlimited: 'Unlimited (a IA da casa)' }
+const nomeIa = (prefixo) => NOME_IA[prefixo] || String(prefixo).toLowerCase().replace(/[^a-z0-9_.-]/g, '-')
+// apelido de cada provedor (claude -> cc): vem do catálogo do app, gerado do roteador
+let APELIDOS = null
+function apelidos() {
+  if (APELIDOS) return APELIDOS
+  try {
+    const w = {}
+    new Function('window', fs.readFileSync(path.join(__dirname, 'renderer', 'provider-catalog.js'), 'utf8'))(w)
+    APELIDOS = Object.fromEntries((w.SB_CATALOGO?.provedores || []).filter((p) => p.alias).map((p) => [p.id, p.alias]))
+  } catch {
+    APELIDOS = {}
+  }
+  return APELIDOS
+}
+async function combosPorProvedor() {
+  // só provedores que o usuário CONECTOU (o roteador também lista provedores gratuitos sem conexão, que não viram "IA" do usuário)
+  const conex = ((await embed.api('GET', '/api/providers')).json?.connections ?? []).filter((c) => c.isActive !== false)
+  const nos = new Map(((await embed.api('GET', '/api/provider-nodes')).json?.nodes ?? []).map((n) => [n.id, n]))
+  const permitidos = new Set(['unl'])
+  for (const c of conex) {
+    permitidos.add(c.provider)
+    if (apelidos()[c.provider]) permitidos.add(apelidos()[c.provider])
+    if (nos.get(c.provider)?.prefix) permitidos.add(nos.get(c.provider).prefix)
+  }
+  const modelos = (await listarModelos()).filter((m) => m.grupo === 'Modelos' && permitidos.has(m.id.slice(0, m.id.indexOf('/'))))
+  const grupos = new Map() // nome da IA -> [ids dos modelos]
+  for (const m of modelos) {
+    const k = m.id.indexOf('/')
+    if (k <= 0) continue
+    const ia = nomeIa(m.id.slice(0, k))
+    if (!grupos.has(ia)) grupos.set(ia, [])
+    grupos.get(ia).push(m.id)
+  }
+  const existentes = (await embed.api('GET', '/api/combos')).json?.combos ?? []
+  const auto = new Set(cfg.combosAuto || [])
+  const saida = []
+  for (const [ia, ids] of grupos) {
+    const ja = existentes.find((c) => c.name === ia)
+    if (!ja) {
+      const r = await embed.api('POST', '/api/combos', { name: ia, models: ids })
+      if (r.status < 300) auto.add(ia)
+    } else if (auto.has(ia) && JSON.stringify(ja.models || []) !== JSON.stringify(ids)) {
+      await embed.api('PUT', '/api/combos/' + ja.id, { models: ids })
+    }
+    saida.push({ ia, titulo: TITULO_IA[ia] || ia, modelos: ids })
+  }
+  // conexão removida: o combo automático dela sai junto (os do usuário ficam)
+  for (const c of existentes) if (auto.has(c.name) && !grupos.has(c.name)) (await embed.api('DELETE', '/api/combos/' + c.id), auto.delete(c.name))
+  cfg.combosAuto = [...auto]
+  salvarCfg()
+  return saida
+}
+// outras IAs conectadas para o Hermes escolher qual usar em cada pedaço da tarefa (Spec 25 §16)
+async function iasDoApp() {
+  try {
+    const est = embed.estado()
+    if (!est.pronto) return null
+    const ias = await combosPorProvedor()
+    return { base: est.origem + '/v1', chave: await chaveLocal(), lista: ias.map((x) => ({ id: x.ia, nome: x.titulo, provedor: x.ia, modelos: x.modelos.slice(0, 6) })) }
+  } catch (e) {
+    registrarAgente(app, 'combos por provedor: ' + (e.message || e))
+    return null
+  }
+}
 async function sessaoDoChat(id, alvo, contexto, historico) {
   // logo depois de entrar na conta, o app leva alguns segundos para ligá-la ao motor interno: a primeira mensagem espera
   // (em vez de sair com a chave ainda não aplicada e voltar "chave inválida")
@@ -268,7 +337,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
   await ponteLLM.iniciar()
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') } })
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.nivel = nivel
