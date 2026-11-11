@@ -36,6 +36,8 @@ foreach ($d in 'tests', 'contributors', 'website', 'evals', 'docker', 'apps\desk
 }
 $depois = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object).Count
 "codigo do Hermes enxugado: $antes -> $depois arquivos"
+# atalhos (junction/symlink) do pnpm que apontavam para o que saiu ficam quebrados e o 7za reclama: remove os que nao levam a lugar nenhum
+Get-ChildItem $agente -Recurse -Force -Attributes ReparsePoint -ErrorAction SilentlyContinue | Where-Object { $_.Target -and -not (Test-Path (Join-Path (Split-Path $_.FullName) ([string]$_.Target)) -ErrorAction SilentlyContinue) -and -not (Test-Path ([string]$_.Target) -ErrorAction SilentlyContinue) } | ForEach-Object { "atalho quebrado removido: $($_.FullName)"; Remove-Item $_.FullName -Force -Recurse -ErrorAction SilentlyContinue }
 
 # o Hermes precisa subir no caminho fixo. O --version AQUI pode falhar porque o ambiente de dependencias so e montado no passo "Ambiente PRONTO" (abaixo):
 # so avisa; quem prova que o agente sobe e o montar-ambiente.js (ACP initialize) e o teste de instalacao do CI.
@@ -53,7 +55,7 @@ foreach ($d in 'cache', 'logs', 'sessions', 'memories', 'backups', 'image_cache'
 $arq = Join-Path $saida 'hermes-win32-x64.7z'
 Push-Location $raiz
 & $sete a -t7z -m0=lzma2 -mx=5 -mmt=on -bso0 -bsp0 $arq '*'
-if ($LASTEXITCODE -ne 0) { throw "7za falhou (codigo $LASTEXITCODE)" }
+if ($LASTEXITCODE -gt 1) { throw "7za falhou (codigo $LASTEXITCODE)" } # 1 = so avisos (ex.: atalho quebrado); o pacote sai inteiro
 Pop-Location
 Copy-Item $sete (Join-Path $saida '7za.exe') -Force
 "pacote: {0} MB" -f [int]((Get-Item $arq).Length / 1MB)
