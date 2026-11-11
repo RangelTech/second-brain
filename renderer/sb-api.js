@@ -101,6 +101,9 @@
       ditadoModelo: () => invoke('ditado:modelo'),
       navegador: {
         limites: (l) => invoke('navegador:limites', l),
+        destacar: () => invoke('navegador:destacar'),
+        reencaixar: () => invoke('navegador:reencaixar'),
+        aoDestacado: (fn) => on('navegador:destacado', fn),
         mostrar: (sim) => invoke('navegador:mostrar', sim),
         esconderTemp: (sim) => invoke('navegador:esconder-temp', sim),
         acao: (acao, url) => invoke('navegador:acao', { acao, url }),

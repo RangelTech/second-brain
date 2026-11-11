@@ -578,12 +578,16 @@ app.whenReady().then(() => {
     janela: () => janela,
     avisar: (e) => janela?.webContents.send('navegador:estado', e),
     pedirPainel: () => janela?.webContents.send('navegador:abrir-painel'),
+    preload: path.join(__dirname, 'preload.js'),
+    avisarDestacada: (sim) => janela?.webContents.send('navegador:destacado', !!sim),
     editor: (nome, args) => ferramentaEditor(nome, args),
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })
   nav.iniciarServidor().then((i) => (navInfo = i))
   ipcMain.handle('navegador:limites', (_e, l) => nav.definirLimites(l))
+  ipcMain.handle('navegador:destacar', () => nav.destacar())
+  ipcMain.handle('navegador:reencaixar', () => nav.reencaixar())
   ipcMain.handle('navegador:mostrar', (_e, sim) => nav.mostrar(sim))
   ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))

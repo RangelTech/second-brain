@@ -14,7 +14,7 @@ const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 // A versão web também chama estes canais (a tela é a mesma), mas eles mexem na camada NATIVA do navegador do computador: a posição, o tamanho e o
 // "esconder por modal" da vista seguem a geometria da tela do PRÓPRIO computador. Se valessem para o aparelho web, abrir o site no celular ou em
 // outro navegador reposicionava a vista do desktop com o tamanho dessa outra tela (a página do navegador ficava por cima do chat).
-const IGNORADOS_NA_WEB = new Set(['navegador:limites', 'navegador:esconder-temp', 'navegador:mostrar'])
+const IGNORADOS_NA_WEB = new Set(['navegador:limites', 'navegador:esconder-temp', 'navegador:mostrar', 'navegador:destacar', 'navegador:reencaixar'])
 const BLOQUEADOS = new Set(['pasta:escolher', 'oauth:janela', 'extensao:conectar', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado', 'ditado:modelo', 'ditado:whisper', 'ditado:whisper-aquecer'])
 // eventos do app que a tela web também recebe (o resto vai só para quem fez a chamada)
 const EVENTOS_ESPELHADOS = new Set(['chats:mudou', 'skills:mudou', 'unlimited:estado', 'navegador:estado', 'navegador:abrir-painel', 'midia:pronta'])

@@ -1,0 +1,46 @@
+const fs = require('fs'), http = require('http')
+const WebSocket = require('C:/Users/lucas.rangel/Desktop/new_ragente/repos/segundo-cerebro-remoto/node_modules/ws')
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const getJson = (u) => new Promise((res, rej) => http.get(u, (r) => { let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => res(JSON.parse(d))) }).on('error', rej))
+const falhas = []; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALHA ') + m); if (!c) falhas.push(m) }
+async function ligar(t) {
+  const ws = new WebSocket(t.webSocketDebuggerUrl); await new Promise((r) => ws.once('open', r))
+  let id = 0; const pend = new Map()
+  ws.on('message', (m) => { const j = JSON.parse(String(m)); if (j.id && pend.has(j.id)) { pend.get(j.id)(j.result); pend.delete(j.id) } })
+  const cmd = (method, params = {}) => new Promise((res) => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })) })
+  return { cmd, js: async (e) => (await cmd('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true })).result.value, fechar: () => ws.close() }
+}
+;(async () => {
+  let lista = await getJson('http://127.0.0.1:9413/json/list')
+  const main = await ligar(lista.find((x) => x.type === 'page' && /index\.html/.test(x.url)))
+  await main.cmd('Page.reload'); await sleep(3500)
+  ok(await main.js('!!document.getElementById("nav-destacar")'), 'botão "abrir em outra janela" existe no painel do navegador')
+  await main.js('document.getElementById("abrir-nav").click()'); await sleep(1500)
+  await main.js('window.sb.navegador.acao("ir", "https://example.com")'); await sleep(5000)
+  const antes = (await getJson('http://127.0.0.1:9413/json/list')).filter((x) => x.type === 'page').length
+  await main.js('document.getElementById("nav-destacar").click()'); await sleep(5000)
+  lista = await getJson('http://127.0.0.1:9413/json/list')
+  const paginas = lista.filter((x) => x.type === 'page')
+  ok(paginas.length === antes + 1, `abriu uma janela nova (${antes} -> ${paginas.length} páginas)`)
+  const det = paginas.find((x) => /nav-destacado/.test(x.url))
+  ok(!!det, 'a nova janela é a do navegador (nav-destacado.html)')
+  const d = await ligar(det)
+  await sleep(1500)
+  const url = await d.js('document.getElementById("url").value')
+  ok(/example\.com/.test(url), 'a janela destacada mostra o endereço da mesma página: ' + url)
+  ok((await main.js('document.getElementById("nav").hidden')) === true, 'o painel da janela principal fechou (o navegador saiu de lá)')
+  // a vista nativa aparece? (a página example.com é uma das vistas; conferimos pelo alvo extra do navegador integrado)
+  const vistas = (await getJson('http://127.0.0.1:9413/json/list')).filter((x) => /example\.com/.test(x.url))
+  ok(vistas.length >= 1, 'a página (vista nativa) está viva na janela destacada: ' + (vistas[0] && vistas[0].url))
+  // o agente continua controlando: navega pelo mesmo canal que as ferramentas usam
+  await main.js('window.sb.navegador.acao("ir", "https://example.org")'); await sleep(4000)
+  const url2 = await d.js('document.getElementById("url").value')
+  ok(/example\.org/.test(url2), 'a barra da janela destacada acompanha a navegação feita pelo canal do agente: ' + url2)
+  // reencaixar
+  await d.js('document.getElementById("reencaixar").click()'); await sleep(4000)
+  const depois = (await getJson('http://127.0.0.1:9413/json/list')).filter((x) => x.type === 'page')
+  ok(depois.length === antes, `reencaixar fecha a janela extra (${depois.length} páginas)`)
+  ok((await main.js('document.getElementById("nav").hidden')) === false, 'o painel do navegador voltou na janela principal')
+  main.fechar()
+  console.log(falhas.length ? `\n${falhas.length} FALHA(S)` : '\nTUDO CERTO'); process.exit(falhas.length ? 1 : 0)
+})().catch((e) => { console.log('ERRO', e.message); process.exit(1) })

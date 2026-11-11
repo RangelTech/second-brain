@@ -1,7 +1,7 @@
 // Navegador integrado: uma vista nativa (WebContentsView) ao lado do chat, que o usuário vê e usa, e que o agente
 // controla por ferramentas (servidor MCP em mcp-navegador.js -> este servidor HTTP local -> a vista).
 // Sessão própria (partition "persist:navegador"): não compartilha cookies nem dados com o resto do app.
-const { WebContentsView } = require('electron')
+const { WebContentsView, BrowserWindow } = require('electron')
 const http = require('http')
 
 const PAGINA_INICIAL = 'https://www.google.com/?hl=pt-BR'
@@ -34,7 +34,7 @@ const LINK_EXTENSAO = 'https://brain.rangeltech.net/extensao/'
 // falhas de TRANSPORTE da extensão (nada chegou a rodar no Chrome); erro da própria ferramenta (elemento sumiu) não entra aqui
 const FALHAS_TRANSPORTE = new Set(['sem_extensao', 'pausado', 'desconectada', 'timeout'])
 
-function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false, editor = null }) {
+function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false, editor = null, preload = '', avisarDestacada = () => {} }) {
   const token = crypto.randomBytes(24).toString('hex')
   const pastaCaps = path.join(app.getPath('userData'), 'navegador-capturas')
   let vista = null
@@ -46,6 +46,53 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   let controlando = false
   let timerControle = null
 
+  // janela destacada (Spec 25): o navegador sai do painel e ganha uma janela própria, grande, com a barra de endereço no topo. A vista nativa é a MESMA
+  // (mesma sessão, mesmas abas, o agente continua controlando); só muda em qual janela ela está encaixada.
+  const BARRA_DESTACADA = 48
+  let destacada = null
+  const alvo = () => (destacada && !destacada.isDestroyed() ? destacada : janela())
+  function limitesDestacada() {
+    const b = destacada.getContentBounds()
+    return { x: 0, y: BARRA_DESTACADA, width: Math.max(1, b.width), height: Math.max(1, b.height - BARRA_DESTACADA) }
+  }
+  function destacar() {
+    if (destacada && !destacada.isDestroyed()) { destacada.focus(); return { ok: true } }
+    garantir()
+    const principal = janela()
+    // sai do painel da janela principal
+    if (principal && principal.contentView.children.includes(vista)) principal.contentView.removeChildView(vista)
+    aberto = true
+    destacada = new BrowserWindow({
+      width: 1180, height: 820, minWidth: 520, minHeight: 360, backgroundColor: '#16120f', autoHideMenuBar: true, title: 'Navegador do Segundo Cérebro',
+      webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: false },
+    })
+    const w = destacada
+    w.loadFile(path.join(__dirname, 'renderer', 'nav-destacado.html'))
+    const ajustar = () => { if (!w.isDestroyed()) aplicar() }
+    for (const ev of ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen']) w.on(ev, ajustar)
+    w.on('closed', () => {
+      if (destacada !== w) return
+      destacada = null
+      aberto = false // fechou a janela: o navegador fica guardado (a mesma vista, sem perder a página); o painel reabre quando alguém pedir
+      try { if (vista && !vista.webContents.isDestroyed() && janela()?.contentView.children.includes(vista)) janela().contentView.removeChildView(vista) } catch {}
+      publicar()
+      avisarDestacada(false)
+    })
+    w.webContents.once('did-finish-load', () => { ajustar(); publicar() })
+    avisarDestacada(true)
+    setTimeout(ajustar, 50)
+    return { ok: true }
+  }
+  function reencaixar() {
+    const w = destacada
+    destacada = null
+    try { if (w && !w.isDestroyed()) { if (vista && w.contentView.children.includes(vista)) w.contentView.removeChildView(vista); w.close() } } catch {}
+    avisarDestacada(false)
+    pedirPainel() // a tela principal abre o painel de novo, com a mesma vista
+    return { ok: true }
+  }
+  const estaDestacado = () => !!(destacada && !destacada.isDestroyed())
+
   const estado = () => {
     const wc = vista?.webContents
     return {
@@ -55,9 +102,10 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
       podeVoltar: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoBack(),
       podeAvancar: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoForward(),
       controlando,
+      destacado: estaDestacado(),
     }
   }
-  const publicar = () => avisar(estado())
+  const publicar = () => { avisar(estado()); try { if (estaDestacado()) destacada.webContents.send('navegador:estado', estado()) } catch {} }
 
   function garantir() {
     if (vista) return vista
@@ -80,13 +128,20 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   }
 
   function aplicar() {
-    if (!vista || !janela()) return
+    const j = alvo()
+    if (!vista || !j) return
+    if (estaDestacado()) { // na janela própria a vista ocupa tudo abaixo da barra, sem depender do painel da janela principal
+      const l = limitesDestacada()
+      if (!j.contentView.children.includes(vista)) j.contentView.addChildView(vista)
+      vista.setBounds({ x: l.x, y: l.y, width: l.width, height: l.height })
+      return
+    }
     const visivel = aberto && !escondidoPorModal && limites
-    const contem = janela().contentView.children.includes(vista)
+    const contem = j.contentView.children.includes(vista)
     if (visivel) {
-      if (!contem) janela().contentView.addChildView(vista)
+      if (!contem) j.contentView.addChildView(vista)
       vista.setBounds({ x: Math.round(limites.x), y: Math.round(limites.y), width: Math.max(1, Math.round(limites.width)), height: Math.max(1, Math.round(limites.height)) })
-    } else if (contem) janela().contentView.removeChildView(vista)
+    } else if (contem) j.contentView.removeChildView(vista)
   }
 
   // o painel do app diz onde a vista deve ficar
@@ -108,6 +163,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   // garante painel aberto e com tamanho antes de o agente agir (precisa estar na tela para capturar)
   async function garantirVisivel() {
     garantir()
+    if (estaDestacado()) { aplicar(); return }
     if (!aberto) pedirPainel()
     const fim = Date.now() + 4000
     while (!(aberto && limites) && Date.now() < fim) await new Promise((r) => setTimeout(r, 100))
@@ -337,6 +393,9 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     mostrar,
     esconderTemporario,
     atender,
+    destacar,
+    reencaixar,
+    estaDestacado,
     viaExtensao,
     // painel da versão web: captura leve (JPEG) da página e entradas diretas do usuário (não marca "controle do agente")
     async captura() {

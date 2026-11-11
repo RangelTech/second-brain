@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'">
+<title>Navegador do Segundo Cérebro</title>
+<style>
+  :root{color-scheme:dark}
+  html,body{margin:0;height:100%;background:#16120f;color:#ece9e4;font:14px/1.4 system-ui,"Segoe UI",sans-serif;overflow:hidden}
+  .barra{display:flex;align-items:center;gap:6px;height:48px;box-sizing:border-box;padding:7px 10px;border-bottom:1px solid #3a322b;background:#1f1a16}
+  .barra button{width:34px;height:34px;border-radius:9px;border:1px solid transparent;background:transparent;color:inherit;font-size:17px;cursor:pointer}
+  .barra button:hover{background:#2c251f;border-color:#3a322b}
+  .barra button:disabled{opacity:.35;cursor:default}
+  form{flex:1;display:flex}
+  input{flex:1;height:34px;border-radius:10px;border:1px solid #3a322b;background:#120f0c;color:inherit;padding:0 12px;font:inherit;min-width:0}
+  input:focus{outline:2px solid #c97a3a;border-color:transparent}
+  .agente{display:none;align-items:center;gap:6px;color:#ffb36b;font-size:12px;white-space:nowrap}
+  .agente.on{display:flex}.agente i{width:8px;height:8px;border-radius:50%;background:#ffb36b;box-shadow:0 0 8px #ffb36b}
+  .reenc{width:auto !important;padding:0 12px;font-size:13px !important;border-color:#3a322b !important}
+</style>
+</head>
+<body>
+<div class="barra">
+  <button id="voltar" title="Voltar" aria-label="Voltar">&#8592;</button>
+  <button id="avancar" title="Avançar" aria-label="Avançar">&#8594;</button>
+  <button id="recarregar" title="Recarregar" aria-label="Recarregar">&#8635;</button>
+  <form id="form"><input id="url" type="text" spellcheck="false" placeholder="Pesquise no Google ou digite um endereço" aria-label="Endereço"></form>
+  <span class="agente" id="agente"><i></i>Agente</span>
+  <button class="reenc" id="reencaixar" title="Voltar o navegador para dentro da janela principal">Reencaixar</button>
+</div>
+<script src="sb-api.js"></script>
+<script src="nav-destacado.js"></script>
+</body>
+</html>

@@ -1734,6 +1734,10 @@
   $('abrir-nav').onclick = () => navAbrir(!navAberto)
   cerebroInstalar()
   $('nav-fechar').onclick = () => navAbrir(false)
+  // janela própria: o navegador sai do painel e vai para uma janela grande (a mesma vista e as mesmas abas; o agente continua controlando)
+  if (window.__sbWeb) $('nav-destacar').hidden = true
+  $('nav-destacar').onclick = async () => { await NAV.destacar(); navAbrir(false) }
+  NAV.aoDestacado?.((sim) => { $('abrir-nav').classList.toggle('on', !!sim) })
   $('nav-voltar').onclick = () => NAV.acao('voltar')
   $('nav-avancar').onclick = () => NAV.acao('avancar')
   $('nav-recarregar').onclick = () => NAV.acao('recarregar')
