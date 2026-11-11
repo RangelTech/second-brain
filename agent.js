@@ -124,6 +124,7 @@ function limparHermesPreso(app, home, exceto = []) {
 // morta no meio), o novo ESPERA ~60 s ele sair antes de assumir, e a partida estoura o prazo em ciclo. Sem nenhuma sessao ativa neste app, ele
 // nao tem cliente: pode ser encerrado com seguranca e o proximo sobe limpo em segundos.
 const sessoesVivas = new Set() // pids dos hermes-acp deste app que estao de pe
+let filaPartida = Promise.resolve() // uma sessão por vez faz o aperto de mão com o Hermes (ver iniciarComVigia)
 function matarGatewayOrfao(app, home) {
   if (sessoesVivas.size > 0) return false // outro chat usa o gateway: nao mexe
   try {
@@ -821,8 +822,22 @@ class Sessao {
     }
   }
   async iniciarComVigia() {
-    let ultimo
     if (!ambienteMontado(this.env.HERMES_HOME, this.bin)) await this.aguardarMontagem()
+    // FILA DE PARTIDA (QA macOS 11/11/2026): reserva + conversa aberta + aquecimento subiam juntos; numa máquina lenta o gateway do Hermes
+    // estourava o prazo de partida ("Gateway starting: deadline"), as sessões eram mortas e a pergunta virava "Não consegui responder agora".
+    // Uma sessão faz o aperto de mão por vez; a seguinte espera no máximo 2 min e então segue mesmo assim (nunca trava).
+    const anterior = filaPartida
+    let liberar
+    filaPartida = new Promise((r) => (liberar = r))
+    await Promise.race([anterior, new Promise((r) => setTimeout(r, 120000))])
+    try {
+      await this.handshakeComTentativas()
+    } finally {
+      liberar()
+    }
+  }
+  async handshakeComTentativas() {
+    let ultimo
     const montado = ambienteMontado(this.env.HERMES_HOME, this.bin)
     const TENTATIVAS = montado ? 5 : 3
     for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
@@ -856,7 +871,9 @@ class Sessao {
           this.subir()
           continue
         }
-        if (e.message !== 'prazo') throw e
+        // "Gateway starting: deadline": o gateway compartilhado ainda está subindo; é igual a estourar o prazo (tenta de novo)
+        if (e.message !== 'prazo' && !/gateway starting/i.test(e.message)) throw e
+        if (/gateway starting/i.test(e.message)) await new Promise((r) => setTimeout(r, 3000))
         if (tentativa < TENTATIVAS) this.emitir({ aviso: 'Preparando o agente… só um instante.' })
         const antigo = this.filho
         this.pendentes.clear()
