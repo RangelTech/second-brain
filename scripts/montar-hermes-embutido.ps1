@@ -27,11 +27,12 @@ $t0 = Get-Date
 "instalador oficial terminou (codigo $LASTEXITCODE) em $([int]((Get-Date) - $t0).TotalMinutes) min"
 if (-not (Test-Path (Join-Path $raiz 'bin\hermes-acp.exe'))) { throw 'o Hermes nao foi instalado (sem bin\hermes-acp.exe)' }
 
-# o Hermes precisa subir no caminho fixo (o --version confere o ambiente de dependencias)
+# o Hermes precisa subir no caminho fixo. O --version AQUI pode falhar porque o ambiente de dependencias so e montado no passo "Ambiente PRONTO" (abaixo):
+# so avisa; quem prova que o agente sobe e o montar-ambiente.js (ACP initialize) e o teste de instalacao do CI.
 $env:HERMES_HOME = Join-Path $env:TEMP 'sb-hermes-home-teste'
 New-Item -ItemType Directory -Force $env:HERMES_HOME | Out-Null
 & (Join-Path $raiz 'bin\hermes.exe') --version
-if ($LASTEXITCODE -ne 0) { throw "hermes --version falhou (codigo $LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { Write-Warning "hermes --version falhou (codigo $LASTEXITCODE): esperado ate o ambiente ser montado" }
 
 # tira o que e estado/cache de quem montou; o app do cliente usa o proprio HERMES_HOME (hermes-home) e nao este
 foreach ($d in 'cache', 'logs', 'sessions', 'memories', 'backups', 'image_cache', 'audio_cache', 'telemetry', 'pairing', 'cron') {

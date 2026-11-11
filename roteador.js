@@ -36,6 +36,7 @@ const afirmaArquivo = (texto) => AFIRMA_ARQUIVO.test(String(texto || '')) && NOM
 
 // o modelo pode chamar usar_agente depois de já ter respondido (resposta completa + chamada à toa): nesse caso a resposta vale e o Hermes não roda de novo.
 // Só escala quando ainda não há resposta de verdade (nada escrito, ou só uma frase de preâmbulo como "Vou criar o arquivo").
+const TETO_RACIOCINIO = 5000 // caracteres de raciocínio sem nenhum texto de resposta
 const PREAMBULO_MAX = 160
 const deveEscalar = (textoJaEscrito) => String(textoJaEscrito || '').trim().length < PREAMBULO_MAX
 
@@ -150,12 +151,14 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
   let total = ''
   let escalar = false
   let loop = false
+  let estourou = false
+  let razChars = 0
   for (;;) {
     let lido
     try {
       lido = await leitor.read()
     } catch (e) {
-      if (loop) break // abortado de propósito por causa do loop
+      if (loop || estourou) break // abortado de propósito (loop ou raciocínio longo demais)
       throw e
     }
     const { done, value } = lido
@@ -165,7 +168,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
     while ((i = buf.indexOf('\n')) >= 0) {
       const linha = buf.slice(0, i).trim()
       buf = buf.slice(i + 1)
-      if (loop) break
+      if (loop || estourou) break
       if (!linha.startsWith('data:')) continue
       const dado = linha.slice(5).trim()
       if (dado === '[DONE]') continue
@@ -173,7 +176,12 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
         const d = JSON.parse(dado).choices?.[0]?.delta ?? {}
         if (d.tool_calls?.length && deveEscalar(total)) escalar = true
         const raz = d.reasoning_content ?? d.reasoning
-        if (raz) onDelta?.({ raciocinio: raz })
+        if (raz) {
+          onDelta?.({ raciocinio: raz })
+          razChars += raz.length
+          // pensou demais sem escrever nada: corta e deixa quem chamou refazer sem raciocínio (antes esperava os 6000 tokens, ~2 min, e ainda escalava)
+          if (!total && razChars > TETO_RACIOCINIO) { estourou = true; ctl.abort() }
+        }
         if (d.content && !escalar) {
           total += d.content
           onDelta?.({ texto: d.content })
@@ -187,7 +195,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
       } catch {}
     }
   }
-  return { escalar, texto: total, loop }
+  return { escalar, texto: total, loop, estourou }
 }
 
 module.exports = { classificar, deveEscalar, inicioDoLoop, afirmaArquivo, responderRapido, resumoDeSkills, memoriaRelevante }
