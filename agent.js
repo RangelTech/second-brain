@@ -322,7 +322,13 @@ function prepararBase(app) {
 // As skills globais vão na instalação e depois são do usuário: o Hermes pode editar, criar e apagar à vontade (autoevolução).
 // A sincronização só traz o que é novo ou o que o usuário não mexeu: arquivo editado fica como está, arquivo apagado não volta.
 // O manifesto guarda o hash de cada arquivo como foi entregue da última vez.
+// Uma vez por execução do app: as skills que vêm no app não mudam enquanto ele está aberto, e ler/conferir centenas de arquivos a cada
+// sessão nova (agora são 3 reservas) segurava a janela por ~2 s na abertura (sonda de travamento, 11/11/2026).
+const skillsSincronizadas = new Set()
 function sincronizarSkillsGlobais(origem, destino) {
+  const chave = origem + '>' + destino
+  if (skillsSincronizadas.has(chave)) return
+  skillsSincronizadas.add(chave)
   const crypto = require('crypto')
   const hash = (f) => crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex')
   const arqManifesto = path.join(destino, '.entregue.json')
