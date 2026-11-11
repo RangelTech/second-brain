@@ -1019,7 +1019,18 @@ app.whenReady().then(() => {
     }, 1000)
   }
   garantirAgente(MODO_SERVIDOR ? undefined : avisarPreparo)
-    .then(() => avisarPreparo(''))
+    .then(() => {
+      avisarPreparo('')
+      // EXTRAS em segundo plano (pedido do Lucas, 11/11/2026): o essencial (agente) fica pronto com a tela bonita; o resto baixa em paralelo, sem tela.
+      // Hoje: o editor de vídeo, quando liberado nesta máquina e ainda não instalado.
+      setTimeout(() => {
+        try {
+          if (editorVideo.habilitado(app) && editorVideo.suportado() && !editorVideo.instalado(app)) {
+            editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p)).catch((e) => registrarAgente(app, 'editor em segundo plano: ' + (e.message || e)))
+          }
+        } catch {}
+      }, 15000)
+    })
     .catch((e) => {
       console.error('[hermes]', e.message)
       avisarPreparo('')

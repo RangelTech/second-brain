@@ -31,7 +31,9 @@ if (-not (Test-Path (Join-Path $raiz 'bin\hermes-acp.exe'))) { throw 'o Hermes n
 # arquivos e ~15 mil sao so de desenvolvimento (testes, site, app de desktop proprio do Hermes, lista de contribuidores). O app usa so o ACP.
 $agente = Join-Path $raiz 'hermes-agent'
 $antes = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object).Count
-foreach ($d in 'tests', 'contributors', 'website', 'evals', 'docker', 'apps\desktop') {
+# node_modules do proprio Hermes: so ferramentas de desenvolvimento e o build das interfaces web/terminal (o app usa so o ACP). Eram ~27 mil arquivos
+# (quase metade do pacote) e o cliente descompacta cada um. O node/npm que o agente usa para rodar MCP ficam em tools\, fora daqui.
+foreach ($d in 'tests', 'contributors', 'website', 'evals', 'docker', 'apps\desktop', 'node_modules', 'web\node_modules', 'ui-tui\node_modules') {
     Remove-Item -Recurse -Force (Join-Path $agente $d) -ErrorAction SilentlyContinue
 }
 $depois = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object).Count
