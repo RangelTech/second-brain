@@ -57,3 +57,12 @@ test('chat com agente vivo: pergunta completa (com ?) no meio do texto continua 
   assert.strictEqual(classificar('Qual e a capital da Australia? Responda em uma frase.', [], { emAgente: true }), 'rapido')
   assert.strictEqual(classificar('agora salva isso', [], { emAgente: true }), 'agente')
 })
+
+test('separador de tabela markdown nao e loop (nao corta a resposta no cabecalho da tabela)', () => {
+
+  assert.strictEqual(inicioDoLoop('| Item |\n|--------------------'), -1)
+  assert.strictEqual(inicioDoLoop('|---|---|---|---|---|---|'), -1)
+  assert.strictEqual(inicioDoLoop('texto\n========================'), -1)
+  // loop de verdade continua sendo cortado
+  assert.ok(inicioDoLoop('resposta ' + 'banana '.repeat(12)) >= 0)
+})

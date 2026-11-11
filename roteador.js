@@ -44,6 +44,9 @@ function inicioDoLoop(texto) {
   const cauda = String(texto || '').slice(-1200)
   const m = /(\S[\s\S]{2,60}?)\1{5,}$/.exec(cauda)
   if (!m) return -1
+  // separador de tabela em markdown (|---|---|, |-----------|) e linhas de traço/igual são repetição de FORMATAÇÃO, não loop: cortavam a resposta
+  // logo no cabeçalho da tabela (achado no QA de 11/11/2026). Só é loop quando o trecho repetido tem letra ou número.
+  if (!/[\p{L}\p{N}]/u.test(m[1])) return -1
   const inicio = texto.length - cauda.length + m.index
   return inicio + m[1].length
 }

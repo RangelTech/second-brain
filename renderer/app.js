@@ -1329,11 +1329,22 @@
         if (m && !r.midias.includes(m[1])) r.midias.push(m[1])
       }
     }
-    if (visivel(r)) {
+    if (visivel(r)) agendarRender(r)
+  })
+  // A resposta chega em pedacinhos (dezenas por segundo) e redesenhar o markdown da mensagem inteira a cada um travava a janela em respostas
+  // longas (medido em 11/11/2026: 2 min parada numa resposta de 11 mil caracteres). Junta os pedaços e redesenha no máximo ~8 vezes por segundo.
+  function agendarRender(r) {
+    if (r.renderPendente) return
+    r.renderPendente = true
+    const espera = Math.max(0, (r.ultimoRender || 0) + 120 - Date.now())
+    setTimeout(() => requestAnimationFrame(() => {
+      r.renderPendente = false
+      r.ultimoRender = Date.now()
+      if (!visivel(r)) return
       renderPartes(r.el.querySelector('.partes'), r.partes)
       rolarSeEstivaPerto()
-    }
-  })
+    }), espera)
+  }
   window.sb.aoFim((d) => fim(d.id, d.texto, '', d.uso))
   // vídeo pesado (alta qualidade, troca de personagem) terminou em segundo plano: entra na conversa de onde saiu o pedido, com o card pronto
   window.sb.aoMidiaPronta?.((m) => {
