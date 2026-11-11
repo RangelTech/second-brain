@@ -323,6 +323,29 @@ async function iasDoApp() {
     return null
   }
 }
+// ÂNCORA do gateway (Spec 25 §14.2): o gateway do Hermes é compartilhado entre os chats, mas o app o derrubava toda vez que a última sessão fechava por ociosidade
+// (matarGatewayOrfao) e cada chat seguinte pagava 11 a 13 s para subir tudo de novo. Uma sessão fixa, sem conversa, fica de pé enquanto o app estiver aberto:
+// com ela o gateway nunca fica órfão, e `session/new` de um chat novo cai para ~2 s. Custo: um processo parado (medir). Desliga com cfg.ancoraAgente=false,
+// e não sobe se a máquina tem pouca memória livre (VM pequena).
+const ANCORA_ID = 'ancora-gateway'
+const MEMORIA_MIN_ANCORA = 1.2 * 1024 * 1024 * 1024
+function manterAncora(alvo, nivel) {
+  try {
+    if (cfg.ancoraAgente === false || cfg.soConversa || !cfg.unlimitedEmail || !alvo) return
+    const a = sessoes.get(ANCORA_ID)
+    if (a && !a.morto) return
+    if (os.freemem() < MEMORIA_MIN_ANCORA) return
+    Promise.resolve(chaveLocal()).then(async (chave) => {
+      if (sessoes.get(ANCORA_ID) && !sessoes.get(ANCORA_ID).morto) return
+      await ponteLLM.iniciar()
+      const s = new Sessao({ app, id: ANCORA_ID, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: chave + require('./ponte-llm').SEP + ANCORA_ID, raciocinio: cfg.raciocinio, nivel, emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => 'manual', midia: null })
+      s.fixa = true
+      s.modelo = alvo; s.racio = cfg.raciocinio; s.nivel = nivel; s.historico = ''
+      sessoes.set(ANCORA_ID, s)
+      s.pronta.then(() => registrarAgente(app, 'âncora do gateway pronta (mantém o Hermes aquecido entre chats)')).catch(() => sessoes.delete(ANCORA_ID))
+    }).catch((e) => registrarAgente(app, 'âncora do gateway: ' + (e.message || e)))
+  } catch {}
+}
 async function sessaoDoChat(id, alvo, contexto, historico) {
   // logo depois de entrar na conta, o app leva alguns segundos para ligá-la ao motor interno: a primeira mensagem espera
   // (em vez de sair com a chave ainda não aplicada e voltar "chave inválida")
@@ -343,6 +366,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   sessao.nivel = nivel
   sessao.historico = historico
   sessoes.set(id, sessao)
+  if (id !== ANCORA_ID) manterAncora(alvo, nivel) // o primeiro chat também sobe a âncora do gateway
   return sessao
 }
 async function responder(alvo, msgs, ctx) {

@@ -1125,6 +1125,7 @@ class Sessao {
   }
   agendarOcioso() {
     clearTimeout(this.ocioso)
+    if (this.fixa) return // sessão-âncora: fica de pé enquanto o app estiver aberto (mantém o gateway do Hermes vivo)
     this.ocioso = setTimeout(() => {
       if (this.ativo || this.turno) {
         registrar(this.app, 'sessão ociosa NÃO encerrada: há turno em andamento (adiada)')
