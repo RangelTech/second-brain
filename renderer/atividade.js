@@ -347,8 +347,40 @@
         const rad = 0.8 + 0.16 * Math.sin(t * m.w2 * vel + m.ph * 0.7)
         let x = CX + Math.cos(ang) * rxO * rad + 24 * Math.sin(t * 0.13 * vel + m.ph * 2)
         let y = CY + Math.sin(ang) * ryO * rad + 16 * Math.cos(t * 0.11 * vel + m.ph)
-        f.ix = Math.max(R0 + 18, Math.min(W - R0 - 18, x))
-        f.iy = Math.max(R0 + 18, Math.min(H - R0 - 18, y))
+        // alvo do passeio; a posição de verdade persegue o alvo (suave) e depois passa pela regra de não sobrepor, lá embaixo
+        const tx = Math.max(R0 + 18, Math.min(W - R0 - 18, x))
+        const ty = Math.max(R0 + 18, Math.min(H - R0 - 18, y))
+        if (f.px === undefined) (f.px = tx), (f.py = ty)
+        const seg = Math.min(1, dt * 2.2)
+        f.px += (tx - f.px) * seg
+        f.py += (ty - f.py) * seg
+      }
+      // REGRA: orbes nunca se sobrepõem. Qualquer par mais perto que os dois raios + folga é afastado ao longo da linha entre eles
+      // (3 passadas por quadro dão conta de grupos de 3 ou mais); depois volta para dentro da tela.
+      const minimo = (R0 + 5) * 2 + 16
+      for (let it = 0; it < 3; it++) {
+        for (let i = 0; i < ferr.length; i++) {
+          for (let j = i + 1; j < ferr.length; j++) {
+            const A = ferr[i], B = ferr[j]
+            let dx = B.px - A.px, dy = B.py - A.py
+            let d = Math.hypot(dx, dy)
+            if (d >= minimo) continue
+            if (d < 0.01) (dx = Math.cos(i + j)), (dy = Math.sin(i + j)), (d = 1)
+            const empurra = (minimo - d) / 2
+            A.px -= (dx / d) * empurra
+            A.py -= (dy / d) * empurra
+            B.px += (dx / d) * empurra
+            B.py += (dy / d) * empurra
+          }
+        }
+        for (const f of ferr) {
+          f.px = Math.max(R0 + 18, Math.min(W - R0 - 18, f.px))
+          f.py = Math.max(R0 + 18, Math.min(H - R0 - 18, f.py))
+        }
+      }
+      for (const f of ferr) {
+        f.ix = f.px
+        f.iy = f.py
         const aceso = f.ativo > 0 || (alvoAtivo > 0 && !algumaFerr && f.id === base)
         f.aceso = aceso
         f.liga = lerp(f.liga, aceso ? 1 : 0, 1 - Math.pow(0.0015, dt))
@@ -635,6 +667,7 @@
     }
     return {
       evento, pensar, iniciar, parar, tamanho, passo, modo, base: definirBase, limpar, estado: () => ({ ativo: alvoAtivo, base }),
+      orbes: () => ferr.map((f) => ({ id: f.id, x: f.ix, y: f.iy })), // diagnóstico (teste de não sobrepor)
       ativas: () => new Map(ferr.filter((f) => f.ativo).map((f) => [f.id, f.ativo]).concat(ferr.filter((f) => !f.ativo && f.liga >= 0).map((f) => [f.id, f.ativo]))),
       particulas: () => pacotes.length + estouros.length + (ferr.some((f) => f.ativo) ? 1 : 0),
       frase: () => fraseAtual,
