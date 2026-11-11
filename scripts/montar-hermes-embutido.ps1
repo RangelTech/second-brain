@@ -47,23 +47,30 @@ Pop-Location
 Copy-Item $sete (Join-Path $saida '7za.exe') -Force
 "pacote: {0} MB" -f [int]((Get-Item $arq).Length / 1MB)
 
-# Cache de pacotes do uv (opcional, 2o pacote): monta o ambiente Python numa pasta descartavel so para encher o cache, e o compacta. No PC do cliente o
-# ambiente e montado a partir dele, sem baixar nada. Qualquer falha aqui NAO derruba o instalador: ele so deixa de levar o cache (os pacotes sao baixados na 1a conversa).
+# Ambiente PRONTO (2o pacote): monta o ambiente Python/Node do Hermes na pasta de dados FIXA (C:\SegundoCerebro\d, a mesma que o app usa no cliente) e compacta so
+# o que e do ambiente (installs, environments, bin, install_id). No PC do cliente isso e descompactado e o agente ja nasce pronto, sem baixar nada (instalacao em
+# poucos minutos). Qualquer falha aqui NAO derruba o instalador: ele so deixa de levar o ambiente (o app monta pela internet, como antes).
 try {
-    $cache = Join-Path $env:TEMP 'sb-uv-cache'
-    Remove-Item -Recurse -Force $cache -ErrorAction SilentlyContinue
+    $home = 'C:\SegundoCerebro\d'
+    Remove-Item -Recurse -Force $home -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force $home | Out-Null
     $t1 = Get-Date
-    & node (Join-Path (Get-Location) 'scripts\aquecer-cache-uv.js') (Join-Path $raiz 'bin\hermes-acp.exe') $cache 30
-    if ($LASTEXITCODE -ne 0) { throw "aquecer-cache-uv falhou (codigo $LASTEXITCODE)" }
-    "cache montado em $([int]((Get-Date) - $t1).TotalMinutes) min"
-    $arqCache = Join-Path $saida 'uv-cache.7z'
-    Push-Location $cache
-    & $sete a -t7z -m0=lzma2 -mx=5 -mmt=on -bso0 -bsp0 $arqCache '*'
-    if ($LASTEXITCODE -ne 0) { throw "7za do cache falhou (codigo $LASTEXITCODE)" }
+    & node (Join-Path (Get-Location) 'scripts\montar-ambiente.js') (Join-Path $raiz 'bin\hermes-acp.exe') $home 40
+    if ($LASTEXITCODE -ne 0) { throw "montar-ambiente falhou (codigo $LASTEXITCODE)" }
+    "ambiente montado em $([int]((Get-Date) - $t1).TotalMinutes) min"
+    foreach ($d in 'cache', 'logs', 'sessions', 'memories', 'backups', 'image_cache', 'audio_cache', 'telemetry', 'pairing', 'cron', 'kanban', 'state', 'runtime', 'platforms', 'plugins', 'hooks', 'gateway', 'skills', 'source-checks', 'pending_messages', 'plugin-update-checks', '.curator_backups') {
+        Remove-Item -Recurse -Force (Join-Path $home $d) -ErrorAction SilentlyContinue
+    }
+    Get-ChildItem $home -File -Force | Where-Object { $_.Name -ne 'install_id' } | Remove-Item -Force -ErrorAction SilentlyContinue
+    "ambiente em disco: {0} MB" -f [int]((Get-ChildItem $home -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB)
+    $arqHome = Join-Path $saida 'home-win32-x64.7z'
+    Push-Location $home
+    & $sete a -t7z -m0=lzma2 -mx=5 -mmt=on -bso0 -bsp0 $arqHome '*'
+    if ($LASTEXITCODE -ne 0) { throw "7za do ambiente falhou (codigo $LASTEXITCODE)" }
     Pop-Location
-    "cache de pacotes: {0} MB" -f [int]((Get-Item $arqCache).Length / 1MB)
+    "ambiente compactado: {0} MB" -f [int]((Get-Item $arqHome).Length / 1MB)
 } catch {
-    Write-Warning "sem cache de pacotes no instalador: $_"
-    Remove-Item -Force (Join-Path $saida 'uv-cache.7z') -ErrorAction SilentlyContinue
+    Write-Warning "sem ambiente pronto no instalador: $_"
+    Remove-Item -Force (Join-Path $saida 'home-win32-x64.7z') -ErrorAction SilentlyContinue
     try { Pop-Location } catch {}
 }

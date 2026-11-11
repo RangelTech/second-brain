@@ -7,12 +7,13 @@ const path = require('path')
 const crypto = require('crypto')
 const { spawn, execFile } = require('child_process')
 
-const ORIGEM = {
-  versao: '0.2.9',
-  repo: 'jub0t/Concat', // trocar para RangelTech/segundo-cerebro-editor quando o fork publicar a release
-  // arquivo da release por sistema; hash conferido contra o SHA256SUMS da mesma release e, no Windows, também contra este valor fixo
-  win32: { arquivo: 'Concat-0.2.9-windows-x86_64-setup.exe', sha256: 'bc3e994a592d46c9dce037bf0b41e329de7b3821c25bc27717a8e0d5d34d1a0a', exe: 'concat.exe' },
-}
+// Origens da release, em ordem: o fork com o nome do Segundo Cérebro (RangelTech/segundo-cerebro-editor) e, se ele ainda não tiver release, o Concat
+// oficial (mesmo motor, só muda o nome da janela). O hash vem SEMPRE do SHA256SUMS da própria release; o do Concat oficial também é fixo aqui.
+const ORIGENS = [
+  { repo: 'RangelTech/segundo-cerebro-editor', tag: 'v0.2.9-sc.1', win32: { arquivo: 'SegundoCerebroEditor-0.2.9-windows-x86_64-setup.exe', sha256: '', exe: 'concat.exe' } },
+  { repo: 'jub0t/Concat', tag: 'v0.2.9', win32: { arquivo: 'Concat-0.2.9-windows-x86_64-setup.exe', sha256: 'bc3e994a592d46c9dce037bf0b41e329de7b3821c25bc27717a8e0d5d34d1a0a', exe: 'concat.exe' } },
+]
+const ORIGEM = { win32: ORIGENS[0].win32 } // só o nome do executável e o suporte por sistema são lidos daqui
 const NOME_EXIBIDO = 'Editor de vídeo do Segundo Cérebro'
 
 function pastaEditor(app) {
@@ -80,19 +81,33 @@ function instalar(app, progresso = () => {}) {
   if (instalado(app)) return Promise.resolve({ ok: true, ja: true })
   if (andamento) return andamento
   andamento = (async () => {
-    const o = ORIGEM[process.platform]
-    const base = `https://github.com/${ORIGEM.repo}/releases/download/v${ORIGEM.versao}/`
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-editor-'))
     try {
-      progresso({ etapa: 'Baixando o editor de vídeo (uma vez só)', fracao: 0 })
-      const arq = path.join(tmp, o.arquivo)
-      await baixar(base + o.arquivo, arq, (f) => progresso({ etapa: 'Baixando o editor de vídeo (uma vez só)', fracao: f * 0.85 }))
-      progresso({ etapa: 'Conferindo o arquivo', fracao: 0.87 })
-      const h = await sha256Arquivo(arq)
-      const sums = await fetch(base + 'SHA256SUMS', { signal: AbortSignal.timeout(60000) }).then((r) => (r.ok ? r.text() : '')).catch(() => '')
-      const esperadoRelease = (sums.split('\n').find((l) => l.includes(o.arquivo)) || '').trim().split(/\s+/)[0]
-      if (h !== o.sha256 && h !== esperadoRelease) throw new Error('O arquivo baixado não confere com a assinatura oficial (SHA-256). Não instalei.')
-      if (o.sha256 && esperadoRelease && esperadoRelease !== o.sha256 && h !== o.sha256) throw new Error('Assinatura divergente.')
+      let arq = ''
+      let ultimoErro = null
+      for (const origem of ORIGENS) {
+        const o = origem[process.platform]
+        if (!o) continue
+        const base = `https://github.com/${origem.repo}/releases/download/${origem.tag}/`
+        try {
+          progresso({ etapa: 'Baixando o editor de vídeo (uma vez só)', fracao: 0 })
+          arq = path.join(tmp, o.arquivo)
+          await baixar(base + o.arquivo, arq, (f) => progresso({ etapa: 'Baixando o editor de vídeo (uma vez só)', fracao: f * 0.85 }))
+          progresso({ etapa: 'Conferindo o arquivo', fracao: 0.87 })
+          const h = await sha256Arquivo(arq)
+          const sums = await fetch(base + 'SHA256SUMS', { signal: AbortSignal.timeout(60000) }).then((r) => (r.ok ? r.text() : '')).catch(() => '')
+          const esperadoRelease = (sums.split('\n').find((l) => l.includes(o.arquivo)) || '').trim().split(/\s+/)[0]
+          const aceitos = [o.sha256, esperadoRelease].filter(Boolean)
+          if (!aceitos.length || !aceitos.includes(h)) throw new Error('O arquivo baixado não confere com a assinatura oficial (SHA-256). Não instalei.')
+          ultimoErro = null
+          break
+        } catch (e) {
+          ultimoErro = e
+          arq = ''
+          if (/SHA-256/.test(String(e.message))) throw e // arquivo adulterado: não tenta outra origem em silêncio
+        }
+      }
+      if (!arq) throw ultimoErro || new Error('Não consegui baixar o editor de vídeo.')
       progresso({ etapa: 'Instalando o editor', fracao: 0.9 })
       const dir = pastaEditor(app)
       fs.mkdirSync(path.dirname(dir), { recursive: true })
@@ -110,7 +125,25 @@ function instalar(app, progresso = () => {}) {
 }
 
 // abre a janela do editor (a interface dele, em janela própria, não espremida no chat), já com o projeto do Hermes
+// Predefine o editor para o Segundo Cérebro: português e a automação ligada (é por ela que o Hermes conversa com a janela). O arquivo é JSON puro, SEM BOM
+// (com BOM o editor o descarta). Só mexe se o editor não estiver aberto, para não ser sobrescrito.
+function configDir() {
+  if (process.platform === 'win32') return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'app.concat.editor')
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', 'app.concat.editor')
+  return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'app.concat.editor')
+}
+function prepararConfig() {
+  const arq = path.join(configDir(), 'settings.json')
+  let j = {}
+  try { j = JSON.parse(fs.readFileSync(arq, 'utf8').replace(/^\uFEFF/, '')) } catch {}
+  const srv = j.server || {}
+  const novo = { ...j, locale: j.locale || 'pt-BR', server: { enabled: true, listen: srv.listen || '127.0.0.1:7420', token: srv.token || crypto.randomBytes(16).toString('hex') } }
+  fs.mkdirSync(path.dirname(arq), { recursive: true })
+  fs.writeFileSync(arq, JSON.stringify(novo, null, 2))
+  return novo
+}
 function abrirJanela(app, projeto) {
+  try { prepararConfig() } catch {}
   if (!instalado(app)) throw new Error('O editor ainda não foi instalado.')
   const args = projeto && fs.existsSync(projeto) ? ['--project', projeto] : []
   const p = spawn(caminhoExe(app), args, { detached: true, stdio: 'ignore', windowsHide: false })
@@ -124,7 +157,7 @@ function mcp(app, pastaTrabalho) {
   return {
     name: 'editor',
     command: caminhoExe(app),
-    args: ['--mcp', 'headless'],
+    args: ['--mcp', 'auto'], // com a janela aberta e a automação ligada fala por ela; sem janela roda sozinho
     env: [{ name: 'CONCAT_MCP_ROOTS', value: [pastaTrabalho, path.join(pastaTrabalho, 'Videos')].filter(Boolean).join(process.platform === 'win32' ? ';' : ':') }],
   }
 }
@@ -174,4 +207,4 @@ async function cortarSilencio(arquivo, { limiar = -35, minimo = 0.6, saida } = {
   return { arquivo: out, duracaoAntes: duracao, duracaoDepois: novo, trechos: som.length, cortado: +(duracao - novo).toFixed(2) }
 }
 
-module.exports = { ORIGEM, NOME_EXIBIDO, pastaEditor, caminhoExe, instalado, suportado, instalar, abrirJanela, mcp, cortarSilencio, trechosComSom, sha256Arquivo }
+module.exports = { ORIGENS, ORIGEM, prepararConfig, configDir, NOME_EXIBIDO, pastaEditor, caminhoExe, instalado, suportado, instalar, abrirJanela, mcp, cortarSilencio, trechosComSom, sha256Arquivo }

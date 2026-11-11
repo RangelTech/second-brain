@@ -17,7 +17,7 @@ test('o editor fica na pasta própria do Segundo Cérebro e o MCP só existe dep
     assert.strictEqual(E.mcp(fake, 'C:/trab'), null)
     fs.writeFileSync(E.caminhoExe(fake), 'x')
     const m = E.mcp(fake, 'C:/trab')
-    assert.deepStrictEqual([m.name, m.args], ['editor', ['--mcp', 'headless']])
+    assert.deepStrictEqual([m.name, m.args], ['editor', ['--mcp', 'auto']])
     assert.match(m.env[0].value, /trab/)
   } finally { delete process.env.SB_EDITOR_DIR }
 })
@@ -36,4 +36,27 @@ test('corte de silêncio de verdade (ffmpeg): 10 s com som em 0-3 e 6-8 viram ~5
   const r = await E.cortarSilencio(a)
   assert.ok(r.duracaoDepois > 4.5 && r.duracaoDepois < 6, 'duração ' + r.duracaoDepois)
   assert.strictEqual(r.trechos, 2)
+})
+
+test('configuração predefinida do editor: português, automação ligada, JSON sem BOM, preserva o resto', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cfgd-'))
+  process.env.APPDATA = dir; process.env.XDG_CONFIG_HOME = dir
+  try {
+    const pasta = E.configDir()
+    fs.mkdirSync(pasta, { recursive: true })
+    fs.writeFileSync(path.join(pasta, 'settings.json'), '﻿' + JSON.stringify({ accent: '#ff8800', locale: null, server: { enabled: false, listen: '127.0.0.1:7420', token: '' } }))
+    const novo = E.prepararConfig()
+    const bruto = fs.readFileSync(path.join(pasta, 'settings.json'), 'utf8')
+    assert.ok(!bruto.startsWith('﻿'))
+    assert.strictEqual(novo.locale, 'pt-BR')
+    assert.strictEqual(novo.server.enabled, true)
+    assert.match(novo.server.token, /^[0-9a-f]{32}$/)
+    assert.strictEqual(JSON.parse(bruto).accent, '#ff8800')
+    assert.strictEqual(E.prepararConfig().server.token, novo.server.token) // não troca o token a cada abertura
+  } finally { delete process.env.APPDATA; delete process.env.XDG_CONFIG_HOME }
+})
+test('origens: o fork com o nome do Segundo Cérebro vem primeiro e o Concat oficial é a reserva com hash fixo', () => {
+  assert.match(E.ORIGENS[0].repo, /segundo-cerebro-editor/)
+  assert.strictEqual(E.ORIGENS[1].repo, 'jub0t/Concat')
+  assert.match(E.ORIGENS[1].win32.sha256, /^[0-9a-f]{64}$/)
 })

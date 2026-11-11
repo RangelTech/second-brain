@@ -38,6 +38,8 @@ function embutido() {
   }
 }
 const RAIZ_FIXA = () => process.env.SB_HERMES_RAIZ || 'C:\\SegundoCerebro\\hermes'
+const HOME_FIXO = () => process.env.SB_HERMES_HOME_FIXO || 'C:\\SegundoCerebro\\d'
+const idDoUsuario = (dados) => crypto.createHash('sha1').update(String(dados).toLowerCase()).digest('hex').slice(0, 6)
 
 function curto(dados) {
   const id = crypto.createHash('sha1').update(String(dados).toLowerCase()).digest('hex').slice(0, 6) // varios usuarios no mesmo PC nao se misturam
@@ -45,7 +47,14 @@ function curto(dados) {
   for (const b of bases) {
     const raiz = path.join(b, id, 'h')
     if (raiz.length > (+process.env.SB_MAX_BASE || MAX_BASE)) continue
-    if (embutido() && b === 'C:\\SegundoCerebro' && gravavel(path.join(b, id))) return { raiz: RAIZ_FIXA(), home: path.join(b, id, 'd'), modo: 'embutido' }
+    // instalador completo: agente E ambiente prontos em pastas FIXAS (o ambiente grava caminhos absolutos). O 1º usuário do PC fica com o home fixo;
+    // outro usuário do mesmo PC cai no caminho por usuário (ambiente montado pela internet, como antes).
+    if (embutido() && b === 'C:\\SegundoCerebro' && gravavel(b)) {
+      let dono = ''
+      try { dono = fs.readFileSync(path.join(HOME_FIXO(), '.dono'), 'utf8').trim() } catch {}
+      if (!dono || dono === id) return { raiz: RAIZ_FIXA(), home: HOME_FIXO(), modo: 'embutido', id }
+      if (gravavel(path.join(b, id))) return { raiz: RAIZ_FIXA(), home: path.join(b, id, 'd'), modo: 'embutido-outro-usuario', id }
+    }
     if (gravavel(path.join(b, id))) return { raiz, home: path.join(b, id, 'd'), modo: 'curto' }
   }
   return null
@@ -78,15 +87,6 @@ function decidir(app) {
 
 const raizAgente = (app) => decidir(app).raiz
 const homeAgente = (app) => decidir(app).home
-// Cache de pacotes do uv que vem no instalador completo (uv-cache.7z): o ambiente do Hermes e montado a partir dele, sem baixar nada (UV_OFFLINE).
-const cacheUv = () => {
-  const p = process.env.SB_UV_CACHE || (process.platform === 'win32' ? 'C:\\SegundoCerebro\\uv-cache' : '')
-  try {
-    return p && fs.existsSync(path.join(p, '.completo')) ? p : ''
-  } catch {
-    return ''
-  }
-}
 const esquecer = () => (memo = null) // so para testes
 
-module.exports = { raizAgente, homeAgente, decidir, esquecer, MAX_BASE, embutido, cacheUv }
+module.exports = { raizAgente, homeAgente, decidir, esquecer, MAX_BASE, embutido, idDoUsuario, HOME_FIXO }

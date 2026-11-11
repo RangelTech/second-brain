@@ -45,7 +45,7 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
       try {
         fs.rmSync(arq, { force: true }) // ja descompactado e conferido: o pacote nao precisa ocupar disco duas vezes
       } catch {}
-      await extrairCacheUv(pasta, sete)
+      await extrairHomePronto(pasta, sete, raiz)
       return true
     } catch (e) {
       try {
@@ -56,27 +56,29 @@ function criar({ app, localizar, recursos = () => process.resourcesPath, executa
     }
   }
 
-  // cache de pacotes do uv (opcional): se nao der certo o app so baixa os pacotes na primeira conversa, como antes
-  async function extrairCacheUv(pasta, sete) {
-    const arq = path.join(pasta, 'uv-cache.7z')
-    const destino = process.env.SB_UV_CACHE || path.join(path.dirname(RAIZ_EMBUTIDA()), 'uv-cache')
+  // Ambiente PRONTO (home-win32-x64.7z: installs, environments, bin): montado no CI no mesmo caminho fixo. Extrai e marca como montado, então a primeira
+  // conversa não monta nada (nem baixa nada). Qualquer falha devolve false e o app monta o ambiente pela internet, como antes.
+  async function extrairHomePronto(pasta, sete, raiz) {
+    const arq = path.join(pasta, 'home-win32-x64.7z')
     if (!fs.existsSync(arq)) return false
+    const cam = require('./caminhos-hermes')
+    const dec = cam.decidir(app)
+    if (dec.modo !== 'embutido') return false // outro usuário do PC: o home fixo é de quem instalou primeiro
+    const home = dec.home
     try {
-      falar('copiando os pacotes do agente')
-      fs.rmSync(destino, { recursive: true, force: true })
-      fs.mkdirSync(destino, { recursive: true })
-      const x = await executar(sete, ['x', arq, '-o' + destino, '-y', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
+      falar('copiando o ambiente do agente')
+      fs.mkdirSync(home, { recursive: true })
+      const x = await executar(sete, ['x', arq, '-o' + home, '-y', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
       if (x.codigo !== 0) throw new Error('codigo ' + x.codigo)
-      fs.writeFileSync(path.join(destino, '.completo'), new Date().toISOString()) // so vale depois de terminar de descompactar
-      try {
-        fs.rmSync(arq, { force: true })
-      } catch {}
+      fs.writeFileSync(path.join(home, '.dono'), dec.id || cam.idDoUsuario(app.getPath('userData')))
+      const bin = path.join(raiz, 'bin', 'hermes-acp.exe')
+      const st = fs.statSync(bin) // mesma assinatura que o app confere em ambienteMontado (agent.js)
+      fs.writeFileSync(path.join(home, 'pronto.ok'), new Date().toISOString() + ' ' + st.size + '-' + Math.round(st.mtimeMs))
+      try { fs.rmSync(arq, { force: true }) } catch {}
       return true
     } catch (e) {
-      try {
-        fs.rmSync(destino, { recursive: true, force: true })
-      } catch {}
-      falar('o cache de pacotes falhou (' + String(e.message).slice(0, 60) + '); os pacotes serao baixados')
+      try { fs.rmSync(home, { recursive: true, force: true }) } catch {}
+      falar('o ambiente pronto falhou (' + String(e.message).slice(0, 60) + '); sera montado pela internet')
       return false
     }
   }
