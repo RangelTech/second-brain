@@ -1627,10 +1627,24 @@
   // ---------- navegador integrado ----------
   const NAV = window.sb.navegador
   let navAberto = false
-  function navPos() {
+  // A vista do navegador é uma camada NATIVA por cima da janela: precisa estar exatamente sobre o #nav-host. O ResizeObserver só avisa quando o
+  // TAMANHO muda; recolher a barra lateral (ou qualquer troca de colunas) move o painel sem mudar o tamanho e a vista ficava para trás, em cima do chat.
+  // Por isso, com o painel aberto, a posição é conferida a cada quadro e só é enviada quando muda.
+  let navUltimo = ''
+  let navLaco = 0
+  function navPos(forcar) {
     if (!navAberto) return
     const r = $('nav-host').getBoundingClientRect()
+    const chave = [r.x, r.y, r.width, r.height].map((n) => Math.round(n)).join(',')
+    if (forcar !== true && chave === navUltimo) return
+    navUltimo = chave
     NAV.limites({ x: r.x, y: r.y, width: r.width, height: r.height })
+  }
+  function navVigiar(sim) {
+    cancelAnimationFrame(navLaco)
+    if (!sim) return
+    const passo = () => { navPos(); navLaco = requestAnimationFrame(passo) }
+    navLaco = requestAnimationFrame(passo)
   }
   async function navAbrir(sim) {
     navAberto = !!sim
@@ -1638,7 +1652,9 @@
     $('app').classList.toggle('nav-aberto', !!sim)
     $('abrir-nav').classList.toggle('on', !!sim)
     await NAV.mostrar(!!sim)
-    if (sim) setTimeout(navPos, 80)
+    navUltimo = ''
+    navVigiar(!!sim)
+    if (sim) setTimeout(() => navPos(true), 80)
     if (window.__sbWeb) webNavLigar(!!sim)
   }
   // Versão web: a página roda na máquina (computador ou VM); aqui aparece uma captura ao vivo, e clique, rolagem e teclado
@@ -1743,8 +1759,10 @@
     $('nav-vazio').hidden = !!e.url
   })
   NAV.aoAbrirPainel(() => navAbrir(true))
-  new ResizeObserver(navPos).observe($('nav-host'))
-  window.addEventListener('resize', navPos)
+  new ResizeObserver(() => navPos(true)).observe($('nav-host'))
+  window.addEventListener('resize', () => navPos(true))
+  document.addEventListener('visibilitychange', () => navPos(true))
+  window.addEventListener('focus', () => navPos(true))
   window.addEventListener('sb-config-abriu', () => NAV.esconderTemp(true))
   window.addEventListener('sb-config-fechou', () => NAV.esconderTemp(false))
 

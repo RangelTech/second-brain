@@ -43,6 +43,9 @@
       "skills.js",
       "skills-repo.js",
       "remoto.js",
+      "oauth-janela.js",
+      "extensao-app.js",
+      "native-host.js",
       "hermes-instalar.js",
       "relatorio-instalacao.js",
       "caminhos-hermes.js",
@@ -118,6 +121,10 @@
       {
         "from": "mcp-navegador.js",
         "to": "mcp-navegador.js"
+      },
+      {
+        "from": "native-host.js",
+        "to": "native-host.js"
       },
       {
         "from": "modelos",

@@ -273,11 +273,16 @@
         if (a.status >= 300 || !a.json?.authUrl) throw new Error(erroDe(a))
         const auth = a.json
         const trocar = (code, state) => api('POST', `/api/oauth/${p.id}/exchange`, { code, redirectUri: auth.redirectUri || REDIRECT, codeVerifier: auth.codeVerifier, state: state || auth.state })
-        if (window.sb.oauthJanela) {
-          // app no computador: o login abre numa janela do próprio app e o retorno é pego sozinho
-          j.q('#m-area').innerHTML = `<div class="passo">Entre na janela que abriu. Quando terminar, ela fecha sozinha e a conta aparece aqui.</div>`
+        // web: se o Chrome do usuário está conectado pela extensão, o login abre nele e o retorno é pego sozinho (sem copiar e colar)
+        let viaExtensao = false
+        if (!window.sb.oauthJanela && window.sb.oauthExtensao && window.sb.extensao) {
+          try { const e = await window.sb.extensao.estado(); viaExtensao = !!(e && e.conectado && !e.pausada) } catch {}
+        }
+        if (window.sb.oauthJanela || viaExtensao) {
+          // app no computador: o login abre numa janela do próprio app; web: numa aba do Chrome do usuário. O retorno é pego sozinho
+          j.q('#m-area').innerHTML = viaExtensao ? `<div class="passo">Entre na aba que abriu no seu Chrome. Quando terminar, ela fecha sozinha e a conta aparece aqui.</div>` : `<div class="passo">Entre na janela que abriu. Quando terminar, ela fecha sozinha e a conta aparece aqui.</div>`
           btn.textContent = 'Aguardando você entrar…'
-          const r = await window.sb.oauthJanela({ url: auth.authUrl, retorno: auth.redirectUri || REDIRECT })
+          const r = viaExtensao ? await window.sb.oauthExtensao({ url: auth.authUrl, retorno: auth.redirectUri || REDIRECT, state: auth.state }) : await window.sb.oauthJanela({ url: auth.authUrl, retorno: auth.redirectUri || REDIRECT })
           if (parado) return
           if (!r || !r.ok) {
             if (r && r.fechada) {
@@ -296,7 +301,10 @@
         }
         window.sb.abrirExterno(auth.authUrl)
         j.q('#m-area').innerHTML = `<div class="passo">Depois de entrar, o navegador vai mostrar uma página de erro em <b>localhost:8080</b>. Isso é esperado: copie o endereço completo dessa página e cole aqui.</div>
+          <div class="passo mut" style="font-size:12px">Para não precisar copiar e colar nunca mais, instale a extensão do Chrome: <a href="#" id="m-ext-link">baixar a extensão</a>.</div>
           <div class="campo" style="margin-top:8px"><label for="m-url">Endereço de retorno</label><input type="text" id="m-url" placeholder="http://localhost:8080/callback?code=…"></div>`
+        const el = j.q('#m-ext-link')
+        if (el) el.onclick = (e) => (e.preventDefault(), window.sb.abrirExterno('https://brain.rangeltech.net/extensao/'))
         btn.textContent = 'Concluir'
         btn.disabled = false
         btn.onclick = async () => {
@@ -511,13 +519,13 @@
   // =====================================================================
   async function telaUso() {
     const r = await window.sb.contaUso()
-    const nt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' mi' : n >= 1e3 ? (n / 1e3).toFixed(1).replace('.', ',') + ' mil' : String(n ?? 0))
+    const nt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' mi' : n >= 1e3 ? (n / 1e3).toFixed(1).replace('.', ',') + ' mil' : String(Math.round(n ?? 0)))
     const reab = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : null)
     const janela = (titulo, sub, w) => {
       const lim = w && w.limit
       const pct = lim ? Math.min(100, Math.round(((w.used || 0) / lim) * 100)) : 0
       const cor = pct >= 90 ? '#e5484d' : pct >= 70 ? '#e0a030' : '#4caf7d'
-      return `<div class="kpi" style="grid-column:span 2"><span>${titulo} <small class="mut">${sub}</small></span>
+      return `<div class="kpi kpi-largo"><span>${titulo} <small class="mut">${sub}</small></span>
         <b>${lim ? pct + '% usado' : 'sem limite'}</b>
         ${lim ? `<div style="height:8px;border-radius:6px;background:var(--bd);margin:10px 0 6px"><div style="height:8px;border-radius:6px;width:${pct}%;background:${cor}"></div></div>
         <span class="mut">${nt(w.used)} de ${nt(lim)} tokens · restam ${nt(w.remaining)}</span>` : `<span class="mut">${nt(w && w.used)} tokens usados</span>`}
@@ -526,11 +534,57 @@
     $('.cfg-corpo').innerHTML = `
       <div class="cfg-cab"><div><h1>Uso</h1><p>O quanto da sua assinatura você já usou. A contagem é do servidor e vale para a sua conta, em todos os seus computadores.</p></div></div>
       ${r.ok ? `<div class="kpis">
-        <div class="kpi"><span>Conta</span><b style="font-size:16px">${esc(r.email)}</b></div>
+        <div class="kpi"><span>Conta</span><b class="kpi-email" title="${esc(r.email)}">${esc(r.email)}</b></div>
         <div class="kpi"><span>Plano</span><b>${esc(r.plano || '—')}</b></div>
         ${janela('Janela atual', '(5 horas)', r.session)}
         ${janela('Semana', '(7 dias)', r.week)}
-      </div>` : `<p class="mut">${esc(r.erro || 'Não consegui ler o uso agora.')}</p>`}`
+      </div>` : `<p class="mut">${esc(r.erro || 'Não consegui ler o uso agora.')}</p>`}
+      <div class="cfg-cab" style="margin-top:28px"><div><h2 style="margin:0">Uso por IA</h2><p>Quanto cada IA conectada trabalhou neste computador: Claude, ChatGPT, Gemini e a nossa. Os números vêm do motor de provedores do aplicativo.</p></div>
+        <div class="uso-periodo" role="group" aria-label="Período"><button data-p="24h">24 horas</button><button data-p="7d" class="on">7 dias</button><button data-p="30d">30 dias</button></div></div>
+      <div id="uso-prov"><p class="mut">Carregando…</p></div>`
+    const pintarProv = async (periodo) => {
+      const alvo = $('#uso-prov')
+      if (!alvo) return
+      document.querySelectorAll('.uso-periodo button').forEach((b) => b.classList.toggle('on', b.dataset.p === periodo))
+      let st
+      let nos = new Map()
+      try {
+        const n = await window.sb.api('GET', '/api/provider-nodes')
+        nos = new Map(((n && (n.nodes || (n.json && n.json.nodes))) || []).map((x) => [x.id, x]))
+      } catch (e) { /* sem os nomes dos provedores personalizados: mostra o id */ }
+      try {
+        st = await window.sb.api('GET', '/api/usage/stats?period=' + periodo)
+        if (st && st.json && !st.byProvider) st = st.json
+      } catch (e) {
+        alvo.innerHTML = '<p class="mut">Não consegui ler o uso das IAs agora.</p>'
+        return
+      }
+      const nomeDe = (id) => {
+        const k = String(id || '')
+        const no = nos.get(k)
+        if (no) return /unlimited/i.test(no.name || '') || no.prefix === UNLIMITED.prefixo ? 'Unlimited (Rangel Tech)' : no.name || no.prefix || k
+        if (k === UNLIMITED.prefixo || /rangeltech|unlimited/i.test(k)) return 'Unlimited (Rangel Tech)'
+        const p = POR_ID[k] || POR_ID[k.replace(/-.*/, '')]
+        return (p && p.nome) || k || 'Outro'
+      }
+      const linhas = Object.entries((st && st.byProvider) || {}).map(([id, v]) => ({ nome: nomeDe(id), pedidos: v.requests || 0, tokens: (v.promptTokens || 0) + (v.completionTokens || 0), entrada: v.promptTokens || 0, saida: v.completionTokens || 0, custo: v.cost || 0 }))
+      // o mesmo provedor pode vir por mais de um id (apelido e id): soma
+      const por = new Map()
+      for (const l of linhas) { const a = por.get(l.nome) || { nome: l.nome, pedidos: 0, tokens: 0, entrada: 0, saida: 0, custo: 0 }; for (const k of ['pedidos', 'tokens', 'entrada', 'saida', 'custo']) a[k] += l[k]; por.set(l.nome, a) }
+      const lista = [...por.values()].filter((l) => l.pedidos || l.tokens).sort((a, b) => b.tokens - a.tokens)
+      if (!lista.length) { alvo.innerHTML = '<p class="mut">Nenhum uso neste período. Quando você conversar usando o Claude, o ChatGPT ou outra IA conectada, ela aparece aqui.</p>'; return }
+      const maior = Math.max(1, ...lista.map((l) => l.tokens))
+      const tot = lista.reduce((s, l) => s + l.tokens, 0)
+      const ped = lista.reduce((s, l) => s + l.pedidos, 0)
+      const modelos = Object.entries((st && st.byModel) || {}).map(([m, v]) => ({ m: (v.meta && v.meta.rawModel) || m.split('|')[0], p: nomeDe(m.split('|')[1] || (v.meta && v.meta.provider)), n: v.requests || 0, t: (v.promptTokens || 0) + (v.completionTokens || 0) })).filter((x) => x.n).sort((a, b) => b.t - a.t).slice(0, 8)
+      alvo.innerHTML = `<div class="uso-total mut">${nt(tot)} tokens em ${ped} pedidos</div>
+        <div class="uso-lista">${lista.map((l) => `<div class="uso-linha"><div class="uso-nome"><b>${esc(l.nome)}</b><span class="mut">${l.pedidos} pedidos · ${nt(l.entrada)} enviados · ${nt(l.saida)} recebidos${l.custo > 0.005 ? ' · ~US$ ' + l.custo.toFixed(2) + ' no preço de tabela' : ''}</span></div>
+          <div class="uso-barra"><i style="width:${Math.max(3, Math.round((l.tokens / maior) * 100))}%"></i></div><div class="uso-tok">${nt(l.tokens)}</div></div>`).join('')}</div>
+        ${modelos.length ? `<h3 style="margin:20px 0 8px;font-size:14px">Modelos mais usados</h3><div class="uso-lista">${modelos.map((x) => `<div class="uso-linha"><div class="uso-nome"><b>${esc(x.m)}</b><span class="mut">${esc(x.p)} · ${x.n} pedidos</span></div><div class="uso-tok">${nt(x.t)}</div></div>`).join('')}</div>` : ''}
+        <p class="mut" style="margin-top:12px;font-size:12px">O que você usa pelo Claude, ChatGPT e outras contas conta no limite delas, não no da assinatura do Segundo Cérebro. Só o que passa pelo Unlimited (nossa IA) conta nas janelas acima.</p>`
+    }
+    document.querySelectorAll('.uso-periodo button').forEach((b) => (b.onclick = () => pintarProv(b.dataset.p)))
+    pintarProv('7d')
   }
 
   // =====================================================================

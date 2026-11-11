@@ -520,6 +520,8 @@ app.whenReady().then(() => {
     janela: () => janela,
     avisar: (e) => janela?.webContents.send('navegador:estado', e),
     pedirPainel: () => janela?.webContents.send('navegador:abrir-painel'),
+    extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
+    modoServidor: MODO_SERVIDOR,
   })
   nav.iniciarServidor().then((i) => (navInfo = i))
   ipcMain.handle('navegador:limites', (_e, l) => nav.definirLimites(l))
@@ -800,6 +802,31 @@ app.whenReady().then(() => {
       if (!fn) throw new Error('Ação não disponível.')
       return fn({ sender }, ...args)
     },
+  })
+  // ---- extensão do Chrome (spec 25 §7): pareamento pelo app (mensageria nativa), estado e login de provedor pelo Chrome do usuário
+  const extApp = require('./extensao-app')
+  extApp.iniciarServidor({ pasta: app.getPath('userData'), pareamento: () => remoto.extensao.pareamento() }).catch(() => {})
+  try {
+    extApp.registrar({ pasta: app.getPath('userData'), execPath: process.execPath, scriptHost: path.join(app.isPackaged ? process.resourcesPath : __dirname, 'native-host.js') })
+  } catch {}
+  ipcMain.handle('extensao:estado', () => ({ ...remoto.extensao.estado(), link: extApp.LINK_EXTENSAO }))
+  // "Conectar o Chrome": liga o acesso web (a extensão fala pela ponte) e abre o site já com o pareamento no endereço (#sbp=..., que nunca vai ao servidor)
+  ipcMain.handle('extensao:conectar', async () => {
+    try {
+      if (!remoto.estado().ativo) await remoto.ativar(true)
+      const p = await remoto.extensao.pareamento()
+      await shell.openExternal(`${p.base}/#sbp=${encodeURIComponent(p.token)}`)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, erro: String(e.message || e) }
+    }
+  })
+  // login de provedor pelo Chrome do usuário: a extensão abre a página de login, pega o retorno em localhost e devolve o código
+  ipcMain.handle('oauth:extensao', async (_e, { url, retorno, state } = {}) => {
+    if (!/^https:\/\//i.test(url || '') || !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(retorno || '')) return { ok: false, erro: 'Endereço inválido' }
+    const r = await remoto.extensao.executar('oauth_capturar', { authUrl: url, retorno, state }, 15 * 60 * 1000)
+    if (r.ok) return { ok: true, code: r.dado.code, state: r.dado.state, url: r.dado.url }
+    return { ok: false, fechada: r.erro === 'fechada', semExtensao: ['sem_extensao', 'pausado', 'desconectada'].includes(r.codigo), erro: r.erro }
   })
   ipcMain.handle('acessoweb:estado', () => remoto.estado())
   ipcMain.handle('acessoweb:ativar', (_e, sim) => remoto.ativar(sim))

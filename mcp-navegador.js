@@ -7,6 +7,7 @@ const URL_APP = process.env.SB_NAV_URL
 const TOKEN = process.env.SB_NAV_TOKEN
 
 const obj = (props, req = []) => ({ type: 'object', properties: props, required: req })
+const ONDE = { type: 'string', enum: ['auto', 'integrado', 'chrome'], description: 'Onde executar. Omita (auto): no aplicativo instalado usa o navegador integrado; na versão web usa o Chrome do usuário (extensão). Use "chrome" quando o usuário pedir o Chrome dele ou precisar das contas já abertas lá; "integrado" para o navegador do aplicativo.' }
 const FERRAMENTAS = [
   { nome: 'abrir', desc: 'Abre um endereço no navegador integrado (o usuário vê a página ao lado do chat).', schema: obj({ url: { type: 'string', description: 'Endereço, por exemplo https://exemplo.com ou localhost:8080' } }, ['url']) },
   { nome: 'ler', desc: 'Lê a página atual: título, texto visível e a lista numerada de elementos clicáveis (links, botões, campos). Use os números em navegador_clicar e navegador_digitar. Rode de novo depois de cada ação que muda a página.', schema: obj({}) },
@@ -16,6 +17,7 @@ const FERRAMENTAS = [
   { nome: 'voltar', desc: 'Volta uma página no histórico.', schema: obj({}) },
   { nome: 'esperar', desc: 'Espera alguns milissegundos (máximo 15000), útil depois de uma ação que carrega conteúdo.', schema: obj({ ms: { type: 'number' } }) },
   { nome: 'js', desc: 'Executa JavaScript na página e devolve o resultado. O código é o corpo de uma função assíncrona: use return para devolver algo.', schema: obj({ codigo: { type: 'string' } }, ['codigo']) },
+  { nome: 'chrome_estado', desc: 'Diz se o Chrome do usuário está conectado pela extensão (e se está pausada), qual é o navegador padrão e o link para baixar a extensão. Rode antes de usar onde="chrome" ou quando o usuário perguntar sobre a extensão.', schema: obj({}) },
   { nome: 'print', desc: 'Tira uma captura de tela da página e salva num arquivo PNG. Devolve o caminho; use vision_analyze nele para olhar a imagem.', schema: obj({}) },
 ]
 
@@ -31,7 +33,7 @@ async function tratar(msg) {
   if (method === 'initialize') return enviar({ jsonrpc: '2.0', id, result: { protocolVersion: params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'navegador', version: '1.0.0' } } })
   if (method === 'notifications/initialized' || (method && method.startsWith('notifications/'))) return
   if (method === 'ping') return enviar({ jsonrpc: '2.0', id, result: {} })
-  if (method === 'tools/list') return enviar({ jsonrpc: '2.0', id, result: { tools: FERRAMENTAS.map((f) => ({ name: 'navegador_' + f.nome, description: f.desc, inputSchema: f.schema })) } })
+  if (method === 'tools/list') return enviar({ jsonrpc: '2.0', id, result: { tools: FERRAMENTAS.map((f) => ({ name: 'navegador_' + f.nome, description: f.desc, inputSchema: f.nome === 'esperar' || f.nome === 'chrome_estado' ? f.schema : { ...f.schema, properties: { ...f.schema.properties, onde: ONDE } } })) } })
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^navegador_/, '')
     try {

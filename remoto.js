@@ -11,7 +11,7 @@ const URL_PADRAO = process.env.SB_REMOTO_URL || 'https://remoto.rangeltech.net'
 const RENDERER = path.join(__dirname, 'renderer')
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' }
 // o que a tela web NÃO pode pedir ao app (abre janela, pasta ou programa no computador, ou mexe no próprio acesso web)
-const BLOQUEADOS = new Set(['pasta:escolher', 'oauth:janela', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado', 'ditado:modelo', 'ditado:whisper', 'ditado:whisper-aquecer'])
+const BLOQUEADOS = new Set(['pasta:escolher', 'oauth:janela', 'extensao:conectar', 'arquivo:abrir', 'arquivo:mostrar', 'logs:abrir', 'dados:exportar', 'dados:importar', 'externo:abrir', 'acessoweb:ativar', 'acessoweb:renomear', 'acessoweb:estado', 'ditado:modelo', 'ditado:whisper', 'ditado:whisper-aquecer'])
 // eventos do app que a tela web também recebe (o resto vai só para quem fez a chamada)
 const EVENTOS_ESPELHADOS = new Set(['chats:mudou', 'skills:mudou', 'unlimited:estado', 'navegador:estado', 'navegador:abrir-painel', 'midia:pronta'])
 
@@ -40,6 +40,13 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
 
   let ws = null
   let conectado = false
+  // extensão do Chrome da MESMA conta (a ponte repassa os comandos): estado e pedidos pendentes
+  let ext = { conectado: false, pausada: false, nome: '', versao: '' }
+  const extPend = new Map() // rid -> { resolve, timer }
+  const extFalhar = (codigo, erro) => {
+    for (const [rid, p] of extPend) { clearTimeout(p.timer); extPend.delete(rid); p.resolve({ ok: false, codigo, erro }) }
+  }
+  const extAvisar = () => { janela()?.webContents.send('extensao:estado', ext); enviar({ t: 'ev', canal: 'extensao:estado', dados: ext }) } // também para a versão web
   let erro = ''
   let tentativas = 0
   let religar = null
@@ -109,12 +116,26 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
         erro = ''
         return avisar()
       }
+      if (m.t === 'ext-estado') {
+        ext = { conectado: !!m.conectado, pausada: !!m.pausada, nome: String(m.nome || ''), versao: String(m.versao || '') }
+        return extAvisar()
+      }
+      if (m.t === 'ext-r') {
+        const p = extPend.get(m.rid)
+        if (!p) return
+        clearTimeout(p.timer)
+        extPend.delete(m.rid)
+        return p.resolve({ ok: !!m.ok, dado: m.dado, erro: m.erro, codigo: m.codigo })
+      }
       if (m.t === 'http') return responderHttp(m)
       if (m.t === 'inv') return chamar(m)
     })
     meu.on('close', (codigo) => {
       if (ws !== meu) return
       conectado = false
+      ext = { conectado: false, pausada: false, nome: '', versao: '' }
+      extFalhar('desconectada', 'A conexão com a ponte caiu.')
+      extAvisar()
       if (codigo === 4004) erro = 'Sua assinatura não está ativa.'
       else if (codigo === 4002) erro = 'Este computador foi conectado em outro lugar.'
       avisar()
@@ -145,12 +166,38 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
     const w = ws
     ws = null
     conectado = false
+    ext = { conectado: false, pausada: false, nome: '', versao: '' }
+    extFalhar('desconectada', 'O acesso web foi desligado.')
     try {
       w?.close()
     } catch {}
   }
 
+  // manda um comando à extensão do Chrome da conta e espera a resposta: { ok, dado, erro, codigo }. Falhas de transporte (sem_extensao,
+  // pausado, desconectada, timeout) têm `codigo`; erro da própria ferramenta (elemento sumiu, página recusou) vem só com `erro`.
+  function extExecutar(acao, args = {}, ms = 30000) {
+    return new Promise((resolve) => {
+      if (!conectado) return resolve({ ok: false, codigo: 'sem_extensao', erro: 'O acesso web está desligado ou sem conexão.' })
+      if (!ext.conectado) return resolve({ ok: false, codigo: 'sem_extensao', erro: 'Nenhum Chrome conectado.' })
+      if (ext.pausada) return resolve({ ok: false, codigo: 'pausado', erro: 'A extensão está pausada.' })
+      const rid = 'x' + crypto.randomBytes(6).toString('hex')
+      const timer = setTimeout(() => { extPend.delete(rid); resolve({ ok: false, codigo: 'timeout', erro: 'A extensão não respondeu a tempo.' }) }, ms + 3000)
+      extPend.set(rid, { resolve, timer })
+      enviar({ t: 'ext-cmd', rid, acao, args })
+    })
+  }
+  // pede à ponte um pareamento da extensão para esta conta (usado pelo host nativo e pelo botão "Conectar o Chrome")
+  async function extPareamento() {
+    const k = await Promise.resolve(chave()).catch(() => '')
+    if (!k) throw new Error('Entre na sua conta no Segundo Cérebro.')
+    const r = await fetch(cfg.url + '/api/extensao/parear-app', { method: 'POST', headers: { Authorization: 'Bearer ' + k }, signal: AbortSignal.timeout(15000) })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || !j.token) throw new Error(j.erro || 'A ponte não aceitou o pareamento.')
+    return { token: j.token, base: cfg.url }
+  }
+
   return {
+    extensao: { estado: () => ({ ...ext, acessoWeb: conectado }), executar: extExecutar, pareamento: extPareamento, disponivel: () => conectado && ext.conectado && !ext.pausada },
     estado,
     async ativar(sim) {
       cfg.ativo = !!sim

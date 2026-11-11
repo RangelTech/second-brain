@@ -102,3 +102,6 @@ Ferramentas: `navegador_abrir`, `navegador_ler`, `navegador_clicar`, `navegador_
 - Se algo falhar, mude o caminho: outro endereço, a busca do próprio site, a busca do Google, outro seletor. Duas ou três tentativas diferentes antes de dizer que não deu.
 - Termine sempre dizendo o que foi feito e mostrando o resultado (os dados lidos, o link da publicação, a mensagem enviada).
 - Sites mudam de layout com frequência. Os nomes aqui são pistas: confirme com `navegador_ler` ou o print antes de agir.
+
+## Chrome do usuário (melhor para redes sociais)
+Instagram, WhatsApp Web, TikTok e Facebook desconfiam de navegador novo e pedem login. No **Chrome do usuário** (extensão, `onde: "chrome"`) as contas dele já estão abertas e não há bloqueio de robô: prefira-o quando o usuário tiver a extensão conectada (`navegador_chrome_estado`), e sempre na versão web. Sem a extensão, mande o link **https://brain.rangeltech.net/extensao/** e explique em uma frase o porquê. Regras de cuidado (conferir com print antes de enviar, só na aba "Segundo Cérebro") na skill `navegador-do-usuario`.

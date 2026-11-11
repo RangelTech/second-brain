@@ -26,7 +26,13 @@
       api: (metodo, rota, corpo) => invoke('router:api', { metodo, rota, corpo }),
       modelos: () => invoke('modelos:listar'),
       abrirExterno: (url) => (extras.abrirExterno ? extras.abrirExterno(url) : invoke('externo:abrir', url)),
-      oauthJanela: extras.abrirExterno ? null : (p) => invoke('oauth:janela', p), // na web o login volta para outro computador: segue copiar e colar
+      oauthJanela: extras.abrirExterno ? null : (p) => invoke('oauth:janela', p), // app instalado: o login abre numa janela do app
+      oauthExtensao: (p) => invoke('oauth:extensao', p), // web (e app com Chrome conectado): o login abre no Chrome do usuário, pela extensão
+      extensao: {
+        estado: () => invoke('extensao:estado'),
+        conectar: () => (extras.abrirExterno ? Promise.resolve({ ok: false, erro: 'Use o aplicativo ou o site do remoto para conectar.' }) : invoke('extensao:conectar')),
+        aoEstado: (fn) => on('extensao:estado', fn),
+      },
       anexar: (p) => invoke('anexo:salvar', p),
       anexoInicio: (p) => invoke('anexo:inicio', p),
       anexoPedaco: (p) => invoke('anexo:pedaco', p),

@@ -187,3 +187,20 @@
 .linha-nome input{min-width:0;width:min(220px,100%)}
 .linha-rem a.btn-pri{display:inline-block;padding:7px 12px;border-radius:8px;text-decoration:none;border:1px solid var(--ac);white-space:nowrap;cursor:pointer}
 .linha-nome input{color:var(--fg)}
+
+/* Uso: o e-mail longo quebra dentro do card; as IAs aparecem com barra proporcional */
+.kpi{min-width:0;overflow:hidden}
+.kpi-email{display:block;font-size:15px !important;overflow-wrap:anywhere;word-break:break-all;line-height:1.3}
+.kpi-largo{grid-column:span 2}
+@media (max-width:700px){.kpi-largo{grid-column:span 1}}
+.uso-periodo{display:flex;gap:6px;flex:none}
+.uso-periodo button{padding:6px 12px;border-radius:999px;border:1px solid var(--bd);background:transparent;color:var(--mut);cursor:pointer;font:inherit;font-size:13px}
+.uso-periodo button.on{background:var(--card);color:var(--fg);border-color:var(--mut)}
+.uso-total{margin:0 0 10px;font-size:14px}
+.uso-lista{display:flex;flex-direction:column;gap:8px}
+.uso-linha{display:grid;grid-template-columns:minmax(180px,1.3fr) minmax(80px,1fr) 70px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 14px}
+.uso-nome{display:flex;flex-direction:column;min-width:0}.uso-nome span{font-size:12px}
+.uso-barra{height:8px;border-radius:6px;background:var(--bd);overflow:hidden}.uso-barra i{display:block;height:8px;border-radius:6px;background:linear-gradient(90deg,#c97a3a,#ffb36b)}
+.uso-tok{text-align:right;font-variant-numeric:tabular-nums}
+.uso-linha:has(.uso-nome):not(:has(.uso-barra)){grid-template-columns:1fr 70px}
+@media (max-width:700px){.uso-linha{grid-template-columns:1fr 60px}.uso-barra{display:none}}

@@ -30,7 +30,11 @@ const path = require('path')
 const MAX_TEXTO = 14000
 const TEMPO_CARGA_MS = 35000
 
-function criar({ app, janela, avisar, pedirPainel }) {
+const LINK_EXTENSAO = 'https://brain.rangeltech.net/extensao/'
+// falhas de TRANSPORTE da extensão (nada chegou a rodar no Chrome); erro da própria ferramenta (elemento sumiu) não entra aqui
+const FALHAS_TRANSPORTE = new Set(['sem_extensao', 'pausado', 'desconectada', 'timeout'])
+
+function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false }) {
   const token = crypto.randomBytes(24).toString('hex')
   const pastaCaps = path.join(app.getPath('userData'), 'navegador-capturas')
   let vista = null
@@ -240,12 +244,63 @@ function criar({ app, janela, avisar, pedirPainel }) {
     },
   }
 
+  // ---- Chrome do usuário (extensão): mesma lista de ferramentas, executada no Chrome dele, com as sessões que ele já tem
+  function salvarCaptura(png64) {
+    fs.mkdirSync(pastaCaps, { recursive: true })
+    const arq = path.join(pastaCaps, `captura-${Date.now()}.png`)
+    fs.writeFileSync(arq, Buffer.from(png64, 'base64'))
+    return arq
+  }
+  async function viaExtensao(nome, args) {
+    const ext = extensao()
+    if (!ext) return { falhou: 'sem_extensao', erro: 'Extensão indisponível.' }
+    const a = { ...args }
+    delete a.onde
+    if (nome === 'abrir') a.url = resolverEntrada(a.url)
+    const r = await ext.executar(nome, a, nome === 'abrir' ? 45000 : 30000)
+    if (r.ok) {
+      const d = r.dado || {}
+      if (d.imagem) {
+        const arq = salvarCaptura(d.imagem)
+        return { texto: `Captura salva em ${arq} (${d.largura || '?'}x${d.altura || '?'}). Use vision_analyze nesse caminho para olhar a imagem.`, imagem: d.imagem, arquivo: arq }
+      }
+      return d
+    }
+    if (FALHAS_TRANSPORTE.has(r.codigo)) return { falhou: r.codigo, erro: r.erro }
+    throw new Error(r.erro || 'A extensão do Chrome falhou.')
+  }
+  function textoSemChrome(falhou) {
+    const motivo = falhou === 'pausado' ? 'A extensão do Chrome está pausada pelo usuário.' : falhou === 'timeout' ? 'O Chrome do usuário não respondeu a tempo.' : 'Não há Chrome conectado ao Segundo Cérebro.'
+    return `${motivo} Para usar o Chrome do usuário (com as contas dele já abertas), ele precisa instalar a extensão e conectar: ${LINK_EXTENSAO} (baixar, abrir chrome://extensions, ligar o Modo do desenvolvedor, Carregar sem compactação e clicar em Entrar no ícone). Mande esse link ao usuário. Se ele preferir, use o navegador integrado repetindo a ferramenta com onde="integrado".`
+  }
+  const estadoChrome = () => {
+    const ext = extensao()
+    const e = ext ? ext.estado() : { conectado: false }
+    return { texto: JSON.stringify({ chrome_conectado: !!e.conectado, pausado: !!e.pausada, nome: e.nome || '', acesso_web_ligado: !!e.acessoWeb, onde_padrao: modoServidor ? 'chrome' : 'integrado', link_extensao: LINK_EXTENSAO }) }
+  }
+
+  // onde roda cada ferramenta (spec 25 §7.12): no APP instalado o padrão é o navegador integrado (o usuário só vai para o Chrome dele se pedir,
+  // com onde="chrome"); na WEB/VM o padrão é sempre a extensão. Só falha de transporte da extensão pode cair no integrado, e só no modo "auto" do app.
   async function atender(nome, args) {
+    args = args || {}
+    if (nome === 'chrome_estado') return estadoChrome()
+    const onde = ['integrado', 'chrome'].includes(args.onde) ? args.onde : 'auto'
+    const querChrome = nome !== 'esperar' && (onde === 'chrome' || (onde === 'auto' && modoServidor))
+    if (querChrome) {
+      marcarControle()
+      try {
+        const r = await viaExtensao(nome, args)
+        if (!r.falhou) return r
+        throw new Error(textoSemChrome(r.falhou))
+      } finally {
+        marcarControle()
+      }
+    }
     const f = ferramentas[nome]
     if (!f) throw new Error('Ferramenta desconhecida: ' + nome)
     marcarControle()
     try {
-      return await f(args || {})
+      return await f(args)
     } finally {
       marcarControle()
     }
@@ -281,6 +336,7 @@ function criar({ app, janela, avisar, pedirPainel }) {
     mostrar,
     esconderTemporario,
     atender,
+    viaExtensao,
     // painel da versão web: captura leve (JPEG) da página e entradas diretas do usuário (não marca "controle do agente")
     async captura() {
       garantir()
