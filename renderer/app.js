@@ -1368,13 +1368,31 @@
   })
   // o agente está sendo preparado (primeira abertura, ou depois de uma instalação que não terminou): tela de carregamento com o cérebro animado,
   // o passo atual e o tempo, no lugar do chat. Impede a pessoa de mandar um pedido que ficaria minutos "enviando"; some sozinha quando termina.
-  const preparo = { el: null, card: null, t0: 0, relogio: 0, ciclo: 0, i: 0 }
+  const preparo = { el: null, card: null, t0: 0, relogio: 0, ciclo: 0, i: 0, texto: '', est: null }
+  const ultimaDuracaoPreparo = () => { try { return +localStorage.getItem('sb.preparoMs') || 0 } catch { return 0 } }
+  function pintarProgresso() {
+    const el = preparo.el
+    if (!el || !window.SBPreparo) return
+    preparo.est = window.SBPreparo.estimar(preparo.est, { texto: preparo.texto, decorridoMs: Date.now() - preparo.t0, ultimaDuracaoMs: ultimaDuracaoPreparo() })
+    const pct = Math.round(preparo.est.pct)
+    el.querySelector('.sbp-barra > i').style.width = pct + '%'
+    el.querySelector('.sbp-barra').setAttribute('aria-valuenow', String(pct))
+    el.querySelector('.sbp-pct').textContent = pct + '%'
+    el.querySelector('.sbp-resta').textContent = 'faltam ' + window.SBPreparo.textoRestante(preparo.est.restanteMs)
+  }
   function fecharPreparo() {
+    if (preparo.el && preparo.t0) { try { localStorage.setItem('sb.preparoMs', String(Date.now() - preparo.t0)) } catch {} } // aprende o tempo desta máquina
+    if (preparo.el) { // termina em 100% antes de sumir
+      const el = preparo.el
+      try { el.querySelector('.sbp-barra > i').style.width = '100%'; el.querySelector('.sbp-pct').textContent = '100%'; el.querySelector('.sbp-resta').textContent = 'pronto' } catch {}
+      el.classList.add('sbp-saindo')
+      setTimeout(() => el.remove(), 700)
+      preparo.el = null
+    }
     clearInterval(preparo.relogio)
     clearInterval(preparo.ciclo)
     preparo.card?.parar()
-    preparo.el?.remove()
-    Object.assign(preparo, { el: null, card: null })
+    Object.assign(preparo, { el: null, card: null, texto: '', est: null })
   }
   window.sb.aoPreparando?.((t) => {
     if (!t) return fecharPreparo()
@@ -1384,7 +1402,7 @@
       el.id = 'sb-preparando'
       el.setAttribute('role', 'status')
       el.className = 'sb-preparando'
-      el.innerHTML = '<div class="sbp-caixa"><canvas class="sbp-canvas" aria-hidden="true"></canvas><h2>Preparando o seu assistente</h2><p class="sbp-passo"></p><p class="sbp-dica">Isso acontece só na primeira vez e leva alguns minutos. Pode deixar o aplicativo aberto: ele avisa quando terminar.</p><p class="sbp-tempo"></p></div>'
+      el.innerHTML = '<canvas class="sbp-canvas" aria-hidden="true"></canvas><div class="sbp-caixa"><h2>Preparando o seu assistente</h2><p class="sbp-passo"></p><div class="sbp-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progresso da preparação"><i></i></div><div class="sbp-linha"><b class="sbp-pct">0%</b><span class="sbp-resta"></span></div><p class="sbp-dica">Isso acontece só na primeira vez. Pode deixar o aplicativo aberto: ele avisa quando terminar.</p><p class="sbp-tempo"></p></div>'
       document.body.appendChild(el)
       preparo.el = el
       preparo.t0 = Date.now()
@@ -1403,10 +1421,13 @@
       }
       preparo.relogio = setInterval(() => {
         const q = el.querySelector('.sbp-tempo')
-        if (q) q.textContent = fmtTempo(Date.now() - preparo.t0)
+        if (q) q.textContent = 'Há ' + fmtTempo(Date.now() - preparo.t0)
+        pintarProgresso()
       }, 1000)
     }
     preparo.el.querySelector('.sbp-passo').textContent = passo ? passo.charAt(0).toUpperCase() + passo.slice(1) + '…' : 'Começando…'
+    preparo.texto = passo
+    pintarProgresso()
   })
   // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)
   if (window.__sbRaw && window.sb.atualizacao) {

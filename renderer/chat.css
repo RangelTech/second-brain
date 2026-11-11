@@ -372,13 +372,20 @@
 @media (prefers-reduced-motion:reduce){.sin-frase{transition:none}.sin-chip i{animation:none}}
 
 /* ---- tela de preparo do assistente (primeira abertura) ---- */
-.sb-preparando{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(18,16,14,.94);backdrop-filter:blur(3px)}
-.sbp-caixa{width:min(620px,92vw);text-align:center;color:var(--fg,#ece9e4)}
-.sbp-caixa h2{margin:6px 0 6px;font-size:20px;font-weight:600}
-.sbp-canvas{display:block;width:100%;height:260px;border-radius:16px;background:#060912;border:1px solid #1d2a44}
-.sbp-passo{margin:0 0 10px;min-height:20px;color:#b9cfe6;font-size:14px}
-.sbp-dica{margin:0 0 6px;color:var(--mut,#a39e96);font-size:13px;line-height:1.5}
-.sbp-tempo{margin:0;color:var(--mut,#a39e96);font-size:13px;font-variant-numeric:tabular-nums}
+.sb-preparando{position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center;background:#05070f;transition:opacity .6s}
+.sb-preparando.sbp-saindo{opacity:0;pointer-events:none}
+.sbp-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#05070f}
+.sbp-caixa{position:relative;width:min(640px,92vw);margin:0 auto 7vh;text-align:center;color:var(--fg,#ece9e4);padding:20px 26px 16px;border-radius:22px;background:rgba(8,12,24,.55);border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);box-shadow:0 12px 44px rgba(0,0,0,.5)}
+.sbp-caixa h2{margin:0 0 4px;font-size:22px;font-weight:600}
+.sbp-passo{margin:0 0 14px;min-height:20px;color:#b9cfe6;font-size:14px}
+.sbp-barra{height:12px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+.sbp-barra>i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#c97a3a,#ffb36b,#ffd79a);box-shadow:0 0 14px rgba(255,179,107,.55);transition:width .9s ease}
+.sbp-linha{display:flex;justify-content:space-between;align-items:baseline;margin:8px 2px 12px}
+.sbp-pct{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.sbp-resta{color:#cdd6e4;font-size:14px}
+.sbp-dica{margin:0 0 4px;color:var(--mut,#a39e96);font-size:13px;line-height:1.5}
+.sbp-tempo{margin:0;color:var(--mut,#a39e96);font-size:12px;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.sbp-barra>i{transition:none}}
 .chip-anexo.enviando{opacity:.75}
 .chip-anexo .pct{font-weight:600;font-variant-numeric:tabular-nums;margin-left:4px}
 
