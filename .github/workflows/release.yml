@@ -11,7 +11,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            alvo: dist:ci
+            alvo: dist:ci:nsis
             podar: darwin linux
           - os: ubuntu-latest
             alvo: dist:linux
@@ -40,6 +40,21 @@ jobs:
       - name: Podar binários de outros sistemas
         shell: bash
         run: for d in ${{ matrix.podar }}; do rm -rf node_modules/onnxruntime-node/bin/napi-v6/$d; done
+      # Windows: o instalador leva o agente (Hermes) dentro, compactado, para a instalacao nao depender de baixar nada no PC do cliente.
+      # O portatil sai ANTES (sem o agente: ele descompacta a cada abertura e ficaria enorme); depois o agente e montado e entra so no instalador.
+      - name: Empacotar o portatil (Windows, sem o agente embutido)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          for i in 1 2 3; do npm run dist:ci:portatil && exit 0; echo "portatil falhou (tentativa $i de 3)"; sleep 15; done; exit 1
+      - name: Montar o agente embutido (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 40
+        run: ./scripts/montar-hermes-embutido.ps1
       # Assinatura do Windows: desligada até existir certificado (segredos WIN_CSC_LINK e WIN_CSC_KEY_PASSWORD).
       # hdiutil do macOS falha de vez em quando (disco ocupado ao montar a imagem): repete o empacotamento até 3 vezes.
       - name: Empacotar
@@ -57,6 +72,11 @@ jobs:
             sleep 15
           done
           exit 1
+      # o teste de instalacao tem de descompactar o agente DE VERDADE: tira a pasta fixa usada na montagem
+      - name: Limpar a montagem do agente (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Remove-Item -Recurse -Force 'C:\SegundoCerebro' -ErrorAction SilentlyContinue
       - name: Conferir a assinatura (Windows)
         if: runner.os == 'Windows'
         shell: pwsh

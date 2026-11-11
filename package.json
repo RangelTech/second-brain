@@ -18,6 +18,8 @@
     "dist:mac": "electron-builder --mac dmg zip --x64 --arm64 --publish never -c.productName=SegundoCerebro",
     "router:fetch": "node scripts/baixar-router.mjs",
     "dist:ci": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true",
+    "dist:ci:portatil": "electron-builder --win portable --publish never -c.win.signAndEditExecutable=true",
+    "dist:ci:nsis": "electron-builder --win nsis --publish never -c.win.signAndEditExecutable=true",
     "modelo:voz": "node scripts/baixar-modelo-voz.js",
     "icone:dev": "node scripts/icone-dev.js"
   },
@@ -108,6 +110,14 @@
           "**/*",
           "!**/*.map",
           "!**/better-sqlite3/**"
+        ]
+      },
+      {
+        "from": "build/hermes-runtime",
+        "to": "hermes-runtime",
+        "filter": [
+          "*.7z",
+          "7za.exe"
         ]
       },
       {

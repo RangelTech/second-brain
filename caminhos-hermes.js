@@ -28,12 +28,24 @@ function gravavel(pasta) {
   }
 }
 
+// Instalador com o agente embutido (hermes-runtime/*.7z em resources): o pacote foi montado numa pasta FIXA e o Hermes grava o caminho absoluto do
+// ambiente, entao ele so funciona nessa mesma pasta. A raiz vira C:\SegundoCerebro\hermes para todos os usuarios do PC; os dados (home) seguem por usuario.
+function embutido() {
+  try {
+    return process.platform === 'win32' && !!process.resourcesPath && fs.existsSync(path.join(process.resourcesPath, 'hermes-runtime', 'hermes-win32-x64.7z'))
+  } catch {
+    return false
+  }
+}
+const RAIZ_FIXA = () => process.env.SB_HERMES_RAIZ || 'C:\SegundoCerebro\hermes'
+
 function curto(dados) {
   const id = crypto.createHash('sha1').update(String(dados).toLowerCase()).digest('hex').slice(0, 6) // varios usuarios no mesmo PC nao se misturam
   const bases = [process.env.SB_RAIZ_CURTA, 'C:\\SegundoCerebro', process.env.ProgramData && path.join(process.env.ProgramData, 'SC'), process.env.PUBLIC && path.join(process.env.PUBLIC, 'SC')].filter(Boolean)
   for (const b of bases) {
     const raiz = path.join(b, id, 'h')
     if (raiz.length > (+process.env.SB_MAX_BASE || MAX_BASE)) continue
+    if (embutido() && b === 'C:\SegundoCerebro' && gravavel(path.join(b, id))) return { raiz: RAIZ_FIXA(), home: path.join(b, id, 'd'), modo: 'embutido' }
     if (gravavel(path.join(b, id))) return { raiz, home: path.join(b, id, 'd'), modo: 'curto' }
   }
   return null
@@ -68,4 +80,4 @@ const raizAgente = (app) => decidir(app).raiz
 const homeAgente = (app) => decidir(app).home
 const esquecer = () => (memo = null) // so para testes
 
-module.exports = { raizAgente, homeAgente, decidir, esquecer, MAX_BASE }
+module.exports = { raizAgente, homeAgente, decidir, esquecer, MAX_BASE, embutido }

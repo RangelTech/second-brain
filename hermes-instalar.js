@@ -10,7 +10,11 @@ const RAIZ = 'https://raw.githubusercontent.com/NousResearch/hermes-agent'
 const REF = process.env.SB_HERMES_REF || 'main' // versão do instalador; o instalador baixa a última release estável do Hermes
 const SEM_COR = /\x1b\[[0-9;?]*[A-Za-z]/g
 
-function criar({ app, localizar }) {
+// Pasta FIXA do agente embutido no instalador do Windows. O Hermes grava o caminho absoluto do ambiente dele, entao o pacote so funciona
+// quando descompactado no MESMO caminho em que foi montado (testado: copiar para outra pasta da `dependency environment is missing`).
+const RAIZ_EMBUTIDA = () => process.env.SB_HERMES_RAIZ || (process.platform === 'win32' ? 'C:\\SegundoCerebro\\hermes' : '')
+
+function criar({ app, localizar, recursos = () => process.resourcesPath, executar = executarProcesso }) {
   let andamento = null
   let etapa = ''
   const ouvintes = new Set()
@@ -18,6 +22,37 @@ function criar({ app, localizar }) {
     if (t === etapa) return
     etapa = t
     for (const f of ouvintes) f(t)
+  }
+
+  // Windows: o instalador traz o agente pronto (hermes-runtime/hermes-win32-x64.7z + 7za.exe). Descompacta na pasta fixa e confere que o Hermes
+  // sobe (--version valida o ambiente). Qualquer falha apaga a pasta e devolve false: o fluxo cai no download de sempre.
+  async function extrairEmbutido() {
+    const raiz = RAIZ_EMBUTIDA()
+    const pasta = path.join(recursos() || '', 'hermes-runtime')
+    const arq = path.join(pasta, 'hermes-win32-x64.7z')
+    const sete = path.join(pasta, '7za.exe')
+    if (!raiz || !fs.existsSync(arq) || !fs.existsSync(sete)) return false
+    const bin = path.join(raiz, 'bin', 'hermes.exe')
+    try {
+      falar('copiando o agente que vem no instalador')
+      fs.mkdirSync(raiz, { recursive: true })
+      const x = await executar(sete, ['x', arq, '-o' + raiz, '-y', '-bso0', '-bsp0'], { timeoutMs: 20 * 60000 })
+      if (x.codigo !== 0) throw new Error('descompactar falhou (codigo ' + x.codigo + ') ' + (x.saida || '').slice(-200))
+      if (!fs.existsSync(bin)) throw new Error('hermes.exe nao apareceu depois de descompactar')
+      falar('conferindo o agente')
+      const v = await executar(bin, ['--version'], { timeoutMs: 120000, env: { ...process.env, HERMES_HOME: path.join(app.getPath('userData'), 'hermes-home') } })
+      if (v.codigo !== 0) throw new Error('hermes --version falhou (codigo ' + v.codigo + ') ' + (v.saida || '').slice(-300))
+      try {
+        fs.rmSync(arq, { force: true }) // ja descompactado e conferido: o pacote nao precisa ocupar disco duas vezes
+      } catch {}
+      return true
+    } catch (e) {
+      try {
+        fs.rmSync(raiz, { recursive: true, force: true })
+      } catch {}
+      falar('o agente embutido falhou (' + String(e.message).slice(0, 80) + '); baixando')
+      return false
+    }
   }
 
   async function instalar() {
@@ -77,7 +112,10 @@ function criar({ app, localizar }) {
       // batimento: etapa longa (baixar dependências) não pode parecer travada nem ser cortada pelo vigia de "sem sinal"
       const batida = setInterval(() => aviso?.(msg(etapa)), 15000)
       try {
-        andamento ||= instalar().finally(() => (andamento = null))
+        andamento ||= (async () => {
+          if ((await extrairEmbutido()) && localizar()) return
+          await instalar()
+        })().finally(() => (andamento = null))
         await andamento
       } finally {
         clearInterval(batida)
@@ -87,4 +125,32 @@ function criar({ app, localizar }) {
   }
 }
 
-module.exports = { criar }
+// roda um programa, junta a saida e devolve { codigo, saida }; estouro de tempo mata o processo
+function executarProcesso(exe, args, { timeoutMs = 60000, env = process.env } = {}) {
+  return new Promise((resolve) => {
+    let saida = ''
+    let fim = false
+    const f = spawn(exe, args, { env, windowsHide: true })
+    const termina = (codigo) => {
+      if (fim) return
+      fim = true
+      clearTimeout(t)
+      resolve({ codigo, saida })
+    }
+    const t = setTimeout(() => {
+      try {
+        f.kill()
+      } catch {}
+      termina(-1)
+    }, timeoutMs)
+    f.stdout.on('data', (d) => (saida += d))
+    f.stderr.on('data', (d) => (saida += d))
+    f.on('error', (e) => {
+      saida += String(e.message)
+      termina(-2)
+    })
+    f.on('close', (c) => termina(c === null ? -1 : c))
+  })
+}
+
+module.exports = { criar, RAIZ_EMBUTIDA }
