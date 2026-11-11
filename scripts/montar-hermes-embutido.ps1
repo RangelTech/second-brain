@@ -75,3 +75,5 @@ try {
     Remove-Item -Force (Join-Path $saida 'home-win32-x64.7z') -ErrorAction SilentlyContinue
     try { Pop-Location } catch {}
 }
+# o pacote do ambiente e opcional: uma falha acima ja virou aviso, e o codigo de saida de um comando nativo nao pode derrubar o build
+exit 0
