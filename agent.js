@@ -396,8 +396,8 @@ function blocoSeguranca(nivel) {
 const MARCA_EST = ['<!-- sb-estilo:inicio -->', '<!-- sb-estilo:fim -->']
 function blocoEstilo() {
   const regras = [
-    'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente.',
-    'Nunca cite detalhes internos: ferramenta, tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
+    'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente, nem a frase curta antes de usar uma ferramenta (ex.: "Vou abrir a Wikipédia e ler o primeiro parágrafo.").',
+    'Nunca cite detalhes internos: nome de ferramenta (navegador_abrir, navegador_*, midia_gerar_imagem, terminal...), tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
     'Não narre cada passo nem cada conferência. Faça o trabalho e entregue uma resposta curta: o que foi feito e onde está o arquivo.',
     'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure entre as suas skills a ferramenta que serve (liste e leia as skills), e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
   ]
