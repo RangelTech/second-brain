@@ -20,6 +20,6 @@ test('a âncora é registrada em main.js só com conta, memória livre e sem opt
   const fs = require('fs'), path = require('path')
   const src = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8')
   assert.match(src, /cfg\.ancoraAgente === false/)
-  assert.match(src, /os\.freemem\(\) < MEMORIA_MIN_ANCORA/)
+  assert.match(src, /memoriaDisponivel\(\) < MEMORIA_MIN_ANCORA/)
   assert.match(src, /s\.fixa = true/)
 })

@@ -69,7 +69,7 @@ function tirarFerramentas(texto) {
   }
 }
 
-function criar({ destino, aoProgresso, registrar = () => {} }) {
+function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null }) {
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
 
@@ -221,9 +221,24 @@ function criar({ destino, aoProgresso, registrar = () => {} }) {
     iniciar() {
       if (servidor) return Promise.resolve(servidor.address().port)
       return new Promise((ok, falha) => {
-        servidor = http.createServer(tratar)
-        servidor.on('error', falha)
-        servidor.listen(0, '127.0.0.1', () => ok(servidor.address().port))
+        // A porta fica a MESMA entre aberturas do app: o Hermes congela o endereço do modelo em cada sessão, e com a porta sorteada de novo
+        // toda conversa aberta antes de fechar o app falhava com "launch_credentials_unavailable" (12/11/2026). Tenta a última porta; se estiver ocupada, sorteia.
+        let preferida = 0
+        try { if (portaArq) preferida = parseInt(require('fs').readFileSync(portaArq, 'utf8'), 10) || 0 } catch {}
+        const subir = (porta) => {
+          const s = http.createServer(tratar)
+          s.once('error', (e) => {
+            if (porta && (e.code === 'EADDRINUSE' || e.code === 'EACCES')) return subir(0)
+            falha(e)
+          })
+          s.listen(porta, '127.0.0.1', () => {
+            servidor = s
+            const usada = s.address().port
+            try { if (portaArq && usada !== preferida) require('fs').writeFileSync(portaArq, String(usada)) } catch {}
+            ok(usada)
+          })
+        }
+        subir(preferida)
       })
     },
     origem: () => (servidor ? `http://127.0.0.1:${servidor.address().port}` : null),

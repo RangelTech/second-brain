@@ -162,6 +162,7 @@ const ponteLLM = require('./ponte-llm').criar({
   destino: () => embed.estado().origem,
   aoProgresso: (chat, info) => (sessoes.get(chat) || sessoes.get(vagaChat.get(chat)))?.emitir?.({ progresso: info }),
   registrar: (linha) => registrarAgente(app, linha),
+  portaArq: path.join(app.getPath('userData'), 'ponte-porta.txt'),
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
@@ -364,6 +365,7 @@ const RESERVAS_ALVO = () => Math.max(0, Math.min(4, Number.isFinite(+cfg.reserva
 const reservas = [] // sessões prontas (ou subindo), sem conversa
 let reservaSubindo = null // promessa da reserva que está sendo criada agora (uma por vez)
 let nReserva = 0
+const nonceAbertura = require('crypto').randomBytes(3).toString('hex')
 const pastaVagas = () => path.join(app.getPath('userData'), 'vagas')
 try {
   fs.rmSync(pastaVagas(), { recursive: true, force: true })
@@ -388,7 +390,9 @@ function manterAncora(alvo, nivel) {
     if (reservaSubindo || reservas.length >= RESERVAS_ALVO()) return
     if (Date.now() < reservaPausadaAte) return
     if (memoriaDisponivel() < MEMORIA_MIN_ANCORA) return
-    const id = 'reserva-' + ++nReserva
+    // id único POR ABERTURA do app: com 'reserva-1' fixo o Hermes reabria a sessão antiga (guardada com a porta/credencial da abertura anterior) e toda
+    // mensagem falhava com launch_credentials_unavailable (12/11/2026)
+    const id = 'reserva-' + nonceAbertura + '-' + ++nReserva
     reservaSubindo = Promise.resolve(chaveLocal())
       .then(async (chave) => {
         await ponteLLM.iniciar()
