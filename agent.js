@@ -141,7 +141,10 @@ function matarGatewayOrfao(app, home) {
 
 const OCIOSO_MS = +process.env.SB_TESTE_OCIOSO_MS || 10 * 60 * 1000
 // erros que significam "o processo (ou o gateway dele) caiu": o app retoma sozinho, sem mostrar nada ao cliente
-const MORTE_DO_AGENTE = /O agente encerrou|Gateway disconnected|turn outcome is unknown|EPIPE|ECONNRESET|Connection (closed|reset)|write after end/i
+// SESSAO VELHA (12/11/2026): o Hermes recusa um turno com launch_credentials_unavailable / admitted_turn_failed quando a sessao foi criada com outra chave, outra porta ou
+// antes de o gateway reiniciar. Nao importa a causa: a sessao nao serve mais, e o app descarta e abre outra, levando a conversa. Nunca reenvia na mesma sessao.
+const SESSAO_VELHA = /launch_credentials_unavailable|admitted_turn_failed/i
+const MORTE_DO_AGENTE = /O agente encerrou|Gateway disconnected|turn outcome is unknown|EPIPE|ECONNRESET|Connection (closed|reset)|write after end|launch_credentials_unavailable|admitted_turn_failed/i
 
 // Primeira execução de cada HERMES_HOME: o Hermes monta um ambiente Python isolado (cerca de 700 MB entre installs/ e cache/uv, baixados da internet).
 // Leva minutos e, se o processo for morto no meio, recomeça do zero. O app antigo desistia aos 90 s e matava o Hermes em laço (sessão nova do zero, 30 min
@@ -1125,6 +1128,7 @@ class Sessao {
     let parcial = ''
     const emitirOriginal = this._emitir || (() => {})
     const embrulho = (e) => {
+      if (e && e.texto && /^\s*gateway\.errors\./.test(e.texto)) return // texto interno do Hermes sobre sessao velha: nunca aparece pro cliente
       if (e && e.texto) parcial += e.texto
       if (e && e.ferramenta && e.ferramenta.status === 'completed' && e.ferramenta.titulo) feitos.push(String(e.ferramenta.titulo).slice(0, 120) + (e.ferramenta.conteudo ? ' -> ' + String(e.ferramenta.conteudo).replace(/\s+/g, ' ').slice(0, 200) : ''))
       emitirOriginal(e)
@@ -1136,10 +1140,12 @@ class Sessao {
       this.turnosVivos = ((this.turnosVivos || '') + '\nUsuário: ' + texto.slice(0, 2000) + '\nAssistente: ' + parcial.slice(0, 2000)).slice(-12000)
     }
     let tentativa = 0
+    let velhas = 0
+    let erroTurno = ''
     try {
       while (true) {
         tentativa++
-        this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo }] })
+        this.turno = this.chamar('session/prompt', { sessionId: this.sid, prompt: [{ type: 'text', text: corpo + (this.chatMarca ? String.fromCharCode(10) + '<!--sb:' + this.chatMarca + '-->' : '') }] })
         try {
           const r = await this.turno
           this.turno = null
@@ -1156,11 +1162,13 @@ class Sessao {
           return r
         } catch (e) {
           this.turno = null
+          erroTurno = String(e.message)
           if (this.pedidoParar || !MORTE_DO_AGENTE.test(String(e.message))) {
             this.agendarOcioso()
             throw e
           }
         }
+        if (SESSAO_VELHA.test(erroTurno) && ++velhas > 2) throw new Error('Não consegui responder agora. Tente enviar de novo em instantes.')
         registrar(this.app, `turno interrompido pela morte do agente (tentativa ${tentativa}), retomando sozinho`)
         this.emitir({ novoCard: true })
         // o processo pode estar de pé mas sem gateway: derruba a árvore DESTA sessão (o gateway compartilhado não cai) e sobe outro
@@ -1169,6 +1177,12 @@ class Sessao {
         try {
           sessoesVivas.delete(antigo.pid)
           matarArvorePoupandoGateway(antigo.pid, this.env.HERMES_HOME)
+          // sessao velha: o gateway guarda a configuracao e a memoria privada de quando subiu; reiniciar so a sessao nao basta. Ele sobe de novo sozinho
+          // e as outras conversas se recuperam pelo mesmo caminho.
+          if (SESSAO_VELHA.test(erroTurno)) {
+            const g = JSON.parse(fs.readFileSync(path.join(this.env.HERMES_HOME, 'gateway.pid'), 'utf8'))
+            if (g && g.kind === 'hermes-gateway' && vivo(g.pid)) (matarArvore(g.pid), registrar(this.app, 'gateway reiniciado: sessao velha (' + erroTurno + ')'))
+          }
         } catch {}
         // a sessão nova não tem a memória da anterior: leva o contexto, a conversa até aqui e o que este turno já fez
         const nl = String.fromCharCode(10)

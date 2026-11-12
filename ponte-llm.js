@@ -69,16 +69,23 @@ function tirarFerramentas(texto) {
   }
 }
 
-function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null }) {
+function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, chaveRoteador = null }) {
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
 
-  function tratar(req, res) {
+  async function tratar(req, res) {
+    // O Hermes recebe uma chave FIXA e sem valor ('sb-local'): qualquer credencial serve a ele, entao nada que mude entre sessoes pode quebrar uma conversa
+    // (12/11/2026: launch_credentials_unavailable). Quem autentica no roteador e a ponte, com a chave real. A conversa de cada chamada vem de uma
+    // marca <!--sb:ID--> que o app poe no fim de cada mensagem enviada ao agente; o formato antigo (chave::sb::ID) ainda e aceito.
     const auth = String(req.headers.authorization || '')
     const i = auth.indexOf(SEP)
-    const chat = i >= 0 ? auth.slice(i + SEP.length) : null
+    let chat = i >= 0 ? auth.slice(i + SEP.length) : null
     const headers = { ...req.headers }
-    if (i >= 0) headers.authorization = auth.slice(0, i)
+    let real = i >= 0 ? auth.slice(0, i) : null
+    if (chaveRoteador) {
+      try { real = 'Bearer ' + (await chaveRoteador()) } catch (e) { registrar('ponte: sem chave do roteador: ' + e.message) }
+    }
+    if (real) headers.authorization = real
     const d = alvo()
     headers.host = d.host
     // A ponte lê e reescreve o corpo (restaura nomes de ferramenta, conta tokens): resposta compactada viraria lixo com o cabeçalho
@@ -102,7 +109,8 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null }) 
     // "conectado e sem erro" já é sinal de vida: a cada segundo avisamos a tela, que mostra o tempo de espera de verdade.
     const est = { ultimo: t0, primeiro: 0, destruir: null }
     let batida = null
-    if (chat && req.method === 'POST' && /chat\/completions/.test(req.url || '')) {
+    const iniciarBatida = () => {
+      if (batida || !chat || req.method !== 'POST' || !/chat\/completions/.test(req.url || '')) return
       batida = setInterval(() => {
         // batimento sempre que o modelo está calado (antes do 1º byte ou no meio de uma ação longa)
         if (Date.now() - est.ultimo > 1500) aoProgresso(chat, { tipo: 'espera', seg: Math.round((Date.now() - t0) / 1000) })
@@ -115,6 +123,7 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null }) 
         }
       }, 1000)
     }
+    iniciarBatida()
     const fimBatida = () => batida && clearInterval(batida)
     let pares = new Map() // sufixos MCP trocados nesta chamada (fixo -> real)
     let restaurador = null // restaura os nomes na resposta em stream (criado quando há troca)
@@ -208,6 +217,10 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null }) 
       req.on('data', (c) => partes.push(c))
       req.on('end', () => {
         let corpo = Buffer.concat(partes)
+        if (!chat) {
+          const marca = /<!--sb:([A-Za-z0-9_-]{4,80})-->/.exec(corpo.toString('utf8'))
+          if (marca) { chat = marca[1]; iniciarBatida() }
+        }
         const n = normalizarEditor(corpo.toString('utf8'))
         if (n.pares.size) pares = n.pares
         corpo = Buffer.from(tirarFerramentas(semPensar(n.pares.size ? n.texto : corpo.toString('utf8'))), 'utf8')
@@ -242,7 +255,7 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null }) 
       })
     },
     origem: () => (servidor ? `http://127.0.0.1:${servidor.address().port}` : null),
-    fechar: () => servidor?.close(),
+    fechar: () => { servidor?.closeAllConnections?.(); servidor?.close() },
   }
 }
 

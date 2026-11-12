@@ -163,6 +163,7 @@ const ponteLLM = require('./ponte-llm').criar({
   aoProgresso: (chat, info) => (sessoes.get(chat) || sessoes.get(vagaChat.get(chat)))?.emitir?.({ progresso: info }),
   registrar: (linha) => registrarAgente(app, linha),
   portaArq: path.join(app.getPath('userData'), 'ponte-porta.txt'),
+  chaveRoteador: () => chaveLocal(),
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
@@ -399,7 +400,7 @@ function manterAncora(alvo, nivel) {
         fs.mkdirSync(pastaVagas(), { recursive: true })
         const vagaArq = path.join(pastaVagas(), id + '.txt')
         fs.writeFileSync(vagaArq, '')
-        const s = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: chave + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp(), vagaArq })
+        const s = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: 'sb-local', raciocinio: cfg.raciocinio, nivel, emitir: () => {}, pedirPermissao: async () => 'negar', modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp(), vagaArq })
         s.fixa = true
         s.reserva = true
         s.modelo = alvo; s.racio = cfg.raciocinio; s.nivel = nivel; s.historico = ''
@@ -573,16 +574,18 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
     else if (historico) adotada.historicoPendente = historico
     adotada.emitir = contexto.onDelta
     adotada.pedirPermissao = contexto.pedirPermissao
+    adotada.chatMarca = id
     sessoes.set(id, adotada)
     manterAncora(alvo, nivel) // já sobe a próxima reserva
     return adotada
   }
   await ponteLLM.iniciar()
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: (await chaveLocal()) + require('./ponte-llm').SEP + id, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
+  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: 'sb-local', raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.nivel = nivel
   sessao.historico = historico
+  sessao.chatMarca = id
   sessoes.set(id, sessao)
   manterAncora(alvo, nivel) // o primeiro chat também sobe a reserva (que mantém o gateway vivo)
   return sessao
