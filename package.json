@@ -37,6 +37,7 @@
       "gateway-cliente.js",
       "dublagem.js",
       "rotinas.js",
+      "memoria-hermes.js",
       "sessao-gateway.js",
       "ponte_gateway.py",
       "navegador.js",

@@ -998,6 +998,9 @@ app.whenReady().then(() => {
       }
     } catch {}
   }, 45000).unref?.()
+  const memoriaHermes = require('./memoria-hermes')
+  ipcMain.handle('memoria-agente:estado', seguro(() => memoriaHermes.estado(caminhosHermes.homeAgente(app))))
+  ipcMain.handle('memoria-agente:gravar', seguro((quem, lista) => memoriaHermes.gravar(caminhosHermes.homeAgente(app), quem, Array.isArray(lista) ? lista : [])))
   ipcMain.handle('skills:listar', seguro(() => skills.listar()))
   ipcMain.handle('skills:ler', seguro((r) => skills.ler(r)))
   ipcMain.handle('skills:gravar', seguro((r, c) => skills.gravar(r, c)))

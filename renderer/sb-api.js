@@ -55,6 +55,10 @@
       },
       responderPermissao: (req, resposta) => invoke('chat:permissao-resp', { req, resposta }),
       aoPermissao: (fn) => on('chat:permissao', fn),
+      memoriaAgente: {
+        estado: () => invoke('memoria-agente:estado'),
+        gravar: (q, l) => invoke('memoria-agente:gravar', q, l),
+      },
       rotinas: {
         listar: () => invoke('rotinas:listar'),
         criar: (d) => invoke('rotinas:criar', d),
