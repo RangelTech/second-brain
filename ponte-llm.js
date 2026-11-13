@@ -69,6 +69,29 @@ function tirarFerramentas(texto) {
   }
 }
 
+
+// Aquecimento SEM modelo (spec 32): o app abre uma conversa descartavel marcada com <!--sb:aquecer--> so para o gateway montar o agente.
+// A ponte responde "Pronto." no lugar do modelo: zero tokens, zero fila. Acontece UMA vez por abertura do app, nunca por conversa.
+const FIM_EVENTO = String.fromCharCode(10, 10)
+let contAquecer = 0
+function responderAquecimento(res, pedido) {
+  const id = 'sb-aquecer-' + ++contAquecer
+  const criado = Math.floor(Date.now() / 1000)
+  const modelo = (pedido && pedido.model) || 'principal'
+  if (pedido && pedido.stream) {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    const ev = (o) => res.write('data: ' + JSON.stringify({ id, object: 'chat.completion.chunk', created: criado, model: modelo, ...o }) + FIM_EVENTO)
+    ev({ choices: [{ index: 0, delta: { role: 'assistant', content: 'Pronto.' }, finish_reason: null }] })
+    ev({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })
+    if (pedido.stream_options && pedido.stream_options.include_usage) ev({ choices: [], usage: { prompt_tokens: 0, completion_tokens: 1, total_tokens: 1 } })
+    res.end('data: [DONE]' + FIM_EVENTO)
+  } else {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ id, object: 'chat.completion', created: criado, model: modelo, choices: [{ index: 0, message: { role: 'assistant', content: 'Pronto.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 0, completion_tokens: 1, total_tokens: 1 } }))
+  }
+}
+const MARCA_AQUECER = '<!--sb:aquecer-->'
+
 function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, chaveRoteador = null, modeloPorChat = null }) {
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
@@ -217,6 +240,13 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, ch
       req.on('data', (c) => partes.push(c))
       req.on('end', () => {
         let corpo = Buffer.concat(partes)
+        if (corpo.includes(MARCA_AQUECER)) { // aquecimento do gateway: responde aqui, sem chamar o modelo
+          try { up.destroy() } catch {}
+          let ped = null
+          try { ped = JSON.parse(corpo.toString('utf8')) } catch {}
+          registrar('ponte: aquecimento respondido localmente (sem modelo)')
+          return responderAquecimento(res, ped)
+        }
         if (!chat) {
           const marca = /<!--sb:([A-Za-z0-9_-]{4,80})-->/.exec(corpo.toString('utf8'))
           if (marca) { chat = marca[1]; iniciarBatida() }

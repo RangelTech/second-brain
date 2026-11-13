@@ -88,7 +88,9 @@ function pedidoDePermissao(ev) {
     execution_generation: p.execution_generation,
     clarify: ev.type === 'clarify.request',
     pergunta: ev.type === 'clarify.request' ? { texto: String(p.question || ''), escolhas: Array.isArray(p.choices) ? p.choices.map(String) : [], multi: !!p.multi_select } : null,
-    titulo: p.description || p.command || p.question || 'Ação do agente',
+    titulo: p.edit && p.edit.path ? 'Gravar o arquivo ' + p.edit.path : p.command ? 'Executar: ' + String(p.command).replace(/^Edit /, 'alterar ').slice(0, 300) : p.question || p.description || 'Ação do agente',
+    caminho: p.edit && p.edit.path ? p.edit.path : null,
+    comando: p.command ? String(p.command) : '',
     tipo: p.edit ? 'edit' : 'execute',
     escolhas,
   }

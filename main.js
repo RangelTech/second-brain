@@ -157,7 +157,7 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 // ---------- resposta do chat ----------
 const roteador = require('./roteador')
 const sessoes = new Map()
-const motorGateway = () => !!(cfg.motorGateway || process.env.SB_MOTOR_GATEWAY === '1') // spec 34: uma ponte para todas as conversas (padrao desligado)
+const motorGateway = () => process.env.SB_MOTOR_GATEWAY === '0' ? false : process.env.SB_MOTOR_GATEWAY === '1' ? true : cfg.motorGateway !== false // spec 34: uma ponte para todas as conversas (padrao desligado)
 // Ponte entre o Hermes e o roteador: repassa tudo e conta o que o modelo já gerou, para a tela mostrar progresso de verdade
 const ponteLLM = require('./ponte-llm').criar({
   destino: () => embed.estado().origem,
@@ -798,6 +798,19 @@ app.whenReady().then(() => {
     modoServidor: MODO_SERVIDOR,
   })
   nav.iniciarServidor().then((i) => (navInfo = i))
+  // motor gateway: monta o agente UMA vez por abertura do app (sem modelo), logo que a conta e o motor ficam prontos; assim a 1a conversa ja nasce quente
+  if (motorGateway()) {
+    const tentar = async (n = 0) => {
+      try {
+        if (!cfg.unlimitedEmail || cfg.soConversa || !embed.estado().pronto || !navInfo) return n < 150 ? setTimeout(() => tentar(n + 1), 2000) : null
+        await garantirAgente()
+        await ponteLLM.iniciar()
+        const { aquecerGateway } = require('./sessao-gateway')
+        aquecerGateway({ app, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', raciocinio: cfg.raciocinio, nivel: await nivelDeSeguranca(), modo: () => 'manual', pedirPermissao: async () => 'negar', emitir: () => {}, navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
+      } catch (e) { registrarAgente(app, 'aquecimento do gateway: ' + (e.message || e)) }
+    }
+    setTimeout(tentar, 2500)
+  }
   ipcMain.handle('navegador:limites', (_e, l) => nav.definirLimites(l))
   ipcMain.handle('navegador:destacar', () => nav.destacar())
   ipcMain.handle('navegador:reencaixar', () => nav.reencaixar())

@@ -559,6 +559,9 @@
         c.innerHTML = md(p.v)
         el.appendChild(c)
         if (/\.(mp4|webm|mov)\b/i.test(p.v || '')) playersLocais(c)
+      } else if (p.t === 'resposta') {
+        fechaGrupo()
+        el.appendChild(cartaoResposta(p))
       } else if (p.t === 'plano') {
         fechaGrupo()
         el.appendChild(cartaoPlano(p.plano))
@@ -979,6 +982,18 @@
 
   // ---------- envio ----------
   // resposta em curso de uma conversa: o estado vive em `respostas`; a bolha só existe enquanto a conversa está na tela
+  // registro da resposta do usuario no proprio chat (fica gravado na conversa: "Voce escolheu: Verde")
+  function registrarResposta(r, reg) {
+    r.partes.push({ t: 'resposta', ...reg })
+    if (typeof visivel === 'function' && visivel(r)) renderPartes(r.el.querySelector('.partes'), r.partes)
+  }
+  function cartaoResposta(p) {
+    const d = document.createElement('div')
+    d.className = 'ferr resposta ' + (p.tom || 'ok')
+    const icone = p.tom === 'neg' ? IC.x : p.tom === 'pula' ? IC.sparkles : IC.check
+    d.innerHTML = `<div class="rs-corpo"><span class="fi">${icone}</span><div class="rs-txt"><div class="rs-quem">${esc(p.titulo)}</div>${p.valor ? `<div class="rs-valor">${esc(p.valor)}</div>` : ''}${p.contexto ? `<div class="rs-ctx">${esc(String(p.contexto).slice(0, 220))}</div>` : ''}</div></div>`
+    return d
+  }
   function cartaoPermissao(r, p) {
     const d = document.createElement('div')
     if (p.pergunta) {
@@ -988,7 +1003,12 @@
       d.innerHTML = `<div><b>${IC.sparkles} O agente tem uma pergunta</b><div class="perg-txt">${esc(p.pergunta.texto || p.titulo)}</div></div>` +
         (esc2.length ? `<div class="facoes perg-esc">${esc2.map((c, i) => `<button data-r="${i}" class="primario">${esc(String(c).replace(/\s*\(Recommended\)/i, ' (recomendado)'))}</button>`).join('')}</div>` : '') +
         `<div class="perg-aberta"><input type="text" placeholder="${esc2.length ? 'Ou escreva outra resposta' : 'Escreva a sua resposta'}" aria-label="Resposta"><button data-enviar="1" class="primario">Responder</button><button data-pular="1">Pular</button></div>`
-      const responder = (txt) => { window.sb.responderPermissao(p.req, 'resp:' + txt); r.perms = r.perms.filter((x) => x.req !== p.req); d.remove() }
+      const responder = (txt) => {
+        window.sb.responderPermissao(p.req, 'resp:' + txt)
+        r.perms = r.perms.filter((x) => x.req !== p.req)
+        d.remove()
+        registrarResposta(r, txt ? { titulo: 'Você respondeu', valor: txt, contexto: p.pergunta.texto || p.titulo, tom: 'ok' } : { titulo: 'Você pulou a pergunta', valor: '', contexto: p.pergunta.texto || p.titulo, tom: 'pula' })
+      }
       d.onclick = (e) => {
         const t = e.target
         if (t.dataset?.r != null) return responder(esc2[+t.dataset.r])
@@ -1006,6 +1026,7 @@
       window.sb.responderPermissao(p.req, resp)
       r.perms = r.perms.filter((x) => x.req !== p.req)
       d.remove()
+      registrarResposta(r, resp === 'negar' ? { titulo: 'Você negou', valor: '', contexto: p.titulo, tom: 'neg' } : { titulo: resp === 'sempre' ? 'Você permitiu sempre nesta conversa' : 'Você permitiu', valor: '', contexto: p.titulo, tom: 'ok' })
     }
     return d
   }

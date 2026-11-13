@@ -195,3 +195,19 @@ test('pergunta do agente (clarify) chega com as escolhas e a resposta volta pelo
   assert.deepEqual({ ...resp.params }, { session_id: 'S1', prompt_id: 'q1', execution_generation: 4, answer: 'verde' })
   s.encerrar()
 })
+
+
+test('aprovação de arquivo mostra o caminho em português e o modo "editar" libera dentro da pasta', async () => {
+  const gw = gwFalso()
+  let perguntou = 0
+  const { s } = montar(gw, { modo: () => 'editar', pedirPermissao: async () => { perguntou++; return 'negar' } })
+  await s.perguntar('um')
+  const dentro = path.join(s.pasta, 'a.txt')
+  gw.emitir({ type: 'approval.request', session_id: 'S1', payload: { prompt_id: 'e1', execution_generation: 1, command: 'Edit ' + dentro, description: 'Approve proposed file change', choices: ['once', 'deny'], edit: { tool_name: 'write_file', path: dentro, new_text: 'oi' } } })
+  await new Promise((r) => setTimeout(r, 30))
+  assert.equal(perguntou, 0, 'dentro da pasta de trabalho no modo editar: nem pergunta')
+  assert.equal(gw.chamadas.filter((c) => c.method === 'approval.respond').pop().params.choice, 'once')
+  const p = pedidoDePermissao({ type: 'approval.request', payload: { prompt_id: 'e2', execution_generation: 1, command: 'Edit /x/b.txt', edit: { path: '/x/b.txt' }, choices: ['once', 'deny'] } })
+  assert.match(p.titulo, /^Gravar o arquivo /)
+  s.encerrar()
+})

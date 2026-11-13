@@ -443,3 +443,13 @@
 .permissao.pergunta .perg-aberta{display:flex;gap:8px;flex-wrap:wrap}
 .permissao.pergunta .perg-aberta input{flex:1;min-width:180px;background:var(--lat);border:1px solid var(--bd);border-radius:10px;color:var(--fg);padding:9px 12px;font:inherit}
 .permissao.pergunta .perg-aberta input:focus{outline:2px solid var(--ac);outline-offset:1px}
+
+/* registro da resposta do usuario (escolhas e permissoes ficam gravadas na conversa) */
+.ferr.resposta{border-color:color-mix(in srgb,var(--ac) 35%,var(--bd))}
+.ferr.resposta .rs-corpo{display:flex;gap:10px;align-items:flex-start;padding:10px 14px}
+.ferr.resposta .fi{margin-top:2px;color:var(--ok)}
+.ferr.resposta.neg .fi{color:#e5897f}
+.ferr.resposta.pula .fi{color:var(--mut)}
+.ferr.resposta .rs-quem{font-size:12.5px;font-weight:600;color:var(--mut);letter-spacing:.02em}
+.ferr.resposta .rs-valor{font-size:16px;font-weight:600;color:var(--fg);margin-top:2px}
+.ferr.resposta .rs-ctx{font-size:13px;color:var(--mut);margin-top:4px;line-height:1.4}

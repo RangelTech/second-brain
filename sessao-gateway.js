@@ -67,7 +67,7 @@ class SessaoGateway {
   _evento(ev) {
     if (!this.sid || ev.session_id !== this.sid) return
     const perm = pedidoDePermissao(ev)
-    if (perm) return void this._permissao(perm, ev)
+    if (perm) { if (process.env.SB_DEBUG_PERM) agente.registrar(this.app, 'approval payload: ' + JSON.stringify(ev.payload).slice(0, 600)); return void this._permissao(perm, ev) }
     const fim = fimDeTurno(ev)
     if (fim.fim && this._fim) return this._fim(fim)
     for (const e of traducao(ev, this.estado)) {
@@ -99,7 +99,7 @@ class SessaoGateway {
         return void (await responder(typeof r === 'string' && r.startsWith('resp:') ? r.slice(5) : ''))
       }
       if (this.permitirSempre) return void (await responder('once'))
-      const tc = { title: p.titulo, kind: p.tipo, rawInput: { command: p.titulo } }
+      const tc = { title: p.titulo, kind: p.tipo, rawInput: { command: p.comando || p.titulo, path: p.caminho }, locations: p.caminho ? [{ path: p.caminho }] : [] }
       if (agente.decidirPermissao(this.modo(), tc, this.pasta) === 'permitir') return void (await responder('once'))
       const r = await this.pedirPermissao({ chat: this.id, titulo: p.titulo, tipo: p.tipo, opcoes })
       if (r === 'sempre') { this.permitirSempre = true; return void (await responder('once')) }
@@ -200,6 +200,26 @@ class SessaoGateway {
   }
 }
 
+// Uma unica conversa descartavel por abertura do app: o gateway monta o agente (plugins, ferramentas, servidores MCP) uma vez; a ponte do LLM
+// responde "Pronto." no lugar do modelo (zero tokens). Depois disso criar conversa leva ~0,2 s e a 1a resposta ~1,5 s.
+let aquecimento = null
+function aquecerGateway(opcoes) {
+  if (aquecimento) return aquecimento
+  aquecimento = (async () => {
+    const t0 = Date.now()
+    const s = new SessaoGateway({ ...opcoes, id: 'aquecer-gateway', modelo: 'principal' })
+    s.primeira = false
+    try {
+      await s.pronta
+      await s.perguntar('Responda apenas: pronto. <!--sb:aquecer-->')
+      agente.registrar(opcoes.app, `gateway aquecido sem modelo em ${((Date.now() - t0) / 1000).toFixed(1)} s`)
+      return Date.now() - t0
+    } finally {
+      s.encerrar()
+    }
+  })().catch((e) => { agente.registrar(opcoes.app, 'aquecimento do gateway falhou: ' + (e.message || e)); aquecimento = null; return null })
+  return aquecimento
+}
 function encerrarGateway() { try { compartilhado?.encerrar() } catch {} compartilhado = null }
 
-module.exports = { SessaoGateway, obterGateway, encerrarGateway }
+module.exports = { SessaoGateway, obterGateway, encerrarGateway, aquecerGateway }
