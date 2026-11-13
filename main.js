@@ -157,6 +157,7 @@ async function chamarOpenAI(p, msgs, { onDelta, sinal }) {
 // ---------- resposta do chat ----------
 const roteador = require('./roteador')
 const sessoes = new Map()
+const motorGateway = () => !!(cfg.motorGateway || process.env.SB_MOTOR_GATEWAY === '1') // spec 34: uma ponte para todas as conversas (padrao desligado)
 // Ponte entre o Hermes e o roteador: repassa tudo e conta o que o modelo já gerou, para a tela mostrar progresso de verdade
 const ponteLLM = require('./ponte-llm').criar({
   destino: () => embed.estado().origem,
@@ -164,6 +165,7 @@ const ponteLLM = require('./ponte-llm').criar({
   registrar: (linha) => registrarAgente(app, linha),
   portaArq: path.join(app.getPath('userData'), 'ponte-porta.txt'),
   chaveRoteador: () => chaveLocal(),
+  modeloPorChat: (chat) => (motorGateway() ? sessoes.get(chat)?.modelo : null), // motor gateway: o Hermes pede 'principal' e a ponte troca pelo modelo da conversa
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
@@ -567,6 +569,19 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   if (existente && !existente.morto && !existente.falhouIniciar && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
+  if (motorGateway()) {
+    // motor gateway (spec 34): uma ponte para todas as conversas; sem reserva nem aquecimento
+    await ponteLLM.iniciar()
+    const { SessaoGateway } = require('./sessao-gateway')
+    const sg = new SessaoGateway({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
+    sg.modelo = alvo
+    sg.racio = cfg.raciocinio
+    sg.nivel = nivel
+    sg.historico = historico
+    sg.chatMarca = id
+    sessoes.set(id, sg)
+    return sg
+  }
   if (!reservas.length) manterAncora(alvo, nivel) // sem reserva ainda (app acabou de abrir): cria e adota a mesma, em vez de subir duas sessões ao mesmo tempo
   const adotada = await adotarReserva(id, alvo, nivel)
   if (adotada) {

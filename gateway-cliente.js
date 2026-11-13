@@ -31,7 +31,7 @@ function traducao(ev, estado = {}) {
       const id = p.tool_call_id
       const guardada = estado.ferramentas?.get(id) || { nome: p.tool_name || p.name || 'ferramenta', args: {} }
       estado.ferramentas?.delete(id)
-      const res = typeof p.result === 'string' ? p.result : p.result != null ? JSON.stringify(p.result) : ''
+      const res = textoDoResultado(p.result)
       return [{ ferramenta: { id, titulo: guardada.nome, tipo: tipoDaFerramenta(guardada.nome), status: p.is_error === true ? 'failed' : 'completed', conteudo: res.slice(0, 4000), caminho: caminhoDe(guardada.args), entrada: JSON.stringify(guardada.args).slice(0, 600) } }]
     }
     case 'session.usage': {
@@ -41,6 +41,20 @@ function traducao(ev, estado = {}) {
     default:
       return []
   }
+}
+// o gateway devolve o resultado de ferramentas MCP como JSON ({"result":"texto"} ou lista de blocos): a tela quer só o texto
+function textoDoResultado(r) {
+  if (r == null) return ''
+  if (typeof r !== 'string') return JSON.stringify(r)
+  const t = r.trim()
+  if (t[0] === '{' || t[0] === '[') {
+    try {
+      const j = JSON.parse(t)
+      if (j && typeof j.result === 'string') return j.result
+      if (Array.isArray(j) && j.every((b) => b && typeof b.text === 'string')) return j.map((b) => b.text).join(String.fromCharCode(10))
+    } catch {}
+  }
+  return r
 }
 function tipoDaFerramenta(nome) {
   const n = String(nome || '')
@@ -94,7 +108,8 @@ class GatewayCliente {
   constructor({ home, registrar = () => {}, script }) {
     this.home = home
     this.registrar = registrar
-    this.script = script || path.join(__dirname, 'ponte_gateway.py')
+    // o Python não lê de dentro do app.asar: no app instalado o script fica em app.asar.unpacked
+    this.script = script || path.join(__dirname, 'ponte_gateway.py').split('app.asar' + path.sep).join('app.asar.unpacked' + path.sep)
     this.seq = 0
     this.pend = new Map()
     this.ouvintes = new Set()
@@ -155,4 +170,4 @@ class GatewayCliente {
   encerrar() { try { this.filho?.kill() } catch {} }
 }
 
-module.exports = { GatewayCliente, traducao, fimDeTurno, pedidoDePermissao, tipoDaFerramenta, caminhosDaPonte }
+module.exports = { GatewayCliente, textoDoResultado, traducao, fimDeTurno, pedidoDePermissao, tipoDaFerramenta, caminhosDaPonte }

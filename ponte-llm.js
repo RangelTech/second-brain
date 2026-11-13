@@ -69,7 +69,7 @@ function tirarFerramentas(texto) {
   }
 }
 
-function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, chaveRoteador = null }) {
+function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, chaveRoteador = null, modeloPorChat = null }) {
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
 
@@ -223,7 +223,10 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, ch
         }
         const n = normalizarEditor(corpo.toString('utf8'))
         if (n.pares.size) pares = n.pares
-        corpo = Buffer.from(tirarFerramentas(semPensar(n.pares.size ? n.texto : corpo.toString('utf8'))), 'utf8')
+        let texto = tirarFerramentas(semPensar(n.pares.size ? n.texto : corpo.toString('utf8')))
+        // motor gateway: o Hermes sempre pede o modelo 'principal'; quem sabe o modelo escolhido na conversa e o app
+        if (modeloPorChat && chat) { try { const m = modeloPorChat(chat); if (m) { const j = JSON.parse(texto); if (j && typeof j === 'object') { j.model = m; texto = JSON.stringify(j) } } } catch {} }
+        corpo = Buffer.from(texto, 'utf8')
         up.setHeader('content-length', corpo.length)
         up.end(corpo)
       })

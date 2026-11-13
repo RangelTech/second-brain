@@ -34,6 +34,9 @@
       "midia-detalhar.js",
       "mcp-memoria.js",
       "mcp-ias.js",
+      "gateway-cliente.js",
+      "sessao-gateway.js",
+      "ponte_gateway.py",
       "navegador.js",
       "unlimited.js",
       "main.js",
@@ -168,6 +171,7 @@
     },
     "asarUnpack": [
       "transcricao-worker.js",
+      "ponte_gateway.py",
       "node_modules/onnxruntime-node/**",
       "node_modules/@huggingface/**",
       "node_modules/sharp/**",
