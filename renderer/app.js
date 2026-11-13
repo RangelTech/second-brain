@@ -523,8 +523,10 @@
     d.innerHTML = `<details open data-chave="sub"><summary><span class="fi">${IC.sparkles}</span><span class="ft"><b>Ajudantes</b> ${feitos} de ${itens.length} terminaram</span></summary><ol class="pl-itens">${itens.map((i) => `<li class="pl-${i.estado}"><span class="pl-m">${marca[i.estado] || ''}</span><span><span>${esc(i.objetivo)}</span>${i.detalhe ? `<span class="mut" style="display:block;font-size:12px">${esc(i.detalhe)}</span>` : ''}</span></li>`).join('')}</ol></details>`
     return d
   }
-  function cartaoPlano(pl) {
+  function cartaoPlano(pl, encerrado) {
     const d = document.createElement('div')
+    // resposta já terminou e o agente não marcou os itens: nada de rodinha eterna (o item "fazendo" vira pendente, sem animação)
+    if (encerrado) pl = { ...pl, itens: pl.itens.map((i) => (i.estado === 'fazendo' ? { ...i, estado: 'pendente' } : i)) }
     const feitos = pl.itens.filter((i) => i.estado === 'feito').length
     d.className = 'ferr plano'
     const marca = { feito: IC.check, fazendo: '<span class="rodando"></span>', pendente: '<span class="pl-vazio"></span>', cancelado: IC.x }
@@ -568,7 +570,7 @@
     if (ehWeb || !window.sb.editor || !caminho) return ''
     return `<button data-editor="${attr(caminho)}">${IC.film || IC.file}Abrir no editor</button>`
   }
-  function renderPartes(el, partes) {
+  function renderPartes(el, partes, encerrado = false) {
     // o usuário abre e fecha os blocos de passos à mão: redesenhar (a cada evento do agente) não pode mudar isso
     const abertos = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => d.open).map((d) => d.dataset.chave))
     const fechados = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => !d.open).map((d) => d.dataset.chave))
@@ -615,7 +617,7 @@
         el.appendChild(cartaoSubagentes(p.itens))
       } else if (p.t === 'plano') {
         fechaGrupo()
-        el.appendChild(cartaoPlano(p.plano))
+        el.appendChild(cartaoPlano(p.plano, encerrado))
       } else if (p.t === 'ferr') {
         if (ehMidia(p.f)) {
           const sig = (p.f.id || '') + '|' + (p.f.status || '') + '|' + String(p.f.conteudo || '').length
@@ -678,7 +680,7 @@
       d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
     } else {
       d.innerHTML = `${QUEM}<button class="ouvir" data-ouvir title="Ouvir a resposta" aria-label="Ouvir a resposta">${IC.volume}</button></div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
-      renderPartes(d.querySelector('.partes'), partesDe(m))
+      renderPartes(d.querySelector('.partes'), partesDe(m), true)
       const nosCartoes = (m.partes || []).filter((p) => p.t === 'ferr').map((p) => String(p.f.conteudo || '')).join(' ')
       for (const a of m.midias || []) if (!nosCartoes.includes(a)) d.appendChild(midia(a)) // o cartão da ferramenta já mostra: não repete como anexo
     }
