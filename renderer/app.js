@@ -663,7 +663,8 @@
     } else {
       d.innerHTML = `${QUEM}<button class="ouvir" data-ouvir title="Ouvir a resposta" aria-label="Ouvir a resposta">${IC.volume}</button></div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
       renderPartes(d.querySelector('.partes'), partesDe(m))
-      for (const a of m.midias || []) d.appendChild(midia(a))
+      const nosCartoes = (m.partes || []).filter((p) => p.t === 'ferr').map((p) => String(p.f.conteudo || '')).join(' ')
+      for (const a of m.midias || []) if (!nosCartoes.includes(a)) d.appendChild(midia(a)) // o cartão da ferramenta já mostra: não repete como anexo
     }
     return d
   }
