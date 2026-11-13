@@ -4,6 +4,8 @@ description: |
   Decide, antes de qualquer pedido de vídeo, áudio ou imagem, se é EDIÇÃO (Motion: cortar, legendar, juntar, título animado, animação de texto, sem custo) ou CRIAÇÃO com modelo de IA (Estúdio: pessoa nova no vídeo, trocar carro, roupa ou rosto, foto que fala, voz clonada, cena nova, com preço). Use sempre que o usuário pedir "faça um vídeo", "edite", "legenda", "me coloca", "troca", "dubla", "narração", "animação", "reel".
 ---
 
+> **Regra de ouro das imagens:** toda imagem (criar ou editar foto) sai primeiro por `midia_gerar_imagem`, que já está no plano e **não gasta crédito**. Créditos do Estúdio só para imagem quando o usuário pedir algo acima do normal ("qualidade máxima", "o melhor que tiver") e aceitar o preço, ou quando o gerador padrão recusar o pedido (`imagem-livre`). Vídeo, voz e troca de pessoa são sempre Estúdio, com preço antes.
+
 # Motion ou Estúdio?
 
 Responda às 3 perguntas, nesta ordem:

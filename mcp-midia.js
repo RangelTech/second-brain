@@ -68,7 +68,7 @@ const FERRAMENTAS = [
   },
   {
     nome: 'estudio',
-    desc: 'CRIA no Estúdio (modelos de vídeo, voz e imagem de ponta). Só chame depois de midia_orcar e do SIM do usuário ao preço (passe confirmado=true). Troca de personagem, trocar o carro/roupa/cenário de um vídeo, foto que fala, sincronia labial, narração com voz clonada, vídeo de cinema. A ferramenta volta na hora; o app acompanha, baixa o arquivo e avisa no chat. Se falhar, nada é cobrado.',
+    desc: 'CRIA no Estúdio (modelos de vídeo, voz e imagem de ponta), cobrando créditos. Para IMAGEM, só use imagem-ponta se o usuário pedir explicitamente algo acima do normal (qualidade máxima, "o melhor possível") e imagem-livre só se midia_gerar_imagem recusar; o resto das imagens é midia_gerar_imagem, sem custo. Só chame depois de midia_orcar e do SIM do usuário ao preço (passe confirmado=true). Troca de personagem, trocar o carro/roupa/cenário de um vídeo, foto que fala, sincronia labial, narração com voz clonada, vídeo de cinema. A ferramenta volta na hora; o app acompanha, baixa o arquivo e avisa no chat. Se falhar, nada é cobrado.',
     schema: obj({
       efeito: { type: 'string', description: 'O mesmo efeito orçado em midia_orcar.' },
       confirmado: { type: 'boolean', description: 'true somente depois que o usuário aceitou o preço mostrado.' },
@@ -147,7 +147,7 @@ const FERRAMENTAS = [
   },
   {
     nome: 'gerar_imagem',
-    desc: 'Gera uma imagem a partir de uma descrição (cerca de 20 a 40 segundos, incluída no plano). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Título curto (1 a 3 palavras, caixa alta, entre aspas no prompt) sai legível. Para frase longa ou texto com acento (ÃO, É, Ç), gere a imagem SEM texto e avise que o texto pode ser colocado depois: o modelo erra acentos e letras. Para pessoas, peça a contagem exata no prompt (exactly two people).',
+    desc: 'PADRÃO PARA QUALQUER IMAGEM (criar ou editar foto): sempre use esta primeiro, não gasta crédito do usuário. Gera uma imagem a partir de uma descrição (cerca de 20 a 40 segundos, incluída no plano). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Título curto (1 a 3 palavras, caixa alta, entre aspas no prompt) sai legível. Para frase longa ou texto com acento (ÃO, É, Ç), gere a imagem SEM texto e avise que o texto pode ser colocado depois: o modelo erra acentos e letras. Para pessoas, peça a contagem exata no prompt (exactly two people).',
     schema: obj({
       prompt: { type: 'string', description: 'Descrição da imagem, em inglês, MUITO detalhada (60 a 120 palavras, mínimo 30): sujeito e aparência, cenário, enquadramento e lente, luz, paleta, atmosfera, estilo e qualidade.' },
       estilo: { type: 'string', enum: ['foto', 'cinema', 'ilustracao', 'anime', '3d', 'minimalista', 'aquarela'], description: 'Estilo visual (opcional; segue a preferência do usuário).' },

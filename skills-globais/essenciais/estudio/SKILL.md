@@ -4,6 +4,8 @@ description: |
   Roteiro do Estúdio (criação de vídeo, voz e imagem de ponta, com preço mostrado antes): trocar a pessoa de um vídeo, trocar carro, roupa, óculos ou cenário, foto que fala, sincronia labial, narração com voz clonada, vídeo de cinema. Use depois que a skill escolher-motion-ou-estudio indicar Estúdio.
 ---
 
+> **Regra de ouro das imagens:** toda imagem (criar ou editar foto) sai primeiro por `midia_gerar_imagem`, que já está no plano e **não gasta crédito**. Créditos do Estúdio só para imagem quando o usuário pedir algo acima do normal ("qualidade máxima", "o melhor que tiver") e aceitar o preço, ou quando o gerador padrão recusar o pedido (`imagem-livre`). Vídeo, voz e troca de pessoa são sempre Estúdio, com preço antes.
+
 # Estúdio
 
 ## Imagem e foto do usuário (não é Estúdio)
