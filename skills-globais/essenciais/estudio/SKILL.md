@@ -33,6 +33,13 @@ Editar ou criar **imagem** ("me veste de terno", "troca o fundo desta foto", "p�
 | `video-google` | vídeo com som ambiente e fala | `prompt` |
 | `imagem-ponta` | imagem com qualidade máxima (o comum é `midia_gerar_imagem`) | `prompt` |
 
+## Dublagem com a voz do usuário (`midia_dublar_video`)
+"Redubla esse vídeo com a minha voz", "dubla em inglês com a minha voz". Precisa de um vídeo com fala e de uma **amostra** da voz (áudio ou vídeo de 30 s a 5 min de fala limpa; peça se não tiver).
+1. Chame `midia_dublar_video` com `video` e `amostra` (e `idioma` se for outro idioma, `texto_novo` se o usuário reescreveu a fala). Ele ouve a fala, traduz se preciso e devolve o preço em créditos e um trecho do texto.
+2. Mostre o preço e o trecho; espere o SIM. Depois chame de novo com `confirmado: true` e os mesmos parâmetros.
+3. Entregue o caminho do vídeo. Avise que a música de fundo não é mantida e que a boca não é sincronizada.
+Custa créditos pelo tamanho da fala (5 minutos de fala ficam por volta de 40 créditos). Falou do Estúdio, nunca diga o nome do fornecedor.
+
 ## Prompt (para editar-video e vídeos novos)
 Em inglês, 40 a 120 palavras: o que trocar e por quê, o que manter ("same camera angle, same motion, same lighting, keep the background"), aparência do novo elemento (marca, cor, ano, material), estilo. Para roupa: "the man now wears a tailored navy blue suit with white shirt and silk tie, keep his face, hair and gestures".
 

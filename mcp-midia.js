@@ -44,6 +44,19 @@ const FORMATOS = { quadrado: '1024x1024', retrato: '832x1216', paisagem: '1216x8
 const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
   {
+    nome: 'dublar_video',
+    desc: 'REDUBLA um vídeo com a VOZ DO USUÁRIO (clonada de uma amostra) e, se pedido, em outro idioma: o vídeo fica igual, só a fala passa a ser dita com a voz dele. Duas etapas: 1) sem confirmado, ouve a fala do vídeo, traduz se preciso e devolve o PREÇO em créditos e um trecho do texto: mostre ao usuário e espere o SIM; 2) com confirmado=true, gera a voz e remonta o vídeo (de 1 a 6 minutos). Amostra: áudio ou vídeo com 30 s a 5 min de fala limpa da pessoa (quanto mais, melhor). A música de fundo não é mantida. A dublagem não sincroniza os lábios.',
+    schema: obj({
+      video: { type: 'string', description: 'Caminho do vídeo com fala (MP4, MOV, WEBM; até 500 MB).' },
+      amostra: { type: 'string', description: 'Caminho do áudio (ou vídeo) com a voz de quem vai falar (30 s a 5 min).' },
+      idioma: { type: 'string', description: 'Idioma da dublagem (pt, en, es, fr, de, it...). Padrão: o mesmo do vídeo.' },
+      idioma_origem: { type: 'string', description: 'Idioma original, se o usuário souber (senão é detectado).' },
+      texto_novo: { type: 'string', description: 'Opcional: o texto exato que deve ser dito (o usuário reescreveu a fala). Sem ele usa a fala original (traduzida se o idioma mudou).' },
+      confirmado: { type: 'boolean', description: 'true somente depois que o usuário aceitou o preço em créditos.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+    }, ['video', 'amostra']),
+  },
+  {
     nome: 'orcar',
     desc: 'Mostra o PREÇO e o tempo de um pedido do Estúdio ANTES de criar, sem gastar nada (1 segundo). Use SEMPRE antes de midia_estudio, midia_gerar_video, midia_trocar_personagem e midia_clonar_voz, mostre o valor ao usuário em reais e espere ele confirmar. Efeitos: video-rapido (texto ou foto vira vídeo, 5 a 15 s, mais barato), video-ponta (Wan 3.0, melhor movimento, 4 a 15 s), video-premium (Seedance 2.0, cinema), video-google (Veo 3.1, pode ter som), trocar-personagem (põe a pessoa de uma foto no vídeo do usuário, mantém o tamanho do vídeo), editar-video (troca objeto, roupa ou cenário num vídeo do usuário; partes de até 15 s), avatar-foto (uma foto que fala um áudio ou texto), sincronia-labial e sincronia-labial-pro (boca acompanha um áudio novo), voz e voz-hd (narração; voz aceita amostra para clonar), imagem-ponta (Seedream 5.5, quando o usuário pedir qualidade máxima; para imagem comum use midia_gerar_imagem).',
     schema: obj({
@@ -347,6 +360,43 @@ async function estudio(args) {
     prompt: args.prompt || args.texto || args.efeito, nome: args.nome || args.efeito, limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
 }
 
+// ---- Redublagem com a voz do usuário (dublagem.js): etapa 1 orça, etapa 2 gera e remonta
+async function dublarVideo(args) {
+  const dub = require('./dublagem')
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  const video = String(args.video || '')
+  if (!fs.existsSync(video) || !dub.temVideo(video)) throw new Error('O vídeo não foi encontrado nesse caminho (use MP4, MOV, WEBM ou MKV).')
+  if (!fs.existsSync(String(args.amostra || ''))) throw new Error('A amostra de voz não foi encontrada nesse caminho.')
+  const marca = hashMidia(video + '|' + (args.idioma || '') + '|' + (args.texto_novo || ''))
+  const arqScript = path.join(PASTA, '.midia', `dublagem-${marca}.json`)
+  let rascunho = null
+  try { rascunho = JSON.parse(fs.readFileSync(arqScript, 'utf8')) } catch {}
+  if (!rascunho) {
+    marcar('video', 'dublagem ' + marca, { status: 'running', position: null, eta_s: 60, progress: 10 })
+    rascunho = await dub.preparar({ video, idioma: args.idioma, idiomaOrigem: args.idioma_origem, textoNovo: args.texto_novo, api, base: BASE, chave: CHAVE, pasta: PASTA })
+    fs.mkdirSync(path.dirname(arqScript), { recursive: true })
+    fs.writeFileSync(arqScript, JSON.stringify(rascunho))
+  }
+  if (!args.confirmado) {
+    const o = await orcar({ efeito: 'voz', texto: rascunho.texto })
+    const previa = rascunho.texto.length > 280 ? rascunho.texto.slice(0, 280) + '…' : rascunho.texto
+    return `Fala encontrada: ${rascunho.texto.length} caracteres${rascunho.origem ? ` (idioma ${rascunho.origem}${rascunho.destino && rascunho.destino.slice(0, 2) !== rascunho.origem.slice(0, 2) ? ', traduzido para ' + rascunho.destino : ''})` : ''}. Trecho: "${previa}". ${o} Pergunte se pode dublar; depois chame midia_dublar_video de novo com confirmado=true (mesmos parâmetros).`
+  }
+  const blocos = dub.dividir(rascunho.texto)
+  const amostra = dataUri(String(args.amostra), 'Amostra de voz', 30)
+  const faixas = []
+  for (let i = 0; i < blocos.length; i++) {
+    const r = await (process.env.SB_MIDIA_MOCK ? simular('video', 'dublagem', process.env.SB_MIDIA_MOCK_ARQ || '') : rodarJob({ tipo: 'video', salvar: 'audio', rota: '/estudio/gerar',
+      corpo: { efeito: 'voz', texto: blocos[i], idioma: rascunho.destino, inputs: { audio: amostra } }, prompt: 'dublagem ' + marca + ' ' + i, nome: 'dub-voz-' + (i + 1), limiteMs: 10 * 60 * 1000 }))
+    if (!r || !r.caminho) throw new Error('A voz não ficou pronta. Nada foi cobrado desse trecho; tente de novo.')
+    faixas.push(r.caminho)
+  }
+  const saida = path.join(PASTA, 'Videos', `${limpo(args.nome || 'video-dublado')}-${stampAgora()}.mp4`)
+  const m = dub.montar({ video, faixas, saida })
+  try { fs.rmSync(arqScript, { force: true }) } catch {}
+  return { caminho: m.saida, segundos: Math.round(m.duracaoVideo), tamanho: Math.round(fs.statSync(m.saida).size / 1024) + ' KB', ajuste: m.fator }
+}
+
 const ehArquivoVideo = (p) => /\.(mp4|mov|webm|mkv)$/i.test(String(p || ''))
 function lerArquivo(caminho, rotulo, maxMb) {
   if (!caminho || !fs.existsSync(String(caminho))) throw new Error(`${rotulo}: o arquivo não foi encontrado nesse caminho.`)
@@ -487,6 +537,11 @@ async function tratar(msg) {
         const ctx = { base: BASE, chave: CHAVE, fetchFn: process.env.SB_MIDIA_MOCK ? async () => { throw new Error('mock') } : undefined }
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: formatarSaida(await detalhar(params?.arguments || {}, ctx)) }] } })
       }
+      if (nome === 'dublar_video') {
+        const v = await dublarVideo(params?.arguments || {})
+        const texto = typeof v === 'string' ? v : `Dublagem pronta (${v.segundos} s, ${v.tamanho}). caminho: ${v.caminho}`
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: texto }] } })
+      }
       if (nome === 'orcar') {
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: await orcar(params?.arguments || {}) }] } })
       }
@@ -537,4 +592,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { gerarImagem, gerarVideo, trocarPersonagem, clonarVoz, trocarVoz, redublarVideo, detalhar, conferirTroca, orcar, estudio, FERRAMENTAS, FORMATOS, configurar, concluirPendentes }
+module.exports = { dublarVideo, gerarImagem, gerarVideo, trocarPersonagem, clonarVoz, trocarVoz, redublarVideo, detalhar, conferirTroca, orcar, estudio, FERRAMENTAS, FORMATOS, configurar, concluirPendentes }
