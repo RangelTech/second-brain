@@ -1128,13 +1128,31 @@ app.whenReady().then(() => {
   // rotinas (cron do Hermes pelo gateway): listar, criar, pausar, retomar, apagar e ver a ultima saida
   const rotinasMod = require('./rotinas')
   // Em andamento (spec 34 §6.4): processos que o agente deixou rodando em segundo plano (servidor, download, build...), pelo gateway
-  const gwAgente = () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app))
-  ipcMain.handle('andamento:listar', seguro(async () => {
+  // por conversa ativa (process.list é por sessão); cada item guarda a sessão para poder parar só ele
+  async function processosDoAgente() {
     if (!motorGateway()) return []
-    const r = await gwAgente().rpc('agents.list', {}, 8000)
-    return (r.processes || []).filter((x) => !/^(exited|finished|killed|done)/i.test(String(x.status || ''))).map((x) => ({ comando: String(x.command || ''), estado: String(x.status || ''), segundos: Math.round(Number(x.uptime) || 0) }))
+    const out = []
+    for (const [chat, sx] of sessoes) {
+      if (!sx || !sx.sid || !sx.gw) continue
+      try {
+        const r = await sx.gw.rpc('process.list', { session_id: sx.sid }, 8000)
+        for (const x of r.processes || []) {
+          if (/^(exited|finished|killed|done|completed)/i.test(String(x.status || ''))) continue
+          out.push({ chat, sessao: sx.sid, id: String(x.session_id || x.id || ''), comando: String(x.command || ''), estado: String(x.status || ''), segundos: Math.round(Number(x.uptime_seconds ?? x.uptime) || 0) })
+        }
+      } catch {}
+    }
+    return out
+  }
+  ipcMain.handle('andamento:listar', seguro(() => processosDoAgente()))
+  ipcMain.handle('andamento:parar', seguro(async () => {
+    let n = 0
+    for (const x of await processosDoAgente()) {
+      const sx = [...sessoes.values()].find((y) => y && y.sid === x.sessao)
+      try { await sx.gw.rpc('process.kill', { session_id: x.sessao, process_id: x.id }, 15000); n++ } catch {}
+    }
+    return n
   }))
-  ipcMain.handle('andamento:parar', seguro(async () => (await gwAgente().rpc('process.stop', {}, 15000)).killed ?? 0))
   const rotinas = rotinasMod.criar({ app, home: () => caminhosHermes.homeAgente(app), obterGateway: () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app)) })
   ipcMain.handle('rotinas:listar', seguro(() => rotinas.listar()))
   ipcMain.handle('rotinas:criar', seguro((d) => rotinas.criar(d || {})))
