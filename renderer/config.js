@@ -698,6 +698,10 @@
       <p class="mut" id="at-txt">Verificando…</p>
       <label class="cfg-linha" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="at-auto"> Atualizar automaticamente</label>
       <div class="cfg-acoes"><button id="at-conf">Verificar agora</button><button id="at-baixar" hidden>Atualizar</button></div>
+      <div id="so-plano" hidden><h2>Segundo plano</h2>
+      <p class="mut">O agente fica rodando com o computador, mesmo com esta janela fechada: é assim que os seus workflows acontecem na hora marcada. O ícone fica na bandeja do sistema, perto do relógio.</p>
+      <label class="cfg-linha" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="so-inicio"> Iniciar com o computador</label>
+      <label class="cfg-linha" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="so-bandeja"> Fechar a janela deixa o agente rodando na bandeja</label></div>
       <h2>Dados e logs</h2>
       <p class="mut">Tudo fica neste computador: <code>${esc(i.dados)}</code>. Nada é enviado para fora, além das chamadas aos provedores que você conectou.</p>
       <div class="cfg-acoes"><button id="so-logs">Abrir pasta de dados e logs</button></div>
@@ -729,6 +733,17 @@
       $('#at-conf').onclick = async () => {
         $('#at-txt').textContent = 'Verificando…'
         pintar(await at.conferir())
+      }
+    }
+    if (window.sb.sistema) {
+      const e = await window.sb.sistema.estado().catch(() => null)
+      if (e && !e.indisponivel) {
+        $('#so-plano').hidden = false
+        $('#so-inicio').checked = !!e.inicio
+        $('#so-inicio').disabled = !e.instalado
+        $('#so-bandeja').checked = !!e.bandeja
+        $('#so-inicio').onchange = (ev) => window.sb.sistema.definir({ inicio: ev.target.checked })
+        $('#so-bandeja').onchange = (ev) => window.sb.sistema.definir({ bandeja: ev.target.checked })
       }
     }
     $('#so-logs').onclick = () => window.sb.abrirLogs()

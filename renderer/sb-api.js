@@ -105,6 +105,8 @@
       creditos: () => invoke('creditos:opcoes'), // saldos, pacotes de crédito e próximo plano (pop-up de limite estourado)
       contaUso: () => invoke('conta:uso'),
       contaPainel: () => invoke('conta:painel'),
+      conexoes: { estado: () => invoke('conexoes:estado'), abrir: (u) => invoke('conexoes:abrir', u), sair: (id) => invoke('conexoes:sair', id) },
+      sistema: { estado: () => invoke('sistema:estado'), definir: (m) => invoke('sistema:definir', m) },
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),
       ditadoServidor: (dados, mime) => invoke('ditado:servidor', dados, mime),

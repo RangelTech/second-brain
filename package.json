@@ -59,6 +59,7 @@
       "ferramentas.js",
       "mcp-editor.js",
       "mcp-motion.js",
+      "bandeja.js",
       "motion-render.js",
       "motion-preload.js",
       "motion-vendor/**",

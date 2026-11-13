@@ -18,6 +18,11 @@ const handlersIpc = new Map()
 }
 // modo servidor (VM sem tela): janela escondida, acesso web ligado, sem depender de monitor
 const MODO_SERVIDOR = process.argv.includes('--servidor') || process.env.SB_SERVIDOR === '1'
+// segundo plano (spec 37): no login o app abre escondido (--oculto) e fica na bandeja; abrir de novo só traz a janela da cópia que já roda
+const OCULTO = process.argv.includes('--oculto')
+let bandeja = null
+if (!MODO_SERVIDOR && !process.argv.includes('--preparar-agente') && !process.env.SB_MULTIPLAS_INSTANCIAS && !require('electron').app.requestSingleInstanceLock()) process.exit(0)
+require('electron').app.on('second-instance', () => bandeja?.mostrar())
 const embed = require('./embed-router')
 const { Sessao, ambienteMontado, prepararBase, definirPacote, localizarBinario, registrar: registrarAgente } = require('./agent')
 const skillsMod = require('./skills')
@@ -724,7 +729,7 @@ function criarJanela() {
     minHeight: 520,
     backgroundColor: '#1f1d1a',
     title: 'Segundo Cérebro',
-    show: !MODO_SERVIDOR,
+    show: !MODO_SERVIDOR && !OCULTO,
     icon: iconeDoApp(),
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
@@ -801,6 +806,15 @@ app.whenReady().then(() => {
   }
   session.defaultSession.setPermissionRequestHandler((_wc, permissao, cb) => cb(['media', 'clipboard-read'].includes(permissao)))
   criarJanela()
+  if (!MODO_SERVIDOR) {
+    try {
+      bandeja = require('./bandeja').criar({ app, janela: () => janela, icone: iconeDoApp(), cfg: () => cfg, salvarCfg, abrirAba: (aba) => janela?.webContents.executeJavaScript(`window.SBConfig && window.SBConfig.abrir(${JSON.stringify(aba)})`).catch(() => {}) })
+    } catch (e) {
+      console.error('bandeja:', e && e.message)
+    }
+  }
+  ipcMain.handle('sistema:estado', () => bandeja?.estado() || { inicio: false, bandeja: false, instalado: app.isPackaged, indisponivel: true })
+  ipcMain.handle('sistema:definir', (_e, m) => bandeja?.definir({ ...(m && 'inicio' in m ? { iniciarComSistema: !!m.inicio } : {}), ...(m && 'bandeja' in m ? { fecharParaBandeja: !!m.bandeja } : {}) }))
   nav = navegadorMod.criar({
     app,
     janela: () => janela,
@@ -834,6 +848,70 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
   ipcMain.handle('navegador:estado', () => nav.estado())
+  // Conexões (spec 37): contas usadas pelo navegador integrado. "Conectado" = cookie de sessão do site na partição do navegador.
+  // WhatsApp e Telegram Web guardam a sessão no IndexedDB (sem cookie): ficam "abra para conferir".
+  const CONEXOES = {
+    whatsapp: { dominios: ['whatsapp.com'], armazenado: ['_https://web.whatsapp.com', 'last-wid'] },
+    telegram: { dominios: ['telegram.org'], armazenado: ['_https://web.telegram.org', 'user_auth'] },
+    instagram: { dominios: ['instagram.com'], cookie: 'sessionid' },
+    facebook: { dominios: ['facebook.com', 'messenger.com'], cookie: 'c_user' },
+    tiktok: { dominios: ['tiktok.com'], cookie: 'sessionid' },
+    linkedin: { dominios: ['linkedin.com'], cookie: 'li_at' },
+    x: { dominios: ['x.com', 'twitter.com'], cookie: 'auth_token' },
+    gmail: { dominios: ['google.com'], cookie: 'SID' },
+  }
+  const sessaoNav = () => session.fromPartition('persist:navegador')
+  const segC = (fn) => async (_e, ...a) => { try { return { ok: true, dado: await fn(...a) } } catch (err) { return { ok: false, erro: String(err.message || err) } } }
+  // WhatsApp e Telegram Web: a sessão fica no localStorage do site (chave last-wid / user_auth), lido direto dos arquivos da partição
+  const noArmazenamento = (origem, chave) => {
+    const pasta = path.join(app.getPath('userData'), 'Partitions', 'navegador', 'Local Storage', 'leveldb')
+    try {
+      for (const f of fs.readdirSync(pasta)) {
+        if (!f.endsWith('.log') && !f.endsWith('.ldb')) continue
+        const b = fs.readFileSync(path.join(pasta, f)).toString('latin1')
+        let i = b.indexOf(origem)
+        while (i >= 0) {
+          if (b.slice(i, i + origem.length + 40).includes(chave)) return true
+          i = b.indexOf(origem, i + 1)
+        }
+      }
+    } catch {}
+    return false
+  }
+  ipcMain.handle('conexoes:estado', segC(async () => {
+    const out = {}
+    for (const [id, c] of Object.entries(CONEXOES)) {
+      let tem = false
+      for (const d of c.dominios) {
+        const ck = await sessaoNav().cookies.get({ domain: d }).catch(() => [])
+        if (c.cookie ? ck.some((x) => x.name === c.cookie && x.value) : false) tem = true
+      }
+      if (c.armazenado && !tem) tem = noArmazenamento(c.armazenado[0], c.armazenado[1])
+      out[id] = { conectado: tem }
+    }
+    return out
+  }))
+  ipcMain.handle('conexoes:abrir', segC(async (url) => {
+    if (!String(url).startsWith('https://')) throw new Error('endereço inválido')
+    janela?.webContents.send('navegador:abrir-painel')
+    await nav.acao('ir', String(url))
+    return true
+  }))
+  ipcMain.handle('conexoes:sair', segC(async (id) => {
+    const c = CONEXOES[id]
+    if (!c) throw new Error('conta desconhecida')
+    const ses = sessaoNav()
+    for (const d of c.dominios) {
+      for (const ck of await ses.cookies.get({ domain: d }).catch(() => [])) {
+        const host = ck.domain.startsWith('.') ? ck.domain.slice(1) : ck.domain
+        await ses.cookies.remove(`https://${host}${ck.path || '/'}`, ck.name).catch(() => {})
+      }
+      await ses.clearStorageData({ origin: `https://${d}`, storages: ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage'] }).catch(() => {})
+      await ses.clearStorageData({ origin: `https://web.${d}`, storages: ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage'] }).catch(() => {})
+      await ses.clearStorageData({ origin: `https://www.${d}`, storages: ['localstorage', 'indexdb', 'serviceworkers', 'cachestorage'] }).catch(() => {})
+    }
+    return true
+  }))
   ipcMain.handle('navegador:captura', () => nav.captura().catch(() => null))
   ipcMain.handle('navegador:clique', (_e, x, y) => (nav.clicarPonto(x, y), true))
   ipcMain.handle('navegador:digitar-texto', (_e, t) => nav.digitarTexto(t).then(() => true))
@@ -1375,7 +1453,7 @@ app.whenReady().then(() => {
     sessoes.get(id)?.cancelar()
     return true
   })
-  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && criarJanela())
+  app.on('activate', () => (BrowserWindow.getAllWindows().length === 0 ? criarJanela() : bandeja?.mostrar()))
 })
 app.on('window-all-closed', () => {
   embed.parar()

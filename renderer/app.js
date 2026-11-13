@@ -1250,7 +1250,7 @@
     if (r.travou && c && (r.retomadas || 0) < MAX_RETOMADAS) {
       // nada aconteceu ainda (agente não chegou a responder): reenvia o pedido original; se já havia trabalho feito, retoma em passos pequenos
       if (!r.partes.length) enviarMensagem(c, r.texto, r.anexosEnviados || [], (r.retomadas || 0) + 1, true)
-      else enviarMensagem(c, 'Continue exatamente de onde parou.', [], (r.retomadas || 0) + 1)
+      else enviarMensagem(c, 'Continue exatamente de onde parou.', [], (r.retomadas || 0) + 1, true) // retomada automática: não vira mensagem do usuário
       return
     }
     proximaDaFila(id)
@@ -1278,6 +1278,8 @@
       }
       if (visivel(r)) r.el.querySelector('.atividade')?.classList.remove('compactando')
       const parou = Date.now() - r.ultimo
+      // esperando o usuário (permissão ou pergunta na tela) não é travamento: o relógio de "sem sinal" recomeça quando ele responder
+      if (r.perms && r.perms.length) r.ultimo = Date.now()
       const isento = r.fase === 'Executando ferramenta' && parou < LIMITE_FERRAMENTA_MS
       if (parou > LIMITE_SEM_SINAL_MS && !isento && !r.travou && !r.paradoManual) {
         r.travou = true

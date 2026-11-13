@@ -274,3 +274,15 @@
 .ct-selo.leve{background:var(--card,#262624);color:#d97757;border:1px solid rgba(217,119,87,.5)}
 .ct-amigo{margin-top:14px;font-size:13px;color:var(--mut);line-height:1.5;padding:12px 14px;border-radius:12px;border:1px dashed var(--bd)}
 .ct-amigo b{color:var(--tx,#eee);font-weight:500}
+
+/* Conexões (spec 37) */
+.cx-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}
+.cx-card{display:flex;gap:14px;align-items:center;padding:16px;border-radius:14px;border:1px solid var(--bd);background:var(--card,#262624)}
+.cx-logo{flex:none;width:44px;height:44px;border-radius:12px;background:var(--cor);display:grid;place-items:center;box-shadow:0 6px 18px color-mix(in srgb,var(--cor) 35%,transparent)}
+.cx-txt{flex:1;min-width:0}
+.cx-nome{font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cx-desc{font-size:13px;color:var(--mut);margin-top:3px;line-height:1.4}
+.cx-st{font-size:11px;font-weight:500;padding:2px 8px;border-radius:999px;border:1px solid var(--bd);color:var(--mut)}
+.cx-st.ok{color:#4caf7d;border-color:rgba(76,175,125,.5);background:rgba(76,175,125,.1)}
+.cx-acoes{display:flex;flex-direction:column;gap:6px;flex:none}
+@media (max-width:700px){.cx-grade{grid-template-columns:1fr}}

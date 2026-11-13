@@ -86,7 +86,10 @@ async function previa(args) {
   const tempos = (o.quadros && o.quadros.length ? o.quadros : [0.2, o.duracao / 2, Math.max(0, o.duracao - 0.2)]).slice(0, 8)
   const p = await abrirPagina(o)
   try {
-    const base = o.saida.replace(/\.mp4$/i, '')
+    // os quadros vão para uma pasta temporária (não sujam a pasta do cliente); o HTML continua carregando da pasta do vídeo
+    const pasta = path.join(os.tmpdir(), 'sb-motion-previa')
+    fs.mkdirSync(pasta, { recursive: true })
+    const base = path.join(pasta, path.basename(o.saida).replace(/\.mp4$/i, ''))
     const arquivos = []
     for (const t of tempos) {
       const img = await quadro(p.wc, o, Math.min(o.duracao, t) * 1000)
