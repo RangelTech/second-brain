@@ -903,6 +903,7 @@ app.whenReady().then(() => {
   const proxyNav = require('./proxy-navegador').criar({
     app, session, net: require('electron').net, registrar: (t) => registrarAgente(app, t),
     buscar: async () => {
+      if (process.env.SB_PROXY_NAV) return { proxy: process.env.SB_PROXY_NAV, dominios: require('./proxy-navegador').DOMINIOS_PADRAO } // teste e VMs provisionadas sem o painel
       if (!cfg.unlimitedChave) return { proxy: null }
       const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
       const r = await fetch(base + '/app/proxy-navegador', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })

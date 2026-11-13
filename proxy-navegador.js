@@ -3,6 +3,7 @@
 // (economiza GB e não muda nada nos outros sites). Vale só para a partição do navegador integrado. Usuário e senha do proxy
 // respondem ao pedido de autenticação do Chromium e nunca vão para log.
 const PARTICAO = 'persist:navegador'
+const DOMINIOS_PADRAO = ['instagram.com', 'cdninstagram.com', 'facebook.com', 'fbcdn.net', 'messenger.com', 'threads.net', 'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'byteoversea.com', 'whatsapp.com', 'whatsapp.net', 'x.com', 'twitter.com', 'twimg.com', 'linkedin.com', 'licdn.com']
 
 function pacDe(proxyUrl, dominios) {
   const u = new URL(proxyUrl)
@@ -93,4 +94,4 @@ function criar({ app, session, net, buscar, registrar = () => {} }) {
   return { aplicar, atualizar, estado, testar }
 }
 
-module.exports = { criar, pacDe, PARTICAO }
+module.exports = { criar, pacDe, PARTICAO, DOMINIOS_PADRAO }
