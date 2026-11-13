@@ -426,3 +426,20 @@
 
 .video-local{display:flex;flex-direction:column;gap:10px;margin:12px 0 4px;width:min(420px,100%)}
 .video-local video{border-radius:12px;max-height:520px;width:auto;max-width:100%;align-self:flex-start;background:#000}
+
+/* plano da tarefa e pergunta do agente */
+.ferr.plano .pl-itens{list-style:none;margin:0;padding:6px 14px 12px;display:flex;flex-direction:column;gap:7px}
+.ferr.plano li{display:flex;gap:10px;align-items:flex-start;line-height:1.4}
+.ferr.plano .pl-m{display:inline-flex;width:18px;height:18px;flex:none;align-items:center;justify-content:center;color:var(--mut)}
+.ferr.plano .pl-m .ic{width:16px;height:16px}
+.ferr.plano .pl-feito .pl-m{color:var(--ok)}
+.ferr.plano .pl-feito>span:last-child{color:var(--mut);text-decoration:line-through}
+.ferr.plano .pl-fazendo>span:last-child{font-weight:600}
+.pl-vazio{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--bd);display:inline-block}
+.permissao.pergunta{flex-direction:column;align-items:stretch;gap:12px}
+.permissao.pergunta .perg-txt{margin-top:6px;font-size:15px;line-height:1.5;color:var(--fg)}
+.permissao.pergunta .perg-esc{display:flex;flex-direction:column;gap:8px}
+.permissao.pergunta .perg-esc button{width:100%;text-align:left;padding:11px 14px;border-radius:10px;font-size:15px}
+.permissao.pergunta .perg-aberta{display:flex;gap:8px;flex-wrap:wrap}
+.permissao.pergunta .perg-aberta input{flex:1;min-width:180px;background:var(--lat);border:1px solid var(--bd);border-radius:10px;color:var(--fg);padding:9px 12px;font:inherit}
+.permissao.pergunta .perg-aberta input:focus{outline:2px solid var(--ac);outline-offset:1px}

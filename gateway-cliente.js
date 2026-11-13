@@ -34,6 +34,11 @@ function traducao(ev, estado = {}) {
       const res = textoDoResultado(p.result)
       return [{ ferramenta: { id, titulo: guardada.nome, tipo: tipoDaFerramenta(guardada.nome), status: p.is_error === true ? 'failed' : 'completed', conteudo: res.slice(0, 4000), caminho: caminhoDe(guardada.args), entrada: JSON.stringify(guardada.args).slice(0, 600) } }]
     }
+    case 'todo.updated': {
+      const itens = Array.isArray(p.todos) ? p.todos : Array.isArray(p.items) ? p.items : []
+      const norm = itens.map((t, i) => ({ id: String(t.id ?? i), texto: String(t.content || t.text || t.title || ''), estado: /complet|done|ok/i.test(t.status || t.state || '') ? 'feito' : /progress|doing|andamento/i.test(t.status || t.state || '') ? 'fazendo' : /cancel/i.test(t.status || t.state || '') ? 'cancelado' : 'pendente' })).filter((t) => t.texto)
+      return norm.length ? [{ plano: { itens: norm, revisao: Number(p.revision ?? p.revisao ?? Date.now()) } }] : []
+    }
     case 'session.usage': {
       const u = p.used ?? p.context_used ?? p.total_tokens
       return u >= 0 ? [{ contexto: { usado: u, tamanho: p.size || p.context_size || 262144 } }] : []
@@ -82,6 +87,7 @@ function pedidoDePermissao(ev) {
     prompt_id: p.prompt_id,
     execution_generation: p.execution_generation,
     clarify: ev.type === 'clarify.request',
+    pergunta: ev.type === 'clarify.request' ? { texto: String(p.question || ''), escolhas: Array.isArray(p.choices) ? p.choices.map(String) : [], multi: !!p.multi_select } : null,
     titulo: p.description || p.command || p.question || 'Ação do agente',
     tipo: p.edit ? 'edit' : 'execute',
     escolhas,

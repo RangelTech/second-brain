@@ -170,3 +170,28 @@ test('SessaoGateway: parar interrompe a conversa no gateway e libera a pergunta'
   assert.ok(gw.chamadas.some((c) => c.method === 'session.interrupt' && c.params.session_id === 'S1'))
   s.encerrar()
 })
+
+test('plano da tarefa (todo.updated) vira lista com estados', () => {
+  const r = traducao({ type: 'todo.updated', payload: { revision: 3, todos: [{ id: 'a', content: 'Criar a pasta', status: 'completed' }, { id: 'b', content: 'Mover os arquivos', status: 'in_progress' }, { id: 'c', content: 'Conferir', status: 'pending' }] } })
+  assert.equal(r.length, 1)
+  assert.equal(r[0].plano.revisao, 3)
+  assert.deepEqual(r[0].plano.itens.map((i) => i.estado), ['feito', 'fazendo', 'pendente'])
+  assert.deepEqual(traducao({ type: 'todo.updated', payload: { revision: 1, todos: [] } }), [])
+})
+
+test('pergunta do agente (clarify) chega com as escolhas e a resposta volta pelo clarify.respond', async () => {
+  const p = pedidoDePermissao({ type: 'clarify.request', payload: { prompt_id: 'q1', execution_generation: 4, question: 'Qual cor?', choices: ['azul', 'verde'], multi_select: false } })
+  assert.equal(p.clarify, true)
+  assert.deepEqual(p.pergunta, { texto: 'Qual cor?', escolhas: ['azul', 'verde'], multi: false })
+  const gw = gwFalso()
+  let visto = null
+  const { s } = montar(gw, { pedirPermissao: async (x) => { visto = x; return 'resp:verde' } })
+  await s.perguntar('um')
+  gw.emitir({ type: 'clarify.request', session_id: 'S1', payload: { prompt_id: 'q1', execution_generation: 4, question: 'Qual cor?', choices: ['azul', 'verde'] } })
+  await new Promise((r) => setTimeout(r, 30))
+  assert.equal(visto.tipo, 'clarify')
+  assert.deepEqual(visto.pergunta.escolhas, ['azul', 'verde'])
+  const resp = gw.chamadas.find((c) => c.method === 'clarify.respond')
+  assert.deepEqual({ ...resp.params }, { session_id: 'S1', prompt_id: 'q1', execution_generation: 4, answer: 'verde' })
+  s.encerrar()
+})

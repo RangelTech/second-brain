@@ -1215,7 +1215,7 @@ app.whenReady().then(() => {
       new Promise((resolve) => {
         const req = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
         permissoes.set(req, (r) => (permissoes.delete(req), resolve(r)))
-        e.sender.send('chat:permissao', { id, req, titulo: p.titulo, tipo: p.tipo })
+        e.sender.send('chat:permissao', { id, req, titulo: p.titulo, tipo: p.tipo, pergunta: p.pergunta || null })
         ac.signal.addEventListener('abort', () => permissoes.get(req)?.('negar'))
       })
     try {

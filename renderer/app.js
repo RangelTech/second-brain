@@ -513,6 +513,16 @@
     }
   }
 
+  // plano da tarefa: lista com marcas (feito, fazendo, pendente), no mesmo estilo dos cartoes de ferramenta
+  function cartaoPlano(pl) {
+    const d = document.createElement('div')
+    const feitos = pl.itens.filter((i) => i.estado === 'feito').length
+    d.className = 'ferr plano'
+    const marca = { feito: IC.check, fazendo: '<span class="rodando"></span>', pendente: '<span class="pl-vazio"></span>', cancelado: IC.x }
+    d.innerHTML = `<details open><summary><span class="fi">${IC.list || IC.file}</span><span class="ft"><b>Plano</b> ${feitos} de ${pl.itens.length} passos</span></summary><ol class="pl-itens">${pl.itens.map((i) => `<li class="pl-${i.estado}"><span class="pl-m">${marca[i.estado] || marca.pendente}</span><span>${esc(i.texto)}</span></li>`).join('')}</ol></details>`
+    return d
+  }
+
   function partesDe(m) {
     return m.partes || [{ t: 'texto', v: m.content }]
   }
@@ -549,6 +559,9 @@
         c.innerHTML = md(p.v)
         el.appendChild(c)
         if (/\.(mp4|webm|mov)\b/i.test(p.v || '')) playersLocais(c)
+      } else if (p.t === 'plano') {
+        fechaGrupo()
+        el.appendChild(cartaoPlano(p.plano))
       } else if (p.t === 'ferr') {
         if (ehMidia(p.f)) {
           const card = cartaoFerramenta(p.f)
@@ -968,6 +981,23 @@
   // resposta em curso de uma conversa: o estado vive em `respostas`; a bolha só existe enquanto a conversa está na tela
   function cartaoPermissao(r, p) {
     const d = document.createElement('div')
+    if (p.pergunta) {
+      // o agente quer saber algo (clarify): botões com as escolhas ou campo de texto; "Pular" deixa o agente seguir sozinho
+      d.className = 'permissao pergunta'
+      const esc2 = p.pergunta.escolhas || []
+      d.innerHTML = `<div><b>${IC.sparkles} O agente tem uma pergunta</b><div class="perg-txt">${esc(p.pergunta.texto || p.titulo)}</div></div>` +
+        (esc2.length ? `<div class="facoes perg-esc">${esc2.map((c, i) => `<button data-r="${i}" class="primario">${esc(String(c).replace(/\s*\(Recommended\)/i, ' (recomendado)'))}</button>`).join('')}</div>` : '') +
+        `<div class="perg-aberta"><input type="text" placeholder="${esc2.length ? 'Ou escreva outra resposta' : 'Escreva a sua resposta'}" aria-label="Resposta"><button data-enviar="1" class="primario">Responder</button><button data-pular="1">Pular</button></div>`
+      const responder = (txt) => { window.sb.responderPermissao(p.req, 'resp:' + txt); r.perms = r.perms.filter((x) => x.req !== p.req); d.remove() }
+      d.onclick = (e) => {
+        const t = e.target
+        if (t.dataset?.r != null) return responder(esc2[+t.dataset.r])
+        if (t.dataset?.pular) return responder('')
+        if (t.dataset?.enviar) { const v = d.querySelector('input').value.trim(); if (v) responder(v) }
+      }
+      d.querySelector('input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) responder(v) } })
+      return d
+    }
     d.className = 'permissao'
     d.innerHTML = `<div><b>${IC.shield} O agente pede permissão</b><div class="mut">${esc(p.titulo)}</div></div><div class="facoes"><button data-p="permitir" class="primario">Permitir</button><button data-p="sempre">Permitir sempre nesta conversa</button><button data-p="negar">Negar</button></div>`
     d.onclick = (e) => {
@@ -1350,6 +1380,14 @@
         a.hidden = false
         a.textContent = d.aviso
       }
+    }
+    if (d.plano) {
+      // plano da tarefa (todo do agente): um cartao unico no topo da resposta, atualizado a cada revisao
+      const ex = r.partes.find((p) => p.t === 'plano')
+      if (!ex) r.partes.unshift({ t: 'plano', plano: d.plano })
+      else if ((d.plano.revisao || 0) >= (ex.plano.revisao || 0)) ex.plano = d.plano
+      const feitos = d.plano.itens.filter((i) => i.estado === 'feito').length
+      anotar(r, `Plano: ${feitos} de ${d.plano.itens.length} passos`)
     }
     if (d.texto) {
       if (r.base !== 'escrever') (r.base = 'escrever'), cardDe(r)?.base('escrever'), definirFrase(r, 'Escrevendo a resposta…')

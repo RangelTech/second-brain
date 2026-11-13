@@ -444,7 +444,33 @@ const PLUGINS_FORA = [
   'web-brave-free', 'web-ddgs', 'web-exa', 'web-firecrawl', 'web-keenable', 'web-openai-native', 'web-parallel', 'web-perplexity', 'web-searxng', 'web-tavily', 'web-xai',
   'hermes-achievements', 'google_meet', 'teams_pipeline', 'disk-cleanup',
 ]
-function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
+// motor gateway (spec 34 fase 2): o agente ganha TODAS as ferramentas do Hermes (plano da tarefa, perguntas, memoria, busca em conversas, voz, rotinas, subagentes,
+// script com varias ferramentas, pesquisa na web). A imagem/video do Hermes ficam de fora: a midia e a nossa (creditos, 9Router, Estudio).
+function yamlGateway(filhos = 3) {
+  return [
+    'platform_toolsets:',
+    '  acp:',
+    '    - hermes-cli',
+    'memory:',
+    '  memory_enabled: true',
+    '  user_profile_enabled: true',
+    '  write_approval: false',
+    'code_execution:',
+    '  mode: project',
+    '  timeout: 300',
+    '  max_tool_calls: 50',
+    'delegation:',
+    `  max_concurrent_children: ${Math.max(1, Math.min(10, filhos | 0))}`,
+    '  child_timeout_seconds: 900',
+    'clarify:',
+    '  timeout: 300',
+    'tts:',
+    '  provider: edge',
+    'skills:',
+    '  write_approval: false',
+  ]
+}
+function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gateway, filhos }) {
   const home = prepararBase(app)
   aplicarSeguranca(home, nivel)
   // a configuração é escrita pelo app, nunca à mão: o modelo é o combo do motor local
@@ -476,7 +502,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
     '  environment_probe: false', // sondagem do toolchain da maquina a cada partida: nao entra no nosso prompt
     // PARTIDA: o Hermes descobre e carrega 59 plugins (provedores de imagem, video, busca, navegador externo, Discord, Feishu...) e nenhum serve ao
     // Segundo Cerebro: imagem, video, navegador e memoria sao os NOSSOS servidores MCP. Cada plugin e um import e um check_fn na partida e no 1o turno.
-    ...(process.env.SB_SEM_PLUGINS_FORA ? [] : ['plugins:', `  disabled: ${JSON.stringify(PLUGINS_FORA)}`]), // SB_SEM_PLUGINS_FORA=1 so para medir/comparar
+    ...(process.env.SB_SEM_PLUGINS_FORA ? [] : ['plugins:', `  disabled: ${JSON.stringify(gateway ? PLUGINS_FORA.filter((x) => x !== 'web-ddgs') : PLUGINS_FORA)}`]), // SB_SEM_PLUGINS_FORA=1 so para medir/comparar
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     // (so aceita nome de TOOLSET; `search_files` sozinha e tirada pela ponte-llm.js, porque o toolset `file` levaria read/write junto)
@@ -484,6 +510,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel }) {
     // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
     // com a conta do Unlimited, a visão vai direto a ele. Sem a conta, o Hermes decide sozinho.
     ...(visao ? ['auxiliary:', '  vision:', '    provider: "custom"', `    model: ${JSON.stringify(visao.modelo)}`, `    base_url: ${JSON.stringify(visao.base)}`, '    api_key_env: "SB_VISAO_CHAVE"'] : []),
+    ...(gateway ? yamlGateway(filhos) : []),
     'terminal:',
     '  backend: "local"',
     `  cwd: ${JSON.stringify(pasta.replace(/\\/g, '/'))}`,

@@ -21,7 +21,7 @@ class SessaoGateway {
   get emitir() { return this.mudo ? () => {} : this._emitir || (() => {}) }
   set emitir(f) { this._emitir = f }
 
-  constructor({ app, id: chat, pasta, base, modelo, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, gateway }) {
+  constructor({ app, id: chat, pasta, base, modelo, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, gateway, filhos }) {
     this.app = app
     this.id = chat
     this.pasta = pasta
@@ -43,7 +43,7 @@ class SessaoGateway {
     this.estado = {}
     this.permitirSempre = false
     this.turnosVivos = ''
-    const home = agente.prepararHome(app, { base, modelo: 'principal', pasta, raciocinio, nivel, visao: midia ? { base: midia.base, modelo: 'qwen-abliterated', chave: midia.chave } : null })
+    const home = agente.prepararHome(app, { base, modelo: 'principal', pasta, raciocinio, nivel, gateway: true, filhos: filhos || 3, visao: midia ? { base: midia.base, modelo: 'qwen-abliterated', chave: midia.chave } : null })
     this.home = home
     this.gw = gateway || obterGateway(app, home) // `gateway`: injetado nos testes
     this.cai = () => { this.sid = null } // a ponte caiu: a próxima pergunta cria a conversa de novo
@@ -86,12 +86,18 @@ class SessaoGateway {
   }
 
   async _permissao(p, ev) {
-    const opcoes = p.escolhas.map((c) => ({ optionId: c, kind: c === 'deny' ? 'reject_once' : c === 'once' ? 'allow_once' : 'allow_always', name: c }))
+    const opcoes = (p.escolhas || []).map((c) => ({ optionId: c, kind: c === 'deny' ? 'reject_once' : c === 'once' ? 'allow_once' : 'allow_always', name: c }))
     const responder = (choice) => this.gw.rpc(p.clarify ? 'clarify.respond' : 'approval.respond', {
       session_id: ev.session_id, prompt_id: p.prompt_id, execution_generation: p.execution_generation, ...(p.clarify ? { answer: choice } : { choice }),
     }).catch((e) => agente.registrar(this.app, 'permissao: ' + e.message))
     try {
-      if (p.clarify) return void (await responder(''))
+      if (p.clarify) {
+        // pergunta do agente: o cartao mostra as escolhas (ou campo aberto); sem resposta em 5 min o agente segue com o padrao dele
+        let t
+        const r = await Promise.race([this.pedirPermissao({ chat: this.id, titulo: p.pergunta?.texto || p.titulo, tipo: 'clarify', pergunta: p.pergunta }), new Promise((ok) => { t = setTimeout(() => ok('resp:'), 300000); t.unref?.() })])
+        clearTimeout(t)
+        return void (await responder(typeof r === 'string' && r.startsWith('resp:') ? r.slice(5) : ''))
+      }
       if (this.permitirSempre) return void (await responder('once'))
       const tc = { title: p.titulo, kind: p.tipo, rawInput: { command: p.titulo } }
       if (agente.decidirPermissao(this.modo(), tc, this.pasta) === 'permitir') return void (await responder('once'))
