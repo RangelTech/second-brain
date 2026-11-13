@@ -9,6 +9,8 @@ const PAGINA_INICIAL = 'https://www.google.com/?hl=pt-BR'
 function resolverEntrada(entrada) {
   const u = String(entrada || '').trim()
   if (/^https?:\/\//i.test(u)) return u
+  // arquivo do computador (site que o agente acabou de criar, PDF, imagem): caminho do Windows/Linux vira file://
+  if (/^[a-zA-Z]:[\\/]/.test(u) || /^\/[^/]/.test(u)) return require('url').pathToFileURL(u).href
   if (/^[a-z][a-z0-9+.-]*:/i.test(u) && !/^[^\s:]+:\d+(\/|$)/.test(u)) return u // outro esquema (file:, javascript:...) é recusado adiante
   const pareceEndereco = !/\s/.test(u) && (/^localhost(:\d+)?(\/|$)/i.test(u) || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/|$)/.test(u) || /^[^\s/]+\.[a-z]{2,}(:\d+)?([/?#].*)?$/i.test(u))
   if (pareceEndereco) return (/^localhost|^\d/.test(u) ? 'http://' : 'https://') + u
@@ -192,7 +194,12 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     let u = String(url || '').trim()
     if (!u) throw new Error('Informe a URL.')
     u = resolverEntrada(u)
-    if (!/^https?:/i.test(u)) throw new Error('Só aceito endereços http e https.')
+    if (/^file:/i.test(u)) {
+      // arquivos locais: só os que existem e são de ver (página, PDF, imagem, vídeo, texto), nunca executáveis
+      const local = require('url').fileURLToPath(u.split('#')[0].split('?')[0])
+      if (!fs.existsSync(local)) throw new Error('Arquivo não encontrado: ' + local)
+      if (!/\.(html?|pdf|png|jpe?g|gif|webp|svg|mp4|webm|txt|md|json|csv)$/i.test(local)) throw new Error('Só abro páginas, PDFs, imagens, vídeos e textos do computador.')
+    } else if (!/^https?:/i.test(u)) throw new Error('Só aceito endereços http, https ou arquivos do computador.')
     await Promise.race([wc.loadURL(u).catch((e) => {
       if (!/ERR_ABORTED/.test(String(e))) throw e
     }), esperar(TEMPO_CARGA_MS).then(() => { throw new Error('A página demorou mais de 35 s para carregar.') })])
