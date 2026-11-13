@@ -56,8 +56,8 @@ XTTS_DIR = RAIZ / "modelos" / "xtts_v2"
 # pacote de rodas (wheels) por sistema, Python 3.12: tudo o que os dois motores usam, travado nas versões testadas juntas.
 # Dentro do zip: as rodas + requisitos.txt (lista travada). sha256 vazio = pacote ainda não publicado para esse sistema (usa a internet).
 RODAS = {
-    "win_amd64": ("6ad8763374b1f93fe903d1323947a4bd74d728b3f62d7d73516d47ea62edfa80", "voz-rodas-win_amd64-cp312.zip"),
-    "linux_x86_64": ("b26a93248dd67d8b3645d95a878340a09d83d18c6ea3a0a2fc2257d8116df434", "voz-rodas-linux_x86_64-cp312.zip"),
+    "win_amd64": ("13177a9f523841ac2b65ec1ee8d3880e28d1453cddec95ba733aae4e0e6aa1fd", "voz-rodas-win_amd64-cp312.zip"),
+    "linux_x86_64": ("77c132a34ab0b24a803594b88a273b66c43ac7136ecea66a975d87841bbe4d01", "voz-rodas-linux_x86_64-cp312.zip"),
 }
 # versões que funcionaram juntas (13/11/2026, Python 3.12, Windows 11 e Ubuntu 24.04)
 PIP_BASE = ["piper-tts==1.8.0", "librosa==1.0.1", "soundfile==0.14.0", "numpy==2.5.4", "pydub", "inflect", "unidecode", "eng_to_ipa", "pypinyin", "jieba", "cn2an"]
@@ -82,6 +82,19 @@ def _sha(p):
         for bloco in iter(lambda: f.read(1 << 20), b""):
             h.update(bloco)
     return h.hexdigest()
+
+
+def _urlretrieve(url, destino):
+    """Baixa com o Python; se o TLS do Python falhar (certificado que só o sistema conhece), usa o curl do sistema."""
+    try:
+        urllib.request.urlretrieve(url, destino)
+    except Exception as e:  # noqa: BLE001
+        if "CERTIFICATE" not in str(e).upper() and "SSL" not in str(e).upper():
+            raise
+        curl = shutil.which("curl") or shutil.which("curl.exe")
+        if not curl:
+            raise
+        subprocess.run([curl, "-fsSL", "--retry", "3", "-o", str(destino), url], check=True)
 
 
 def _sistema():
@@ -116,7 +129,7 @@ def _baixar_url(urls, destino, sha):
         try:
             _log(f"baixando {destino.name} de {url.split('/')[2]}...")
             tmp = destino.with_suffix(destino.suffix + ".parcial")
-            urllib.request.urlretrieve(url, tmp)
+            _urlretrieve(url, tmp)
             if not sha or _sha(tmp) == sha:
                 tmp.replace(destino)
                 return True
@@ -163,9 +176,14 @@ def _pacote_de_rodas():
 
 def _criar_ambiente():
     RAIZ.mkdir(parents=True, exist_ok=True)
-    if PY.exists():
-        return
     uv = _uv()
+    if PY.exists():
+        v = subprocess.run([str(PY), "-c", "import sys; print('%d.%d' % sys.version_info[:2])"], capture_output=True, text=True).stdout.strip()
+        if v == PYTHON_DO_AMBIENTE or not uv:
+            return
+        _log(f"ambiente com Python {v or '?'} (precisa {PYTHON_DO_AMBIENTE}): refazendo")
+        shutil.rmtree(VENV, ignore_errors=True)
+        (RAIZ / ".rodas-instaladas").unlink(missing_ok=True)
     if uv:
         _sh([uv, "venv", "--python", PYTHON_DO_AMBIENTE, "--seed", VENV])
     elif sys.version_info >= (3, 11):

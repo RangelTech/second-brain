@@ -22,14 +22,27 @@ VENV = RAIZ / "venv"
 PY = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 NOSSA = "https://github.com/RangelTech/segundo-cerebro-artefatos/releases/download/escritorio-v1/"
 PACOTES = {
-    "win_amd64": ("ff7673eefd0fb2c5b0486b12cb018098088810eaafab6f4040d1193e554b73df", "docs-rodas-win_amd64-cp312.zip"),
-    "linux_x86_64": ("e01180be9da8845b2f26b25acb04c669ee7c71514380921e978baabada765ead", "docs-rodas-linux_x86_64-cp312.zip"),
+    "win_amd64": ("fb3ee82ce7ec0b27afca669eb26cbefa2ccf7e132e0b28f8aace3640b638fff3", "docs-rodas-win_amd64-cp312.zip"),
+    "linux_x86_64": ("3e63642fde4fd756d9b87f208aea7c6d961ced50d2c75bfe5926ede1f4eb404f", "docs-rodas-linux_x86_64-cp312.zip"),
 }
 FIXOS = ["python-docx==1.2.0", "openpyxl==3.1.5", "XlsxWriter==3.3.1", "python-pptx==1.0.2", "pillow==13.0.0", "lxml==6.1.3"]
 
 
 def _log(m):
     print(m, file=sys.stderr, flush=True)
+
+
+def _urlretrieve(url, destino):
+    """Baixa com o Python; se o TLS do Python falhar (certificado que só o sistema conhece), usa o curl do sistema."""
+    try:
+        urllib.request.urlretrieve(url, destino)
+    except Exception as e:  # noqa: BLE001
+        if "CERTIFICATE" not in str(e).upper() and "SSL" not in str(e).upper():
+            raise
+        curl = shutil.which("curl") or shutil.which("curl.exe")
+        if not curl:
+            raise
+        subprocess.run([curl, "-fsSL", "--retry", "3", "-o", str(destino), url], check=True)
 
 
 def _sistema():
@@ -71,7 +84,7 @@ def preparar(silencioso=False):
         zipf = RAIZ / nome
         try:
             _log(f"baixando {nome} (pacote nosso)...")
-            urllib.request.urlretrieve(NOSSA + nome, zipf)
+            _urlretrieve(NOSSA + nome, zipf)
             if hashlib.sha256(zipf.read_bytes()).hexdigest() != sha:
                 raise RuntimeError("sha256 não confere")
             pasta = RAIZ / "rodas"
