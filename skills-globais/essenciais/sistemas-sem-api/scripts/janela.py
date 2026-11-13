@@ -211,16 +211,36 @@ def controle(w, nome, tipo=None, espera=10):
     raise LookupError(f"não achei o controle '{nome}'" + (f" ({tipo})" if tipo else "") + "; use listar_controles(w) para ver os nomes")
 
 
+def _valor(c):
+    try:
+        return c.get_value() if hasattr(c, "get_value") else c.window_text()
+    except Exception:
+        try:
+            return c.window_text()
+        except Exception:
+            return None
+
+
 def preencher(w, nome, texto):
-    """Limpa o campo e escreve o texto (por Ctrl+V: acentos certos)."""
+    """Escreve no campo SEM usar o teclado (acessibilidade): não mistura com o que o usuário estiver digitando.
+    Confere o valor; só se precisar cai para Ctrl+V, e confere de novo. Erro se o campo não ficar com o texto certo."""
     c = controle(w, nome, "Edit")
-    focar(w)
-    c.set_focus()
-    keyboard.send_keys("^a{BACKSPACE}")
-    _area_de_transferencia(texto)
-    keyboard.send_keys("^v")
-    time.sleep(0.2)
-    return c
+    for tentativa in range(3):
+        try:
+            if tentativa == 0:
+                c.set_edit_text(texto)
+            else:
+                focar(w)
+                c.set_focus()
+                keyboard.send_keys("^a{BACKSPACE}")
+                _area_de_transferencia(texto)
+                keyboard.send_keys("^v")
+        except Exception:
+            pass
+        time.sleep(0.25)
+        if (_valor(c) or "") == texto:
+            return c
+    raise RuntimeError(f"o campo '{nome}' não ficou com o texto certo (ficou: {_valor(c)!r})")
 
 
 def clicar(w, nome):
