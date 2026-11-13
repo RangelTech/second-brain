@@ -5,11 +5,12 @@
     tokens: { titulo: 'O seu uso acabou por agora', corpo: 'Você usou todo o limite de uso do seu plano. Para continuar agora, compre mais crédito ou passe para o próximo plano. Nada do que você pediu foi perdido.' },
     image: { titulo: 'Suas imagens do mês acabaram', corpo: 'Você usou todas as imagens incluídas no seu plano neste mês. Para continuar gerando agora, compre mais crédito de imagens ou passe para o próximo plano.' },
     video: { titulo: 'Seus vídeos do mês acabaram', corpo: 'Você usou todos os vídeos incluídos no seu plano neste mês. Para continuar gerando agora, compre mais crédito de vídeos ou passe para o próximo plano.' },
+    studio: { titulo: 'Seus créditos do Estúdio acabaram', corpo: 'Para criar este vídeo você precisa de mais créditos. Compre um pacote agora ou passe para o próximo plano, que já traz mais créditos todo mês. O que você pediu fica guardado.' },
     audio: { titulo: 'Seu áudio do mês acabou', corpo: 'Você usou toda a voz e dublagem incluídas no seu plano neste mês. Para continuar agora, compre mais crédito de áudio ou passe para o próximo plano.' },
   }
   // avisos antes de acabar (spec 34 secao 6.18): o servidor decide (GET /v1/credits: low, renews_in_days, payment_failed); no maximo 1 por dia por tipo
   const AVISOS = {
-    acabando: (kind) => ({ titulo: { image: 'Suas imagens do mês estão acabando', video: 'Seus vídeos do mês estão acabando', audio: 'Seu áudio do mês está acabando' }[kind] || 'Seu crédito está acabando',
+    acabando: (kind) => ({ titulo: { image: 'Suas imagens do mês estão acabando', video: 'Seus vídeos do mês estão acabando', audio: 'Seu áudio do mês está acabando', studio: 'Seus créditos do Estúdio estão acabando' }[kind] || 'Seu crédito está acabando',
       corpo: 'Para não parar no meio de um trabalho, você já pode garantir mais crédito agora. O que sobrar continua valendo.' }),
     renovacao: (dias) => ({ titulo: dias <= 1 ? 'Sua assinatura renova amanhã' : `Sua assinatura renova em ${Math.ceil(dias)} dias`,
       corpo: 'É só conferir se o cartão está em dia para continuar usando sem interrupção.' }),

@@ -584,6 +584,7 @@ function mcpsExternos(app, reservados = []) {
 // O servidor recusou a mídia porque a cota do plano acabou: "...a cota de imagens|vídeos|áudios do seu plano neste mês...". Devolve o tipo de crédito ou null.
 const KIND_DE_COTA = { imagens: 'image', 'vídeos': 'video', 'áudios': 'audio' }
 function kindDeCotaDeMidia(texto) {
+  if (/você precisa de \d+ créditos para este pedido/i.test(texto || '')) return 'studio' // créditos do Estúdio acabaram: o pop-up oferece comprar mais
   const m = /cota de (imagens|vídeos|áudios) do seu plano/i.exec(texto || '')
   return m ? KIND_DE_COTA[m[1].toLowerCase()] || null : null
 }

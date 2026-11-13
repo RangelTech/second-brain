@@ -375,7 +375,7 @@
   function cartaoEstudio(d, f) {
     if (f.status !== 'completed') return false
     const t = String(f.conteudo || '').replace(/^[\s\S]*?\*\*result:\*\*\s*/, '').trim() // o Hermes embrulha a resposta do MCP ("... result" + "- **result:** texto")
-    const m = /^(.*?):\s*(.*?)\.\s*Preço:\s*(R\$\s*[\d.,]+)\s*\(US\$\s*([\d.]+)\),\s*cerca de\s*(\d+)\s*min/.exec(t)
+    const m = /^(.*?):\s*(.*?)\.\s*Preço:\s*((?:\d+ créditos \(≈ R\$\s*[\d.,]+\))|(?:R\$\s*[\d.,]+))\s*(?:\(US\$\s*[\d.]+\))?,\s*cerca de\s*(\d+)\s*min\.?(?: Você tem (\d+) créditos\.)?/.exec(t)
     if (!m) {
       if (/em breve/i.test(t)) {
         d.hidden = false
@@ -385,14 +385,17 @@
       }
       return false
     }
-    const [, rotulo, detalhe, reais, , min] = m
+    const [, rotulo, detalhe, precoTxt, min, saldoCred] = m
+    const emCreditos = /^(\d+) créditos \(≈ (R\$\s*[\d.,]+)\)$/.exec(precoTxt)
+    const reais = emCreditos ? emCreditos[1] + ' créditos' : precoTxt
+    const subPreco = emCreditos ? 'cerca de ' + emCreditos[2] + (saldoCred ? ' · você tem ' + saldoCred : '') : ''
     const acima = /passa do valor normal/.test(t)
     const respondido = d.dataset.respondido === '1'
     d.hidden = false
     d.className = 'ferr img-ferr mc-ferr estudio'
     d.innerHTML = `<div class="mc est" role="group" aria-label="Orçamento do Estúdio">
       <div class="est-topo"><span class="est-marca">${IC.sparkles}</span><div class="est-txt"><div class="est-eyebrow">Estúdio</div><div class="mc-tit">${esc(rotulo)}</div><div class="mc-sub">${esc(detalhe)} · cerca de ${esc(min)} min</div></div>
-      <div class="est-preco"><b>${esc(reais.replace(/\s+/, ' '))}</b><span>${acima ? 'acima do valor normal' : 'cobrado só se der certo'}</span></div></div>
+      <div class="est-preco"><b>${esc(reais.replace(/\s+/, ' '))}</b><span>${acima ? 'acima do valor normal' : subPreco || 'cobrado só se der certo'}</span></div></div>
       ${respondido ? '' : `<div class="est-acoes"><button type="button" class="mc-retry" data-estudio="sim">Criar</button><button type="button" class="est-nao" data-estudio="nao">Agora não</button></div>`}
     </div>`
     return true

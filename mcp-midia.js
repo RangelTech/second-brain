@@ -141,6 +141,7 @@ const FERRAMENTAS = [
       formato: { type: 'string', enum: Object.keys(FORMATOS), description: 'quadrado (1024x1024), retrato, paisagem, story (vertical 9:16) ou banner. Padrão: quadrado.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
       negative_prompt: { type: 'string', description: 'O que evitar (em inglês): ex. "blurry, deformed hands, extra fingers, watermark, text". Opcional.' },
+      referencias: { type: 'array', items: { type: 'string' }, description: 'Caminhos de fotos do usuário (até 4) para EDITAR ou usar de base: "me veste de terno", "troca o fundo", "deixa a pessoa de óculos", "põe meu rosto neste cartaz". Com referências a imagem sai editando a foto, mantendo o rosto e a pessoa; descreva só o que muda, em inglês.' },
       qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'rapida (padrão, menos passos) ou alta (mais passos, mais lento).' },
       steps: { type: 'number', description: 'Passos de geração (opcional; normalmente deixe a qualidade escolher).' },
       cfg: { type: 'number', description: 'Fidelidade ao prompt (opcional).' },
@@ -289,13 +290,14 @@ function exigirDetalhe(tipo, prompt, minimo) {
 
 async function gerarImagem(args) {
   const { prompt, formato, nome } = args
-  exigirDetalhe('imagem', prompt, 30)
+  exigirDetalhe('imagem', prompt, Array.isArray(args.referencias) && args.referencias.length ? 8 : 30)
   if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor (Unlimited). Abra Configurações e conclua o cadastro.')
   if (process.env.SB_MIDIA_MOCK) return simular('imagem', prompt, process.env.SB_MIDIA_MOCK_IMG || path.join(__dirname, 'renderer', 'img', 'segundo-cerebro-64.png'))
   const corpo = { prompt: String(prompt || '').slice(0, 3500), size: FORMATOS[formato] || FORMATOS[PREFS.proporcao] || FORMATOS.quadrado, ...paramsComuns(args, false) }
   const estilo = ESTILO_SERVIDOR[args.estilo] || ESTILO_SERVIDOR[PREFS.estilo]
   if (estilo) corpo.style = estilo
   if (args.n != null) corpo.n = Math.max(1, Math.min(4, Number(args.n)))
+  if (Array.isArray(args.referencias) && args.referencias.length) corpo.images = args.referencias.slice(0, 4).map((f, i) => dataUri(f, 'Foto ' + (i + 1), 8))
   return rodarJob({ tipo: 'imagem', rota: '/images/generations', corpo, prompt, nome, limiteMs: ESPERA_MAX_MS })
 }
 
@@ -321,10 +323,12 @@ async function orcar(args) {
   }
   if (o.disponivel === false) return 'O Estúdio ainda não está disponível (em breve). Avise o usuário em uma frase e ofereça editar o que ele já tem (Motion) sem custo.'
   const qtd = o.unidade === 'segundo' ? `${o.quantidade} s` : o.unidade === 'caractere' ? `${o.quantidade} caracteres` : `${o.quantidade} imagem(ns)`
-  return `${o.rotulo}: ${qtd}${o.qualidade && o.qualidade !== 'padrao' ? ' em ' + o.qualidade : ''}. Preço: ${brl(o.preco_brl)} (US$ ${Number(o.preco_usd).toFixed(2)}), cerca de ${minutos(o.tempo_estimado_s)} min.` +
+  const preco = o.creditos != null ? `${o.creditos} créditos (≈ ${brl(o.preco_brl)})` : `${brl(o.preco_brl)} (US$ ${Number(o.preco_usd).toFixed(2)})`
+  const saldo = o.saldo != null ? ` Você tem ${o.saldo} créditos.` + (o.creditos != null && o.saldo < o.creditos ? ` Faltam ${o.creditos - o.saldo}: avise que é preciso comprar mais créditos e o app oferece o pacote.` : '') : ''
+  return `${o.rotulo}: ${qtd}${o.qualidade && o.qualidade !== 'padrao' ? ' em ' + o.qualidade : ''}. Preço: ${preco}, cerca de ${minutos(o.tempo_estimado_s)} min.${saldo}` +
     (o.partes > 1 ? ` O vídeo será feito em ${o.partes} partes de até 15 s.` : '') +
     (o.acima_do_teto ? ' Atenção: passa do valor normal por ser grande; diga isso ao usuário.' : '') +
-    ' Mostre este preço ao usuário em reais e pergunte se pode criar. Só chame midia_estudio (ou a ferramenta do pedido) depois do sim.'
+    ' Mostre este preço ao usuário em CRÉDITOS (o valor em reais é só referência) e pergunte se pode criar. Só chame midia_estudio (ou a ferramenta do pedido) depois do sim.'
 }
 async function estudio(args) {
   if (!args.confirmado) throw new Error('Antes de criar, chame midia_orcar, mostre o preço ao usuário e espere ele aceitar. Depois chame de novo com confirmado=true.')
