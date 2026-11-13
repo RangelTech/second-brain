@@ -8,6 +8,17 @@ description: |
 
 Você usa o WhatsApp Web **com a conta do usuário**, no navegador integrado (ferramentas `navegador_*`). A sessão fica salva só no computador dele. A receita técnica completa (seletores, URLs, leitura em lote) está na skill `redes-sociais-no-navegador`, seção WhatsApp Web. Esta skill diz **como ajudar**.
 
+## 0. Ferramentas prontas (use SEMPRE estas primeiro: são testadas e rápidas)
+| Pedido | Ferramenta |
+|---|---|
+| Está conectado? | `navegador_whatsapp_estado` |
+| O que chegou / não lidas | `navegador_whatsapp_conversas` com `filtro: "nao_lidas"` |
+| Ler uma conversa | `navegador_whatsapp_ler` com `contato` (nome) ou `numero`, e `limite` |
+| Tudo dos últimos N dias (e os links) | `navegador_whatsapp_ler` com `dias: N` (rola sozinho; devolve `links`) |
+| Mandar mensagem | `navegador_whatsapp_enviar` com `contato` ou `numero` e `texto` (limpa o rascunho, aceita várias linhas) |
+| Baixar fotos, vídeos, áudios | `navegador_whatsapp_baixar` (vão para Downloads/WhatsApp) |
+Só caia para `navegador_ler`, `navegador_clicar` e `navegador_digitar` se a ferramenta pronta falhar. **Nunca** escreva na caixa de mensagem com `navegador_js`: o WhatsApp desfaz e o texto duplica.
+
 ## 1. Conectar (primeira vez ou sessão caiu)
 1. `navegador_abrir` em `https://web.whatsapp.com/`, espere 4 s e leia.
 2. Se aparecer o QR code ("Escaneie para entrar"), diga em 3 passos curtos:
@@ -17,9 +28,6 @@ Você usa o WhatsApp Web **com a conta do usuário**, no navegador integrado (fe
    Alternativa sem câmera: "Conectar com número de telefone" mostra um código de 8 letras para digitar no celular.
 3. Espere a lista de conversas aparecer (pode levar até 1 minuto em contas grandes: "Carregando suas conversas"). Confirme: "Pronto, conectado."
 4. O usuário também conecta pela aba **Configurações > Conexões**, botão Conectar do WhatsApp.
-
-## Atalho testado: nomes das conversas da lista
-`navegador_js` com `return [...document.querySelectorAll('#pane-side [data-testid="cell-frame-title"]')].map(e => e.innerText).filter(t => t !== 'Arquivadas').slice(0, 15)` (a primeira linha da lista é a pasta "Arquivadas"). Se voltar vazio, a página ainda está carregando: espere 3 s e repita, ou use `navegador_print`.
 
 ## 2. O que mais pedem (e como entregar)
 - **"O que chegou?" / resumo das não lidas:** filtro "Não lidas", leia as conversas (no máximo 15), e entregue um resumo por pessoa em lista: quem, o que quer, se precisa de resposta. Termine oferecendo responder.

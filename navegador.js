@@ -218,7 +218,15 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     return { titulo: document.title, url: location.href, texto: (document.body ? document.body.innerText : '').replace(/\\n{3,}/g, '\\n\\n').slice(0, ${MAX_TEXTO}), elementos: lista, rolagem: { y: Math.round(scrollY), altura: document.documentElement.scrollHeight, janela: innerHeight } }
   })()`
 
+  // WhatsApp (spec 37): atalhos testados (whatsapp-web.js), sempre no navegador integrado
+  const wa = require('./whatsapp-web').criar({ vista: () => vista, carregar, garantirVisivel, esperar, pastaDownloads: () => app.getPath('downloads') })
+  const textoWa = (o) => ({ texto: JSON.stringify(o, null, 1) })
   const ferramentas = {
+    whatsapp_estado: async () => textoWa(await wa.estado()),
+    whatsapp_conversas: async (a) => textoWa(await wa.conversas(a)),
+    whatsapp_ler: async (a) => textoWa(await wa.ler(a)),
+    whatsapp_enviar: async (a) => textoWa(await wa.enviar(a)),
+    whatsapp_baixar: async (a) => textoWa(await wa.baixar(a)),
     async abrir({ url }) {
       await garantirVisivel()
       await carregar(url)
@@ -343,7 +351,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     if (nome.startsWith('motion_') && motion) return motion(nome.slice(7), args) // Motion desenhado: HTML vira MP4 (mcp-motion.js)
     if (nome === 'chrome_estado') return estadoChrome()
     const onde = ['integrado', 'chrome'].includes(args.onde) ? args.onde : 'auto'
-    const querChrome = nome !== 'esperar' && (onde === 'chrome' || (onde === 'auto' && modoServidor))
+    const querChrome = nome !== 'esperar' && !nome.startsWith('whatsapp_') && (onde === 'chrome' || (onde === 'auto' && modoServidor))
     if (querChrome) {
       marcarControle()
       try {
