@@ -62,16 +62,17 @@ test('origens: o fork com o nome do Segundo Cérebro vem primeiro e o Concat ofi
   assert.match(E.ORIGENS[1].win32.sha256, /^[0-9a-f]{64}$/)
 })
 
-test('editor desligado por padrão: sem MCP, sem instalação, sem janela, sem skill', async () => {
+test('editor ligado por padrão; desligado (arquivo .off ou SB_EDITOR=0): sem MCP, sem instalação, sem janela', async () => {
   delete process.env.SB_EDITOR
   const dirOff = fs.mkdtempSync(path.join(os.tmpdir(), 'ed-off-'))
   const app = { getPath: () => dirOff }
+  assert.strictEqual(E.habilitado(app), true)
+  fs.writeFileSync(path.join(dirOff, 'editor-video.off'), '1')
   assert.strictEqual(E.habilitado(app), false)
   assert.strictEqual(E.mcp(app, 'C:/trab'), null)
   await assert.rejects(E.instalar(app), /ainda não está disponível/)
   assert.throws(() => E.abrirJanela(app, ''), /ainda não está disponível/)
-  const on = path.join(app.getPath('userData'), 'editor-video.on'); fs.writeFileSync(on, '1')
-  assert.strictEqual(E.habilitado(app), true)
+  process.env.SB_EDITOR = '1'; assert.strictEqual(E.habilitado(app), true)
   process.env.SB_EDITOR = '0'; assert.strictEqual(E.habilitado(app), false); delete process.env.SB_EDITOR
 })
 test('a skill do editor não vai no pacote das skills essenciais', () => {

@@ -1076,8 +1076,10 @@ class Sessao {
     } catch {}
     if (!this.navegador) return lista
     const shim = [path.join(process.resourcesPath || '', 'mcp-navegador.js'), path.join(__dirname, 'mcp-navegador.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-navegador.js')
+    const shimMotion = [path.join(process.resourcesPath || '', 'mcp-motion.js'), path.join(__dirname, 'mcp-motion.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-motion.js')
     return [
       ...lista,
+      { name: 'motion', command: process.execPath, args: [shimMotion], env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }, { name: 'SB_NAV_URL', value: this.navegador.url }, { name: 'SB_NAV_TOKEN', value: this.navegador.token }] },
       {
         name: 'navegador',
         command: process.execPath,

@@ -16,12 +16,12 @@ const ORIGENS = [
 const ORIGEM = { win32: ORIGENS[0].win32 } // só o nome do executável e o suporte por sistema são lidos daqui
 const NOME_EXIBIDO = 'Editor de vídeo do Segundo Cérebro'
 
-// INTERRUPTOR: o editor de vídeo só existe para o usuário quando ligado (variável SB_EDITOR=1 ou o arquivo `editor-video.on` na pasta de dados).
-// Desligado: o Hermes não recebe skill nem ferramentas, o app não instala nada e as telas não mostram o botão.
+// INTERRUPTOR: ligado por padrão desde a spec 37 (o usuário abre o editor pelo botão ao lado do Navegador, sem depender do chat).
+// Desliga com SB_EDITOR=0 ou o arquivo `editor-video.off` na pasta de dados: aí o Hermes não recebe skill nem ferramentas, o app não instala nada e o botão some.
 function habilitado(app) {
   if (process.env.SB_EDITOR === '1') return true
   if (process.env.SB_EDITOR === '0') return false
-  try { return !!app && fs.existsSync(path.join(app.getPath('userData'), 'editor-video.on')) } catch { return false }
+  try { return !!app && !fs.existsSync(path.join(app.getPath('userData'), 'editor-video.off')) } catch { return false }
 }
 
 function pastaEditor(app) {

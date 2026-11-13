@@ -1,12 +1,38 @@
 ---
 name: motion
 description: |
-  Edição de vídeo sem custo (Motion), no computador do usuário: reel ou vinheta com título animado e legenda palavra por palavra, cortar, juntar, tirar silêncio, mudar para 9:16, pôr música ou logo, acelerar. Use quando a skill escolher-motion-ou-estudio indicar Motion ou o pedido for "faça um vídeo com o título...", "reel com texto", "legenda", "corta", "junta", "vertical".
+  Edição e animação de vídeo sem custo (Motion), no computador do usuário: animação desenhada com React/HTML (motion graphics de verdade: tipografia cinética, números subindo, gráficos, partículas, chamadas para ação) renderizada em MP4 pela ferramenta motion_animar; reel ou vinheta com título; cortar, juntar, tirar silêncio, mudar para 9:16, pôr música ou logo, acelerar. Use quando a skill escolher-motion-ou-estudio indicar Motion ou o pedido for "faça uma animação", "motion", "vídeo com texto animado", "reel com texto", "vinheta", "legenda", "corta", "junta", "vertical".
 ---
 
 # Motion (edição, sem custo)
 
 Tudo roda com o FFmpeg que vem com o Segundo Cérebro. **Não instale nada** (nem Pillow, nem Node): use os comandos abaixo.
+
+## 0. Animação desenhada (o jeito bonito, padrão para "faça uma animação")
+Ferramentas do servidor `motion`: `motion_previa` (tira quadros PNG para você olhar) e `motion_animar` (gera o MP4). Rodam no computador do usuário com o navegador embutido do app: **nada para instalar, sem custo**.
+
+Você escreve UMA página HTML do tamanho exato do vídeo. Já vêm carregados:
+- **React + ReactDOM** e ``html`...` `` (JSX sem compilar, via htm), por exemplo: ``html`<div class="x" style=${{opacity: a}}>${texto}</div>` ``
+- **SB** (ajudante): `SB.prog(t, inicio, duracao, 'out'|'inOut'|'outExpo'|'outBack')` dá 0 a 1 com easing; `SB.spring(t, inicio)` pula e assenta; `SB.stagger(i, inicio, passo)` cascata; `SB.mix(a, b, p)` números e cores; `SB.noise(x)` tremido suave; `SB.split(el)` letra a letra.
+- O tempo é controlado: defina `window.sbFrame = (t) => {...}` (t em segundos) e desenhe o quadro daquele instante. Com React: ``const root = ReactDOM.createRoot(el); window.sbFrame = (t) => ReactDOM.flushSync(() => root.render(html`<${Cena} t=${t} />`)) ``. Animações CSS `@keyframes` e Web Animations também funcionam sozinhas.
+- Vídeo do usuário dentro da animação: `<video src="arquivo.mp4" data-inicio="1.5" data-corte="0">` (caminho relativo à pasta do vídeo de saída). Ele é posicionado quadro a quadro.
+
+**Modelo pronto:** `modelos/reel-promo-react.html` (reel 9:16 de 6 s: selo, título palavra por palavra com mola, barra, número subindo, subtítulo, botão pulsando, fundo com luz e partículas). Copie, troque textos, cores e tempos. Não comece do zero.
+
+**Roteiro (sempre):**
+1. Combine em uma frase: formato (9:16 reel/story, 1:1, 16:9), duração, textos e cores (as da marca do usuário, se ele tiver).
+2. Escreva o HTML a partir do modelo. Salve também o `.html` ao lado do vídeo (o usuário pode pedir ajuste depois).
+3. `motion_previa` com 4 a 6 tempos (começo, cada entrada, final) e **olhe cada quadro** com `vision_analyze`. Corrija antes de renderizar.
+4. `motion_animar` (duração e trilha, se houver: `audio`). Leva cerca de 6 s de trabalho por segundo de vídeo em 1080x1920.
+5. Entregue o caminho do MP4 numa linha própria e ofereça: ajustar, versão 1:1, ou abrir no Editor para mexer junto.
+
+**Padrão de qualidade (confira na prévia):**
+- Área segura do reel: nada importante a menos de 160 px do topo nem 260 px de baixo (a interface do Instagram cobre). Margens laterais de 80 px.
+- Tipografia grande e firme: título 110 a 150 px com peso 800, no máximo 3 linhas, sem palavra cortada. Corpo 44 a 56 px.
+- Contraste alto (texto claro em fundo escuro ou o contrário). No máximo 2 cores de destaque.
+- Movimento com intenção: cada elemento entra com easing (nunca linear), em cascata de 0,1 a 0,2 s; nada pisca; uma coisa de cada vez para o olho acompanhar. Segure o quadro final por 1 s antes de sair.
+- Sempre algo vivo no fundo (luz que anda, grade que desliza, partículas lentas), sem roubar a atenção do texto.
+- Nada sobreposto sem querer: confira título x barra x número na prévia.
 
 ## Onde está o FFmpeg
 - Windows: `%APPDATA%\SegundoCerebro\hermes\tools\ffmpeg-*\bin\ffmpeg.exe`
@@ -40,9 +66,10 @@ python "<pasta desta skill>/scripts/titulo.py" --titulo "PROMO DE NATAL" --subti
 | Legenda da fala | transcreva com o ditado/Whisper, gere `.srt` e queime: `ffmpeg -i in.mp4 -vf subtitles=leg.srt final.mp4` |
 
 ## 3. Editor
-Para ajustes finos que o usuário quer ver (arrastar cortes, trocar ordem), ofereça abrir no Editor (`editor_abrir_janela`), quando estiver ligado.
+Quando o usuário pede para editar um vídeo, ofereça as duas opções: "eu edito e te entrego" ou "abrimos o editor e editamos juntos" (`editor_abrir_janela`; ele também abre pelo botão **Editor** no topo do app). Para ajustes finos que o usuário quer ver (arrastar cortes, trocar ordem), o Editor é o melhor caminho.
 
 ## Regras
 - Sem custo e sem orçamento: não chame `midia_orcar` para Motion.
-- Não escreva um gerador de vídeo do zero: use o script e as receitas. Se um pedido não couber, combine receitas.
+- Não escreva um gerador de vídeo do zero: use `motion_animar` com o modelo, o script e as receitas. Se um pedido não couber, combine.
+- Tudo aqui roda no computador do usuário, de graça. Se o pedido precisar de algo que não existe nos arquivos dele (pessoa, cena, voz nova), aí é o Estúdio, em créditos, com o preço antes.
 - Entregue sempre o **caminho completo** do arquivo numa linha própria (ex.: `C:\Users\...\Videos\promo.mp4`; o app mostra o vídeo tocando no chat), a duração real e uma frase sobre o resultado. Não diga "IA", "FFmpeg" nem "script" ao usuário: diga "editei" e "criei".

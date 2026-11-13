@@ -58,6 +58,10 @@
       "partida-direta.js",
       "ferramentas.js",
       "mcp-editor.js",
+      "mcp-motion.js",
+      "motion-render.js",
+      "motion-preload.js",
+      "motion-vendor/**",
       "hermes-instalar.js",
       "relatorio-instalacao.js",
       "caminhos-hermes.js",
@@ -149,6 +153,10 @@
       {
         "from": "mcp-editor.js",
         "to": "mcp-editor.js"
+      },
+      {
+        "from": "mcp-motion.js",
+        "to": "mcp-motion.js"
       },
       {
         "from": "modelos",

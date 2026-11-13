@@ -552,6 +552,21 @@ async function ferramentaEditor(nome, args) {
   }
   throw new Error('Ferramenta desconhecida: ' + nome)
 }
+// ---- Motion desenhado (spec 37): página HTML/React vira MP4 com o Chromium do app e o FFmpeg do agente
+async function ferramentaMotion(nome, args) {
+  const mr = require('./motion-render')
+  const saidaPadrao = (a) => (a.saida ? (path.isAbsolute(String(a.saida)) ? String(a.saida) : path.join(cfg.pasta, String(a.saida))) : path.join(cfg.pasta, 'Videos', `animacao-${Date.now()}.mp4`))
+  const a = { ...args, saida: saidaPadrao(args || {}) }
+  if (nome === 'previa') {
+    const r = await mr.previa(a)
+    return { texto: `Quadros para conferir (olhe cada um com vision_analyze):\n${r.arquivos.join('\n')}${r.erros.length ? '\nErros no console da página:\n' + r.erros.join('\n') : ''}` }
+  }
+  if (nome === 'animar') {
+    const r = await mr.renderizar(a, { ffmpeg: require('./dublagem').binario('ffmpeg') })
+    return { texto: `${r.arquivo}\nDuração: ${r.duracao} s · ${r.largura}x${r.altura} · ${r.fps} fps · ${r.tamanho_mb} MB · renderizado em ${r.segundos} s${r.erros.length ? '\nErros no console da página:\n' + r.erros.join('\n') : ''}` }
+  }
+  throw new Error('Ferramenta desconhecida: ' + nome)
+}
 ipcMain.handle('editor:estado', () => ({ habilitado: editorVideo.habilitado(app), instalado: editorVideo.instalado(app), suportado: editorVideo.suportado(), nome: editorVideo.NOME_EXIBIDO }))
 ipcMain.handle('editor:instalar', async () => { try { await editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p)); return { ok: true } } catch (e) { return { ok: false, erro: String(e.message || e) } } })
 ipcMain.handle('editor:abrir', (_e, projeto) => { try { return editorVideo.abrirJanela(app, projeto || path.join(cfg.pasta, 'Videos')) } catch (e) { return { ok: false, erro: String(e.message || e) } } })
@@ -794,6 +809,7 @@ app.whenReady().then(() => {
     preload: path.join(__dirname, 'preload.js'),
     avisarDestacada: (sim) => janela?.webContents.send('navegador:destacado', !!sim),
     editor: (nome, args) => ferramentaEditor(nome, args),
+    motion: (nome, args) => ferramentaMotion(nome, args),
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })
