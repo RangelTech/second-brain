@@ -103,13 +103,13 @@ def main():
     altura_bloco = len(linhas) * tam_tit * 1.12
     for i, ln in enumerate(linhas):
         y0 = centro - altura_bloco / 2 + i * tam_tit * 1.12
-        filtros.append(f"drawtext=fontfile='{ff(bold)}':text='{ff(ln)}':fontsize={tam_tit}:fontcolor={cor(o.texto)}:"
+        filtros.append(f"drawtext=fontfile='{ff(bold)}':expansion=none:text='{ff(ln)}':fontsize={tam_tit}:fontcolor={cor(o.texto)}:"
                        f"x=(w-text_w)/2:y='{y0:.0f}+{int(H*0.05)}*{sobe}':alpha='{alpha_tit}':shadowcolor=black@0.45:shadowx=0:shadowy=6")
     if o.subtitulo:
         tam_sub = int(tam_tit * 0.5)
         ys = centro + altura_bloco / 2 + tam_sub * 0.9
         alpha_sub = f"if(lt(t,0.9),0,min(1,(t-0.9)/0.6))*{fim}"
-        filtros.append(f"drawtext=fontfile='{ff(bold)}':text='{ff(o.subtitulo)}':fontsize={tam_sub}:fontcolor={cor(o.destaque)}:"
+        filtros.append(f"drawtext=fontfile='{ff(bold)}':expansion=none:text='{ff(o.subtitulo)}':fontsize={tam_sub}:fontcolor={cor(o.destaque)}:"
                        f"x=(w-text_w)/2:y={ys:.0f}+{int(H*0.03)}*max(0\\,1-(t-0.9)/0.6):alpha='{alpha_sub}'")
     if o.legenda:
         # legenda palavra por palavra no estilo de reels: uma palavra por vez, centralizada, com fundo em pílula
@@ -124,7 +124,7 @@ def main():
             if t0 >= D:
                 break
             entra = f"min(1,(t-{t0:.2f})/0.08)"
-            filtros.append(f"drawtext=fontfile='{ff(bold)}':text='{ff(p.upper())}':fontsize={tam_leg}:fontcolor={cor(o.destaque)}:"
+            filtros.append(f"drawtext=fontfile='{ff(bold)}':expansion=none:text='{ff(p.upper())}':fontsize={tam_leg}:fontcolor={cor(o.destaque)}:"
                            f"x=(w-text_w)/2:y={y_leg:.0f}:box=1:boxcolor=black@0.45:boxborderw={int(tam_leg*0.35)}:"
                            f"enable='between(t,{t0:.2f},{t1:.2f})':alpha='{entra}'")
     fundo = (f"gradients=s={W}x{H}:c0={cor(o.cor1)}:c1={cor(o.cor2)}:x0=0:y0=0:x1={W}:y1={H}:speed=0.008:r={o.fps}:d={D:.2f}")

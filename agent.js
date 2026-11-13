@@ -323,7 +323,7 @@ function prepararBase(app) {
   const globais = [path.join(process.resourcesPath || '', 'skills-globais', 'rangeltech'), path.join(__dirname, 'skills-globais', 'rangeltech')].find((p) => fs.existsSync(p))
   if (globais && ENTREGAR_PACOTE) sincronizarSkillsGlobais(globais, path.join(home, 'skills', 'rangeltech'))
   const essenciais = [path.join(process.resourcesPath || '', 'skills-globais', 'essenciais'), path.join(__dirname, 'skills-globais', 'essenciais')].find((p) => fs.existsSync(p))
-  if (essenciais) sincronizarSkillsGlobais(essenciais, path.join(home, 'skills', 'essenciais')) // vai para TODOS os planos, inclusive o Lite
+  if (essenciais) sincronizarSkillsGlobais(essenciais, path.join(home, 'skills', 'essenciais'), { novaVence: true }) // vai para TODOS os planos, inclusive o Lite
   // editor de vídeo: a skill só chega ao Hermes com o editor ligado (editor-video.js `habilitado`); desligado, nada dele existe para o agente
   try {
     const ev = require('./editor-video')
@@ -343,12 +343,27 @@ function prepararBase(app) {
 // Uma vez por execução do app: as skills que vêm no app não mudam enquanto ele está aberto, e ler/conferir centenas de arquivos a cada
 // sessão nova (agora são 3 reservas) segurava a janela por ~2 s na abertura (sonda de travamento, 11/11/2026).
 const skillsSincronizadas = new Set()
-function sincronizarSkillsGlobais(origem, destino) {
+// essenciais (opcoes.novaVence): as skills de que o produto depende (motion, estudio, workflows...). Se o app traz uma versão nova e o Hermes
+// tinha editado a antiga, a nova entra e o que ele aprendeu fica em notas-aprendidas.md na mesma pasta (com aviso no fim do SKILL.md).
+// O hash ignora CRLF x LF: só o conteúdo conta.
+function sincronizarSkillsGlobais(origem, destino, opcoes = {}) {
   const chave = origem + '>' + destino
   if (skillsSincronizadas.has(chave)) return
   skillsSincronizadas.add(chave)
   const crypto = require('crypto')
-  const hash = (f) => crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex')
+  const hash = (f) => crypto.createHash('sha1').update(fs.readFileSync(f).toString('latin1').split('\r\n').join('\n'), 'latin1').digest('hex')
+  const guardarAprendido = (dst) => {
+    try {
+      const notas = path.join(path.dirname(dst), 'notas-aprendidas.md')
+      fs.appendFileSync(notas, '\n\n<!-- versão anterior, editada no seu computador, guardada em ' + new Date().toISOString() + ' -->\n' + fs.readFileSync(dst, 'utf8'))
+    } catch {}
+  }
+  const avisarNotas = (dst) => {
+    try {
+      if (path.basename(dst) !== 'SKILL.md' || !fs.existsSync(path.join(path.dirname(dst), 'notas-aprendidas.md'))) return
+      fs.appendFileSync(dst, '\n\n## Ajustes que você já tinha aprendido\nVeja notas-aprendidas.md nesta pasta (a sua versão anterior desta skill). Aproveite o que ainda vale; esta versão nova manda.\n')
+    } catch {}
+  }
   const arqManifesto = path.join(destino, '.entregue.json')
   let antes = {}
   const primeira = !fs.existsSync(arqManifesto)
@@ -377,7 +392,12 @@ function sincronizarSkillsGlobais(origem, destino) {
             if (primeira) fs.copyFileSync(src, dst)
             else agora[r] = hash(dst)
           } else if (hash(dst) !== antes[r]) {
-            agora[r] = antes[r] // editado pelo usuário: mantém a edição e o registro antigo
+            if (opcoes.novaVence && antes[r] !== h && hash(dst) !== h) {
+              guardarAprendido(dst) // versão nova do app + edição do Hermes: a nova entra, a edição vira nota
+              fs.copyFileSync(src, dst)
+              avisarNotas(dst)
+              agora[r] = h
+            } else agora[r] = antes[r] // editado pelo usuário: mantém a edição e o registro antigo
           }
         } catch {}
       }
@@ -1307,4 +1327,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas }
+module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais }
