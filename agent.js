@@ -253,8 +253,8 @@ async function contarArquivos(dirs) {
   return n
 }
 const CONTEXTO_REAL = 131072
-const COMPRIMIR_EM = +process.env.SB_COMPRIMIR_EM || 72000 // variáveis SB_* só para medir variantes (spec de contexto); sem elas vale o padrão
-const PODAR_EM = +process.env.SB_PODAR_EM || 48000
+const COMPRIMIR_EM = 160000 // janela de 262 mil: comprimir cedo (72 mil) fazia o agente esquecer skills em tarefas longas
+const PODAR_EM = 110000 // a poda apaga resultados velhos de ferramenta, inclusive a skill lida no começo
 
 const caminhosHermes = require('./caminhos-hermes')
 function localizarBinario(app) {
@@ -565,6 +565,8 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     `  threshold_tokens: ${COMPRIMIR_EM}`, // comprime cedo: o resumo fica pequeno e rápido
     `  proactive_prune_tokens: ${PODAR_EM}`, // antes disso, só poda resultados velhos de ferramenta (não chama o modelo)
     '  target_ratio: 0.15',
+    '  protect_last_n: 30',
+    '  min_tail_user_messages: 3',
     'agent:',
     `  reasoning_effort: ${JSON.stringify(raciocinio || 'none')}`,
     '  environment_probe: false', // sondagem do toolchain da maquina a cada partida: nao entra no nosso prompt
@@ -717,7 +719,7 @@ class Sessao {
     this.ocioso = null
     const bin = localizarBinario(app)
     if (!bin) throw new Error('Não encontrei o Hermes (hermes-acp). Instale o Hermes ou defina SECOND_BRAIN_HERMES_BIN.')
-    const home = prepararHome(app, { base, modelo, pasta, raciocinio, nivel, visao: midia ? { base: midia.base, modelo: 'qwen-abliterated', chave: midia.chave } : null })
+    const home = prepararHome(app, { base, modelo, pasta, raciocinio, nivel, visao: midia ? { base: midia.base, modelo: 'visao', chave: midia.chave } : null })
     if (!fs.existsSync(path.join(home, 'installs'))) emitir({ aviso: 'Preparando o agente pela primeira vez. Isso leva alguns minutos e acontece uma vez só…' })
     this.bin = bin
     this.env = { ...process.env, HERMES_HOME: home, SB_LOCAL_KEY: chave, PYTHONUTF8: '1', ...(midia ? { SB_VISAO_CHAVE: midia.chave } : {}) }

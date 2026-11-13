@@ -51,8 +51,11 @@ function traducao(ev, estado = {}) {
       return norm.length ? [{ plano: { itens: norm, revisao: Number(p.revision ?? p.revisao ?? Date.now()) } }] : []
     }
     case 'session.usage': {
-      const u = p.used ?? p.context_used ?? p.total_tokens
-      return u >= 0 ? [{ contexto: { usado: u, tamanho: p.size || p.context_size || 262144 } }] : []
+      // tamanho ATUAL da conversa (context_tokens / último prompt), não o total somado da sessão (passava de 100%)
+      const v = p.usage && typeof p.usage === 'object' ? p.usage : p
+      const u = v.context_tokens ?? p.context_tokens ?? v.last_prompt_tokens ?? p.last_prompt_tokens
+      const tam = v.context_length ?? p.context_length ?? v.config_context_length ?? p.config_context_length ?? 262144
+      return u >= 0 ? [{ contexto: { usado: Math.min(u, tam), tamanho: tam } }] : []
     }
     default:
       return []

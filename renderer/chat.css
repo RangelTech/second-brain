@@ -482,3 +482,5 @@
 .and-lista li{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--bd);border-radius:10px}
 .and-lista code{font-size:12px;white-space:pre-wrap;word-break:break-all}
 .sb-modal .rodape-j{display:flex;justify-content:flex-end;gap:8px}
+
+.sb-bolinha.andamento[hidden]{display:none}
