@@ -7,6 +7,17 @@
     video: { titulo: 'Seus vídeos do mês acabaram', corpo: 'Você usou todos os vídeos incluídos no seu plano neste mês. Para continuar gerando agora, compre mais crédito de vídeos ou passe para o próximo plano.' },
     audio: { titulo: 'Seu áudio do mês acabou', corpo: 'Você usou toda a voz e dublagem incluídas no seu plano neste mês. Para continuar agora, compre mais crédito de áudio ou passe para o próximo plano.' },
   }
+  // avisos antes de acabar (spec 34 secao 6.18): o servidor decide (GET /v1/credits: low, renews_in_days, payment_failed); no maximo 1 por dia por tipo
+  const AVISOS = {
+    acabando: (kind) => ({ titulo: { image: 'Suas imagens do mês estão acabando', video: 'Seus vídeos do mês estão acabando', audio: 'Seu áudio do mês está acabando' }[kind] || 'Seu crédito está acabando',
+      corpo: 'Para não parar no meio de um trabalho, você já pode garantir mais crédito agora. O que sobrar continua valendo.' }),
+    renovacao: (dias) => ({ titulo: dias <= 1 ? 'Sua assinatura renova amanhã' : `Sua assinatura renova em ${Math.ceil(dias)} dias`,
+      corpo: 'É só conferir se o cartão está em dia para continuar usando sem interrupção.' }),
+    falhou: () => ({ titulo: 'Não conseguimos renovar sua assinatura', corpo: 'O pagamento não passou. Atualize o cartão ou pague de novo para continuar usando tudo sem interrupção.' }),
+  }
+  const CHECAR_MS = 30 * 60 * 1000
+  const visto = (chave) => { try { return localStorage.getItem('sb-aviso-' + chave) === new Date().toISOString().slice(0, 10) } catch { return false } }
+  const marcarVisto = (chave) => { try { localStorage.setItem('sb-aviso-' + chave, new Date().toISOString().slice(0, 10)) } catch {} }
   const POLL_MS = 5000
   const POLL_MAX_MS = 15 * 60 * 1000
   const estado = { aberto: false, kind: null, timer: null, inicio: 0, saldoInicial: 0 }
@@ -33,6 +44,8 @@
 .cred-acoes button.suave{background:transparent;color:var(--mut,#a39e96);border-color:transparent}
 .cred-nota{margin-top:12px;font-size:13px;color:var(--mut,#a39e96)}
 .cred-ok{color:var(--ok,#7ab87a);font-weight:600}
+.cred-alerta{border-color:color-mix(in srgb,#e5897f 45%,var(--bd,#3d3a35))}
+.cred-alerta h2{color:#f0a49a}
 `
     document.head.appendChild(s)
   }
@@ -120,5 +133,51 @@
     })
   }
 
-  window.SBCreditos = { abrir, fechar, estado: () => ({ ...estado }), TEXTOS }
+
+  // aviso preventivo: mesma caixa, mesmos botões; nunca por cima de outro pop-up
+  function avisar(modo, r, kind) {
+    if (estado.aberto) return false
+    const t = modo === 'acabando' ? AVISOS.acabando(kind) : modo === 'falhou' ? AVISOS.falhou() : AVISOS.renovacao(Number(r.renews_in_days || 0))
+    const c = montar()
+    estado.aberto = true
+    estado.kind = kind || 'tokens'
+    c.hidden = false
+    const pacote = modo === 'acabando' ? (r.packs || []).find((p) => p.kind === kind) : null
+    const botoes = []
+    if (pacote?.checkout_url) botoes.push(`<button class="pri" data-acao="comprar">Comprar crédito de ${esc(pacote.label)} · ${esc(dinheiro(pacote))}</button>`)
+    if (modo !== 'acabando' && r.manage_url) botoes.push(`<button class="pri" data-acao="conta">${modo === 'falhou' ? 'Atualizar pagamento' : 'Ver minha conta'}</button>`)
+    botoes.push(`<button class="suave" data-acao="fechar">${modo === 'falhou' ? 'Depois' : 'Agora não'}</button>`)
+    c.innerHTML = `<div class="cred-caixa${modo === 'falhou' ? ' cred-alerta' : ''}"><div class="cred-corpo"><h2 id="creditos-tit">${esc(t.titulo)}</h2><p>${esc(t.corpo)}</p><div class="cred-acoes">${botoes.join('')}</div></div></div>`
+    estado.saldoInicial = Number(r.balances?.[estado.kind] || 0)
+    c.onclick = (e) => {
+      const acao = e.target?.dataset?.acao
+      if (e.target === c || acao === 'fechar') return fechar()
+      if (acao === 'comprar') { window.sb.abrirExterno(pacote.checkout_url); acompanhar(estado.kind) }
+      if (acao === 'conta') { window.sb.abrirExterno(r.manage_url); fechar() }
+    }
+    return true
+  }
+
+  // consulta o servidor ao abrir o app e a cada 30 min; prioridade: pagamento recusado > renovação em até 3 dias > cota no fim
+  async function checar(dados) {
+    let r = dados
+    if (!r) { try { r = await window.sb.creditos() } catch { return null } }
+    if (!r?.ok && !dados) return null
+    if (r.payment_failed && !visto('falhou')) { if (avisar('falhou', r)) marcarVisto('falhou'); return 'falhou' }
+    if (r.renews_in_days != null && r.renews_in_days >= 0 && r.renews_in_days <= 3 && !visto('renovacao')) { if (avisar('renovacao', r)) marcarVisto('renovacao'); return 'renovacao' }
+    for (const kind of Object.keys(r.low || {})) {
+      if (visto('acabando-' + kind)) continue
+      if (avisar('acabando', r, kind)) marcarVisto('acabando-' + kind)
+      return 'acabando'
+    }
+    return null
+  }
+  function vigiar() {
+    if (estado.vigia) return
+    estado.vigia = setInterval(() => checar(), CHECAR_MS)
+    setTimeout(() => checar(), 8000) // depois que o app terminou de abrir
+  }
+
+  window.SBCreditos = { abrir, fechar, avisar, checar, vigiar, estado: () => ({ ...estado }), TEXTOS, AVISOS }
+  if (window.sb?.creditos) vigiar()
 })()
