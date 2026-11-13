@@ -16,7 +16,7 @@ Você usa o WhatsApp Web **com a conta do usuário**, no navegador integrado (fe
 | Ler uma conversa | `navegador_whatsapp_ler` com `contato` (nome) ou `numero`, e `limite` |
 | Tudo dos últimos N dias (e os links) | `navegador_whatsapp_ler` com `dias: N` (rola sozinho; devolve `links`) |
 | Mandar mensagem | `navegador_whatsapp_enviar` com `contato` ou `numero` e `texto` (limpa o rascunho, aceita várias linhas) |
-| Baixar fotos, vídeos, áudios | `navegador_whatsapp_baixar` (vão para Downloads/WhatsApp) |
+| Baixar fotos, vídeos, áudios | `navegador_whatsapp_baixar` (vão para Downloads/WhatsApp). Só mensagens de voz de alguém: `tipo="audio"`, `de="contato"` (sai .ogg, sem tocar som). Só fotos: `tipo="imagem"` |
 Só caia para `navegador_ler`, `navegador_clicar` e `navegador_digitar` se a ferramenta pronta falhar. **Nunca** escreva na caixa de mensagem com `navegador_js`: o WhatsApp desfaz e o texto duplica.
 
 ## 1. Conectar (primeira vez ou sessão caiu)

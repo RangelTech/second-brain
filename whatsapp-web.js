@@ -172,20 +172,52 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
   }
 
   // baixa as imagens, vídeos e áudios mais recentes da conversa (como estão carregados na tela) para a pasta Downloads/WhatsApp
-  async function baixar({ contato, numero, limite }) {
+  // tipo: 'todos' | 'audio' | 'imagem' | 'video'; de: 'todos' | 'contato' (só o que a outra pessoa mandou) | 'voce'
+  // Mensagens de voz NÃO ficam no HTML: o WhatsApp cria o <audio> só quando aperta play. Aqui apertamos play com o som mudo,
+  // pegamos o áudio na hora (gancho no play) e pausamos: o usuário não ouve nada e a conversa não muda.
+  async function baixar({ contato, numero, limite, tipo, de }) {
     const a = await abrir({ contato, numero })
     await esperar(1500)
+    const N = Math.min(20, Number(limite) || 5)
+    const t = String(tipo || 'todos')
+    const quem = String(de || 'todos')
     const itens = await js(`(async () => {
-      const els = [...document.querySelectorAll('#main [role="row"] img[src^="blob:"], #main [role="row"] video[src^="blob:"], #main [role="row"] audio[src^="blob:"]')].filter((e) => !(e.tagName === 'IMG' && e.naturalWidth < 120)).slice(-${Math.min(20, Number(limite) || 5)})
+      const N = ${N}, T = ${JSON.stringify(t)}, DE = ${JSON.stringify(quem)}
+      const main = document.querySelector('#main').getBoundingClientRect()
+      const lado = (e) => { const r = e.closest('[role="row"]'); const b = (r && (r.querySelector('[data-testid="msg-container"]') || r)).getBoundingClientRect(); return b.left > main.left + main.width * 0.35 ? 'voce' : 'contato' }
+      const vale = (e) => DE === 'todos' || lado(e) === DE
+      const pegar = async (src) => {
+        const b = await (await fetch(src)).blob()
+        const buf = new Uint8Array(await b.arrayBuffer())
+        let s = ''
+        for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768))
+        return { tipo: b.type, b64: btoa(s) }
+      }
       const out = []
-      for (const e of els) {
-        try {
-          const b = await (await fetch(e.src)).blob()
-          const buf = new Uint8Array(await b.arrayBuffer())
-          let s = ''
-          for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768))
-          out.push({ tipo: b.type, b64: btoa(s) })
-        } catch {}
+      if (T === 'todos' || T === 'imagem' || T === 'video') {
+        const sel = T === 'imagem' ? 'img[src^="blob:"]' : T === 'video' ? 'video[src^="blob:"]' : 'img[src^="blob:"], video[src^="blob:"], audio[src^="blob:"]'
+        const els = [...document.querySelectorAll(sel.split(', ').map((x) => '#main [role="row"] ' + x).join(', '))].filter((e) => !(e.tagName === 'IMG' && e.naturalWidth < 120)).filter(vale).slice(-N)
+        for (const e of els) { try { out.push(await pegar(e.src)) } catch {} }
+      }
+      if (T === 'todos' || T === 'audio') {
+        if (!window.__sbHook) {
+          window.__sbHook = true; window.__sbSrc = []
+          const p = HTMLMediaElement.prototype.play
+          HTMLMediaElement.prototype.play = function () { try { if (window.__sbCap) { this.muted = true; window.__sbSrc.push(this) } } catch {} return p.apply(this, arguments) }
+        }
+        const bts = [...document.querySelectorAll('#main [role="row"] button[aria-label], #main [role="row"] [role="button"][aria-label]')]
+          .filter((b) => /mensagem de voz|voice message|mensaje de voz/i.test(b.getAttribute('aria-label')) && /reproduzir|play|reproducir/i.test(b.getAttribute('aria-label')))
+          .filter(vale).slice(-N)
+        for (const bt of bts) {
+          window.__sbSrc = []; window.__sbCap = true
+          try {
+            bt.scrollIntoView({ block: 'center' }); bt.click()
+            let el = null
+            for (let i = 0; i < 60 && !el; i++) { await new Promise((r) => setTimeout(r, 250)); el = window.__sbSrc.find((x) => x.src && x.src.startsWith('blob:')) }
+            if (el) { try { el.pause(); el.currentTime = 0 } catch {} ; const it = await pegar(el.src); it.voz = true; out.push(it) }
+          } catch {}
+          window.__sbCap = false
+        }
       }
       return out
     })()`)
@@ -193,12 +225,16 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     fs.mkdirSync(pasta, { recursive: true })
     const ext = (t) => (/jpeg/.test(t) ? '.jpg' : /png/.test(t) ? '.png' : /webp/.test(t) ? '.webp' : /mp4/.test(t) ? '.mp4' : /ogg|opus/.test(t) ? '.ogg' : /mpeg/.test(t) ? '.mp3' : '.bin')
     const base = String(a.titulo || 'conversa').replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 40) || 'conversa'
+    const carimbo = Date.now()
     const arquivos = itens.map((it, i) => {
-      const f = path.join(pasta, `${base}-${Date.now()}-${i + 1}${ext(it.tipo)}`)
+      const f = path.join(pasta, `${base}-${it.voz ? 'voz-' : ''}${carimbo}-${i + 1}${ext(it.tipo)}`)
       fs.writeFileSync(f, Buffer.from(it.b64, 'base64'))
       return f
     })
-    return { conversa: a.titulo, arquivos, dica: arquivos.length ? '' : 'Nenhuma mídia carregada na tela. Role a conversa para cima (navegador_rolar) para carregar as antigas e tente de novo. Documentos (PDF etc.) baixam pelo botão de download da mensagem.' }
+    const dica = arquivos.length
+      ? ''
+      : 'Nada desse tipo carregado na tela. Role a conversa para cima (navegador_rolar direcao=cima, algumas vezes) para carregar mensagens antigas e tente de novo. Documentos (PDF etc.) baixam pelo botão de download da mensagem.'
+    return { conversa: a.titulo, arquivos, dica }
   }
 
   async function estado() {

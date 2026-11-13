@@ -538,6 +538,35 @@ function yamlGateway(filhos = 3, globais = null) {
     '  write_approval: false',
   ]
 }
+// uv e Python que vêm com o agente (pasta tools do HERMES_HOME): as skills usam para montar ambientes próprios
+// (voz local, etc.) mesmo num computador sem Python. Vão no FIM do PATH: um Python do sistema continua tendo a vez.
+function ferramentasPython(home, env) {
+  const out = env || {}
+  const chave = Object.keys(out).find((k) => k.toUpperCase() === 'PATH') || 'PATH' // no Windows a chave costuma ser "Path"
+  try {
+    const tools = path.join(home, 'tools')
+    const dirs = fs.readdirSync(tools).sort().reverse()
+    const exe = process.platform === 'win32' ? '.exe' : ''
+    const extra = []
+    const uv = dirs.find((d) => d.startsWith('uv-') && fs.existsSync(path.join(tools, d, 'uv' + exe)))
+    if (uv) {
+      out.SB_UV = path.join(tools, uv, 'uv' + exe)
+      extra.push(path.join(tools, uv))
+    }
+    const py = dirs.find((d) => d.startsWith('python-'))
+    if (py) {
+      const raiz = path.join(tools, py)
+      const bin = process.platform === 'win32' ? raiz : path.join(raiz, 'bin')
+      if (fs.existsSync(path.join(bin, process.platform === 'win32' ? 'python.exe' : 'python3'))) {
+        out.SB_PYTHON = path.join(bin, process.platform === 'win32' ? 'python.exe' : 'python3')
+        extra.push(bin)
+      }
+    }
+    if (extra.length) out[chave] = (out[chave] || '') + path.delimiter + extra.join(path.delimiter)
+  } catch {}
+  return out
+}
+
 function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gateway, filhos }) {
   const home = prepararBase(app)
   aplicarSeguranca(home, nivel)
@@ -726,6 +755,7 @@ class Sessao {
     // macOS sem as ferramentas da Apple: o git portátil do app vai na frente do PATH (o agente usa git em skills e atualizações)
     const gitExtra = require('./ferramentas').caminhoExtra(app)
     if (gitExtra) this.env.PATH = gitExtra + path.delimiter + (this.env.PATH || '')
+    ferramentasPython(home, this.env)
     this.subir()
     this.pronta = this.iniciar()
     this.pronta.catch(() => {
@@ -1380,4 +1410,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, yamlGateway, mcpGlobais }
+module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }

@@ -77,7 +77,8 @@
   const CAT = Object.fromEntries(((window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []).map((p) => [p.id, p]))
 
   // caminho completo de um arquivo gerado pelo agente (C:\...\a.xlsx ou /home/.../a.pdf): vira link (abre no app, baixa na web)
-  const EXT_ARQ = 'xlsx?|xlsm|docx?|pptx?|pdf|csv|zip|txt|md|json|png|jpe?g|gif|webp|svg|mp3|wav|mp4|mov|html?'
+  const EXT_ARQ = 'xlsx?|xlsm|docx?|pptx?|odt|ods|odp|rtf|pdf|csv|zip|txt|md|json|png|jpe?g|gif|webp|svg|mp3|wav|ogg|mp4|mov|html?'
+  const EXT_ESCRITORIO = /\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|csv|rtf)$/i // abrem no editor de documentos (spec 37)
   const CAMINHO_ARQ = new RegExp('(?:[A-Za-z]:\\\\[^<>"\'`|*?\\n]{1,180}?|(?<![\\w:./-])/(?:home|root|var|opt|tmp|Users|srv|mnt)/[^<>"\'`|*?\\n]{1,180}?)\\.(?:' + EXT_ARQ + ')(?![\\w])', 'gi')
   // markdown mínimo: blocos de código, código em linha, negrito, títulos, listas, links http(s)
   function md(t) {
@@ -122,7 +123,7 @@
         if (lista) saida.push('</ul>')
         return saida
           .join('')
-          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>`)
+          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>${!ehWeb && EXT_ESCRITORIO.test(m) && window.sb.escritorio ? `<button class="arq-editar" data-escritorio="${m}" title="Abrir no editor de documentos do Segundo Cérebro">Abrir no editor</button>` : ''}`)
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
           .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)]+)/g, (m, rotulo, urlMd, urlSolta) => {
@@ -1782,6 +1783,19 @@
     if (ab) return ehWeb ? baixarArquivo(ab.dataset.abrir, ab) : window.sb.abrirArquivo(ab.dataset.abrir)
     const ou = e.target.closest('[data-ouvir]')
     if (ou) return ouvir(ou)
+    const btEsc = e.target.closest('[data-escritorio]')
+    if (btEsc) {
+      if (btEsc.disabled) return
+      btEsc.disabled = true
+      const rot = btEsc.textContent
+      btEsc.textContent = 'Abrindo…'
+      const fim = window.sb.escritorio.aoProgresso?.((p) => { if (p && p.fase === 'baixando' && btEsc.disabled) btEsc.textContent = `Preparando o editor ${p.pct}%` })
+      window.sb.escritorio.abrir(btEsc.dataset.escritorio).then((r) => {
+        if (!r || !r.ok) aviso('Editor de documentos: ' + ((r && r.erro) || 'não abriu'))
+        else if (r.padrao) aviso('Abri no programa padrão do computador. ' + (r.aviso || ''))
+      }).finally(() => { btEsc.disabled = false; btEsc.textContent = rot; if (typeof fim === 'function') fim() })
+      return
+    }
     const ed = e.target.closest('[data-editor]')
     if (ed) {
       if (ed.disabled) return

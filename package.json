@@ -61,6 +61,8 @@
       "mcp-motion.js",
       "bandeja.js",
       "whatsapp-web.js",
+      "escritorio.js",
+      "extras.js",
       "proxy-navegador.js",
       "motion-render.js",
       "motion-preload.js",

@@ -145,7 +145,7 @@ class GatewayCliente {
     if (!c) return (this.pronta = Promise.reject(new Error('Hermes ainda não está instalado.')))
     const t0 = Date.now()
     this.pronta = new Promise((res, rej) => {
-      const p = spawn(c.py, [this.script], { cwd: c.ws, env: { ...process.env, HERMES_HOME: this.home, PYTHONPATH: c.ws, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }, windowsHide: true })
+      const p = spawn(c.py, [this.script], { cwd: c.ws, env: { ...require('./agent').ferramentasPython(this.home, { ...process.env }), HERMES_HOME: this.home, PYTHONPATH: c.ws, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }, windowsHide: true })
       this.filho = p
       p.stdout.on('data', (d) => this._dados(String(d), res))
       p.stderr.on('data', (d) => this.registrar('ponte-gateway: ' + String(d).slice(-300)))

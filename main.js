@@ -584,6 +584,20 @@ ipcMain.handle('editor:abrir-video', async (_e, video) => {
     return { ok: false, erro: String(e.message || e) }
   }
 })
+// suíte de escritório (spec 37): docx/xlsx/pptx/csv do chat abrem no editor de documentos integrado (ONLYOFFICE portátil)
+const escritorio = require('./escritorio')
+ipcMain.handle('escritorio:estado', () => escritorio.estado(app))
+ipcMain.handle('escritorio:abrir', async (_e, arq) => {
+  const alvo = String(arq || '')
+  try {
+    if (!escritorio.executavel(app)) await escritorio.instalar(app, (p) => janela?.webContents.send('escritorio:progresso', p))
+    return escritorio.abrir(app, alvo)
+  } catch (e) {
+    // sem editor para este sistema (ou a instalação falhou): abre no programa padrão do computador e avisa
+    const r = fs.existsSync(alvo) ? await shell.openPath(alvo) : 'Arquivo não encontrado'
+    return r ? { ok: false, erro: String(e.message || e) } : { ok: true, padrao: true, aviso: String(e.message || e) }
+  }
+})
 ipcMain.handle('editor:abrir', (_e, projeto) => { try { return editorVideo.abrirJanela(app, projeto || path.join(cfg.pasta, 'Videos')) } catch (e) { return { ok: false, erro: String(e.message || e) } } })
 
 // conversas que pediram edição de vídeo: só nelas o motor do editor entra (ele pesa ~47 mil tokens por chamada)
@@ -1343,6 +1357,8 @@ app.whenReady().then(() => {
             editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p)).catch((e) => registrarAgente(app, 'editor em segundo plano: ' + (e.message || e)))
           }
         } catch {}
+        // e o que as skills precisam (voz local, editor de documentos): do snapshot nosso, um de cada vez, sem tela
+        require('./extras').preparar(app, { log: (m) => registrarAgente(app, m), progressoEscritorio: (p) => janela?.webContents.send('escritorio:progresso', p) }).catch(() => {})
       }, 15000)
     })
     .catch((e) => {

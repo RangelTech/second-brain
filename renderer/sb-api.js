@@ -139,6 +139,11 @@
         aoReposicionar: (fn) => on('navegador:reposicionar', () => fn()),
       },
       // editor de vídeo (spec 25 §21): janela própria, como o navegador destacado
+      escritorio: {
+        estado: () => invoke('escritorio:estado'),
+        abrir: (arq) => invoke('escritorio:abrir', arq),
+        aoProgresso: (fn) => on('escritorio:progresso', fn),
+      },
       editor: {
         estado: () => invoke('editor:estado'),
         instalar: () => invoke('editor:instalar'),
