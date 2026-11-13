@@ -899,6 +899,20 @@ app.whenReady().then(() => {
     } catch {}
     return false
   }
+  // proxy do navegador (spec 31): a conta recebe do servidor o proxy do Brasil para Instagram e afins (sobretudo nas VMs, IP de datacenter)
+  const proxyNav = require('./proxy-navegador').criar({
+    app, session, net: require('electron').net, registrar: (t) => registrarAgente(app, t),
+    buscar: async () => {
+      if (!cfg.unlimitedChave) return { proxy: null }
+      const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+      const r = await fetch(base + '/app/proxy-navegador', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
+      return r.ok ? await r.json() : null // servidor antigo (sem a rota) ou fora do ar: mantém como está
+    },
+  })
+  proxyNav.atualizar()
+  setInterval(() => proxyNav.atualizar(), 30 * 60 * 1000).unref?.()
+  ipcMain.handle('proxy:estado', segC(async () => proxyNav.estado()))
+  ipcMain.handle('proxy:testar', segC(async () => { await proxyNav.atualizar(); return { ...proxyNav.estado(), teste: await proxyNav.testar() } }))
   ipcMain.handle('conexoes:estado', segC(async () => {
     const out = {}
     for (const [id, c] of Object.entries(CONEXOES)) {

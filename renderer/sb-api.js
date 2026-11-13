@@ -105,6 +105,7 @@
       creditos: () => invoke('creditos:opcoes'), // saldos, pacotes de crédito e próximo plano (pop-up de limite estourado)
       contaUso: () => invoke('conta:uso'),
       contaPainel: () => invoke('conta:painel'),
+      proxyNav: { estado: () => invoke('proxy:estado'), testar: () => invoke('proxy:testar') },
       conexoes: { estado: () => invoke('conexoes:estado'), abrir: (u) => invoke('conexoes:abrir', u), sair: (id) => invoke('conexoes:sair', id) },
       andamento: { listar: () => invoke('andamento:listar'), parar: () => invoke('andamento:parar') },
       sistema: { estado: () => invoke('sistema:estado'), definir: (m) => invoke('sistema:definir', m) },

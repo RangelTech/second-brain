@@ -12,16 +12,31 @@
     if (!corpo) return
     corpo.innerHTML = `<div class="cfg-cab"><div><h1>Conexões</h1><p>As contas que o agente usa por você: mandar WhatsApp, responder o Instagram, ler o e-mail. Você entra uma vez no navegador integrado e a sessão fica salva só neste computador. Nenhuma senha passa pela gente.</p></div>
       <div class="cfg-acoes"><button id="cx-atualizar">Atualizar</button></div></div>
+      <div class="cx-rede" id="cx-rede"><span class="mut">Conferindo a rede do navegador…</span></div>
       <div class="cx-grade" id="cx-grade">${SITES.map((s) => cartao(s, null)).join('')}</div>
       <div class="ct-amigo" style="margin-top:16px"><b>Dica:</b> depois de conectar, peça no chat, por exemplo: “todo dia às 8h manda bom dia no WhatsApp para a lista de clientes” ou “responde os comentários novos do Instagram”. Os workflows usam estas mesmas contas.</div>`
     corpo.querySelector('#cx-atualizar').onclick = () => carregar()
     corpo.querySelector('#cx-grade').onclick = clique
+    rede()
     await carregar()
   }
   function cartao(s, e) {
     const st = e == null ? '<span class="cx-st">Conferindo…</span>' : e.conectado ? '<span class="cx-st ok">Conectado</span>' : e.incerto ? '<span class="cx-st">Abra para conferir</span>' : '<span class="cx-st">Não conectado</span>'
     return `<div class="cx-card" data-id="${s.id}">${logo(s)}<div class="cx-txt"><div class="cx-nome">${esc(s.nome)} ${st}</div><div class="cx-desc">${esc(s.txt)}</div></div>
       <div class="cx-acoes"><button class="${e && e.conectado ? '' : 'btn-pri'}" data-a="abrir">${e && e.conectado ? 'Abrir' : 'Conectar'}</button>${e && e.conectado ? '<button class="btn-perigo" data-a="sair">Desconectar</button>' : ''}</div></div>`
+  }
+  // rede do navegador: direto (IP deste computador) ou pelo proxy do Brasil configurado para a conta
+  async function rede(testar) {
+    const el = K.corpo()?.querySelector('#cx-rede')
+    if (!el || !window.sb.proxyNav) return
+    if (testar) el.innerHTML = '<span class="mut">Testando a saída… (até 20 s)</span>'
+    const r = await (testar ? window.sb.proxyNav.testar() : window.sb.proxyNav.estado()).catch(() => null)
+    const e = r && r.ok ? r.dado : null
+    if (!e) return (el.innerHTML = '')
+    const t = e.teste
+    const res = t ? (t.erro ? ` · <span class="cx-st">teste falhou: ${esc(t.erro)}</span>` : ` · Instagram sai ${t.rota === 'proxy' ? 'pelo proxy' : 'direto'}${t.pais ? `, IP ${esc(t.ip)} (${esc(t.cidade || '')} ${esc(t.pais)})` : ''}`) : ''
+    el.innerHTML = `<b>Rede do navegador:</b> ${e.ativo ? `<span class="cx-st ok">pelo Brasil</span> Instagram, Facebook, TikTok e afins passam por um IP do Brasil; o resto sai direto.` : '<span class="cx-st">direta</span> O navegador usa a internet deste computador.'}${res} <button id="cx-testar" class="cx-mini">Testar</button>`
+    el.querySelector('#cx-testar').onclick = () => rede(true)
   }
   async function carregar() {
     const r = await window.sb.conexoes.estado().catch(() => null)

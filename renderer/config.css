@@ -286,3 +286,6 @@
 .cx-st.ok{color:#4caf7d;border-color:rgba(76,175,125,.5);background:rgba(76,175,125,.1)}
 .cx-acoes{display:flex;flex-direction:column;gap:6px;flex:none}
 @media (max-width:700px){.cx-grade{grid-template-columns:1fr}}
+
+.cx-rede{margin:0 0 14px;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cx-rede .cx-mini{margin-left:auto;padding:4px 10px;font-size:12px}
