@@ -453,3 +453,14 @@
 .ferr.resposta .rs-quem{font-size:12.5px;font-weight:600;color:var(--mut);letter-spacing:.02em}
 .ferr.resposta .rs-valor{font-size:16px;font-weight:600;color:var(--fg);margin-top:2px}
 .ferr.resposta .rs-ctx{font-size:13px;color:var(--mut);margin-top:4px;line-height:1.4}
+
+/* bolinhas da conta na barra do chat (spec 37) */
+.sb-bolinha{background:none;border:0;font:inherit;cursor:pointer;border-radius:999px;padding:2px 8px 2px 6px;margin-right:4px}
+.sb-bolinha:hover{background:var(--bd)}
+.sb-bolinha.creditos{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#d97757}
+.sb-bolinha.creditos.baixo{color:#e5484d}
+.sb-bolinha[hidden]{display:none}
+.ctx-medidor.sessao{cursor:pointer}
+.ctx-medidor.sessao.livre .ctx-arco{stroke:#4caf7d;stroke-dashoffset:0}
+.ctx-medidor.sessao #sessao-txt{display:inline-flex}
+.ctx-medidor{cursor:help}

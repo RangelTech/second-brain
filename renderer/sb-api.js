@@ -104,6 +104,7 @@
       unlimitedEsqueci: (email) => invoke('unlimited:esqueci', email),
       creditos: () => invoke('creditos:opcoes'), // saldos, pacotes de crédito e próximo plano (pop-up de limite estourado)
       contaUso: () => invoke('conta:uso'),
+      contaPainel: () => invoke('conta:painel'),
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),
       ditadoServidor: (dados, mime) => invoke('ditado:servidor', dados, mime),

@@ -951,6 +951,20 @@ app.whenReady().then(() => {
   ipcMain.handle('unlimited:entrar', (_e, { email, senha }) => unl.entrar(email, senha))
   ipcMain.handle('unlimited:esqueci', (_e, email) => unl.esqueci(email))
   ipcMain.handle('creditos:opcoes', () => unl.creditos())
+  // painel da conta (spec 37): créditos do Estúdio, limites da sessão e da semana, plano e nível de segurança, numa chamada só (barra do chat e aba Cota)
+  ipcMain.handle('conta:painel', async () => {
+    if (!cfg.unlimitedEmail || !cfg.unlimitedChave) return { ok: false, erro: 'Entre na sua conta.' }
+    const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+    const h = { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }
+    const pegar = async (rota) => { try { const r = await fetch(base + rota, { headers: h, signal: AbortSignal.timeout(15000) }); return r.ok ? await r.json() : null } catch { return null } }
+    const [uso, eu, cred] = await Promise.all([pegar('/usage'), pegar('/auth/whoami'), pegar('/credits')])
+    if (!uso && !eu && !cred) return { ok: false, erro: 'Sem conexão com o servidor.' }
+    return {
+      ok: true, email: cfg.unlimitedEmail, plano: eu?.plan?.id || cred?.plan || cfg.unlimitedPlano || '', nivel: eu?.safety_level || null,
+      sessao: uso?.session || null, semana: uso?.week || null,
+      creditos: cred?.balances?.studio ?? null, pacotes: cred?.studio_packs || [], proximo: cred?.next_plan || null, renova: cred?.renews_at || null, gerenciar: cred?.manage_url || null,
+    }
+  })
   ipcMain.handle('unlimited:sair', () => unl.sair())
   // Uso da assinatura: janelas de 5 horas e da semana, medidas pelo servidor para a chave desta conta
   ipcMain.handle('conta:uso', async () => {

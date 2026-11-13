@@ -29,7 +29,7 @@
     { id: 'prov', nome: 'Provedores', grupo: 'Modelos' },
     { id: 'combo', nome: 'Combos', grupo: 'Modelos' },
     { id: 'uso', nome: 'Uso', grupo: 'Consumo' },
-    { id: 'cota', nome: 'Cota', grupo: 'Consumo' },
+    { id: 'cota', nome: 'Créditos e limites', grupo: 'Consumo' },
     { id: 'chrome', nome: 'Chrome', grupo: 'Aplicativo' },
     { id: 'sobre', nome: 'Sobre', grupo: 'Aplicativo' },
   ]
@@ -624,8 +624,9 @@
   async function telaCota() {
     const conta = S.conex.filter((c) => c.isActive !== false && (c.authType === 'oauth' || POR_ID[c.provider]))
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Cota</h1><p>Quanto ainda resta em cada conta conectada. Atualiza sozinho a cada minuto enquanto esta tela está aberta.</p></div>
+      <div class="cfg-cab"><div><h1>Créditos e limites</h1><p>Seus créditos, os limites da sessão, o seu plano e quanto ainda resta em cada conta conectada. Atualiza sozinho a cada minuto.</p></div>
         <div class="cfg-acoes"><button id="atualizar">Atualizar agora</button></div></div>
+      <div id="conta-sb"></div>
       <div class="cotas" id="cotas">${conta.length ? conta.map((c) => `<div class="cota" data-id="${esc(c.id)}"><div class="cota-topo">${logoHtml(c.provider)}<div class="col"><div class="nm" style="font-weight:500">${esc(c.name || nomeProvedor(c.provider))}</div><div class="sub mut">${esc(nomeProvedor(c.provider))}</div></div><span class="mut" data-estado>Consultando…</span></div><div data-corpo></div></div>`).join('') : '<div class="vazio-cfg">Nenhuma conta conectada. Conecte um provedor para acompanhar a cota.</div>'}</div>`
     const buscar = async (forcar) => {
       for (const c of conta) {
@@ -653,8 +654,9 @@
           : '<div class="mut" style="margin-top:10px">Este provedor não informa cota.</div>'
       }
     }
+    window.SBConta?.desenharPainel($('#conta-sb'))
     buscar(false)
-    $('#atualizar').onclick = () => buscar(true)
+    $('#atualizar').onclick = () => (window.SBConta?.desenharPainel($('#conta-sb')), buscar(true))
     clearInterval(S.timerCota)
     S.timerCota = setInterval(() => (S.aba === 'cota' && !raiz.hidden ? buscar(false) : null), 60000)
   }
