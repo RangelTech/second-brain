@@ -34,6 +34,17 @@ function traducao(ev, estado = {}) {
       const res = textoDoResultado(p.result)
       return [{ ferramenta: { id, titulo: guardada.nome, tipo: tipoDaFerramenta(guardada.nome), status: p.is_error === true ? 'failed' : 'completed', conteudo: res.slice(0, 4000), caminho: caminhoDe(guardada.args), entrada: JSON.stringify(guardada.args).slice(0, 600) } }]
     }
+    // subagentes (delegate_task): o app mostra um cartão com cada um, o que está fazendo e o resumo quando termina (spec 34 §6.10)
+    case 'subagent.start':
+    case 'subagent.spawn_requested':
+      return [{ subagente: { id: String(p.subagent_id || p.delegation_id || p.goal || ''), objetivo: String(p.goal || '').slice(0, 200), estado: 'fazendo' } }]
+    case 'subagent.tool':
+    case 'subagent.progress':
+      return [{ subagente: { id: String(p.subagent_id || p.delegation_id || p.goal || ''), objetivo: p.goal ? String(p.goal).slice(0, 200) : undefined, detalhe: String(p.tool_name || p.preview || p.text || '').slice(0, 120), estado: 'fazendo' } }]
+    case 'subagent.complete': {
+      const ok = !/fail|error|erro|cancel|interrupt/i.test(String(p.status || ''))
+      return [{ subagente: { id: String(p.subagent_id || p.delegation_id || p.goal || ''), objetivo: p.goal ? String(p.goal).slice(0, 200) : undefined, estado: ok ? 'feito' : 'cancelado', detalhe: String(p.summary || p.status || '').slice(0, 300) } }]
+    }
     case 'todo.updated': {
       const itens = Array.isArray(p.todos) ? p.todos : Array.isArray(p.items) ? p.items : []
       const norm = itens.map((t, i) => ({ id: String(t.id ?? i), texto: String(t.content || t.text || t.title || ''), estado: /complet|done|ok/i.test(t.status || t.state || '') ? 'feito' : /progress|doing|andamento/i.test(t.status || t.state || '') ? 'fazendo' : /cancel/i.test(t.status || t.state || '') ? 'cancelado' : 'pendente' })).filter((t) => t.texto)

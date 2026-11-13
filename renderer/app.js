@@ -514,6 +514,15 @@
   }
 
   // plano da tarefa: lista com marcas (feito, fazendo, pendente), no mesmo estilo dos cartoes de ferramenta
+  // ajudantes (subagentes) que o agente pôs para trabalhar em paralelo
+  function cartaoSubagentes(itens) {
+    const d = document.createElement('div')
+    const feitos = itens.filter((i) => i.estado !== 'fazendo').length
+    d.className = 'ferr plano'
+    const marca = { feito: IC.check, fazendo: '<span class="rodando"></span>', cancelado: IC.x }
+    d.innerHTML = `<details open data-chave="sub"><summary><span class="fi">${IC.sparkles}</span><span class="ft"><b>Ajudantes</b> ${feitos} de ${itens.length} terminaram</span></summary><ol class="pl-itens">${itens.map((i) => `<li class="pl-${i.estado}"><span class="pl-m">${marca[i.estado] || ''}</span><span><span>${esc(i.objetivo)}</span>${i.detalhe ? `<span class="mut" style="display:block;font-size:12px">${esc(i.detalhe)}</span>` : ''}</span></li>`).join('')}</ol></details>`
+    return d
+  }
   function cartaoPlano(pl) {
     const d = document.createElement('div')
     const feitos = pl.itens.filter((i) => i.estado === 'feito').length
@@ -599,6 +608,9 @@
       } else if (p.t === 'resposta') {
         fechaGrupo()
         el.appendChild(cartaoResposta(p))
+      } else if (p.t === 'subagentes') {
+        fechaGrupo()
+        el.appendChild(cartaoSubagentes(p.itens))
       } else if (p.t === 'plano') {
         fechaGrupo()
         el.appendChild(cartaoPlano(p.plano))
@@ -1445,6 +1457,16 @@
         a.hidden = false
         a.textContent = d.aviso
       }
+    }
+    if (d.subagente && d.subagente.id) {
+      // subagentes: um cartão só na resposta, uma linha por subagente, atualizada a cada evento
+      let ex = r.partes.find((p) => p.t === 'subagentes')
+      if (!ex) r.partes.push((ex = { t: 'subagentes', itens: [] }))
+      const it = ex.itens.find((i) => i.id === d.subagente.id)
+      if (it) Object.assign(it, Object.fromEntries(Object.entries(d.subagente).filter(([, v]) => v !== undefined && v !== '')))
+      else ex.itens.push({ ...d.subagente, objetivo: d.subagente.objetivo || 'Subtarefa' })
+      const ativos = ex.itens.filter((i) => i.estado === 'fazendo').length
+      anotar(r, ativos ? `${ativos} ${ativos === 1 ? 'ajudante trabalhando' : 'ajudantes trabalhando'} em paralelo` : 'Ajudantes terminaram')
     }
     if (d.plano) {
       // plano da tarefa (todo do agente): um cartao unico no topo da resposta, atualizado a cada revisao
