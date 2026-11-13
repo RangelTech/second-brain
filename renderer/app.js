@@ -482,6 +482,34 @@
       ${caminho && f.status === 'completed' && tipo === 'edit' ? `<div class="facoes"><button data-abrir="${attr(caminho)}">${IC.file}${ehWeb ? 'Baixar' : 'Abrir'} ${esc(nomeArq(caminho))}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>` : ''}`
   }
 
+
+  // vídeo pronto citado na resposta (Motion): caminho completo de .mp4/.webm/.mov vira player no próprio chat, com Abrir e Mostrar na pasta
+  const cacheVideos = new Map()
+  const RE_VIDEO = /(?:[A-Za-z]:[\\/]|\/(?:home|root|tmp|Users)\/)[^\n"<>|*?`]*?\.(?:mp4|webm|mov)\b/g
+  function playersLocais(el) {
+    const vistos = new Set()
+    const achados = [...Array.from(el.querySelectorAll('[data-arq]')).map((a) => a.dataset.arq).filter((c) => /\.(mp4|webm|mov)$/i.test(c || '')), ...(String(el.textContent || '').match(RE_VIDEO) || [])]
+    for (const bruto of achados) {
+      const caminho = bruto.trim()
+      if (vistos.has(caminho) || vistos.size >= 3) continue
+      vistos.add(caminho)
+      const box = document.createElement('div')
+      box.className = 'video-local'
+      el.appendChild(box)
+      const pintar = (r) => {
+        if (!r || !r.ok) { box.remove(); return }
+        if (r.tamanho > 60 * 1024 * 1024) {
+          box.innerHTML = `<div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${IC.file}Abrir ${esc(nomeArq(caminho))}</button></div>`
+          return
+        }
+        const mime = /\.webm$/i.test(caminho) ? 'video/webm' : 'video/mp4'
+        box.innerHTML = `<video class="img-final" src="data:${mime};base64,${r.base64}" controls playsinline preload="metadata"></video><div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${IC.file}${ehWeb ? 'Baixar' : 'Abrir'}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>`
+      }
+      if (cacheVideos.has(caminho)) pintar(cacheVideos.get(caminho))
+      else window.sb.lerArquivo(caminho).then((r) => { if (r && r.ok) cacheVideos.set(caminho, r); pintar(r) }).catch(() => box.remove())
+    }
+  }
+
   function partesDe(m) {
     return m.partes || [{ t: 'texto', v: m.content }]
   }
@@ -517,6 +545,7 @@
         c.className = 'corpo'
         c.innerHTML = md(p.v)
         el.appendChild(c)
+        if (/\.(mp4|webm|mov)\b/i.test(p.v || '')) playersLocais(c)
       } else if (p.t === 'ferr') {
         if (ehMidia(p.f)) {
           const card = cartaoFerramenta(p.f)

@@ -45,4 +45,4 @@ Para ajustes finos que o usuário quer ver (arrastar cortes, trocar ordem), ofer
 ## Regras
 - Sem custo e sem orçamento: não chame `midia_orcar` para Motion.
 - Não escreva um gerador de vídeo do zero: use o script e as receitas. Se um pedido não couber, combine receitas.
-- Entregue sempre o caminho do arquivo, a duração real e uma frase sobre o resultado. Não diga "IA", "FFmpeg" nem "script" ao usuário: diga "editei" e "criei".
+- Entregue sempre o **caminho completo** do arquivo numa linha própria (ex.: `C:\Users\...\Videos\promo.mp4`; o app mostra o vídeo tocando no chat), a duração real e uma frase sobre o resultado. Não diga "IA", "FFmpeg" nem "script" ao usuário: diga "editei" e "criei".

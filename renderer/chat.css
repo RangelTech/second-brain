@@ -423,3 +423,6 @@
 .est-nao:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 @media (max-width:520px){.est-topo:has(.est-preco){flex-wrap:wrap}.est-preco{text-align:left;width:100%;padding-left:54px}}
 .msg:not(:last-of-type) .est-acoes{display:none}
+
+.video-local{display:flex;flex-direction:column;gap:10px;margin:12px 0 4px;width:min(420px,100%)}
+.video-local video{border-radius:12px;max-height:520px;width:auto;max-width:100%;align-self:flex-start;background:#000}
