@@ -549,7 +549,8 @@ async function tratar(msg) {
       }
       if (nome === 'estudio') {
         const v = await comReserva(estudio, params?.arguments || {}, 'video')
-        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('pedido do Estúdio', v.min || 3) }] } })
+        const ehImg = /^imagem-/.test(String((params?.arguments || {}).efeito || ''))
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: ehImg ? TEXTO_PENDENTE('imagem do Estúdio', v.min || 1).split('o seu vídeo').join('a sua imagem') : TEXTO_PENDENTE('pedido do Estúdio', v.min || 3) }] } })
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Pronto em ${v.segundos} s. caminho: ${v.caminho}` }] } })
       }
       if (nome === 'conferir_troca') {

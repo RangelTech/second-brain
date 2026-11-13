@@ -402,7 +402,7 @@
   }
 
   function criandoImagem(d, f) {
-    const video = /midia_(gerar_video|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '') || (/midia_estudio/.test(f.titulo || '') && !/imagem-ponta/.test(f.entrada || ''))
+    const video = /midia_(gerar_video|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '') || (/midia_estudio/.test(f.titulo || '') && !/imagem-(ponta|livre)/.test(f.entrada || ''))
     const pendente = f.status === 'completed' && /\[\[midia-pendente\]\]/.test(String(f.conteudo || '')) // enviado em segundo plano: segue "gerando" até o app avisar
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
     const prox = video ? 'o vídeo' : 'a imagem'
@@ -411,7 +411,7 @@
       if (j) { j.fim = Date.now(); clearTimeout(j.timer) }
     }
     if (f.status === 'completed' && !pendente) {
-      const m = (video ? /caminho:\s*(.+?\.mp4)/i : /caminho:\s*(.+?\.png)/i).exec(String(f.conteudo || ''))
+      const m = (video ? /caminho:\s*(.+?\.(mp4|webm|mov))/i : /caminho:\s*(.+?\.(png|jpe?g|webp|gif))/i).exec(String(f.conteudo || ''))
       if (!m) {
         d.className = 'ferr img-ferr'
         d.hidden = true // etapa de apoio da ferramenta (sem o arquivo): o cartão que mostra o resultado é o outro
@@ -1528,16 +1528,16 @@
         if (!achou && p.t === 'ferr' && /\[\[midia-pendente\]\]/.test(String(p.f.conteudo || ''))) {
           p.f.conteudo = ok ? 'caminho: ' + m.caminho : 'falhou'
           p.f.status = ok ? 'completed' : 'failed'
-          if (ok) (msg.midias = msg.midias || []).push(m.caminho)
-          achou = true
+          achou = true // o cartão da própria ferramenta mostra o resultado (sem repetir como anexo)
         }
       }
       if (achou) break
     }
     if (!achou) {
-      const texto = ok ? 'Pronto! Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo agora. Tente de novo em instantes.'
-      const partes = ok ? [{ t: 'ferr', f: { id: 'bg-' + Date.now(), titulo: 'midia_gerar_video', status: 'completed', tipo: 'other', conteudo: 'caminho: ' + m.caminho, entrada: '{}' } }] : [{ t: 'texto', v: texto }]
-      c.msgs.push({ role: 'assistant', content: texto, partes, midias: ok ? [m.caminho] : undefined, fim: Date.now() })
+      const img = /\.(png|jpe?g|webp|gif)$/i.test(String(m.caminho || ''))
+      const texto = ok ? (img ? 'Pronto! Sua imagem ficou pronta.' : 'Pronto! Seu vídeo ficou pronto.') : 'Não consegui gerar agora. Tente de novo em instantes.'
+      const partes = ok ? [{ t: 'ferr', f: { id: 'bg-' + Date.now(), titulo: img ? 'midia_gerar_imagem' : 'midia_gerar_video', status: 'completed', tipo: 'other', conteudo: 'caminho: ' + m.caminho, entrada: '{}' } }] : [{ t: 'texto', v: texto }]
+      c.msgs.push({ role: 'assistant', content: texto, partes, fim: Date.now() })
     } else if (!ok) {
       c.msgs.push({ role: 'assistant', content: 'Não consegui gerar o vídeo agora. Tente de novo em instantes.', fim: Date.now() })
     }
