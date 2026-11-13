@@ -480,7 +480,7 @@
     }
     const caminho = f.caminho
     d.className = 'ferr ' + (f.status || 'pending')
-    d.innerHTML = `<details ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${icone}</span><span class="ft"><b>${esc(rotulo)}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
+    d.innerHTML = `<details data-chave="f:${esc(f.id || '')}" ${f.conteudo || f.entrada ? '' : 'class="sem-corpo"'}><summary><span class="fi">${icone}</span><span class="ft"><b>${esc(rotulo)}</b> ${esc(titulo)}</span><span class="fe">${estado}</span></summary>
       <div class="fcorpo">${f.entrada ? `<div class="mut">${esc(f.entrada)}</div>` : ''}${f.conteudo ? `<pre>${esc(f.conteudo)}</pre>` : ''}</div></details>
       ${caminho && f.status === 'completed' && tipo === 'edit' ? `<div class="facoes"><button data-abrir="${attr(caminho)}">${IC.file}${ehWeb ? 'Baixar' : 'Abrir'} ${esc(nomeArq(caminho))}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>` : ''}`
   }
@@ -527,6 +527,9 @@
     return m.partes || [{ t: 'texto', v: m.content }]
   }
   function renderPartes(el, partes) {
+    // o usuário abre e fecha os blocos de passos à mão: redesenhar (a cada evento do agente) não pode mudar isso
+    const abertos = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => d.open).map((d) => d.dataset.chave))
+    const fechados = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => !d.open).map((d) => d.dataset.chave))
     el.innerHTML = ''
     let grupo = null
     let ultimaFalha = null
@@ -541,6 +544,7 @@
         det.innerHTML = `<summary><span class="gf-ic">${rodando ? '<span class="rodando"></span>' : IC.check}</span><span>${rodando ? 'Trabalhando...' : 'Concluído'} · ${itens.length} ${itens.length === 1 ? 'passo' : 'passos'}${erro && !rodando ? ` · ${erro} sem sucesso` : ''}</span></summary><div class="gf-lista"></div>`
         const lista = det.querySelector('.gf-lista')
         for (const x of itens) lista.appendChild(cartaoFerramenta(x.f))
+        det.dataset.chave = 'g:' + (itens[0].f.id || '')
         el.appendChild(det)
       }
       grupo = null
@@ -585,6 +589,10 @@
       }
     }
     fechaGrupo()
+    for (const d of el.querySelectorAll('details[data-chave]')) {
+      if (abertos.has(d.dataset.chave)) d.open = true
+      else if (fechados.has(d.dataset.chave)) d.open = false
+    }
   }
 
   const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Segundo Cérebro`
