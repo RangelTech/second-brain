@@ -148,6 +148,29 @@ LIB="$(dpkg -L second-brain 2>/dev/null | grep 'resources/liberdade-vm.sh$' | he
 if [ -n "$LIB" ]; then bash "$LIB" || LOG "aviso: a configuracao de liberdade nao terminou (o vigia tenta de novo em 5 min)."; fi
 systemctl enable --now segundo-cerebro.service
 systemctl enable --now segundo-cerebro-atualizar.timer
+# proxy do navegador (spec 31): Instagram e afins saem por um IP do Brasil (a conta busca o proxy no servidor); refaz a cada 6 h e na partida
+curl -fsSL --retry 3 https://raw.githubusercontent.com/RangelTech/second-brain/main/scripts/proxy-vm.sh -o /usr/local/bin/segundo-cerebro-proxy && chmod 755 /usr/local/bin/segundo-cerebro-proxy || LOG "aviso: não baixei o script do proxy do navegador"
+cat > /etc/systemd/system/segundo-cerebro-proxy.service <<UNIT4
+[Unit]
+Description=Proxy do navegador do Segundo Cérebro (IP do Brasil para redes sociais)
+After=network-online.target segundo-cerebro.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/segundo-cerebro-proxy
+UNIT4
+cat > /etc/systemd/system/segundo-cerebro-proxy.timer <<UNIT5
+[Unit]
+Description=Confere o proxy do navegador do Segundo Cérebro
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=6h
+Persistent=true
+[Install]
+WantedBy=timers.target
+UNIT5
+systemctl daemon-reload
+[ -x /usr/local/bin/segundo-cerebro-proxy ] && { /usr/local/bin/segundo-cerebro-proxy || LOG "aviso: proxy do navegador não configurado agora (tenta de novo em 6 h)"; }
+systemctl enable --now segundo-cerebro-proxy.timer >/dev/null 2>&1 || true
 sleep 6
 if systemctl is-active --quiet segundo-cerebro.service; then
   LOG "Pronto. O servidor está rodando e aparece em https://remoto.rangeltech.net (entre com a sua conta)."
