@@ -17,7 +17,7 @@ const N = Number(process.argv[2] || 5)
 
 function ponte() {
   const t0 = Date.now()
-  const p = spawn(py, [path.join(__dirname, 'ponte_gateway.py')], { cwd: ws, env: { ...process.env, HERMES_HOME: HOME, PYTHONPATH: ws, PYTHONIOENCODING: 'utf-8' }, windowsHide: true })
+  const p = spawn(py, [path.join(__dirname, '..', '..', 'ponte_gateway.py')], { cwd: ws, env: { ...process.env, HERMES_HOME: HOME, PYTHONPATH: ws, PYTHONIOENCODING: 'utf-8' }, windowsHide: true })
   let buf = ''
   let seq = 0
   const pend = new Map()
