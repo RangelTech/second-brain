@@ -15,6 +15,7 @@ Você escreve UMA página HTML do tamanho exato do vídeo. Já vêm carregados:
 - **React + ReactDOM** e ``html`...` `` (JSX sem compilar, via htm), por exemplo: ``html`<div class="x" style=${{opacity: a}}>${texto}</div>` ``
 - **SB** (ajudante): `SB.prog(t, inicio, duracao, 'out'|'inOut'|'outExpo'|'outBack')` dá 0 a 1 com easing; `SB.spring(t, inicio)` pula e assenta; `SB.stagger(i, inicio, passo)` cascata; `SB.mix(a, b, p)` números e cores; `SB.noise(x)` tremido suave; `SB.split(el)` letra a letra.
 - O tempo é controlado: defina `window.sbFrame = (t) => {...}` (t em segundos) e desenhe o quadro daquele instante. Com React: ``const root = ReactDOM.createRoot(el); window.sbFrame = (t) => ReactDOM.flushSync(() => root.render(html`<${Cena} t=${t} />`)) ``. Animações CSS `@keyframes` e Web Animations também funcionam sozinhas.
+- Imagens e vídeos usados na página: coloque na MESMA pasta do vídeo de saída (ou numa subpasta dela) e use caminho relativo, ex.: `url('foto.jpg')`. Não converta imagem para base64.
 - Vídeo do usuário dentro da animação: `<video src="arquivo.mp4" data-inicio="1.5" data-corte="0">` (caminho relativo à pasta do vídeo de saída). Ele é posicionado quadro a quadro.
 
 **Modelo pronto:** `modelos/reel-promo-react.html` (reel 9:16 de 6 s: selo, título palavra por palavra com mola, barra, número subindo, subtítulo, botão pulsando, fundo com luz e partículas). Copie, troque textos, cores e tempos. Não comece do zero.
@@ -23,7 +24,7 @@ Você escreve UMA página HTML do tamanho exato do vídeo. Já vêm carregados:
 1. Combine em uma frase: formato (9:16 reel/story, 1:1, 16:9), duração, textos e cores (as da marca do usuário, se ele tiver).
 2. Escreva o HTML a partir do modelo. Salve também o `.html` ao lado do vídeo (o usuário pode pedir ajuste depois).
 3. `motion_previa` com 4 a 6 tempos (começo, cada entrada, final) e **olhe cada quadro** com `vision_analyze`. Corrija antes de renderizar.
-4. `motion_animar` (duração e trilha, se houver: `audio`). Leva cerca de 6 s de trabalho por segundo de vídeo em 1080x1920.
+4. `motion_animar` (duração e trilha, se houver: `audio`). **Limite: no máximo 1 rodada de correção depois da prévia e 2 renderizações no total.** Se ainda tiver detalhe, entregue e ofereça ajustar; o usuário decide se quer mais uma. Leva cerca de 6 s de trabalho por segundo de vídeo em 1080x1920.
 5. Entregue o caminho do MP4 numa linha própria e ofereça: ajustar, versão 1:1, ou abrir no Editor para mexer junto.
 
 **Padrão de qualidade (confira na prévia):**

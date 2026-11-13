@@ -12,6 +12,9 @@ O que faz um site desses impressionar: **vídeo de verdade** (topo e cartões), 
 - `modelos/landing-cinema.html`: a página inteira, um arquivo só, sem dependências, responsiva (celular com botão fixo embaixo). Troque os `{{CAMPOS}}`, as cores em `:root` e os vídeos em `videos/`.
 - `modelos/camera-cinema.html`: transforma **uma foto** em vídeo de cinema (câmera lenta com zoom e deslize, luz passando, poeira no ar, barras de cinema, texto entrando). Renderize com `motion_animar` (Motion, de graça, no computador do usuário). Troque `FOTO`, `TITULO`, `SUBTITULO` e a duração `D`.
 
+## Ritmo (importante)
+O usuário está esperando. Faça na ordem, sem refazer à toa: 1 imagem por cena, 1 prévia, no máximo 1 correção, 1 renderização por vídeo; escreva o `index.html` **logo depois do primeiro vídeo pronto** (dá para trocar o vídeo depois). Meta: página pronta em até 15 minutos.
+
 ## Roteiro
 1. Entenda em 1 pergunta (se faltar): o que vende, para quem, preço e o link de compra (checkout). Peça fotos do produto/imóvel/pessoa, se ele tiver.
 2. Crie a pasta `Sites/<nome>/` na pasta de trabalho, com `index.html`, `videos/` e `imagens/`.
