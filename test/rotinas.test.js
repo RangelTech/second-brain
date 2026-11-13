@@ -1,0 +1,52 @@
+// Rotinas: frequência em linguagem de gente vira a expressão do Hermes e volta em português.
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { agendamento, descrever, lista, novasExecucoes, ultimaSaida } = require('../rotinas')
+
+test('agendamento: diária, dias úteis, semanal, a cada hora e a cada N minutos', () => {
+  assert.equal(agendamento({ frequencia: 'diaria', horario: '08:30' }), '30 8 * * *')
+  assert.equal(agendamento({ frequencia: 'dias-uteis', horario: '7:05' }), '5 7 * * 1-5')
+  assert.equal(agendamento({ frequencia: 'semanal', horario: '18:00', dias: [1, 3, 5] }), '0 18 * * 1,3,5')
+  assert.equal(agendamento({ frequencia: 'hora' }), 'every 1h')
+  assert.equal(agendamento({ frequencia: 'minutos', horario: '2' }), 'every 5m', 'mínimo de 5 minutos')
+  assert.equal(agendamento({ frequencia: 'minutos', horario: '45' }), 'every 45m')
+  assert.equal(agendamento({ expressao: ' 0 9 * * 1 ' }), '0 9 * * 1')
+  assert.throws(() => agendamento({ frequencia: 'nada' }), /frequência/)
+})
+
+test('descrever: expressão vira frase em português', () => {
+  assert.equal(descrever('every 1440m'), 'Todo dia')
+  assert.equal(descrever('every 60m'), 'Toda hora')
+  assert.equal(descrever('every 120m'), 'A cada 2 horas')
+  assert.equal(descrever('every 30m'), 'A cada 30 minutos')
+  assert.equal(descrever('30 8 * * *'), 'Todo dia às 08:30')
+  assert.equal(descrever('5 7 * * 1-5'), 'Dias úteis às 07:05')
+  assert.equal(descrever('0 18 * * 1,3,5'), 'segunda, quarta, sexta às 18:00')
+})
+
+test('lista: marca pausadas e erros', () => {
+  const r = lista([{ job_id: 'a', name: 'Resumo', schedule: 'every 1440m', enabled: true, state: 'scheduled', last_status: 'ok', prompt_preview: 'x' }, { job_id: 'b', name: 'Relatório', schedule: '0 9 * * 1', enabled: false, state: 'paused', last_error: 'falhou' }])
+  assert.equal(r[0].ativa, true)
+  assert.equal(r[1].ativa, false)
+  assert.equal(r[1].erro, 'falhou')
+  assert.equal(r[0].quando, 'Todo dia')
+})
+
+test('execuções novas e última saída lidas do disco (sem acordar o gateway)', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-cron-'))
+  fs.mkdirSync(path.join(home, 'cron', 'output', 'abc'), { recursive: true })
+  const grava = (t) => fs.writeFileSync(path.join(home, 'cron', 'jobs.json'), JSON.stringify({ jobs: [{ job_id: 'abc', name: 'Resumo', last_run_at: t }] }))
+  const vistos = new Map()
+  grava('2026-11-13T08:00:00')
+  assert.deepEqual(novasExecucoes(home, vistos), [], 'primeira leitura só memoriza')
+  grava('2026-11-13T08:00:00')
+  assert.deepEqual(novasExecucoes(home, vistos), [])
+  grava('2026-11-14T08:00:00')
+  assert.deepEqual(novasExecucoes(home, vistos), [{ id: 'abc', nome: 'Resumo' }])
+  fs.writeFileSync(path.join(home, 'cron', 'output', 'abc', '2026-11-14_08-00.md'), 'Bom dia!')
+  assert.equal(ultimaSaida(home, 'abc').texto, 'Bom dia!')
+  assert.equal(ultimaSaida(home, 'nao-existe'), null)
+})

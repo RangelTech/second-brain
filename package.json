@@ -36,6 +36,7 @@
       "mcp-ias.js",
       "gateway-cliente.js",
       "dublagem.js",
+      "rotinas.js",
       "sessao-gateway.js",
       "ponte_gateway.py",
       "navegador.js",

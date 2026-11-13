@@ -204,3 +204,17 @@
 .uso-tok{text-align:right;font-variant-numeric:tabular-nums}
 .uso-linha:has(.uso-nome):not(:has(.uso-barra)){grid-template-columns:1fr 70px}
 @media (max-width:700px){.uso-linha{grid-template-columns:1fr 60px}.uso-barra{display:none}}
+
+/* Rotinas */
+.ro-itens{display:flex;flex-direction:column;gap:10px}
+.ro-item{align-items:flex-start}
+.ro-item .ro-acoes{display:flex;gap:8px;flex-wrap:wrap;flex:none}
+.ro-item .ro-pedido{margin-top:4px;color:var(--mut);white-space:normal}
+.ro-pausada{opacity:.75}
+.ro-saida{background:var(--lat);border:1px solid var(--bd);border-radius:10px;padding:12px;max-height:50vh;overflow:auto;white-space:pre-wrap;font-size:13.5px;line-height:1.5}
+@media (max-width:640px){.ro-item{flex-direction:column}.ro-item .ro-acoes{width:100%}}
+.janela textarea,.janela input,.janela select,.cfg-corpo textarea{background:var(--lat);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;outline:none;min-width:0;color:var(--fg);font:inherit;width:100%}
+.janela textarea:focus,.janela input:focus,.janela select:focus,.cfg-corpo textarea:focus{border-color:var(--ac)}
+.janela .campo{display:flex;flex-direction:column;gap:6px;margin:0}
+.janela .campo[hidden]{display:none}
+.janela .campo>label{font-size:13px;color:var(--mut)}

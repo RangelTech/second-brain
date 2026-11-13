@@ -58,9 +58,9 @@ const FERRAMENTAS = [
   },
   {
     nome: 'orcar',
-    desc: 'Mostra o PREÇO e o tempo de um pedido do Estúdio ANTES de criar, sem gastar nada (1 segundo). Use SEMPRE antes de midia_estudio, midia_gerar_video, midia_trocar_personagem e midia_clonar_voz, mostre o valor ao usuário em reais e espere ele confirmar. Efeitos: video-rapido (texto ou foto vira vídeo, 5 a 15 s, mais barato), video-ponta (Wan 3.0, melhor movimento, 4 a 15 s), video-premium (Seedance 2.0, cinema), video-google (Veo 3.1, pode ter som), trocar-personagem (põe a pessoa de uma foto no vídeo do usuário, mantém o tamanho do vídeo), editar-video (troca objeto, roupa ou cenário num vídeo do usuário; partes de até 15 s), avatar-foto (uma foto que fala um áudio ou texto), sincronia-labial e sincronia-labial-pro (boca acompanha um áudio novo), voz e voz-hd (narração; voz aceita amostra para clonar), imagem-ponta (Seedream 5.5, quando o usuário pedir qualidade máxima; para imagem comum use midia_gerar_imagem).',
+    desc: 'Mostra o PREÇO e o tempo de um pedido do Estúdio ANTES de criar, sem gastar nada (1 segundo). Use SEMPRE antes de midia_estudio, midia_gerar_video, midia_trocar_personagem e midia_clonar_voz, mostre o valor ao usuário em reais e espere ele confirmar. Efeitos: video-rapido (texto ou foto vira vídeo, 5 a 15 s, mais barato), video-ponta (Wan 3.0, melhor movimento, 4 a 15 s), video-premium (Seedance 2.0, cinema), video-google (Veo 3.1, pode ter som), trocar-personagem (põe a pessoa de uma foto no vídeo do usuário, mantém o tamanho do vídeo), editar-video (troca objeto, roupa ou cenário num vídeo do usuário; partes de até 15 s), avatar-foto (uma foto que fala um áudio ou texto), sincronia-labial e sincronia-labial-pro (boca acompanha um áudio novo), voz e voz-hd (narração; voz aceita amostra para clonar), imagem-ponta (Seedream 5.5, quando o usuário pedir qualidade máxima), imagem-livre (imagem SEM restrição de conteúdo, 5 créditos: conteúdo adulto, violento ou que o gerador padrão recusou; para imagem comum use midia_gerar_imagem).',
     schema: obj({
-      efeito: { type: 'string', enum: ['video-rapido', 'video-ponta', 'video-premium', 'video-google', 'trocar-personagem', 'editar-video', 'avatar-foto', 'sincronia-labial', 'sincronia-labial-pro', 'voz', 'voz-hd', 'imagem-ponta'] },
+      efeito: { type: 'string', enum: ['video-rapido', 'video-ponta', 'video-premium', 'video-google', 'trocar-personagem', 'editar-video', 'avatar-foto', 'sincronia-labial', 'sincronia-labial-pro', 'voz', 'voz-hd', 'imagem-livre', 'imagem-ponta'] },
       segundos: { type: 'number', description: 'Duração do vídeo (para trocar-personagem, sincronia e editar-video: a duração do vídeo do usuário).' },
       texto: { type: 'string', description: 'Para voz: o texto que será falado (o preço é por caractere).' },
       qualidade: { type: 'string', description: 'Opcional: 480p, 720p, 768p, 1080p (vídeo), turbo/hd (voz-hd), 1.5K/2K (imagem). Sem ela vale a mais barata que resolve.' },
@@ -80,6 +80,7 @@ const FERRAMENTAS = [
       idioma: { type: 'string', description: 'Idioma da fala (pt, en, es...). Padrão pt.' },
       segundos: { type: 'number', description: 'Duração (a mesma do orçamento).' },
       qualidade: { type: 'string', description: 'A mesma do orçamento.' },
+      tamanho: { type: 'string', description: 'Só para imagem-livre: quadrado (padrão), paisagem ou retrato.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
     }, ['efeito', 'confirmado']),
   },
@@ -216,6 +217,7 @@ async function api(rota, opcoes = {}) {
 
 const TEXTO_PENDENTE = (o, min) => `[[midia-pendente]] ${o} em andamento, previsão de ${min} minutos. Diga ao usuário apenas: "Estou gerando o seu vídeo; fica pronto em aproximadamente ${min} minutos." Não mencione GPU, fila, servidor nem andamento. NÃO espere, NÃO consulte e NÃO gere de novo: o arquivo é salvo sozinho e o aplicativo avisa quando ficar pronto.`
 const MSG_FALHA = 'Não consegui gerar agora, tente de novo em instantes.'
+const MSG_RECUSADA = 'O gerador padrão de imagens não aceita este pedido (conteúdo restrito). Diga ao usuário, sem julgar, que dá para criar no Estúdio, sem restrição de conteúdo, por 5 créditos; chame midia_orcar com efeito imagem-livre e, com o SIM, midia_estudio (prompt em inglês, tamanho opcional: paisagem, retrato ou quadrado).'
 const EXT_POR_MIME = { 'audio/wav': '.wav', 'audio/mpeg': '.mp3', 'video/mp4': '.mp4', 'video/webm': '.webm', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' }
 const stampAgora = () => new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '').replace(/^(\d{8})(\d{6})$/, '$1-$2')
 
@@ -269,7 +271,7 @@ async function rodarJob({ tipo, rota, corpo, prompt, nome, limiteMs, assincrono,
     await pausa(1500)
     const s = await andamento(id)
     marcar(tipo, prompt, s)
-    if (s.status === 'failed') throw new Error(MSG_FALHA)
+    if (s.status === 'failed') throw new Error(s.error === 'recusada' ? MSG_RECUSADA : MSG_FALHA)
     if (s.status === 'done') {
       const r = await salvarResultado(id, salvar || tipo, nome, s)
       marcar(tipo, prompt, { status: 'done', position: null, eta_s: 0, progress: 100 })
@@ -352,10 +354,10 @@ async function estudio(args) {
   if (Array.isArray(args.fotos) && args.fotos.length) inputs.referenceImages = args.fotos.slice(0, 4).map((f, i) => dataUri(f, 'Foto ' + (i + 1), 8))
   if (args.audio) inputs.audio = dataUri(args.audio, 'Áudio', 20)
   if (args.efeito === 'avatar-foto' && inputs.referenceImages) inputs.referenceImages = inputs.referenceImages.slice(0, 1)
-  const corpo = { efeito: args.efeito, prompt: args.prompt, texto: args.texto, idioma: args.idioma, segundos: args.segundos, qualidade: args.qualidade, ...(Object.keys(inputs).length ? { inputs } : {}) }
+  const corpo = { efeito: args.efeito, prompt: args.prompt, tamanho: args.tamanho, texto: args.texto, idioma: args.idioma, segundos: args.segundos, qualidade: args.qualidade, ...(Object.keys(inputs).length ? { inputs } : {}) }
   if (args.efeito === 'sincronia-labial' && !args.audio && args.texto) corpo.texto_fala = args.texto
   const audio = args.efeito === 'voz' || args.efeito === 'voz-hd'
-  const imagem = args.efeito === 'imagem-ponta'
+  const imagem = args.efeito === 'imagem-ponta' || args.efeito === 'imagem-livre'
   return rodarJob({ tipo: audio ? 'video' : imagem ? 'imagem' : 'video', salvar: audio ? 'audio' : imagem ? 'imagem' : 'video', rota: '/estudio/gerar', corpo,
     prompt: args.prompt || args.texto || args.efeito, nome: args.nome || args.efeito, limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
 }

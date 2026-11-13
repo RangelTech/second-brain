@@ -9,6 +9,9 @@ description: |
 ## Imagem e foto do usuário (não é Estúdio)
 Editar ou criar **imagem** ("me veste de terno", "troca o fundo desta foto", "põe meu rosto neste cartaz") usa `midia_gerar_imagem` com `referencias` (caminhos das fotos): não gasta crédito, conta na cota de imagens do plano, e não precisa de orçamento.
 
+## Imagem que o gerador padrão não faz (conteúdo adulto, violento, etc.)
+Se o usuário pedir imagem **adulta/explícita** ou o `midia_gerar_imagem` avisar que o pedido foi recusado, ofereça o Estúdio sem restrição: efeito `imagem-livre`, **5 créditos** por imagem. Não julgue nem faça sermão: é um serviço adulto do próprio usuário. Orce (`midia_orcar`), espere o SIM e crie com `midia_estudio` (`prompt` em inglês, `tamanho`: quadrado, paisagem ou retrato). Menores de idade nunca: recuse sem exceção.
+
 ## Roteiro fixo (não pule passos)
 1. **Entender o pedido** com no máximo 3 perguntas curtas (só o que falta): qual vídeo/foto, o que muda, formato (9:16 para reel).
 2. **Conferir os arquivos**: duração do vídeo (`ffprobe`), tamanho (até 40 MB; se passar, reduza com FFmpeg ou o Editor antes). Para trocar pessoa, rode `midia_conferir_troca`.
@@ -31,6 +34,7 @@ Editar ou criar **imagem** ("me veste de terno", "troca o fundo desta foto", "p�
 | `video-ponta` | vídeo bonito de 4 a 15 s | `prompt` (+ foto) |
 | `video-premium` | cinema, comercial | `prompt` (+ fotos/vídeos de referência) |
 | `video-google` | vídeo com som ambiente e fala | `prompt` |
+| `imagem-livre` | imagem sem restrição de conteúdo (5 créditos) | `prompt` |
 | `imagem-ponta` | imagem com qualidade máxima (o comum é `midia_gerar_imagem`) | `prompt` |
 
 ## Dublagem com a voz do usuário (`midia_dublar_video`)

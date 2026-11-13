@@ -981,6 +981,23 @@ app.whenReady().then(() => {
   ipcMain.handle('skillsrepo:criar', seguro((n) => skillsRepo.criarRepositorio(n)))
   ipcMain.handle('skillsrepo:desvincular', seguro(() => skillsRepo.desvincular()))
   ipcMain.handle('skillsrepo:sincronizar', seguro((o) => skillsRepo.sincronizar(o || {})))
+  // rotinas (cron do Hermes pelo gateway): listar, criar, pausar, retomar, apagar e ver a ultima saida
+  const rotinasMod = require('./rotinas')
+  const rotinas = rotinasMod.criar({ app, home: () => caminhosHermes.homeAgente(app), obterGateway: () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app)) })
+  ipcMain.handle('rotinas:listar', seguro(() => rotinas.listar()))
+  ipcMain.handle('rotinas:criar', seguro((d) => rotinas.criar(d || {})))
+  ipcMain.handle('rotinas:acao', seguro((id, a) => rotinas.acao(id, a)))
+  ipcMain.handle('rotinas:saida', seguro((id) => rotinas.saida(id)))
+  const rotinasVistas = new Map()
+  rotinasMod.novasExecucoes(caminhosHermes.homeAgente(app), rotinasVistas)
+  setInterval(() => {
+    try {
+      for (const n of rotinasMod.novasExecucoes(caminhosHermes.homeAgente(app), rotinasVistas)) {
+        janela?.webContents.send('rotinas:rodou', n)
+        try { new (require('electron').Notification)({ title: 'Rotina executada', body: n.nome }).show() } catch {}
+      }
+    } catch {}
+  }, 45000).unref?.()
   ipcMain.handle('skills:listar', seguro(() => skills.listar()))
   ipcMain.handle('skills:ler', seguro((r) => skills.ler(r)))
   ipcMain.handle('skills:gravar', seguro((r, c) => skills.gravar(r, c)))

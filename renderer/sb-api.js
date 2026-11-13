@@ -55,6 +55,13 @@
       },
       responderPermissao: (req, resposta) => invoke('chat:permissao-resp', { req, resposta }),
       aoPermissao: (fn) => on('chat:permissao', fn),
+      rotinas: {
+        listar: () => invoke('rotinas:listar'),
+        criar: (d) => invoke('rotinas:criar', d),
+        acao: (id, a) => invoke('rotinas:acao', id, a),
+        saida: (id) => invoke('rotinas:saida', id),
+        aoRodar: (fn) => on('rotinas:rodou', fn),
+      },
       skills: {
         listar: () => invoke('skills:listar'),
         ler: (r) => invoke('skills:ler', r),
