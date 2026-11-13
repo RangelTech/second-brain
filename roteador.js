@@ -9,7 +9,7 @@ const path = require('path')
 const CAMINHO = /(\b[a-z]:[\\/]|\\\\|(^|\s)~[\\/]|(^|\s)\/(users|home|etc|var|tmp|mnt)\/|\.(pdf|docx?|xlsx?|pptx?|csv|json|zip|png|jpe?g|mp4|py|js|ts|html|sql|md|txt)\b)/i
 const URL_RE = /https?:\/\/|www\./i
 const ACAO_FORTE = /\b(pesquis[ae]\w* (na|pela|no) (web|internet|google)|busqu?e\w* (na|pela|no) (web|internet|google)|navegu?e|abr[ae] o (site|navegador)|gere? (uma |um )?(imagem|foto|v[ií]deo)|cri[ae]r? (uma |um )?(imagem|foto|v[ií]deo|arquivo|pasta|site|planilha|apresenta[cç][aã]o)|salv[ae]\w* (em|num|no|na) |execut[ae]\w* (o |a |este |esse )?(comando|script|programa)|rod[ae]\w* (o |a |este |esse )?(comando|script|teste)|instal[ae]\w* |baix[ae]\w* |apag[ae]\w* (o |a |os |as )?(arquivo|pasta)|liste? (os )?arquivos|na minha (m[aá]quina|pasta|tela)|meu computador|git (commit|push|pull|clone))\b/i
-const VERBO_ACAO = /\b(ger[ae]\w*|cri[ae]\w*|fa[cç]\w*|fez|mont[ae]\w*|constru\w*|anim[ae]\w*|edit[ae]\w*|salv[ae]\w*|convert\w*|baix[ae]\w*|sub[ae]\w*|instal\w*|rod[ae]\w*|execut\w*|abr[ae]\w*|apag\w*|mov[ae]\w*|renome\w*|desenh\w*|produz\w*|program\w*|deploy\w*|publiq\w*|envie\w*|envia\w*|exporte\w*|transforme\w*|coloque\w*|ponha\w*|troque\w*|substitu\w*|refa[cç]\w*)\b/i
+const VERBO_ACAO = /\b(ger[ae]\w*|cri[ae]\w*|fa[cç]\w*|faz\w*|fazer|fez|mont[ae]\w*|constru\w*|anim[ae]\w*|edit[ae]\w*|salv[ae]\w*|convert\w*|baix[ae]\w*|sub[ae]\w*|instal\w*|rod[ae]\w*|execut\w*|abr[ae]\w*|apag\w*|mov[ae]\w*|renome\w*|desenh\w*|produz\w*|program\w*|deploy\w*|publiq\w*|envie\w*|envia\w*|exporte\w*|transforme\w*|coloque\w*|ponha\w*|troque\w*|substitu\w*|refa[cç]\w*)\b/i
 const SUBSTANTIVO_PRODUCAO = /\b(v[ií]deo\w*|imagem|imagens|foto\w*|figura|ilustra[cç]\w*|logo\w*|banner\w*|capa|avatar|arquivo\w*|pasta\w*|site\w*|p[aá]gina\w*|planilha\w*|pdf|docx?|word|excel|powerpoint|pptx?|apresenta[cç]\w*|slide\w*|script\w*|programa\w*|aplicativo\w*|app|api|docker|container\w*|servidor\w*|banco de dados|metabase|git|commit|reposit[oó]rio|terminal|comando\w*|pip|npm|processo\w*|porta)\b/i
 const ANIMA = /\banim[ae]\w*\b/i
 // Atualidade: o modelo do caminho rápido NÃO sabe o que aconteceu hoje e, medido em 08/11/2026, responde "notícias de hoje" chutando. Isso vai SEMPRE ao agente (que pesquisa na web).
@@ -37,6 +37,7 @@ const afirmaArquivo = (texto) => AFIRMA_ARQUIVO.test(String(texto || '')) && NOM
 // o modelo pode chamar usar_agente depois de já ter respondido (resposta completa + chamada à toa): nesse caso a resposta vale e o Hermes não roda de novo.
 // Só escala quando ainda não há resposta de verdade (nada escrito, ou só uma frase de preâmbulo como "Vou criar o arquivo").
 const PREAMBULO_MAX = 160
+const SEGURAR = 40 // caracteres retidos no inicio da resposta rapida
 const deveEscalar = (textoJaEscrito) => String(textoJaEscrito || '').trim().length < PREAMBULO_MAX
 
 // Loop degenerado: o modelo repete a mesma palavra ou o mesmo trecho sem parar. Devolve onde o loop começa (mantendo uma ocorrência) ou -1.
@@ -154,6 +155,7 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
   let total = ''
   let escalar = false
   let loop = false
+  let segurado = ''
   for (;;) {
     let lido
     try {
@@ -180,6 +182,11 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
         if (raz) onDelta?.({ raciocinio: raz })
         if (d.content && !escalar) {
           total += d.content
+          // o modelo as vezes ESCREVE "usar_agente" em vez de chamar a ferramenta: isso e um pedido de escalar, nunca texto para a pessoa (achado em 13/11/2026)
+          if (/usar_agente/i.test(total)) { escalar = true; segurado = ''; continue }
+          // as primeiras palavras ficam retidas ate dar para ter certeza de que nao e esse caso
+          if (total.length < SEGURAR) { segurado += d.content; continue }
+          if (segurado) { onDelta?.({ texto: segurado }); segurado = '' }
           onDelta?.({ texto: d.content })
           const ini = inicioDoLoop(total)
           if (ini >= 0) { // o modelo entrou em loop: corta aqui e para de gastar tokens
@@ -191,7 +198,8 @@ async function responderRapido({ base, chave, modelo, msgs, onDelta, sinal, raci
       } catch {}
     }
   }
-  return { escalar, texto: total, loop }
+  if (segurado && !escalar) onDelta?.({ texto: segurado }) // resposta curta que nunca passou do limite de retencao
+  return { escalar, texto: escalar ? '' : total, loop }
 }
 
 module.exports = { classificar, deveEscalar, inicioDoLoop, afirmaArquivo, responderRapido, resumoDeSkills, memoriaRelevante }

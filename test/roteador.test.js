@@ -66,3 +66,25 @@ test('separador de tabela markdown nao e loop (nao corta a resposta no cabecalho
   // loop de verdade continua sendo cortado
   assert.ok(inicioDoLoop('resposta ' + 'banana '.repeat(12)) >= 0)
 })
+
+test('pedido de vídeo com "faz" vai para o agente e a palavra usar_agente escrita no texto escala em vez de aparecer', async () => {
+  const r = require('../roteador')
+  assert.equal(r.classificar('faz um video 9:16 de 5 segundos com o titulo SEXTOU', []), 'agente')
+  assert.equal(r.classificar('faz um reel com legenda para a loja', []), 'agente')
+  assert.equal(r.classificar('me explica o que é um reel', []), 'rapido')
+  const http = require('http')
+  const srv = http.createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream' })
+    const mand = (c) => res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: c } }] }) + '\n\n')
+    mand('O usuário quer um vídeo — isso requer a ferramenta ')
+    mand('`usar_agente` para produção.')
+    res.end('data: [DONE]\n\n')
+  })
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok))
+  const textos = []
+  const out = await r.responderRapido({ base: 'http://127.0.0.1:' + srv.address().port, chave: 'k', modelo: 'm', msgs: [{ role: 'user', content: 'faz um video' }], onDelta: (e) => e.texto && textos.push(e.texto), sinal: new AbortController().signal, raciocinio: 'none', memoriaArquivo: '', chat: 'c', skillsDir: '', usuario: 'u' })
+  srv.close()
+  assert.equal(out.escalar, true)
+  assert.equal(textos.join(''), '', 'nada vaza para a tela')
+  assert.equal(out.texto, '')
+})
