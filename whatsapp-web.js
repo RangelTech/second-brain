@@ -80,19 +80,20 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     return { titulo: await titulo() }
   }
 
+  // quem mandou cada mensagem: o WhatsApp põe um rótulo escondido "Você:" ou "Nome:" no começo de cada grupo de balões
+  // (o mesmo que o leitor de tela fala). Balões seguidos do mesmo autor herdam o rótulo. A posição na tela NÃO serve (medido 13/11/2026).
+  const QUEM_JS = `const quemDe = (rows) => { let ult = null; return rows.map((r) => { const l = [...r.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') || '').find((a) => /:$/.test(a) && a.length < 60); if (l) ult = l.slice(0, -1).trim(); return ult }) }; const ehVoce = (n) => /^(você|voce|you|tú)$/i.test(n || '');`
+
   // mensagens da conversa aberta: texto, quem, quando, e um marcador para mídia
-  const LER_MSGS = (limite) => `(() => [...document.querySelectorAll('#main [role="row"]')].slice(-${limite}).map((r) => {
+  const LER_MSGS = (limite) => `(() => { ${QUEM_JS} const rows = [...document.querySelectorAll('#main [role="row"]')]; const quem = quemDe(rows); return rows.map((r, i) => [r, quem[i]]).slice(-${limite}).map(([r, q]) => {
     const p = r.querySelector('[data-pre-plain-text]')
     const meta = p ? p.getAttribute('data-pre-plain-text').trim() : ''
     const texto = p ? (p.querySelector('span.selectable-text') || p).innerText.trim() : ''
-    const midia = r.querySelector('img[src^="blob:"]:not([draggable="false"])') ? '[imagem]' : r.querySelector('video') ? '[vídeo]' : r.querySelector('[data-icon*="audio"], [data-icon*="ptt"], audio') ? '[áudio]' : r.querySelector('[data-icon*="document"], [title*="Baixar"]') ? '[documento: ' + ((r.innerText.split('\\n')[0]) || '') + ']' : ''
-    const main = document.querySelector('#main').getBoundingClientRect()
-    const bolha = (p || r.querySelector('[data-testid="msg-container"]') || r).getBoundingClientRect()
-    const eu = bolha.left > main.left + main.width * 0.35 // balão à direita = enviado pelo usuário
+    const midia = r.querySelector('img[src^="blob:"]:not([draggable="false"])') ? '[imagem]' : r.querySelector('video') ? '[vídeo]' : r.querySelector('[data-icon*="audio"], [data-icon*="ptt"], audio, button[aria-label*="mensagem de voz"], button[aria-label*="voice message"]') ? '[áudio]' : r.querySelector('[data-icon*="document"], [title*="Baixar"]') ? '[documento: ' + ((r.innerText.split('\\n')[0]) || '') + ']' : ''
     if (!meta && !midia) { const t = r.innerText.trim(); return t ? { info: t.slice(0, 120) } : null }
     const links = [...new Set([...r.querySelectorAll('a[href^="http"]')].map((x) => x.href))]
-    return { meta, de: eu ? 'você' : undefined, texto, midia: midia || undefined, links: links.length ? links : undefined }
-  }).filter(Boolean))()`
+    return { meta, de: ehVoce(q) ? 'você' : q || undefined, texto, midia: midia || undefined, links: links.length ? links : undefined }
+  }).filter(Boolean) })()`
 
   // data da mensagem a partir de "[13:28, 13/11/2026] Nome:"
   const dataDe = (meta) => {
@@ -113,7 +114,7 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
 
   async function ler({ contato, numero, limite, dias }) {
     const a = await abrir({ contato, numero })
-    await esperar(800)
+    await mensagensCarregadas()
     if (Number(dias) > 0) {
       const corte = Date.now() - Number(dias) * 86400000
       await carregarDesde(corte)
@@ -175,17 +176,31 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
   // tipo: 'todos' | 'audio' | 'imagem' | 'video'; de: 'todos' | 'contato' (só o que a outra pessoa mandou) | 'voce'
   // Mensagens de voz NÃO ficam no HTML: o WhatsApp cria o <audio> só quando aperta play. Aqui apertamos play com o som mudo,
   // pegamos o áudio na hora (gancho no play) e pausamos: o usuário não ouve nada e a conversa não muda.
+  // logo depois de abrir, o WhatsApp ainda está trazendo as mensagens: espera a lista parar de mudar (até 12 s)
+  async function mensagensCarregadas() {
+    let antes = -1
+    let iguais = 0
+    for (let i = 0; i < 24; i++) {
+      await esperar(500)
+      const n = await js(`document.querySelectorAll('#main [role="row"]').length`)
+      iguais = n > 0 && n === antes ? iguais + 1 : 0
+      if (iguais >= 2) break
+      antes = n
+    }
+    await esperar(500)
+  }
+
   async function baixar({ contato, numero, limite, tipo, de }) {
     const a = await abrir({ contato, numero })
-    await esperar(1500)
+    await mensagensCarregadas()
     const N = Math.min(20, Number(limite) || 5)
     const t = String(tipo || 'todos')
     const quem = String(de || 'todos')
-    const itens = await js(`(async () => {
+    const colher = () => js(`(async () => {
       const N = ${N}, T = ${JSON.stringify(t)}, DE = ${JSON.stringify(quem)}
-      const main = document.querySelector('#main').getBoundingClientRect()
-      const lado = (e) => { const r = e.closest('[role="row"]'); const b = (r && (r.querySelector('[data-testid="msg-container"]') || r)).getBoundingClientRect(); return b.left > main.left + main.width * 0.35 ? 'voce' : 'contato' }
-      const vale = (e) => DE === 'todos' || lado(e) === DE
+      ${QUEM_JS}
+      // A lista do WhatsApp é virtual: só as mensagens perto da tela existem no HTML. Então colhe o que está visível, de baixo para
+      // cima, e sobe a conversa aos poucos (até 15 passos) até juntar N. Cada mensagem entra uma vez só (id da mensagem).
       const pegar = async (src) => {
         const b = await (await fetch(src)).blob()
         const buf = new Uint8Array(await b.arrayBuffer())
@@ -193,34 +208,63 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
         for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768))
         return { tipo: b.type, b64: btoa(s) }
       }
+      if (!window.__sbHook) {
+        window.__sbHook = true; window.__sbSrc = []
+        const p = HTMLMediaElement.prototype.play
+        HTMLMediaElement.prototype.play = function () { try { if (window.__sbCap) { this.muted = true; window.__sbSrc.push(this) } } catch {} return p.apply(this, arguments) }
+      }
+      const ehBotaoVoz = (b) => /mensagem de voz|voice message|mensaje de voz/i.test(b.getAttribute('aria-label') || '') && /reproduzir|play|reproducir/i.test(b.getAttribute('aria-label') || '')
+      const querMidia = T === 'todos' || T === 'imagem' || T === 'video'
+      const querVoz = T === 'todos' || T === 'audio'
+      const selMidia = T === 'imagem' ? 'img[src^="blob:"]' : T === 'video' ? 'video[src^="blob:"]' : 'img[src^="blob:"], video[src^="blob:"]'
+      const rolavel = (() => { let e = document.querySelector('#main [role="row"]'); while (e && e !== document.body) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) return e; e = e.parentElement } return null })()
+      if (rolavel) { rolavel.scrollTop = rolavel.scrollHeight; await new Promise((r) => setTimeout(r, 800)) }
+      const vistos = new Set()
       const out = []
-      if (T === 'todos' || T === 'imagem' || T === 'video') {
-        const sel = T === 'imagem' ? 'img[src^="blob:"]' : T === 'video' ? 'video[src^="blob:"]' : 'img[src^="blob:"], video[src^="blob:"], audio[src^="blob:"]'
-        const els = [...document.querySelectorAll(sel.split(', ').map((x) => '#main [role="row"] ' + x).join(', '))].filter((e) => !(e.tagName === 'IMG' && e.naturalWidth < 120)).filter(vale).slice(-N)
-        for (const e of els) { try { out.push(await pegar(e.src)) } catch {} }
-      }
-      if (T === 'todos' || T === 'audio') {
-        if (!window.__sbHook) {
-          window.__sbHook = true; window.__sbSrc = []
-          const p = HTMLMediaElement.prototype.play
-          HTMLMediaElement.prototype.play = function () { try { if (window.__sbCap) { this.muted = true; window.__sbSrc.push(this) } } catch {} return p.apply(this, arguments) }
+      let tentou = 0
+      for (let passo = 0; passo < 15 && out.length < N; passo++) {
+        const linhas = [...document.querySelectorAll('#main [role="row"]')]
+        const quem = quemDe(linhas)
+        for (let k = linhas.length - 1; k >= 0 && out.length < N; k--) {
+          const r = linhas[k]
+          const idm = (r.querySelector('[data-id]') || {}).dataset?.id || r.innerText.slice(0, 80)
+          if (vistos.has(idm)) continue
+          if (DE !== 'todos' && (!quem[k] || (ehVoce(quem[k]) ? 'voce' : 'contato') !== DE)) continue
+          const bt = querVoz ? [...r.querySelectorAll('button[aria-label], [role="button"][aria-label]')].find(ehBotaoVoz) : null
+          const md = querMidia ? [...r.querySelectorAll(selMidia)].filter((e) => !(e.tagName === 'IMG' && e.naturalWidth < 120)) : []
+          if (!bt && !md.length) continue
+          vistos.add(idm)
+          for (const e of md) { try { if (out.length < N) out.push(await pegar(e.src)) } catch {} }
+          if (bt && out.length < N) {
+            tentou++
+            window.__sbSrc = []; window.__sbCap = true
+            try {
+              bt.scrollIntoView({ block: 'center' }); bt.click()
+              let el = null
+              for (let i = 0; i < 60 && !el; i++) { await new Promise((ok) => setTimeout(ok, 250)); el = window.__sbSrc.find((x) => x.src && x.src.startsWith('blob:')) }
+              if (el) { try { el.pause(); el.currentTime = 0 } catch {} ; const it = await pegar(el.src); it.voz = true; out.push(it) }
+            } catch {}
+            window.__sbCap = false
+          }
         }
-        const bts = [...document.querySelectorAll('#main [role="row"] button[aria-label], #main [role="row"] [role="button"][aria-label]')]
-          .filter((b) => /mensagem de voz|voice message|mensaje de voz/i.test(b.getAttribute('aria-label')) && /reproduzir|play|reproducir/i.test(b.getAttribute('aria-label')))
-          .filter(vale).slice(-N)
-        for (const bt of bts) {
-          window.__sbSrc = []; window.__sbCap = true
-          try {
-            bt.scrollIntoView({ block: 'center' }); bt.click()
-            let el = null
-            for (let i = 0; i < 60 && !el; i++) { await new Promise((r) => setTimeout(r, 250)); el = window.__sbSrc.find((x) => x.src && x.src.startsWith('blob:')) }
-            if (el) { try { el.pause(); el.currentTime = 0 } catch {} ; const it = await pegar(el.src); it.voz = true; out.push(it) }
-          } catch {}
-          window.__sbCap = false
-        }
+        if (out.length >= N || !rolavel) break
+        const antes = rolavel.scrollTop
+        rolavel.scrollTop = Math.max(0, rolavel.scrollTop - rolavel.clientHeight * 0.8)
+        await new Promise((ok) => setTimeout(ok, 1500))
+        if (antes === 0 && rolavel.scrollTop === 0) break
       }
-      return out
+      const ls = [...document.querySelectorAll('#main [role="row"]')]
+      const diag = { linhas: ls.length, comQuem: quemDe(ls).filter(Boolean).length, botoes: [...new Set(ls.flatMap((r) => [...r.querySelectorAll('button[aria-label], [role="button"][aria-label]')].map((b) => b.getAttribute('aria-label'))))].slice(0, 12) }
+      return { out, tentou, diag }
     })()`)
+    let r = await colher()
+    // logo depois que o WhatsApp carrega, o primeiro play só "acorda" o tocador e não entrega o áudio: tenta de novo uma vez
+    if (!r.out.length && r.tentou) {
+      await esperar(1500)
+      r = await colher()
+    }
+    const itens = r.out
+    if (process.env.SB_WA_DIAG) console.log('[wa-baixar]', JSON.stringify(r.diag), 'tentou', r.tentou)
     const pasta = path.join(pastaDownloads(), 'WhatsApp')
     fs.mkdirSync(pasta, { recursive: true })
     const ext = (t) => (/jpeg/.test(t) ? '.jpg' : /png/.test(t) ? '.png' : /webp/.test(t) ? '.webp' : /mp4/.test(t) ? '.mp4' : /ogg|opus/.test(t) ? '.ogg' : /mpeg/.test(t) ? '.mp3' : '.bin')
