@@ -44,6 +44,33 @@ const FORMATOS = { quadrado: '1024x1024', retrato: '832x1216', paisagem: '1216x8
 const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
   {
+    nome: 'orcar',
+    desc: 'Mostra o PREÇO e o tempo de um pedido do Estúdio ANTES de criar, sem gastar nada (1 segundo). Use SEMPRE antes de midia_estudio, midia_gerar_video, midia_trocar_personagem e midia_clonar_voz, mostre o valor ao usuário em reais e espere ele confirmar. Efeitos: video-rapido (texto ou foto vira vídeo, 5 a 15 s, mais barato), video-ponta (Wan 3.0, melhor movimento, 4 a 15 s), video-premium (Seedance 2.0, cinema), video-google (Veo 3.1, pode ter som), trocar-personagem (põe a pessoa de uma foto no vídeo do usuário, mantém o tamanho do vídeo), editar-video (troca objeto, roupa ou cenário num vídeo do usuário; partes de até 15 s), avatar-foto (uma foto que fala um áudio ou texto), sincronia-labial e sincronia-labial-pro (boca acompanha um áudio novo), voz e voz-hd (narração; voz aceita amostra para clonar), imagem-ponta (Seedream 5.5, quando o usuário pedir qualidade máxima; para imagem comum use midia_gerar_imagem).',
+    schema: obj({
+      efeito: { type: 'string', enum: ['video-rapido', 'video-ponta', 'video-premium', 'video-google', 'trocar-personagem', 'editar-video', 'avatar-foto', 'sincronia-labial', 'sincronia-labial-pro', 'voz', 'voz-hd', 'imagem-ponta'] },
+      segundos: { type: 'number', description: 'Duração do vídeo (para trocar-personagem, sincronia e editar-video: a duração do vídeo do usuário).' },
+      texto: { type: 'string', description: 'Para voz: o texto que será falado (o preço é por caractere).' },
+      qualidade: { type: 'string', description: 'Opcional: 480p, 720p, 768p, 1080p (vídeo), turbo/hd (voz-hd), 1.5K/2K (imagem). Sem ela vale a mais barata que resolve.' },
+    }, ['efeito']),
+  },
+  {
+    nome: 'estudio',
+    desc: 'CRIA no Estúdio (modelos de vídeo, voz e imagem de ponta). Só chame depois de midia_orcar e do SIM do usuário ao preço (passe confirmado=true). Troca de personagem, trocar o carro/roupa/cenário de um vídeo, foto que fala, sincronia labial, narração com voz clonada, vídeo de cinema. A ferramenta volta na hora; o app acompanha, baixa o arquivo e avisa no chat. Se falhar, nada é cobrado.',
+    schema: obj({
+      efeito: { type: 'string', description: 'O mesmo efeito orçado em midia_orcar.' },
+      confirmado: { type: 'boolean', description: 'true somente depois que o usuário aceitou o preço mostrado.' },
+      prompt: { type: 'string', description: 'O que criar ou mudar, em inglês e detalhado (para trocar objeto: "replace the old silver car with a black 2024 Ford Mustang GT, same camera, same motion, keep the street and lighting").' },
+      video: { type: 'string', description: 'Caminho do vídeo do usuário (MP4/MOV/WEBM, até 40 MB).' },
+      fotos: { type: 'array', items: { type: 'string' }, description: 'Caminhos de fotos de referência (pessoa que entra no vídeo, roupa, produto). Até 4.' },
+      audio: { type: 'string', description: 'Caminho de um áudio (sincronia labial, avatar, ou amostra de 3 a 25 s para clonar a voz).' },
+      texto: { type: 'string', description: 'Texto falado (voz, avatar-foto, sincronia labial sem áudio).' },
+      idioma: { type: 'string', description: 'Idioma da fala (pt, en, es...). Padrão pt.' },
+      segundos: { type: 'number', description: 'Duração (a mesma do orçamento).' },
+      qualidade: { type: 'string', description: 'A mesma do orçamento.' },
+      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
+    }, ['efeito', 'confirmado']),
+  },
+  {
     nome: 'detalhar_prompt',
     desc: 'PRIMEIRO PASSO de TODA imagem e TODO vídeo: transforma o pedido do usuário (curto ou vago) num briefing profissional em inglês (sujeito, ação e movimento, câmera, luz, cores, estilo, o que evitar) com o formato e a duração certos, e devolve o prompt pronto para você passar EXATAMENTE a midia_gerar_imagem ou midia_gerar_video. Quanto mais detalhado, mais o modelo acerta na primeira tentativa (um vídeo errado custa até 20 minutos do cliente). Leva de 5 a 15 segundos. Depois de chamar, mostre ao usuário o resumo devolvido em 1 ou 2 linhas e gere.',
     schema: obj({
@@ -66,7 +93,7 @@ const FERRAMENTAS = [
   },
   {
     nome: 'clonar_voz',
-    desc: 'CLONA uma voz: lê um texto com a voz de uma AMOSTRA (de 3 a 25 segundos de fala limpa, de um arquivo de áudio ou vídeo) e salva um WAV na pasta Audios. Serve para locução, narração e avisos com a voz da pessoa. Idiomas: pt, en, es, fr, de, it, ja, ko, zh, ru. Leva cerca de 1 a 6 minutos (a primeira do dia inclui a partida da máquina); a ferramenta volta na hora e o app avisa quando ficar pronto. O texto é o que será falado: escreva-o exatamente como deve soar, com pontuação para as pausas.',
+    desc: 'Narração com a voz de uma AMOSTRA (3 a 25 segundos de fala limpa): lê o texto com a voz clonada e salva o áudio na pasta Audios (Estúdio). Para locução, narração e avisos com a voz da pessoa. Antes: midia_orcar (efeito voz, texto) e o SIM do usuário ao preço (narração costuma custar centavos). A ferramenta volta na hora e o app avisa quando ficar pronto.',
     schema: obj({
       texto: { type: 'string', description: 'O texto que será falado, no idioma escolhido, até 3000 caracteres.' },
       amostra: { type: 'string', description: 'Caminho do arquivo com a voz de referência (WAV, MP3, M4A ou vídeo com fala).' },
@@ -76,48 +103,26 @@ const FERRAMENTAS = [
     }, ['texto', 'amostra']),
   },
   {
-    nome: 'trocar_voz',
-    desc: 'TROCA a voz de um áudio ou vídeo: a fala passa a soar como a voz da amostra, mantendo o conteúdo, o ritmo, a música de fundo e o resto do vídeo. Vídeo entra e sai vídeo (MP4); áudio entra e sai WAV. Até 180 segundos. Leva cerca de 2 a 8 minutos; a ferramenta volta na hora e o app avisa quando ficar pronto.',
-    schema: obj({
-      arquivo: { type: 'string', description: 'Caminho do áudio ou vídeo cuja voz será trocada (até 40 MB).' },
-      voz_alvo: { type: 'string', description: 'Caminho do áudio com a voz que vai substituir (3 a 25 s de fala limpa).' },
-      manter_fundo: { type: 'boolean', description: 'true (padrão) mantém música e ruído de fundo; false deixa só a voz nova.' },
-      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
-    }, ['arquivo', 'voz_alvo']),
-  },
-  {
-    nome: 'redublar_video',
-    desc: 'REDUBLA um vídeo para outro idioma: transcreve a fala, traduz mantendo o tom, fala de novo com a voz CLONADA do próprio locutor (ou com outra voz, se você passar uma amostra), encaixa no tempo original e mantém a música de fundo. Até 120 segundos. Leva cerca de 3 a 12 minutos; a ferramenta volta na hora e o app avisa quando ficar pronto. A dublagem não sincroniza os lábios.',
-    schema: obj({
-      video: { type: 'string', description: 'Caminho do vídeo com fala (MP4, MOV ou WEBM, até 40 MB).' },
-      idioma: { type: 'string', description: 'Idioma da dublagem: pt, en, es, fr, de, it, ja, ko, zh ou ru.' },
-      idioma_origem: { type: 'string', description: 'Idioma original da fala, se o usuário souber (senão é detectado). Opcional.' },
-      voz: { type: 'string', description: 'Caminho de uma amostra de OUTRA voz para dublar (opcional; sem ela usa a voz do próprio locutor).' },
-      manter_fundo: { type: 'boolean', description: 'true (padrão) mantém a música e o ruído de fundo.' },
-      nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
-    }, ['video', 'idioma']),
-  },
-  {
     nome: 'trocar_personagem',
-    desc: 'Troca a pessoa principal de um VÍDEO pela pessoa de uma FOTO (troca de personagem / de rosto), mantendo câmera, cortes, movimento e áudio do vídeo original. Roda na GPU do servidor com o Openjutsu (MiniMax H3) e leva vários minutos (cerca de 9 minutos para 5 segundos em 480p). Use quando o usuário pedir para colocar o rosto ou a pessoa de uma foto num vídeo. Funciona melhor com uma pessoa em primeiro plano, rosto grande no quadro e foto nítida de frente; espelhos e reflexos falham. Salva um MP4 na pasta Videos e devolve o caminho.',
+    desc: 'Troca a pessoa principal de um VÍDEO pela pessoa de uma FOTO, mantendo câmera, cortes, movimento e áudio (Estúdio). O vídeo sai com a mesma duração do original. Antes: midia_conferir_troca e midia_orcar (efeito trocar-personagem, segundos = duração do vídeo) e o SIM do usuário ao preço. A ferramenta volta na hora e o app avisa quando ficar pronto (1 a 4 minutos).',
     schema: obj({
       video: { type: 'string', description: 'Caminho do vídeo de origem (MP4, MOV ou WEBM, até 40 MB).' },
       foto: { type: 'string', description: 'Caminho da foto da pessoa que vai entrar no vídeo (PNG, JPEG ou WEBP, até 6 MB).' },
-      resolucao: { type: 'string', enum: ['480p', '576p', '736p'], description: 'Altura do vídeo gerado. Padrão: 480p (mais rápido). Mais alto leva muito mais tempo.' },
+      resolucao: { type: 'string', enum: ['480p', '576p', '736p'], description: 'Qualidade: 480p (padrão, mais barato) ou 736p (alta). Mais alta custa mais; confira em midia_orcar.' },
       sem_sincronia_labial: { type: 'boolean', description: 'true (padrão) quando as pessoas do vídeo não estão cantando nem falando junto com o áudio.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
     }, ['video', 'foto']),
   },
   {
     nome: 'gerar_video',
-    desc: 'Gera um VÍDEO (1 a 60 segundos, sem áudio) a partir de uma descrição. Qualidade ALTA (padrão): modelo Wan 2.2 de 14 bilhões de parâmetros, 720p, o melhor resultado possível; leva de 5 a 20 minutos por clipe de 5 s (acima de 5 s o servidor encadeia clipes e entrega um MP4 só, em 480p). A ferramenta volta na hora com a previsão e o app avisa no chat quando o arquivo fica pronto. Qualidade RAPIDA: modelo leve, cerca de 1 minuto, só para testar uma ideia. Salva um MP4 na pasta Videos da pasta de trabalho e devolve o caminho. Escreva o prompt em INGLÊS, descrevendo a cena e o movimento da câmera (ex.: "slow camera push-in, a juicy cheeseburger falls onto a wooden board, bun and lettuce bounce, studio lighting, shallow depth of field"). Serve para cenas realistas (produto, comida, natureza, pessoas). Para animações gráficas com texto, gráficos, títulos e legendas use a skill video-motion, que não gasta GPU.',
+    desc: 'Gera um VÍDEO de 4 a 15 segundos a partir de uma descrição ou de uma imagem (Estúdio). Qualidade alta (padrão): Wan 3.0 em 720p, ótimo movimento, 2 a 3 minutos. Rápida: P-Video em 480p, cerca de 1 minuto e bem mais barato, bom para testar a ideia. Antes: midia_orcar (efeito video-ponta na alta, video-rapido na rápida) e o SIM do usuário ao preço. Vídeo maior que 15 s: gere partes e junte no Editor. A ferramenta volta na hora e o app avisa quando ficar pronto.',
     schema: obj({
       prompt: { type: 'string', description: 'Cena e movimento, em inglês, MUITO detalhado (80 a 150 palavras, mínimo 40; 20 se passar imagem): sujeito, cenário, ação e movimento, câmera e lente, luz, paleta, atmosfera, estilo e qualidade.' },
       formato: { type: 'string', enum: FORMATOS_VIDEO, description: 'paisagem (768x512), retrato (512x768) ou quadrado. Padrão: paisagem.' },
       imagem: { type: 'string', description: 'Caminho de uma imagem para ANIMAR (imagem para vídeo). PNG, JPEG ou WEBP até 6 MB. Opcional.' },
       strength: { type: 'number', description: 'Quanto mudar a imagem de partida, de 0 a 1 (opcional).' },
       fps: { type: 'number', description: 'Quadros por segundo, de 8 a 30 (opcional).' },
-      segundos: { type: 'number', description: 'Duração total de 1 a 60 segundos (o servidor encadeia clipes de 4 s na qualidade rápida e de 5 s na alta; até 5 s sai em 720p, acima disso em 480p para a entrega caber em cerca de 20 minutos). Padrão: 5 na alta, 4 na rápida.' },
+      segundos: { type: 'number', description: 'Duração de 4 a 15 segundos. Padrão: 5.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
       negative_prompt: { type: 'string', description: 'O que evitar (em inglês): ex. "blurry, deformed hands, extra fingers, watermark, text". Opcional.' },
       qualidade: { type: 'string', enum: ['rapida', 'alta'], description: 'alta (padrão): Wan 2.2 de 14 bilhões de parâmetros, 720p, 16 quadros por segundo, movimento e rostos muito mais coerentes; leva de 5 a 20 minutos por clipe de 5 s (a primeira vez do dia inclui ~8 min de partida) e o app avisa quando fica pronto. rapida: modelo leve, cerca de 1 minuto, 640x384, só para testar uma ideia (a qualidade é bem menor). Para o melhor resultado, gere antes uma imagem com gerar_imagem, confira e anime-a passando em imagem.' },
@@ -128,7 +133,7 @@ const FERRAMENTAS = [
   },
   {
     nome: 'gerar_imagem',
-    desc: 'Gera uma imagem a partir de uma descrição, numa GPU do servidor (cerca de 10 a 30 segundos). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Título curto (1 a 3 palavras, caixa alta, entre aspas no prompt) sai legível. Para frase longa ou texto com acento (ÃO, É, Ç), gere a imagem SEM texto e avise que o texto pode ser colocado depois: o modelo erra acentos e letras. Para pessoas, peça a contagem exata no prompt (exactly two people).',
+    desc: 'Gera uma imagem a partir de uma descrição (cerca de 20 a 40 segundos, incluída no plano). Salva um PNG na pasta de trabalho e devolve o caminho completo. Escreva o prompt em INGLÊS, detalhado (assunto, estilo, luz, enquadramento, cores). Título curto (1 a 3 palavras, caixa alta, entre aspas no prompt) sai legível. Para frase longa ou texto com acento (ÃO, É, Ç), gere a imagem SEM texto e avise que o texto pode ser colocado depois: o modelo erra acentos e letras. Para pessoas, peça a contagem exata no prompt (exactly two people).',
     schema: obj({
       prompt: { type: 'string', description: 'Descrição da imagem, em inglês, MUITO detalhada (60 a 120 palavras, mínimo 30): sujeito e aparência, cenário, enquadramento e lente, luz, paleta, atmosfera, estilo e qualidade.' },
       estilo: { type: 'string', enum: ['foto', 'cinema', 'ilustracao', 'anime', '3d', 'minimalista', 'aquarela'], description: 'Estilo visual (opcional; segue a preferência do usuário).' },
@@ -294,6 +299,50 @@ async function gerarImagem(args) {
   return rodarJob({ tipo: 'imagem', rota: '/images/generations', corpo, prompt, nome, limiteMs: ESPERA_MAX_MS })
 }
 
+
+// ---- Estúdio (Runware pelo servidor): preço antes, confirmação, criação acompanhada pelo mesmo mecanismo de jobs
+const MIME_EXT = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.mkv': 'video/x-matroska', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg' }
+function dataUri(caminho, rotulo, maxMb) {
+  const b = lerArquivo(caminho, rotulo, maxMb)
+  const mime = MIME_EXT[path.extname(String(caminho)).toLowerCase()] || 'application/octet-stream'
+  return `data:${mime};base64,${b.toString('base64')}`
+}
+const brl = (v) => (v == null ? '' : 'R$ ' + Number(v).toFixed(2).replace('.', ','))
+const minutos = (s) => Math.max(1, Math.round((Number(s) || 60) / 60))
+async function orcar(args) {
+  if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  const corpo = { efeito: args.efeito, segundos: args.segundos, texto: args.texto, qualidade: args.qualidade }
+  let o
+  if (process.env.SB_MIDIA_MOCK) o = { rotulo: 'Simulação', preco_brl: 13.75, preco_usd: 2.5, tempo_estimado_s: 100, quantidade: args.segundos || 10, unidade: 'segundo', qualidade: args.qualidade || '480p', disponivel: true, acima_do_teto: false }
+  else {
+    const r = await api('/estudio/orcar', { method: 'POST', body: JSON.stringify(corpo) })
+    o = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(o.error?.message || 'Não consegui calcular o preço agora.')
+  }
+  if (o.disponivel === false) return 'O Estúdio ainda não está disponível (em breve). Avise o usuário em uma frase e ofereça editar o que ele já tem (Motion) sem custo.'
+  const qtd = o.unidade === 'segundo' ? `${o.quantidade} s` : o.unidade === 'caractere' ? `${o.quantidade} caracteres` : `${o.quantidade} imagem(ns)`
+  return `${o.rotulo}: ${qtd}${o.qualidade && o.qualidade !== 'padrao' ? ' em ' + o.qualidade : ''}. Preço: ${brl(o.preco_brl)} (US$ ${Number(o.preco_usd).toFixed(2)}), cerca de ${minutos(o.tempo_estimado_s)} min.` +
+    (o.partes > 1 ? ` O vídeo será feito em ${o.partes} partes de até 15 s.` : '') +
+    (o.acima_do_teto ? ' Atenção: passa do valor normal por ser grande; diga isso ao usuário.' : '') +
+    ' Mostre este preço ao usuário em reais e pergunte se pode criar. Só chame midia_estudio (ou a ferramenta do pedido) depois do sim.'
+}
+async function estudio(args) {
+  if (!args.confirmado) throw new Error('Antes de criar, chame midia_orcar, mostre o preço ao usuário e espere ele aceitar. Depois chame de novo com confirmado=true.')
+  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (process.env.SB_MIDIA_MOCK) return simular(args.efeito === 'voz' || args.efeito === 'voz-hd' ? 'video' : 'video', args.prompt || args.efeito, process.env.SB_MIDIA_MOCK_ARQ || '')
+  const inputs = {}
+  if (args.video) inputs.video = dataUri(args.video, 'Vídeo', 40)
+  if (Array.isArray(args.fotos) && args.fotos.length) inputs.referenceImages = args.fotos.slice(0, 4).map((f, i) => dataUri(f, 'Foto ' + (i + 1), 8))
+  if (args.audio) inputs.audio = dataUri(args.audio, 'Áudio', 20)
+  if (args.efeito === 'avatar-foto' && inputs.referenceImages) inputs.referenceImages = inputs.referenceImages.slice(0, 1)
+  const corpo = { efeito: args.efeito, prompt: args.prompt, texto: args.texto, idioma: args.idioma, segundos: args.segundos, qualidade: args.qualidade, ...(Object.keys(inputs).length ? { inputs } : {}) }
+  if (args.efeito === 'sincronia-labial' && !args.audio && args.texto) corpo.texto_fala = args.texto
+  const audio = args.efeito === 'voz' || args.efeito === 'voz-hd'
+  const imagem = args.efeito === 'imagem-ponta'
+  return rodarJob({ tipo: audio ? 'video' : imagem ? 'imagem' : 'video', salvar: audio ? 'audio' : imagem ? 'imagem' : 'video', rota: '/estudio/gerar', corpo,
+    prompt: args.prompt || args.texto || args.efeito, nome: args.nome || args.efeito, limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
+}
+
 const ehArquivoVideo = (p) => /\.(mp4|mov|webm|mkv)$/i.test(String(p || ''))
 function lerArquivo(caminho, rotulo, maxMb) {
   if (!caminho || !fs.existsSync(String(caminho))) throw new Error(`${rotulo}: o arquivo não foi encontrado nesse caminho.`)
@@ -434,6 +483,14 @@ async function tratar(msg) {
         const ctx = { base: BASE, chave: CHAVE, fetchFn: process.env.SB_MIDIA_MOCK ? async () => { throw new Error('mock') } : undefined }
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: formatarSaida(await detalhar(params?.arguments || {}, ctx)) }] } })
       }
+      if (nome === 'orcar') {
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: await orcar(params?.arguments || {}) }] } })
+      }
+      if (nome === 'estudio') {
+        const v = await comReserva(estudio, params?.arguments || {}, 'video')
+        if (v.pendente) return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: TEXTO_PENDENTE('pedido do Estúdio', v.min || 3) }] } })
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: `Pronto em ${v.segundos} s. caminho: ${v.caminho}` }] } })
+      }
       if (nome === 'conferir_troca') {
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: formatarConferencia(conferirTroca(params?.arguments || {})) }] } })
       }
@@ -476,4 +533,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { gerarImagem, gerarVideo, trocarPersonagem, clonarVoz, trocarVoz, redublarVideo, detalhar, conferirTroca, FORMATOS, configurar, concluirPendentes }
+module.exports = { gerarImagem, gerarVideo, trocarPersonagem, clonarVoz, trocarVoz, redublarVideo, detalhar, conferirTroca, orcar, estudio, FERRAMENTAS, FORMATOS, configurar, concluirPendentes }
