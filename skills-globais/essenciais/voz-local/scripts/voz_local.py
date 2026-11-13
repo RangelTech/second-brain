@@ -279,6 +279,30 @@ def _gravar_wav(arq, amostras, taxa):
         wf.writeframes(a.tobytes())
 
 
+def _frases(texto, maximo=200):
+    """Quebra em frases de até ~200 caracteres (limite do XTTS em português), sem spaCy."""
+    import re
+    blocos, atual = [], ""
+    for f in re.split(r"(?<=[.!?…;:])\s+", " ".join(str(texto).split())):
+        while len(f) > maximo:  # frase enorme: corta na última vírgula ou espaço antes do limite
+            corte = max(f.rfind(",", 0, maximo), f.rfind(" ", 0, maximo))
+            corte = corte if corte > 40 else maximo
+            if atual:
+                blocos.append(atual)
+                atual = ""
+            blocos.append(f[: corte + 1].strip())
+            f = f[corte + 1 :].strip()
+        if len(atual) + len(f) + 1 <= maximo:
+            atual = (atual + " " + f).strip()
+        else:
+            if atual:
+                blocos.append(atual)
+            atual = f
+    if atual:
+        blocos.append(atual)
+    return [b for b in blocos if b.strip()]
+
+
 def _xtts():
     if "xtts" not in _CACHE:
         os.environ.setdefault("COQUI_TOS_AGREED", "1")  # o usuário escolheu o XTTS sabendo da licença não comercial
@@ -343,8 +367,13 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt"):
         if chave_amostra not in _CACHE:  # a voz da amostra é calculada uma vez só por amostra
             _CACHE[chave_amostra] = m.get_conditioning_latents(audio_path=[str(Path(amostra).resolve())])
         gpt, spk = _CACHE[chave_amostra]
-        out = m.inference(texto, idioma, gpt, spk, enable_text_splitting=True)
-        _gravar_wav(saida, out["wav"], 24000)
+        # divide em frases aqui (o enable_text_splitting do coqui exige spaCy, que não vem no pacote) e junta com pausas curtas
+        import numpy as np
+        partes = []
+        for frase in _frases(texto):
+            partes.append(np.asarray(m.inference(frase, idioma, gpt, spk)["wav"], dtype="float32").reshape(-1))
+            partes.append(np.zeros(int(24000 * 0.18), dtype="float32"))
+        _gravar_wav(saida, np.concatenate(partes[:-1]) if partes else np.zeros(1, dtype="float32"), 24000)
         return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "xtts"}
     base = saida.with_name(saida.stem + ".base.wav") if amostra else saida
     with wave.open(str(base), "wb") as wf:
