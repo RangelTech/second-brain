@@ -572,6 +572,8 @@
     // o usuário abre e fecha os blocos de passos à mão: redesenhar (a cada evento do agente) não pode mudar isso
     const abertos = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => d.open).map((d) => d.dataset.chave))
     const fechados = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => !d.open).map((d) => d.dataset.chave))
+    // cartões de mídia já desenhados e iguais são reaproveitados: recriar recarregava a imagem (altura zero por um instante) e a conversa pulava
+    const midiasProntas = new Map([...el.querySelectorAll(':scope > [data-sig]')].map((c) => [c.dataset.sig, c]))
     el.innerHTML = ''
     let grupo = null
     let ultimaFalha = null
@@ -616,7 +618,9 @@
         el.appendChild(cartaoPlano(p.plano))
       } else if (p.t === 'ferr') {
         if (ehMidia(p.f)) {
-          const card = cartaoFerramenta(p.f)
+          const sig = (p.f.id || '') + '|' + (p.f.status || '') + '|' + String(p.f.conteudo || '').length
+          const card = midiasProntas.get(sig) || cartaoFerramenta(p.f)
+          card.dataset.sig = sig
           if (p.f.status === 'failed' && ultimaFalha && ultimaFalha.tipo === (/video/.test(p.f.titulo) ? 'video' : 'imagem')) {
             ultimaFalha.n++ // tentativas repetidas viram um só cartão de falha, com contador discreto
             const c = ultimaFalha.el.querySelector('.mc-sub')
