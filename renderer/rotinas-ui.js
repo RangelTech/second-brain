@@ -45,10 +45,10 @@
     if (!R.lista.length) return (el.innerHTML = '<div class="vazio-cfg">Você ainda não tem workflows. Clique em <b>Novo workflow</b> ou peça no chat: “todo dia às 8h, manda bom dia no WhatsApp para os meus clientes”.</div>')
     el.innerHTML = `<div class="ro-itens">${R.lista.map((r) => `
       <div class="cartao-prov ro-item${r.ativa ? '' : ' ro-pausada'}" data-id="${esc(r.id)}">
-        <div class="col"><span class="nm">${esc(r.nome)} ${r.ativa ? '' : '<span class="selo">Pausada</span>'} ${r.erro ? '<span class="selo err">Deu erro</span>' : r.status === 'ok' || r.status === 'success' ? '<span class="selo ok">Rodou</span>' : ''}</span>
+        <div class="col"><span class="nm">${esc(r.nome)} ${r.concluida ? '<span class="selo">Concluído</span>' : r.ativa ? '' : '<span class="selo">Pausada</span>'} ${r.erro ? '<span class="selo err">Deu erro</span>' : r.status === 'ok' || r.status === 'success' ? '<span class="selo ok">Rodou</span>' : ''}</span>
           <span class="sub">${esc(r.quando)} · próxima: ${esc(r.ativa ? fmt(r.proxima) : '—')} · última: ${esc(fmt(r.ultima))}</span>
           <span class="sub ro-pedido">${esc(String(r.pedido).slice(0, 160))}</span></div>
-        <div class="ro-acoes"><button data-a="ver">Ver resultado</button><button data-a="editar">Editar no chat</button><button data-a="${r.ativa ? 'pause' : 'resume'}">${r.ativa ? 'Pausar' : 'Retomar'}</button><button class="btn-perigo" data-a="remove">Apagar</button></div>
+        <div class="ro-acoes"><button data-a="ver">Ver resultado</button><button data-a="editar">Editar no chat</button>${r.concluida ? '' : `<button data-a="${r.ativa ? 'pause' : 'resume'}">${r.ativa ? 'Pausar' : 'Retomar'}</button>`}<button class="btn-perigo" data-a="remove">Apagar</button></div>
       </div>`).join('')}</div>`
     el.onclick = async (e) => {
       const b = e.target.closest('button[data-a]')

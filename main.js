@@ -586,7 +586,11 @@ ipcMain.handle('editor:abrir-video', async (_e, video) => {
 })
 ipcMain.handle('editor:abrir', (_e, projeto) => { try { return editorVideo.abrirJanela(app, projeto || path.join(cfg.pasta, 'Videos')) } catch (e) { return { ok: false, erro: String(e.message || e) } } })
 
+// conversas que pediram edição de vídeo: só nelas o motor do editor entra (ele pesa ~47 mil tokens por chamada)
+const PEDE_EDITOR = /\b(edit[ae]r?|ediç[ãa]o|editor|cort[ae]r?|corta|legend[ae]r?|junt[ae]r?|timeline|linha do tempo|trech|transiç|sil[êe]ncio|reels?|shorts?)\b[^.]*\b(v[íi]deos?|clipes?|filmagem|grava[çc][ãa]o|reels?|shorts?)\b|\bv[íi]deos?\b[^.]*\b(edit|cort|legend|junt|acelera|tira[r]? (o )?sil[êe]ncio)|\b(abr[ae] o editor|no editor)\b/i
+const chatsComEditor = new Set()
 async function sessaoDoChat(id, alvo, contexto, historico) {
+  const querEditor = chatsComEditor.has(id)
   // logo depois de entrar na conta, o app leva alguns segundos para ligá-la ao motor interno: a primeira mensagem espera
   // (em vez de sair com a chave ainda não aplicada e voltar "chave inválida")
   if (cfg.unlimitedChave && !cfg.unlimitedLigado) {
@@ -596,14 +600,14 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   const est = embed.estado()
   const existente = sessoes.get(id)
   const nivel = await nivelDeSeguranca()
-  if (existente && !existente.morto && !existente.falhouIniciar && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel) return existente
+  if (existente && !existente.morto && !existente.falhouIniciar && existente.modelo === alvo && existente.pasta === cfg.pasta && existente.racio === cfg.raciocinio && existente.nivel === nivel && (existente.editorMotor || !querEditor)) return existente
   existente?.encerrar()
   fs.mkdirSync(cfg.pasta, { recursive: true })
   if (motorGateway()) {
     // motor gateway (spec 34): uma ponte para todas as conversas; sem reserva nem aquecimento
     await ponteLLM.iniciar()
     const { SessaoGateway } = require('./sessao-gateway')
-    const sg = new SessaoGateway({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
+    const sg = new SessaoGateway({ editorMotor: querEditor, app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
     sg.modelo = alvo
     sg.racio = cfg.raciocinio
     sg.nivel = nivel
@@ -625,7 +629,7 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
     return adotada
   }
   await ponteLLM.iniciar()
-  const sessao = new Sessao({ app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: 'sb-local', raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
+  const sessao = new Sessao({ editorMotor: querEditor, app, id, pasta: cfg.pasta, base: ponteLLM.origem() + '/v1', modelo: alvo, chave: 'sb-local', raciocinio: cfg.raciocinio, nivel, emitir: contexto.onDelta, pedirPermissao: contexto.pedirPermissao, modo: () => cfg.modoPermissao || 'manual', navegador: navInfo, midia: midiaDoApp(), memoria: { arquivo: path.join(app.getPath('userData'), 'chats.json') }, ias: await iasDoApp() })
   sessao.modelo = alvo
   sessao.racio = cfg.raciocinio
   sessao.nivel = nivel
@@ -671,6 +675,7 @@ async function responder(alvo, msgs, ctx) {
   const anteriores = msgs.slice(0, -1).slice(-10)
   const linhaHist = (m) => (m.role === 'user' ? 'Usuário' : 'Assistente') + ': ' + String(m.content).slice(0, 700)
   const historico = anteriores.map(linhaHist).join(String.fromCharCode(10))
+  if (PEDE_EDITOR.test(ultimo)) chatsComEditor.add(ctx.chat)
   const sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
   if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o resumo do que já foi dito
   sessao.emitir = ctx.onDelta // cada mensagem tem o seu canal de resposta e de permissão
@@ -731,6 +736,8 @@ const ROTAS_PERMITIDAS = [/^\/api\/providers(\/|\?|$)/, /^\/api\/provider-nodes(
 let janela
 const abortos = new Map()
 function criarJanela() {
+  // sem a barra "File Edit View" (no Windows e no Linux ela aparecia ao apertar Alt); no macOS o menu do sistema fica
+  if (process.platform !== 'darwin') require('electron').Menu.setApplicationMenu(null)
   janela = new BrowserWindow({
     width: 1240,
     center: true,

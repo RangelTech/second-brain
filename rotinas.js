@@ -49,7 +49,8 @@ function lista(jobs) {
     ultima: j.last_run_at || null,
     status: j.last_status || null,
     erro: j.last_error || j.last_fire_error || null,
-    ativa: j.enabled !== false && j.state !== 'paused',
+    concluida: j.state === 'completed',
+    ativa: j.enabled !== false && j.state !== 'paused' && j.state !== 'completed',
     pedido: j.prompt_preview || '',
   }))
 }

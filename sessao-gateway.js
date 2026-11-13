@@ -21,8 +21,9 @@ class SessaoGateway {
   get emitir() { return this.mudo ? () => {} : this._emitir || (() => {}) }
   set emitir(f) { this._emitir = f }
 
-  constructor({ app, id: chat, pasta, base, modelo, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, gateway, filhos }) {
+  constructor({ app, id: chat, pasta, base, modelo, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, gateway, filhos, editorMotor }) {
     this.app = app
+    this.editorMotor = !!editorMotor
     this.id = chat
     this.pasta = pasta
     this.modo = modo || (() => 'manual')

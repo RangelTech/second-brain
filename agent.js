@@ -693,7 +693,8 @@ class Sessao {
   set emitir(f) {
     this._emitir = f
   }
-  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, vagaArq }) {
+  constructor({ app, id, pasta, base, modelo, chave, raciocinio, emitir, pedirPermissao, modo, navegador, midia, memoria, ias, nivel, vagaArq, editorMotor }) {
+    this.editorMotor = !!editorMotor
     this.app = app
     this.id = id
     this.vagaArq = vagaArq || null // sessão reserva: arquivo onde o app grava a conversa que adotou este processo
@@ -1135,7 +1136,8 @@ class Sessao {
     // editor de vídeo: o motor (quando instalado) e as ferramentas do app (instalar, abrir janela, cortar silêncio)
     try {
       const ev = require('./editor-video')
-      const motor = ev.mcp(this.app, this.pasta)
+      // o motor do editor traz ~50 comandos (~47 mil tokens a mais em TODA chamada): só entra na conversa que pediu edição de vídeo
+      const motor = this.editorMotor ? ev.mcp(this.app, this.pasta) : null
       if (motor) lista.push(motor)
       if (this.navegador && ev.suportado() && ev.habilitado(this.app)) {
         const shimEd = [path.join(process.resourcesPath || '', 'mcp-editor.js'), path.join(__dirname, 'mcp-editor.js')].find((p) => fs.existsSync(p)) || path.join(__dirname, 'mcp-editor.js')
