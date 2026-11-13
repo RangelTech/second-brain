@@ -464,3 +464,10 @@
 .ctx-medidor.sessao.livre .ctx-arco{stroke:#4caf7d;stroke-dashoffset:0}
 .ctx-medidor.sessao #sessao-txt{display:inline-flex}
 .ctx-medidor{cursor:help}
+
+/* ouvir a resposta */
+.msg.assistant .quem .ouvir{margin-left:auto;background:none;border:0;padding:4px;border-radius:7px;color:var(--mut);opacity:0;transition:opacity .15s;display:inline-flex}
+.msg.assistant:hover .quem .ouvir,.msg.assistant .quem .ouvir.on{opacity:1}
+.msg.assistant .quem .ouvir:hover{background:var(--card2);color:var(--fg)}
+.msg.assistant .quem .ouvir.on{color:var(--ac)}
+.msg.assistant .quem .ouvir svg{width:16px;height:16px}

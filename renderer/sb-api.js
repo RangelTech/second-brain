@@ -141,6 +141,7 @@
         estado: () => invoke('editor:estado'),
         instalar: () => invoke('editor:instalar'),
         abrir: (projeto) => invoke('editor:abrir', projeto),
+        abrirVideo: (video) => invoke('editor:abrir-video', video),
         aoProgresso: (fn) => on('editor:progresso', fn),
       },
       aoErro: (fn) => on('chat:erro', fn),

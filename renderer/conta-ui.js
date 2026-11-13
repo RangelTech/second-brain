@@ -79,7 +79,8 @@
     ses.classList.toggle('alto', pct >= 85)
     arco.style.strokeDashoffset = String(50.27 * (1 - pct / 100))
     document.getElementById('sessao-txt').textContent = `${pct}%`
-    ses.title = `Sessão de 5 horas: ${pct}% usado (${tok(s.used || 0)} de ${tok(s.limit)} tokens). ${renova(s.resets_at)}.`
+    ses.title = `Sessão de 5 horas: ${pct}% usado
+${tok(s.used || 0)} de ${tok(s.limit)} tokens · ${renova(s.resets_at).replace(/^r/, 'R')}`
   }
 
   // ---------- painel "Sua conta" (topo da aba Créditos e limites)

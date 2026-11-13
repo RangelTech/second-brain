@@ -431,7 +431,7 @@
         const slot = d.querySelector('.img-slot')
         if (!slot) return
         const brief = [arg.prompt && 'Descrição: ' + arg.prompt, arg.negative_prompt && 'Evitar: ' + arg.negative_prompt, arg.formato && 'Formato: ' + arg.formato, arg.segundos && 'Duração: ' + arg.segundos + ' s', arg.qualidade && 'Qualidade: ' + arg.qualidade, arg.seed != null && 'Semente: ' + arg.seed].filter(Boolean).join('\n')
-        slot.innerHTML = `${ehVideo ? `<video class="img-final" src="${src}" controls loop playsinline preload="metadata"></video>` : `<img class="img-final" src="${src}" alt="${attr(arg.prompt || 'Imagem gerada')}">`}<div class="facoes" style="padding:0"><a class="baixar" href="${src}" download="${attr(nomeArq(caminho))}">Baixar</a><button data-variacao="${ehVideo ? 'video' : 'imagem'}">Variação</button><button data-ajustar="${ehVideo ? 'video' : 'imagem'}">Refazer com ajuste</button><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button></div>${brief ? `<details class="briefing"><summary>Ver o briefing usado</summary><pre>${esc(brief)}</pre></details>` : ''}`
+        slot.innerHTML = `${ehVideo ? `<video class="img-final" src="${src}" controls loop playsinline preload="metadata"></video>` : `<img class="img-final" src="${src}" alt="${attr(arg.prompt || 'Imagem gerada')}">`}<div class="facoes" style="padding:0"><a class="baixar" href="${src}" download="${attr(nomeArq(caminho))}">Baixar</a><button data-variacao="${ehVideo ? 'video' : 'imagem'}">Variação</button><button data-ajustar="${ehVideo ? 'video' : 'imagem'}">Refazer com ajuste</button><button data-abrir="${attr(caminho)}">Abrir</button><button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>${ehVideo ? botaoEditor(caminho) : ''}</div>${brief ? `<details class="briefing"><summary>Ver o briefing usado</summary><pre>${esc(brief)}</pre></details>` : ''}`
       })
       return true
     }
@@ -506,7 +506,7 @@
           return
         }
         const mime = /\.webm$/i.test(caminho) ? 'video/webm' : 'video/mp4'
-        box.innerHTML = `<video class="img-final" src="data:${mime};base64,${r.base64}" controls playsinline preload="metadata"></video><div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${IC.file}${ehWeb ? 'Baixar' : 'Abrir'}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>`
+        box.innerHTML = `<video class="img-final" src="data:${mime};base64,${r.base64}" controls playsinline preload="metadata"></video><div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${IC.file}${ehWeb ? 'Baixar' : 'Abrir'}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}${botaoEditor(caminho)}</div>`
       }
       if (cacheVideos.has(caminho)) pintar(cacheVideos.get(caminho))
       else window.sb.lerArquivo(caminho).then((r) => { if (r && r.ok) cacheVideos.set(caminho, r); pintar(r) }).catch(() => box.remove())
@@ -525,6 +525,39 @@
 
   function partesDe(m) {
     return m.partes || [{ t: 'texto', v: m.content }]
+  }
+  // Ouvir a resposta (spec 34 §6.5): voz do próprio sistema (Windows, macOS, Linux), em português, sem instalar nada e sem custo
+  let falando = null
+  function vozPt() {
+    const vs = speechSynthesis.getVoices().filter((v) => /^pt(-|_)?BR/i.test(v.lang) || /portugu/i.test(v.name))
+    return vs.find((v) => /natural|online|neural/i.test(v.name)) || vs.find((v) => /BR/i.test(v.lang)) || vs[0] || null
+  }
+  function ouvir(botao) {
+    const parar = () => { speechSynthesis.cancel(); document.querySelectorAll('.ouvir.on').forEach((b) => b.classList.remove('on')); falando = null }
+    if (falando === botao) return parar()
+    parar()
+    const msg = botao.closest('.msg')
+    const texto = [...msg.querySelectorAll('.partes > .corpo')].map((c) => c.innerText).join('\n').replace(/https?:\/\/\S+/g, 'link').trim()
+    if (!texto) return
+    // frases curtas em sequência: o sintetizador do Chromium corta falas muito longas
+    const partes = texto.match(/[^.!?\n]+[.!?]?/g) || [texto]
+    const voz = vozPt()
+    falando = botao
+    botao.classList.add('on')
+    partes.forEach((t, i) => {
+      const u = new SpeechSynthesisUtterance(t.trim())
+      u.lang = 'pt-BR'
+      if (voz) u.voice = voz
+      u.rate = 1.05
+      if (i === partes.length - 1) u.onend = () => { if (falando === botao) parar() }
+      speechSynthesis.speak(u)
+    })
+  }
+  if (window.speechSynthesis) speechSynthesis.getVoices()
+  // "Abrir no editor" em todo vídeo do chat (spec 37): cria um projeto com o vídeo e abre o editor integrado nele
+  function botaoEditor(caminho) {
+    if (ehWeb || !window.sb.editor || !caminho) return ''
+    return `<button data-editor="${attr(caminho)}">${IC.film || IC.file}Abrir no editor</button>`
   }
   function renderPartes(el, partes) {
     // o usuário abre e fecha os blocos de passos à mão: redesenhar (a cada evento do agente) não pode mudar isso
@@ -628,7 +661,7 @@
     if (m.role === 'user') {
       d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
     } else {
-      d.innerHTML = `${QUEM}</div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
+      d.innerHTML = `${QUEM}<button class="ouvir" data-ouvir title="Ouvir a resposta" aria-label="Ouvir a resposta">${IC.volume}</button></div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
       renderPartes(d.querySelector('.partes'), partesDe(m))
       for (const a of m.midias || []) d.appendChild(midia(a))
     }
@@ -641,7 +674,7 @@
     d.className = 'midia'
     const ext = (caminho.split('.').pop() || '').toLowerCase()
     const tipo = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext) ? 'img' : ['mp3', 'wav', 'ogg', 'webm', 'm4a'].includes(ext) ? 'audio' : ['mp4', 'mov'].includes(ext) ? 'video' : 'arq'
-    const acoes = `<div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${ehWeb ? 'Baixar' : 'Abrir'}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}</div>`
+    const acoes = `<div class="facoes" style="padding:0"><button data-abrir="${attr(caminho)}">${ehWeb ? 'Baixar' : 'Abrir'}</button>${ehWeb ? '' : `<button data-mostrar="${attr(caminho)}">${IC.folder}Mostrar na pasta</button>`}${tipo === 'video' ? botaoEditor(caminho) : ''}</div>`
     if (tipo === 'arq') d.innerHTML = `<div class="anexo-msg">${IC.file}${esc(nomeArq(caminho))}</div>${acoes}`
     else {
       d.innerHTML = `<div class="mut">${esc(nomeArq(caminho))}</div>${acoes}`
@@ -1718,6 +1751,19 @@
     }
     const ab = e.target.closest('[data-abrir]')
     if (ab) return ehWeb ? baixarArquivo(ab.dataset.abrir, ab) : window.sb.abrirArquivo(ab.dataset.abrir)
+    const ou = e.target.closest('[data-ouvir]')
+    if (ou) return ouvir(ou)
+    const ed = e.target.closest('[data-editor]')
+    if (ed) {
+      if (ed.disabled) return
+      ed.disabled = true
+      const rot = ed.innerHTML
+      ed.textContent = 'Abrindo no editor…'
+      window.sb.editor.abrirVideo(ed.dataset.editor).then((r) => {
+        if (!r || !r.ok) aviso('Editor de vídeo: ' + ((r && r.erro) || 'não abriu'))
+      }).finally(() => { ed.disabled = false; ed.innerHTML = rot })
+      return
+    }
     const mo = e.target.closest('[data-mostrar]')
     if (mo) return window.sb.mostrarArquivo(mo.dataset.mostrar)
     const a = e.target.closest('a[href^="http"]')

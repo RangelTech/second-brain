@@ -161,6 +161,54 @@ function abrirJanela(app, projeto) {
   return { ok: true, pid: p.pid }
 }
 
+// "Abrir no editor" de um vídeo do chat (spec 37): o próprio motor, sem janela, cria um projeto ao lado dos vídeos, importa o arquivo
+// e põe na linha do tempo; depois a janela abre nesse projeto. Caminhos com barra normal (o motor recusa a mesma pasta escrita com contrabarra).
+function projetoComVideo(app, video, pastaVideos) {
+  const barra = (x) => path.resolve(x).split(path.sep).join('/')
+  const raiz = barra(pastaVideos)
+  fs.mkdirSync(pastaVideos, { recursive: true })
+  const arq = barra(video)
+  const base = path.basename(video, path.extname(video)).replace(/[^\p{L}\p{N}_-]+/gu, '-').slice(0, 40) || 'video'
+  const nome = `${base}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
+  const proj = raiz + '/' + nome
+  return new Promise((ok, falha) => {
+    const p = spawn(caminhoExe(app), ['--mcp', 'headless'], { windowsHide: true, env: { ...process.env, CONCAT_MCP_ROOTS: [raiz, barra(path.dirname(video))].join(process.platform === 'win32' ? ';' : ':') } })
+    let buf = ''
+    let id = 0
+    const pend = new Map()
+    const fim = (e, v) => { try { p.kill() } catch {} ; clearTimeout(t); e ? falha(e) : ok(v) }
+    const t = setTimeout(() => fim(new Error('O editor demorou demais para preparar o projeto.')), 90000)
+    p.on('error', (e) => fim(e))
+    p.stdout.on('data', (d) => {
+      buf += d
+      let i
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const l = buf.slice(0, i)
+        buf = buf.slice(i + 1)
+        try { const j = JSON.parse(l); if (pend.has(j.id)) { pend.get(j.id)(j); pend.delete(j.id) } } catch {}
+      }
+    })
+    const rpc = (method, params) => new Promise((r) => { const i = ++id; pend.set(i, r); p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: i, method, params }) + '\n') })
+    const ferramenta = async (name, args) => {
+      const r = await rpc('tools/call', { name, arguments: args })
+      const txt = r.result && r.result.content && r.result.content[0] && r.result.content[0].text
+      if (r.error || (r.result && r.result.isError)) throw new Error(String(txt || (r.error && r.error.message) || 'falhou'))
+      try { return JSON.parse(txt) } catch { return {} }
+    }
+    ;(async () => {
+      await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'segundo-cerebro', version: '1' } })
+      p.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
+      await ferramenta('project_create', { location: raiz, name: nome })
+      const m = await ferramenta('media_import', { path: proj, file: arq })
+      const mid = m.media && m.media.length ? m.media[m.media.length - 1].id : null
+      if (!mid) throw new Error('O editor não conseguiu importar o vídeo.')
+      await ferramenta('clips_add_sequence', { path: proj, mediaIds: [mid], start: 0 })
+      await ferramenta('project_close', { path: proj, save: true })
+      fim(null, proj)
+    })().catch((e) => fim(e))
+  })
+}
+
 // servidor MCP do Concat para o Hermes: o próprio binário, em stdio. `auto` = usa a janela se estiver aberta, senão roda sozinho (headless)
 function mcp(app, pastaTrabalho) {
   if (!habilitado(app) || !instalado(app)) return null
@@ -217,4 +265,4 @@ async function cortarSilencio(arquivo, { limiar = -35, minimo = 0.6, saida } = {
   return { arquivo: out, duracaoAntes: duracao, duracaoDepois: novo, trechos: som.length, cortado: +(duracao - novo).toFixed(2) }
 }
 
-module.exports = { habilitado, ORIGENS, ORIGEM, prepararConfig, configDir, NOME_EXIBIDO, pastaEditor, caminhoExe, instalado, suportado, instalar, abrirJanela, mcp, cortarSilencio, trechosComSom, sha256Arquivo }
+module.exports = { projetoComVideo, habilitado, ORIGENS, ORIGEM, prepararConfig, configDir, NOME_EXIBIDO, pastaEditor, caminhoExe, instalado, suportado, instalar, abrirJanela, mcp, cortarSilencio, trechosComSom, sha256Arquivo }
