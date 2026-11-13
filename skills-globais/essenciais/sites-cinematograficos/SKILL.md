@@ -13,7 +13,7 @@ O que faz um site desses impressionar: **vídeo de verdade** (topo e cartões), 
 - `modelos/camera-cinema.html`: transforma **uma foto** em vídeo de cinema (câmera lenta com zoom e deslize, luz passando, poeira no ar, barras de cinema, texto entrando). Renderize com `motion_animar` (Motion, de graça, no computador do usuário). Troque `FOTO`, `TITULO`, `SUBTITULO` e a duração `D`.
 
 ## Ritmo (importante)
-O usuário está esperando. Faça na ordem, sem refazer à toa: 1 imagem por cena, 1 prévia, no máximo 1 correção, 1 renderização por vídeo; escreva o `index.html` **logo depois do primeiro vídeo pronto** (dá para trocar o vídeo depois). Meta: página pronta em até 15 minutos.
+O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primeira**: planeje antes (textos, cores, cenas), use os modelos sem reinventar, confira a prévia contra o padrão de qualidade e corrija tudo de uma vez. Escreva o `index.html` **logo depois do primeiro vídeo pronto**, para o usuário já ver a página, e continue refinando (vídeos, textos, prints) até ficar perfeito. Diga em uma frase o que está melhorando a cada rodada.
 
 ## Roteiro
 1. Entenda em 1 pergunta (se faltar): o que vende, para quem, preço e o link de compra (checkout). Peça fotos do produto/imóvel/pessoa, se ele tiver.

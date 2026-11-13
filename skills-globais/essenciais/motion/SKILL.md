@@ -24,7 +24,7 @@ Você escreve UMA página HTML do tamanho exato do vídeo. Já vêm carregados:
 1. Combine em uma frase: formato (9:16 reel/story, 1:1, 16:9), duração, textos e cores (as da marca do usuário, se ele tiver).
 2. Escreva o HTML a partir do modelo. Salve também o `.html` ao lado do vídeo (o usuário pode pedir ajuste depois).
 3. `motion_previa` com 4 a 6 tempos (começo, cada entrada, final) e **olhe cada quadro** com `vision_analyze`. Corrija antes de renderizar.
-4. `motion_animar` (duração e trilha, se houver: `audio`). **Limite: no máximo 1 rodada de correção depois da prévia e 2 renderizações no total.** Se ainda tiver detalhe, entregue e ofereça ajustar; o usuário decide se quer mais uma. Leva cerca de 6 s de trabalho por segundo de vídeo em 1080x1920.
+4. `motion_animar` (duração e trilha, se houver: `audio`). **Acerte de primeira:** antes de renderizar, confira na prévia TODOS os itens do padrão de qualidade abaixo e corrija tudo de uma vez (uma correção por item, não uma por renderização). Depois de renderizar, olhe 3 quadros do MP4; se algo ainda não estiver perfeito, corrija e renderize de novo até ficar. Leva cerca de 6 s de trabalho por segundo de vídeo em 1080x1920.
 5. Entregue o caminho do MP4 numa linha própria e ofereça: ajustar, versão 1:1, ou abrir no Editor para mexer junto.
 
 **Padrão de qualidade (confira na prévia):**
