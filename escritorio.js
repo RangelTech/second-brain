@@ -56,7 +56,21 @@ function estado(app) {
   return { instalado: !!executavel(app), suportado: !!p || !!doSistema(), tamanhoMb: p ? p.mb : 0, versao: VERSAO }
 }
 
+function shaArquivo(arq) {
+  const h = crypto.createHash('sha256')
+  const fd = fs.openSync(arq, 'r')
+  const buf = Buffer.alloc(1 << 20)
+  try {
+    let n
+    while ((n = fs.readSync(fd, buf, 0, buf.length, null)) > 0) h.update(buf.subarray(0, n))
+  } finally {
+    fs.closeSync(fd)
+  }
+  return h.digest('hex')
+}
+
 async function baixar(urls, destino, sha, progresso) {
+  if (fs.existsSync(destino) && shaArquivo(destino) === sha) return // já baixado e conferido (instalação interrompida antes)
   for (const url of urls) {
     try {
       const r = await fetch(url, { signal: AbortSignal.timeout(30 * 60 * 1000) })
@@ -119,7 +133,8 @@ function abrir(app, arquivo) {
   const exe = executavel(app)
   if (!exe) throw new Error('O editor de documentos não está instalado.')
   if (!fs.existsSync(arquivo)) throw new Error('Arquivo não encontrado: ' + arquivo)
-  const filho = spawn(exe, [arquivo], { detached: true, stdio: 'ignore', windowsHide: false, cwd: path.dirname(exe) })
+  // --lang=pt-BR: menus em português e número no formato brasileiro (R$ 89,90), testado no 10.0.0
+  const filho = spawn(exe, ['--lang=pt-BR', arquivo], { detached: true, stdio: 'ignore', windowsHide: false, cwd: path.dirname(exe) })
   filho.unref()
   return { ok: true }
 }
