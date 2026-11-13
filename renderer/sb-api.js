@@ -106,6 +106,7 @@
       contaUso: () => invoke('conta:uso'),
       contaPainel: () => invoke('conta:painel'),
       conexoes: { estado: () => invoke('conexoes:estado'), abrir: (u) => invoke('conexoes:abrir', u), sair: (id) => invoke('conexoes:sair', id) },
+      andamento: { listar: () => invoke('andamento:listar'), parar: () => invoke('andamento:parar') },
       sistema: { estado: () => invoke('sistema:estado'), definir: (m) => invoke('sistema:definir', m) },
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),

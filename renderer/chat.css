@@ -471,3 +471,14 @@
 .msg.assistant .quem .ouvir:hover{background:var(--card2);color:var(--fg)}
 .msg.assistant .quem .ouvir.on{color:var(--ac)}
 .msg.assistant .quem .ouvir svg{width:16px;height:16px}
+
+/* Em andamento */
+.sb-bolinha.andamento{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ac)}
+.sb-bolinha.andamento .rodando{width:10px;height:10px}
+.sb-modal-fundo{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);display:grid;place-items:center}
+.sb-modal{width:min(560px,92vw);background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:20px 22px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.sb-modal h3{margin:0 0 6px}.sb-modal .mut{color:var(--mut);font-size:13px}
+.and-lista{list-style:none;padding:0;margin:14px 0;display:flex;flex-direction:column;gap:10px;max-height:50vh;overflow:auto}
+.and-lista li{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--bd);border-radius:10px}
+.and-lista code{font-size:12px;white-space:pre-wrap;word-break:break-all}
+.sb-modal .rodape-j{display:flex;justify-content:flex-end;gap:8px}

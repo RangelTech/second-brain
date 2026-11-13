@@ -1112,6 +1112,14 @@ app.whenReady().then(() => {
   ipcMain.handle('skillsrepo:sincronizar', seguro((o) => skillsRepo.sincronizar(o || {})))
   // rotinas (cron do Hermes pelo gateway): listar, criar, pausar, retomar, apagar e ver a ultima saida
   const rotinasMod = require('./rotinas')
+  // Em andamento (spec 34 §6.4): processos que o agente deixou rodando em segundo plano (servidor, download, build...), pelo gateway
+  const gwAgente = () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app))
+  ipcMain.handle('andamento:listar', seguro(async () => {
+    if (!motorGateway()) return []
+    const r = await gwAgente().rpc('agents.list', {}, 8000)
+    return (r.processes || []).filter((x) => !/^(exited|finished|killed|done)/i.test(String(x.status || ''))).map((x) => ({ comando: String(x.command || ''), estado: String(x.status || ''), segundos: Math.round(Number(x.uptime) || 0) }))
+  }))
+  ipcMain.handle('andamento:parar', seguro(async () => (await gwAgente().rpc('process.stop', {}, 15000)).killed ?? 0))
   const rotinas = rotinasMod.criar({ app, home: () => caminhosHermes.homeAgente(app), obterGateway: () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app)) })
   ipcMain.handle('rotinas:listar', seguro(() => rotinas.listar()))
   ipcMain.handle('rotinas:criar', seguro((d) => rotinas.criar(d || {})))
