@@ -37,7 +37,7 @@ const afirmaArquivo = (texto) => AFIRMA_ARQUIVO.test(String(texto || '')) && NOM
 // o modelo pode chamar usar_agente depois de já ter respondido (resposta completa + chamada à toa): nesse caso a resposta vale e o Hermes não roda de novo.
 // Só escala quando ainda não há resposta de verdade (nada escrito, ou só uma frase de preâmbulo como "Vou criar o arquivo").
 const PREAMBULO_MAX = 160
-const SEGURAR = 40 // caracteres retidos no inicio da resposta rapida
+const SEGURAR = 120 // caracteres retidos no inicio da resposta rapida
 const deveEscalar = (textoJaEscrito) => String(textoJaEscrito || '').trim().length < PREAMBULO_MAX
 
 // Loop degenerado: o modelo repete a mesma palavra ou o mesmo trecho sem parar. Devolve onde o loop começa (mantendo uma ocorrência) ou -1.
