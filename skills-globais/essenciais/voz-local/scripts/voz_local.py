@@ -34,7 +34,7 @@ ARQUIVOS = {
 # versões que funcionaram juntas (13/11/2026, Python 3.12)
 PIP_BASE = ["piper-tts==1.8.0", "librosa==1.0.1", "soundfile==0.14.0", "numpy==2.5.4", "pydub", "inflect", "unidecode", "eng_to_ipa", "pypinyin", "jieba", "cn2an"]
 PIP_TORCH = ["torch==2.15.0", "torchaudio==2.11.1"]
-PIP_XTTS = ["coqui-tts[codec]==0.28.0"]
+PIP_XTTS = ["coqui-tts[codec]==0.28.0", "six"]
 CONVERSOR_HF = "https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/main/converter/"  # fonte oficial (MyShell) do conversor v2
 
 
