@@ -3,8 +3,19 @@
 // Roda com o Node do Electron (ELECTRON_RUN_AS_NODE=1); não tem dependências.
 const readline = require('readline')
 
-const URL_APP = process.env.SB_NAV_URL
-const TOKEN = process.env.SB_NAV_TOKEN
+// Conversas: endereço e senha vêm no ambiente. Workflows (servidor global do Hermes): vêm do arquivo SB_PONTE_ARQ, que o app regrava a cada início.
+let URL_APP = process.env.SB_NAV_URL
+let TOKEN = process.env.SB_NAV_TOKEN
+function ponte() {
+  if (!process.env.SB_PONTE_ARQ) return
+  try {
+    const j = JSON.parse(require('fs').readFileSync(process.env.SB_PONTE_ARQ, 'utf8'))
+    URL_APP = j.url
+    TOKEN = j.token
+  } catch {
+    throw new Error('O Segundo Cérebro precisa estar aberto (pode ser só na bandeja) para usar o navegador, o WhatsApp e o Motion.')
+  }
+}
 
 const obj = (props, req = []) => ({ type: 'object', properties: props, required: req })
 const ONDE = { type: 'string', enum: ['auto', 'integrado', 'chrome'], description: 'Onde executar. Omita (auto): no aplicativo instalado usa o navegador integrado; na versão web usa o Chrome do usuário (extensão). Use "chrome" quando o usuário pedir o Chrome dele ou precisar das contas já abertas lá; "integrado" para o navegador do aplicativo.' }
@@ -30,6 +41,7 @@ const FERRAMENTAS = [
 const enviar = (o) => process.stdout.write(JSON.stringify(o) + '\n')
 
 async function chamar(nome, args) {
+  ponte()
   const r = await fetch(URL_APP, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN }, body: JSON.stringify({ nome, args }) })
   return r.json()
 }

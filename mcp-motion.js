@@ -1,7 +1,18 @@
 // Servidor MCP (stdio) do Motion desenhado (spec 37): página HTML (CSS, SVG, canvas, React com htm, ajudante SB) vira MP4 no próprio app.
 const readline = require('readline')
-const URL_APP = process.env.SB_NAV_URL
-const TOKEN = process.env.SB_NAV_TOKEN
+// Conversas: endereço e senha vêm no ambiente. Workflows (servidor global do Hermes): vêm do arquivo SB_PONTE_ARQ, que o app regrava a cada início.
+let URL_APP = process.env.SB_NAV_URL
+let TOKEN = process.env.SB_NAV_TOKEN
+function ponte() {
+  if (!process.env.SB_PONTE_ARQ) return
+  try {
+    const j = JSON.parse(require('fs').readFileSync(process.env.SB_PONTE_ARQ, 'utf8'))
+    URL_APP = j.url
+    TOKEN = j.token
+  } catch {
+    throw new Error('O Segundo Cérebro precisa estar aberto (pode ser só na bandeja) para usar o navegador, o WhatsApp e o Motion.')
+  }
+}
 const obj = (props, req = []) => ({ type: 'object', properties: props, required: req })
 const ARGS = {
   html: { type: 'string', description: 'Página HTML completa da animação (CSS, SVG, canvas). React, ReactDOM, html`...` (JSX sem compilar) e SB (easing, spring, stagger, split, mix, noise) já estão carregados. Anime com CSS @keyframes, Web Animations ou defina window.sbFrame = (t) => {...} (t em segundos). Caminhos relativos partem da pasta do vídeo de saída.' },
@@ -19,6 +30,7 @@ const FERRAMENTAS = [
 const enviar = (o) => process.stdout.write(JSON.stringify(o) + '\n')
 // http puro (sem fetch): render longo pode passar de 5 min e o fetch do Node corta a espera da resposta nesse ponto
 function chamar(nome, args) {
+  ponte()
   const u = new URL(URL_APP)
   const corpo = Buffer.from(JSON.stringify({ nome: 'motion_' + nome, args }))
   return new Promise((ok, falha) => {

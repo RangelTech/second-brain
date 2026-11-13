@@ -299,7 +299,37 @@ let ENTREGAR_PACOTE = false
 function definirPacote(v) {
   ENTREGAR_PACOTE = v === true
 }
+// Ajuste no Hermes instalado (spec 37): os servidores de ferramentas do app (navegador, WhatsApp, Motion, mídia) recebiam 5 s para subir e
+// 30 s por chamada. Sob carga um servidor não subia a tempo, e renderizar um vídeo ou ler dias de WhatsApp passa de 30 s. Só troca o texto
+// exato (versão nova do Hermes que mude essa linha fica como está); vale a partir do próximo início do gateway.
+const AJUSTE_MCP = ['config.update(connect_timeout=5, tool_timeout=30, lazy=False)', 'config.update(connect_timeout=20, tool_timeout=900, lazy=False)']
+// o gateway roda do código em <raiz>/hermes-agent ou de uma cópia em <home>/installs/<id>/environments/<id>/workspace: ajusta todas
+function ajustarArquivo(f) {
+  try {
+    const txt = fs.readFileSync(f, 'utf8')
+    if (txt.includes(AJUSTE_MCP[0])) {
+      fs.writeFileSync(f, txt.replace(AJUSTE_MCP[0], AJUSTE_MCP[1]))
+      return 'ajustado'
+    }
+    return txt.includes(AJUSTE_MCP[1]) ? 'ja' : 'sem-alvo'
+  } catch {
+    return 'sem-arquivo'
+  }
+}
+function ajustarHermes(raiz, home) {
+  const alvos = [path.join(raiz, 'hermes-agent', 'gateway', 'session_local_mcp.py')]
+  try {
+    const inst = path.join(home || '', 'installs')
+    for (const a of fs.readdirSync(inst)) {
+      const envs = path.join(inst, a, 'environments')
+      for (const e of fs.existsSync(envs) ? fs.readdirSync(envs) : []) alvos.push(path.join(envs, e, 'workspace', 'gateway', 'session_local_mcp.py'))
+    }
+  } catch {}
+  const r = alvos.map(ajustarArquivo)
+  return r.includes('ajustado') ? 'ajustado' : r.includes('ja') ? 'ja' : r[0]
+}
 function prepararBase(app) {
+  try { ajustarHermes(caminhosHermes.raizAgente(app), caminhosHermes.homeAgente(app)) } catch {}
   const home = caminhosHermes.homeAgente(app)
   fs.mkdirSync(path.join(home, 'skills'), { recursive: true })
   // pasta nova (caminho curto) no lugar da antiga: leva so a memoria do usuario; o ambiente Python e as sessoes se refazem
@@ -466,11 +496,29 @@ const PLUGINS_FORA = [
 ]
 // motor gateway (spec 34 fase 2): o agente ganha TODAS as ferramentas do Hermes (plano da tarefa, perguntas, memoria, busca em conversas, voz, rotinas, subagentes,
 // script com varias ferramentas, pesquisa na web). A imagem/video do Hermes ficam de fora: a midia e a nossa (creditos, 9Router, Estudio).
-function yamlGateway(filhos = 3) {
+// Workflows (cron) não recebem os servidores da sessão: o app os declara como servidores globais do Hermes, liberados só para o cron.
+// As conversas (plataforma local) ficam com no_mcp para não receber esses globais em dobro (as da sessão continuam chegando).
+function mcpGlobais(app) {
+  const shim = (n) => [path.join(process.resourcesPath || '', n), path.join(__dirname, n)].find((p) => fs.existsSync(p)) || path.join(__dirname, n)
+  const ponte = path.join(app.getPath('userData'), 'ponte-app.json')
+  const env = { ELECTRON_RUN_AS_NODE: '1', SB_PONTE_ARQ: ponte }
+  return { sb_navegador: { command: process.execPath, args: [shim('mcp-navegador.js')], env }, sb_motion: { command: process.execPath, args: [shim('mcp-motion.js')], env } }
+}
+function yamlMcpGlobais(globais) {
+  const q = (v) => JSON.stringify(String(v))
+  const out = ['mcp_servers:']
+  for (const [nome, c] of Object.entries(globais)) {
+    out.push(`  ${nome}:`, `    command: ${q(c.command)}`, '    args:', ...c.args.map((a) => `      - ${q(a)}`), '    env:', ...Object.entries(c.env).map(([k, v]) => `      ${k}: ${q(v)}`), '    connect_timeout: 20', '    timeout: 900')
+  }
+  return out
+}
+function yamlGateway(filhos = 3, globais = null) {
   return [
+    ...(globais ? yamlMcpGlobais(globais) : []),
     'platform_toolsets:',
     '  acp:',
     '    - hermes-cli',
+    ...(globais ? ['    - no_mcp', '  local:', '    - hermes-cli', '    - no_mcp', '  cron:', '    - hermes-cron', ...Object.keys(globais).map((n) => '    - ' + n)] : []),
     'memory:',
     '  memory_enabled: true',
     '  user_profile_enabled: true',
@@ -530,7 +578,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
     // com a conta do Unlimited, a visão vai direto a ele. Sem a conta, o Hermes decide sozinho.
     ...(visao ? ['auxiliary:', '  vision:', '    provider: "custom"', `    model: ${JSON.stringify(visao.modelo)}`, `    base_url: ${JSON.stringify(visao.base)}`, '    api_key_env: "SB_VISAO_CHAVE"'] : []),
-    ...(gateway ? yamlGateway(filhos) : []),
+    ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : []),
     'terminal:',
     '  backend: "local"',
     `  cwd: ${JSON.stringify(pasta.replace(/\\/g, '/'))}`,
@@ -1327,4 +1375,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais }
+module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, yamlGateway, mcpGlobais }

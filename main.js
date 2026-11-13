@@ -837,7 +837,11 @@ app.whenReady().then(() => {
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })
-  nav.iniciarServidor().then((i) => (navInfo = i))
+  nav.iniciarServidor().then((i) => {
+    navInfo = i
+    // workflows rodam numa sessão sem a tela: as ferramentas do app acham este endereço pelo arquivo (só este usuário lê)
+    try { fs.writeFileSync(path.join(app.getPath('userData'), 'ponte-app.json'), JSON.stringify({ url: i.url, token: i.token, em: new Date().toISOString() }), { mode: 0o600 }) } catch {}
+  })
   // motor gateway: monta o agente UMA vez por abertura do app (sem modelo), logo que a conta e o motor ficam prontos; assim a 1a conversa ja nasce quente
   if (motorGateway()) {
     const tentar = async (n = 0) => {
