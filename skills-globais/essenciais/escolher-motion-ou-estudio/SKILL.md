@@ -15,8 +15,8 @@ Responda às 3 perguntas, nesta ordem:
    - "Criar com o Estúdio (tem um preço, mostro antes)"
 
 ## Motion (edição, sem custo)
-- Título, legenda palavra por palavra, vinheta, reel com texto: skill `video-motion` (caminho curto `titulo_animado.py`).
-- Cortar, juntar, tirar silêncio, ajustar no tempo: abra o Editor (`editor_abrir_janela`, `cortar_silencio`).
+- Título, legenda palavra por palavra, vinheta, reel com texto: skill `motion` (script `titulo.py`, pronto em segundos).
+- Cortar, juntar, vertical 9:16, música, logo, acelerar: receitas da skill `motion`; ajuste fino visual: Editor (`editor_abrir_janela`), quando estiver ligado.
 - Entregue o arquivo e ofereça "Abrir no Editor" para ajustes.
 
 ## Estúdio (criação com IA, com preço)
