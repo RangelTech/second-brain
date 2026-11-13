@@ -406,3 +406,19 @@
   box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 26px rgba(0,0,0,.28);
   -webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5)}
 @media (max-width:720px){.msg.assistant{padding:12px 14px 10px;border-radius:16px}}
+
+/* Estúdio: orçamento antes de criar (mesmo cartão .mc das mídias) */
+.mc.est{gap:16px}
+.est-topo{display:flex;align-items:flex-start;gap:14px}
+.est-marca{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb,var(--ac) 16%,transparent);color:var(--ac)}
+.est-marca .ic{width:20px;height:20px}
+.est-txt{flex:1;min-width:0}
+.est-eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ac)}
+.est-preco{flex:none;text-align:right;display:flex;flex-direction:column;gap:2px}
+.est-preco b{font-size:22px;font-weight:650;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.est-preco span{font-size:12px;color:var(--mut)}
+.est-acoes{display:flex;gap:10px;flex-wrap:wrap}
+.est-nao{background:transparent;color:var(--fg);border:1px solid var(--bd);border-radius:10px;font-weight:500;padding:9px 16px;min-height:40px}
+.est-nao:hover{background:var(--card2)}
+.est-nao:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+@media (max-width:520px){.est-topo:has(.est-preco){flex-wrap:wrap}.est-preco{text-align:left;width:100%;padding-left:54px}}

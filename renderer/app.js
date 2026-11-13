@@ -268,9 +268,9 @@
   const nomeArq = (p) => String(p || '').split(/[\\/]/).pop()
   // nome de ferramenta -> rótulo de gente; etapas internas do agente não aparecem
   const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
-  const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz)/.test((f && f.titulo) || '')
+  const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz|estudio)/.test((f && f.titulo) || '')
   const ROTULOS = [
-    [/ias_perguntar/, 'Consultando outra IA'], [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
+    [/ias_perguntar/, 'Consultando outra IA'], [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_orcar/, 'Calculando o preço'], [/midia_estudio/, 'Criando no Estúdio'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
     [/navegador_|browser|web_?search|search_web/i, 'Pesquisando na web'], [/vision_analyze/, 'Olhando a imagem'],
     [/read_file|^read\b/i, 'Lendo arquivo'], [/write_file|patch|edit/i, 'Escrevendo arquivo'], [/terminal|execute|shell/i, 'Executando'],
   ]
@@ -370,8 +370,36 @@
     }, 400)
     return j
   }
+
+  // Estúdio: o agente orçou (midia_orcar) -> cartão com o preço e "Criar" / "Agora não" (a resposta vai como mensagem normal)
+  function cartaoEstudio(d, f) {
+    if (f.status !== 'completed') return false
+    const t = String(f.conteudo || '')
+    const m = /^(.*?):\s*(.*?)\.\s*Preço:\s*(R\$\s*[\d.,]+)\s*\(US\$\s*([\d.]+)\),\s*cerca de\s*(\d+)\s*min/.exec(t)
+    if (!m) {
+      if (/em breve/i.test(t)) {
+        d.hidden = false
+        d.className = 'ferr img-ferr mc-ferr estudio'
+        d.innerHTML = `<div class="mc est"><div class="est-topo"><span class="est-marca">${IC.sparkles}</span><div><div class="mc-tit">Estúdio</div><div class="mc-sub">Chegando em breve. Enquanto isso, dá para editar o que você já tem, sem custo.</div></div></div></div>`
+        return true
+      }
+      return false
+    }
+    const [, rotulo, detalhe, reais, , min] = m
+    const acima = /passa do valor normal/.test(t)
+    const respondido = d.dataset.respondido === '1'
+    d.hidden = false
+    d.className = 'ferr img-ferr mc-ferr estudio'
+    d.innerHTML = `<div class="mc est" role="group" aria-label="Orçamento do Estúdio">
+      <div class="est-topo"><span class="est-marca">${IC.sparkles}</span><div class="est-txt"><div class="est-eyebrow">Estúdio</div><div class="mc-tit">${esc(rotulo)}</div><div class="mc-sub">${esc(detalhe)} · cerca de ${esc(min)} min</div></div>
+      <div class="est-preco"><b>${esc(reais.replace(/\s+/, ' '))}</b><span>${acima ? 'acima do valor normal' : 'cobrado só se der certo'}</span></div></div>
+      ${respondido ? '' : `<div class="est-acoes"><button type="button" class="mc-retry" data-estudio="sim">Criar</button><button type="button" class="est-nao" data-estudio="nao">Agora não</button></div>`}
+    </div>`
+    return true
+  }
+
   function criandoImagem(d, f) {
-    const video = /midia_(gerar_video|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '')
+    const video = /midia_(gerar_video|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '') || (/midia_estudio/.test(f.titulo || '') && !/imagem-ponta/.test(f.entrada || ''))
     const pendente = f.status === 'completed' && /\[\[midia-pendente\]\]/.test(String(f.conteudo || '')) // enviado em segundo plano: segue "gerando" até o app avisar
     const arg = (() => { try { return JSON.parse(f.entrada || '{}') } catch { return {} } })()
     const prox = video ? 'o vídeo' : 'a imagem'
@@ -413,7 +441,7 @@
     d.hidden = false
     d.className = 'ferr img-ferr mc-ferr ' + (pendente ? 'pending' : f.status || 'pending')
     const t = f.titulo || ''
-    const rotuloFixo = /trocar_personagem/.test(t) ? 'troca de personagem' : /redublar_video/.test(t) ? 'redublagem' : /trocar_voz/.test(t) ? 'troca de voz' : /clonar_voz/.test(t) ? 'clonagem de voz' : ''
+    const rotuloFixo = /midia_estudio/.test(t) ? 'pedido do Estúdio' : /trocar_personagem/.test(t) ? 'troca de personagem' : /redublar_video/.test(t) ? 'redublagem' : /trocar_voz/.test(t) ? 'troca de voz' : /clonar_voz/.test(t) ? 'clonagem de voz' : ''
     const trocar = !!rotuloFixo
     const j = acompanharMidia(f, video, rotuloFixo || arg.prompt)
     j.padrao = video ? (trocar || arg.qualidade === 'alta' ? 480 : 90) : 30 // tempo típico, até o servidor informar o dele
@@ -427,7 +455,8 @@
   function atualizarCartao(d, f) {
     d.hidden = INTERNA.test(f.titulo || '') // etapa interna do agente, sem significado para quem usa
     if (d.hidden) return
-    if (/midia_(gerar_(imagem|video)|trocar_personagem|redublar_video|trocar_voz|clonar_voz)/.test(f.titulo || '') && criandoImagem(d, f)) return
+    if (/midia_orcar/.test(f.titulo || '') && cartaoEstudio(d, f)) return
+    if (/midia_(gerar_(imagem|video)|trocar_personagem|redublar_video|trocar_voz|clonar_voz|estudio)/.test(f.titulo || '') && criandoImagem(d, f)) return
     const estado = f.status === 'completed' ? IC.check : f.status === 'failed' ? IC.x : '<span class="rodando"></span>'
     const tipo = f.tipo || 'other'
     let titulo = tituloLimpo(f.titulo)
@@ -1565,6 +1594,14 @@
     if (aj) {
       $('texto').value = `Refaça ${aj.dataset.ajustar === 'video' ? 'o vídeo' : 'a imagem'} com este ajuste: `
       $('texto').focus()
+      return
+    }
+    const es = e.target.closest('[data-estudio]')
+    if (es) {
+      const c = chats.find((x) => x.id === atual)
+      const card = es.closest('.ferr')
+      if (card) { card.dataset.respondido = '1'; card.querySelector('.est-acoes')?.remove() }
+      if (c && !respostas.has(c.id)) enviarMensagem(c, es.dataset.estudio === 'sim' ? 'Pode criar.' : 'Agora não, obrigado.', [])
       return
     }
     const tm = e.target.closest('[data-tentar-midia]')
