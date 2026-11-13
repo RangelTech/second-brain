@@ -79,6 +79,7 @@ function criar({ app, session, net, buscar, registrar = () => {} }) {
         const req = net.request({ url: 'https://ipinfo.io/json', session: tmp, useSessionCookies: false })
         let corpo = ''
         req.on('response', (r) => { r.on('data', (c) => (corpo += c)); r.on('end', () => ok(corpo)) })
+        req.on('login', (auth, cb) => (auth && auth.isProxy && atual ? cb(atual.usuario, atual.senha) : cb()))
         req.on('error', falha)
         setTimeout(() => falha(new Error('sem resposta em 20 s')), 20000)
         req.end()
