@@ -108,7 +108,7 @@ const FERRAMENTAS = [
     schema: obj({
       video: { type: 'string', description: 'Caminho do vídeo de origem (MP4, MOV ou WEBM, até 40 MB).' },
       foto: { type: 'string', description: 'Caminho da foto da pessoa que vai entrar no vídeo (PNG, JPEG ou WEBP, até 6 MB).' },
-      resolucao: { type: 'string', enum: ['480p', '576p', '736p'], description: 'Qualidade: 480p (padrão, mais barato) ou 736p (alta). Mais alta custa mais; confira em midia_orcar.' },
+      resolucao: { type: 'string', enum: ['480p', '768p', '1080p'], description: 'Qualidade: 480p (padrão, mais barato), 768p ou 1080p. Mais alta custa mais; confira em midia_orcar com a mesma qualidade.' },
       sem_sincronia_labial: { type: 'boolean', description: 'true (padrão) quando as pessoas do vídeo não estão cantando nem falando junto com o áudio.' },
       nome: { type: 'string', description: 'Nome curto do arquivo, sem extensão (opcional).' },
     }, ['video', 'foto']),
@@ -385,7 +385,7 @@ async function trocarPersonagem(args) {
   const f = fs.readFileSync(String(foto))
   if (v.length > 40 * 1024 * 1024) throw new Error('O vídeo é grande demais (máximo 40 MB). Corte ou comprima o vídeo antes.')
   if (f.length > 6 * 1024 * 1024) throw new Error('A foto é grande demais (máximo 6 MB).')
-  const corpo = { recipe: 'openjutsu-swap', video: v.toString('base64'), image: f.toString('base64'), resolution: ['480p', '576p', '736p'].includes(resolucao) ? resolucao : '480p', no_lip_sync: args.sem_sincronia_labial !== false }
+  const corpo = { recipe: 'openjutsu-swap', video: v.toString('base64'), image: f.toString('base64'), resolution: ['480p', '768p', '1080p'].includes(resolucao) ? resolucao : '480p', no_lip_sync: args.sem_sincronia_labial !== false }
   return rodarJob({ tipo: 'video', rota: '/videos/generations', corpo, prompt: 'troca de personagem', nome: nome || 'troca-personagem', limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
 }
 

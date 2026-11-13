@@ -268,7 +268,7 @@
   const nomeArq = (p) => String(p || '').split(/[\\/]/).pop()
   // nome de ferramenta -> rótulo de gente; etapas internas do agente não aparecem
   const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
-  const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz|estudio)/.test((f && f.titulo) || '')
+  const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz|estudio|orcar|trocar_personagem)/.test((f && f.titulo) || '')
   const ROTULOS = [
     [/ias_perguntar/, 'Consultando outra IA'], [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_orcar/, 'Calculando o preço'], [/midia_estudio/, 'Criando no Estúdio'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
     [/navegador_|browser|web_?search|search_web/i, 'Pesquisando na web'], [/vision_analyze/, 'Olhando a imagem'],
@@ -374,7 +374,7 @@
   // Estúdio: o agente orçou (midia_orcar) -> cartão com o preço e "Criar" / "Agora não" (a resposta vai como mensagem normal)
   function cartaoEstudio(d, f) {
     if (f.status !== 'completed') return false
-    const t = String(f.conteudo || '')
+    const t = String(f.conteudo || '').replace(/^[\s\S]*?\*\*result:\*\*\s*/, '').trim() // o Hermes embrulha a resposta do MCP ("... result" + "- **result:** texto")
     const m = /^(.*?):\s*(.*?)\.\s*Preço:\s*(R\$\s*[\d.,]+)\s*\(US\$\s*([\d.]+)\),\s*cerca de\s*(\d+)\s*min/.exec(t)
     if (!m) {
       if (/em breve/i.test(t)) {
