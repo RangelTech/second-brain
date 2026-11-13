@@ -17,7 +17,7 @@ function agendamento({ frequencia, horario, dias, expressao }) {
   if (frequencia === 'dias-uteis' && hm) return `${+hm[2]} ${+hm[1]} * * 1-5`
   if (FREQUENCIAS[frequencia]) return FREQUENCIAS[frequencia]
   if (frequencia === 'minutos' && +horario > 0) return `every ${Math.max(5, +horario | 0)}m`
-  throw new Error('Escolha a frequência da rotina.')
+  throw new Error('Escolha quando o workflow roda.')
 }
 
 const NOMES_DIA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
@@ -96,7 +96,7 @@ function criar({ app, obterGateway, home }) {
       const p = String(pedido || '').trim()
       if (!n || !p) throw new Error('Dê um nome e diga o que o agente deve fazer.')
       const r = await chamar({ action: 'add', name: n.slice(0, 80), prompt: p.slice(0, 4000), schedule: agendamento({ frequencia, horario, dias, expressao }) })
-      if (r.success === false) throw new Error(r.error || 'Não consegui criar a rotina.')
+      if (r.success === false) throw new Error(r.error || 'Não consegui criar o workflow.')
       return { ok: true, id: r.job_id }
     },
     saida: (id) => ({ ok: true, saida: ultimaSaida(home(), id) }),

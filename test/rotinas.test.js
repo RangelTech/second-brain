@@ -14,7 +14,7 @@ test('agendamento: diária, dias úteis, semanal, a cada hora e a cada N minutos
   assert.equal(agendamento({ frequencia: 'minutos', horario: '2' }), 'every 5m', 'mínimo de 5 minutos')
   assert.equal(agendamento({ frequencia: 'minutos', horario: '45' }), 'every 45m')
   assert.equal(agendamento({ expressao: ' 0 9 * * 1 ' }), '0 9 * * 1')
-  assert.throws(() => agendamento({ frequencia: 'nada' }), /frequência/)
+  assert.throws(() => agendamento({ frequencia: 'nada' }), /quando o workflow roda/)
 })
 
 test('descrever: expressão vira frase em português', () => {

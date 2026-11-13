@@ -1008,7 +1008,7 @@ app.whenReady().then(() => {
     try {
       for (const n of rotinasMod.novasExecucoes(caminhosHermes.homeAgente(app), rotinasVistas)) {
         janela?.webContents.send('rotinas:rodou', n)
-        try { new (require('electron').Notification)({ title: 'Rotina executada', body: n.nome }).show() } catch {}
+        try { new (require('electron').Notification)({ title: 'Workflow executado', body: n.nome }).show() } catch {}
       }
     } catch {}
   }, 45000).unref?.()

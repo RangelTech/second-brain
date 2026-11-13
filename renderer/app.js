@@ -2235,6 +2235,19 @@
     if (atualMudou) atual ? abrir(atual) : desenhar()
   })
 
-  window.SB = { enviar: (txt) => (($('texto').value = txt), enviar()), anexos: () => anexosPendentes, chats: () => chats }
+  window.SB = {
+    enviar: (txt) => (($('texto').value = txt), enviar()),
+    anexos: () => anexosPendentes,
+    chats: () => chats,
+    // conversa nova com o texto já escrito (sem enviar): o usuário completa e manda. Usado por "Editar no chat" dos Workflows.
+    novaConversa: (txt) => {
+      criarChat()
+      const t = $('texto')
+      t.value = txt || ''
+      t.dispatchEvent(new Event('input'))
+      t.focus()
+      t.setSelectionRange(t.value.length, t.value.length)
+    },
+  }
   iniciar()
 })()
