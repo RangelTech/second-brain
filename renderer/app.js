@@ -538,32 +538,77 @@
   function partesDe(m) {
     return m.partes || [{ t: 'texto', v: m.content }]
   }
-  // Ouvir a resposta (spec 34 §6.5): voz do próprio sistema (Windows, macOS, Linux), em português, sem instalar nada e sem custo
-  let falando = null
+  // Ouvir a resposta (spec 38 E): voz neural (Microsoft, pelo servidor), frase a frase, a próxima já carregando enquanto
+  // a atual toca. Sem conta ou servidor fora do ar: voz do próprio sistema (Windows, macOS, Linux), como antes.
+  let falando = null // { botao, audio, parado }
   function vozPt() {
     const vs = speechSynthesis.getVoices().filter((v) => /^pt(-|_)?BR/i.test(v.lang) || /portugu/i.test(v.name))
     return vs.find((v) => /natural|online|neural/i.test(v.name)) || vs.find((v) => /BR/i.test(v.lang)) || vs[0] || null
   }
-  function ouvir(botao) {
-    const parar = () => { speechSynthesis.cancel(); document.querySelectorAll('.ouvir.on').forEach((b) => b.classList.remove('on')); falando = null }
-    if (falando === botao) return parar()
-    parar()
-    const msg = botao.closest('.msg')
-    const texto = [...msg.querySelectorAll('.partes > .corpo')].map((c) => c.innerText).join('\n').replace(/https?:\/\/\S+/g, 'link').trim()
-    if (!texto) return
-    // frases curtas em sequência: o sintetizador do Chromium corta falas muito longas
-    const partes = texto.match(/[^.!?\n]+[.!?]?/g) || [texto]
+  function pararFala() {
+    if (falando) {
+      falando.parado = true
+      try { falando.audio && falando.audio.pause() } catch {}
+    }
+    try { speechSynthesis.cancel() } catch {}
+    document.querySelectorAll('.ouvir.on').forEach((b) => b.classList.remove('on'))
+    falando = null
+  }
+  // blocos de ~1 a 3 frases: o 1º curto para começar logo, os seguintes maiores para soar contínuo
+  function blocosDeFala(texto) {
+    const frases = texto.match(/[^.!?\n]+[.!?]*/g) || [texto]
+    const out = []
+    let cur = ''
+    for (const f of frases.map((x) => x.trim()).filter(Boolean)) {
+      const lim = out.length === 0 ? 120 : 400
+      if (cur && (cur + ' ' + f).length > lim) { out.push(cur); cur = f } else cur = cur ? cur + ' ' + f : f
+    }
+    if (cur) out.push(cur)
+    return out
+  }
+  function falarSistema(estado, partes) {
     const voz = vozPt()
-    falando = botao
-    botao.classList.add('on')
     partes.forEach((t, i) => {
-      const u = new SpeechSynthesisUtterance(t.trim())
+      const u = new SpeechSynthesisUtterance(t)
       u.lang = 'pt-BR'
       if (voz) u.voice = voz
       u.rate = 1.05
-      if (i === partes.length - 1) u.onend = () => { if (falando === botao) parar() }
+      if (i === partes.length - 1) u.onend = () => { if (falando === estado) pararFala() }
       speechSynthesis.speak(u)
     })
+  }
+  async function ouvir(botao) {
+    if (falando && falando.botao === botao) return pararFala()
+    pararFala()
+    const msg = botao.closest('.msg')
+    const texto = [...msg.querySelectorAll('.partes > .corpo')].map((c) => c.innerText).join('\n').replace(/https?:\/\/\S+/g, 'link').trim()
+    if (!texto) return
+    const blocos = blocosDeFala(texto)
+    const estado = { botao, audio: null, parado: false }
+    falando = estado
+    botao.classList.add('on')
+    const pedir = (t) => (window.sb.vozFalar ? window.sb.vozFalar(t, (window.SB_CFG && window.SB_CFG.voz) || 'feminina').catch(() => ({ ok: false })) : Promise.resolve({ ok: false }))
+    let prox = pedir(blocos[0])
+    for (let i = 0; i < blocos.length; i++) {
+      const r = await prox
+      if (estado.parado) return
+      if (!r || !r.ok) {
+        // servidor de voz indisponível: o resto vai na voz do sistema
+        if (falando === estado) falarSistema(estado, blocos.slice(i))
+        return
+      }
+      if (i + 1 < blocos.length) prox = pedir(blocos[i + 1])
+      const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime || 'audio/mpeg' }))
+      const a = new Audio(url)
+      estado.audio = a
+      await new Promise((ok) => {
+        a.onended = a.onerror = ok
+        a.play().catch(ok)
+      })
+      URL.revokeObjectURL(url)
+      if (estado.parado) return
+    }
+    if (falando === estado) pararFala()
   }
   if (window.speechSynthesis) speechSynthesis.getVoices()
   // "Abrir no editor" em todo vídeo do chat (spec 37): cria um projeto com o vídeo e abre o editor integrado nele

@@ -1053,6 +1053,21 @@ app.whenReady().then(() => {
       return { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
     }
   })
+  // Voz de saída (spec 38 E): texto -> fala neural (vozes da Microsoft) pelo servidor; o renderer pede frase a frase e toca
+  // enquanto a próxima carrega. Falhou => o renderer usa a voz do sistema.
+  ipcMain.handle('voz:falar', async (_e, texto, voz) => {
+    const m = midiaDoApp()
+    if (!m) return { ok: false }
+    try {
+      const r = await fetch(m.base + '/audio/speech', { method: 'POST', headers: { Authorization: 'Bearer ' + m.chave, 'Content-Type': 'application/json' }, body: JSON.stringify({ input: String(texto || '').slice(0, 6000), voice: voz || 'feminina' }), signal: AbortSignal.timeout(60000) })
+      if (!r.ok) return { ok: false, status: r.status }
+      const buf = new Uint8Array(await r.arrayBuffer())
+      return buf.length ? { ok: true, bytes: buf, mime: 'audio/mpeg' } : { ok: false }
+    } catch (e) {
+      registrarAgente(app, 'voz: ' + String((e && e.message) || e).slice(0, 160))
+      return { ok: false }
+    }
+  })
   ipcMain.handle('ditado:whisper-pronto', () => !!pastaWhisper())
   ipcMain.handle('ditado:whisper-aquecer', () => (pastaWhisper() ? whisperChamar({ tipo: 'aquecer' }) : { ok: false }))
   ipcMain.handle('ditado:whisper', async (_e, ab) => {
