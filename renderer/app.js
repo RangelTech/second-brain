@@ -724,6 +724,7 @@
     d.className = 'msg ' + m.role
     if (m.role === 'user') {
       d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
+      for (const a of m.midias || []) d.insertBefore(midia(a), d.querySelector('.hora-msg')) // foto mandada pela pessoa (conversas de exemplo)
     } else {
       d.innerHTML = `${QUEM}<button class="ouvir" data-ouvir title="Ouvir a resposta" aria-label="Ouvir a resposta">${IC.volume}</button></div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
       renderPartes(d.querySelector('.partes'), partesDe(m), true)

@@ -77,6 +77,7 @@
       "autoteste.js",
       "embed-router.js",
       "renderer/**",
+      "exemplos/**",
       "package.json"
     ],
     "win": {
