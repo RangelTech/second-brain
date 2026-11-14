@@ -64,8 +64,11 @@ Ex.: "coloca a voz do Fulano neste reel". Só com autorização da pessoa dona d
 - A semelhança depende da amostra: quanto mais limpa e longa, melhor.
 - Só clone a voz do próprio usuário ou de quem autorizou.
 
-## Limite honesto da clonagem local (diga ao usuário)
-A voz local (XTTS/OpenVoice) fica PARECIDA, não idêntica: bom para conteúdo, paródia, rascunho e teste. Para "ninguém percebe" (comercial, voz do dono da marca), o caminho é voz em nuvem de ponta (tipo ElevenLabs), pelos créditos do Estúdio.
+## Qualidade da voz clonada (OpenVoice é o motor principal)
+O OpenVoice V2 é o caminho para a voz ficar igual à da pessoa, aqui no computador e sem custo. O script já faz o que mais melhora a semelhança:
+- lê a voz da amostra só nos trechos com fala (sem silêncio nem música), em pedaços de 10 s, e faz a média;
+- na troca de timbre (`--modo conversao`), passa duas vezes pelo conversor.
+O que ainda depende de você: amostra LIMPA (sem música, sem eco), 1 a 3 min no total, várias falas da mesma pessoa. Amostra ruim = voz menos parecida. Ouça o resultado antes de entregar; se não convencer, peça mais áudios em vez de mudar de motor.
 
 ## Quando ir para o Estúdio (créditos)
 Dublagem com a boca acompanhando (sincronia labial), voz de altíssima qualidade para comercial, ou computador fraco (menos de 8 GB de RAM livre: o XTTS não carrega). Diga "seu computador não tem potência para isso; posso fazer na nuvem por X créditos". Use `midia_orcar` e mostre o preço antes.
