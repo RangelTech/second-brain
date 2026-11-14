@@ -1,0 +1,27 @@
+/* Tour de boas-vindas (spec 38 A) */
+.sb-tour{position:fixed;inset:0;z-index:9000;pointer-events:auto}
+.sb-tour-furo{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(10,9,8,.72);outline:2px solid var(--ac);outline-offset:2px;transition:all .28s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.sb-tour-balao{position:fixed;width:min(380px,calc(100vw - 24px));background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:14px;padding:16px 18px 14px;box-shadow:0 18px 50px rgba(0,0,0,.45);transition:left .28s cubic-bezier(.2,.8,.2,1),top .28s cubic-bezier(.2,.8,.2,1);outline:none;animation:sbTourIn .25s ease}
+.sb-tour-balao.centro{left:50%!important;top:50%!important;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 24px))}
+@keyframes sbTourIn{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
+.sb-tour-topo{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sb-tour-topo b{font-size:16px;flex:1}
+.sb-tour-ic{font-size:20px}
+.sb-tour-x{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px}
+.sb-tour-x:hover{color:var(--fg);background:var(--card2)}
+.sb-tour-balao p{margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--fg)}
+.sb-tour-balao ul{margin:4px 0 12px;padding:0;list-style:none;display:grid;gap:6px;font-size:14px}
+.sb-tour-balao li{background:var(--card2);border-radius:8px;padding:7px 10px}
+.sb-tour-pe{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sb-tour-pontos{display:flex;gap:4px}
+.sb-tour-pontos i{width:6px;height:6px;border-radius:50%;background:var(--bd)}
+.sb-tour-pontos i.on{background:var(--ac);width:16px;border-radius:3px}
+.sb-tour-bts{display:flex;gap:6px;margin-left:auto}
+.sb-tour-bts button{border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;border:1px solid var(--bd)}
+.sb-tour-sec{background:transparent;color:var(--fg)}
+.sb-tour-sec:hover{background:var(--card2)}
+.sb-tour-pri{background:var(--ac);border-color:var(--ac)!important;color:#fff;font-weight:600}
+.sb-tour-pri:hover{background:var(--ac2)}
+/* conversa de exemplo na lateral */
+.selo-exemplo{font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:rgba(217,119,87,.16);color:var(--ac2);border-radius:4px;padding:1px 5px;margin-left:6px;flex:none}
+@media (max-width:600px){.sb-tour-balao{left:12px!important;right:12px;width:auto}}

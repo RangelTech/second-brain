@@ -1053,6 +1053,21 @@ app.whenReady().then(() => {
       return { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
     }
   })
+  // Voz de saída (spec 38 E): texto -> fala neural (vozes da Microsoft) pelo servidor; o renderer pede frase a frase e toca
+  // enquanto a próxima carrega. Falhou => o renderer usa a voz do sistema.
+  ipcMain.handle('voz:falar', async (_e, texto, voz) => {
+    const m = midiaDoApp()
+    if (!m) return { ok: false }
+    try {
+      const r = await fetch(m.base + '/audio/speech', { method: 'POST', headers: { Authorization: 'Bearer ' + m.chave, 'Content-Type': 'application/json' }, body: JSON.stringify({ input: String(texto || '').slice(0, 6000), voice: voz || 'feminina' }), signal: AbortSignal.timeout(60000) })
+      if (!r.ok) return { ok: false, status: r.status }
+      const buf = new Uint8Array(await r.arrayBuffer())
+      return buf.length ? { ok: true, bytes: buf, mime: 'audio/mpeg' } : { ok: false }
+    } catch (e) {
+      registrarAgente(app, 'voz: ' + String((e && e.message) || e).slice(0, 160))
+      return { ok: false }
+    }
+  })
   ipcMain.handle('ditado:whisper-pronto', () => !!pastaWhisper())
   ipcMain.handle('ditado:whisper-aquecer', () => (pastaWhisper() ? whisperChamar({ tipo: 'aquecer' }) : { ok: false }))
   ipcMain.handle('ditado:whisper', async (_e, ab) => {
@@ -1294,7 +1309,39 @@ app.whenReady().then(() => {
     salvarCfg()
     return publica()
   })
-  ipcMain.handle('chats:get', () => ler('chats.json', []))
+  // Conversas de exemplo (spec 38 A): na 1ª abertura copia exemplos/ do pacote para a pasta de dados e coloca 5 conversas
+  // prontas na lateral (selo "Exemplo"). Uma vez por versão dos exemplos; apagada pela pessoa não volta (chats-apagados).
+  const VERSAO_EXEMPLOS = 1
+  function instalarExemplos() {
+    if ((cfg.exemplosV || 0) >= VERSAO_EXEMPLOS) return
+    try {
+      const origem = path.join(__dirname, 'exemplos')
+      const destino = path.join(app.getPath('userData'), 'exemplos')
+      fs.mkdirSync(destino, { recursive: true })
+      for (const f of fs.readdirSync(origem)) if (f !== 'conversas.json') fs.writeFileSync(path.join(destino, f), fs.readFileSync(path.join(origem, f)))
+      const conversas = JSON.parse(fs.readFileSync(path.join(origem, 'conversas.json'), 'utf8'))
+      const mortos = new Set(ler('chats-apagados.json', []))
+      const atuais = ler('chats.json', [])
+      const ids = new Set(atuais.map((c) => c.id))
+      const agora = Date.now()
+      const novos = conversas.filter((c) => !mortos.has(c.id) && !ids.has(c.id)).map((c, i) => {
+        const em = agora - (i + 1) * 60000
+        return {
+          ...c,
+          exemplo: true,
+          em,
+          mod: em,
+          msgs: c.msgs.map((m) => ({ ...m, em, midias: m.midias ? m.midias.map((x) => x.replace('{EXEMPLOS}', destino.split(path.sep).join('/'))) : undefined })),
+        }
+      })
+      if (novos.length) gravar('chats.json', [...atuais, ...novos])
+      cfg.exemplosV = VERSAO_EXEMPLOS
+      salvarCfg()
+    } catch (e) {
+      registrarAgente(app, 'exemplos: ' + String((e && e.message) || e).slice(0, 160))
+    }
+  }
+  ipcMain.handle('chats:get', () => (instalarExemplos(), ler('chats.json', [])))
   // Várias pessoas (ou o app e a web) usam as mesmas conversas: junta por conversa (vence a alteração mais recente)
   // e guarda as apagadas para não ressuscitarem; as outras telas recebem só o que mudou (chats:mudou).
   ipcMain.handle('chats:set', (_e, recebidas, apagados) => {

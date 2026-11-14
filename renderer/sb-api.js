@@ -120,6 +120,7 @@
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),
       ditadoServidor: (dados, mime) => invoke('ditado:servidor', dados, mime),
+      vozFalar: (texto, voz) => invoke('voz:falar', texto, voz),
       ditadoWhisperPronto: () => invoke('ditado:whisper-pronto'),
       ditadoWhisperAquecer: () => invoke('ditado:whisper-aquecer'),
       ditadoWhisper: (pcm) => invoke('ditado:whisper', pcm),

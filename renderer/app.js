@@ -210,7 +210,7 @@
       b.className = 'chat' + (c.id === atual ? ' ativo' : '') + (c.fixado ? ' fixado' : '')
       b.tabIndex = 0
       b.setAttribute('role', 'button')
-      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
+      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span>${c.exemplo ? '<span class="selo-exemplo">Exemplo</span>' : ''}<span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
       b.onclick = async (e) => {
         if (e.target.closest('.fixar')) {
           c.fixado = !c.fixado
@@ -538,32 +538,77 @@
   function partesDe(m) {
     return m.partes || [{ t: 'texto', v: m.content }]
   }
-  // Ouvir a resposta (spec 34 §6.5): voz do próprio sistema (Windows, macOS, Linux), em português, sem instalar nada e sem custo
-  let falando = null
+  // Ouvir a resposta (spec 38 E): voz neural (Microsoft, pelo servidor), frase a frase, a próxima já carregando enquanto
+  // a atual toca. Sem conta ou servidor fora do ar: voz do próprio sistema (Windows, macOS, Linux), como antes.
+  let falando = null // { botao, audio, parado }
   function vozPt() {
     const vs = speechSynthesis.getVoices().filter((v) => /^pt(-|_)?BR/i.test(v.lang) || /portugu/i.test(v.name))
     return vs.find((v) => /natural|online|neural/i.test(v.name)) || vs.find((v) => /BR/i.test(v.lang)) || vs[0] || null
   }
-  function ouvir(botao) {
-    const parar = () => { speechSynthesis.cancel(); document.querySelectorAll('.ouvir.on').forEach((b) => b.classList.remove('on')); falando = null }
-    if (falando === botao) return parar()
-    parar()
-    const msg = botao.closest('.msg')
-    const texto = [...msg.querySelectorAll('.partes > .corpo')].map((c) => c.innerText).join('\n').replace(/https?:\/\/\S+/g, 'link').trim()
-    if (!texto) return
-    // frases curtas em sequência: o sintetizador do Chromium corta falas muito longas
-    const partes = texto.match(/[^.!?\n]+[.!?]?/g) || [texto]
+  function pararFala() {
+    if (falando) {
+      falando.parado = true
+      try { falando.audio && falando.audio.pause() } catch {}
+    }
+    try { speechSynthesis.cancel() } catch {}
+    document.querySelectorAll('.ouvir.on').forEach((b) => b.classList.remove('on'))
+    falando = null
+  }
+  // blocos de ~1 a 3 frases: o 1º curto para começar logo, os seguintes maiores para soar contínuo
+  function blocosDeFala(texto) {
+    const frases = texto.match(/[^.!?\n]+[.!?]*/g) || [texto]
+    const out = []
+    let cur = ''
+    for (const f of frases.map((x) => x.trim()).filter(Boolean)) {
+      const lim = out.length === 0 ? 120 : 400
+      if (cur && (cur + ' ' + f).length > lim) { out.push(cur); cur = f } else cur = cur ? cur + ' ' + f : f
+    }
+    if (cur) out.push(cur)
+    return out
+  }
+  function falarSistema(estado, partes) {
     const voz = vozPt()
-    falando = botao
-    botao.classList.add('on')
     partes.forEach((t, i) => {
-      const u = new SpeechSynthesisUtterance(t.trim())
+      const u = new SpeechSynthesisUtterance(t)
       u.lang = 'pt-BR'
       if (voz) u.voice = voz
       u.rate = 1.05
-      if (i === partes.length - 1) u.onend = () => { if (falando === botao) parar() }
+      if (i === partes.length - 1) u.onend = () => { if (falando === estado) pararFala() }
       speechSynthesis.speak(u)
     })
+  }
+  async function ouvir(botao) {
+    if (falando && falando.botao === botao) return pararFala()
+    pararFala()
+    const msg = botao.closest('.msg')
+    const texto = [...msg.querySelectorAll('.partes > .corpo')].map((c) => c.innerText).join('\n').replace(/https?:\/\/\S+/g, 'link').trim()
+    if (!texto) return
+    const blocos = blocosDeFala(texto)
+    const estado = { botao, audio: null, parado: false }
+    falando = estado
+    botao.classList.add('on')
+    const pedir = (t) => (window.sb.vozFalar ? window.sb.vozFalar(t, (window.SB_CFG && window.SB_CFG.voz) || 'feminina').catch(() => ({ ok: false })) : Promise.resolve({ ok: false }))
+    let prox = pedir(blocos[0])
+    for (let i = 0; i < blocos.length; i++) {
+      const r = await prox
+      if (estado.parado) return
+      if (!r || !r.ok) {
+        // servidor de voz indisponível: o resto vai na voz do sistema
+        if (falando === estado) falarSistema(estado, blocos.slice(i))
+        return
+      }
+      if (i + 1 < blocos.length) prox = pedir(blocos[i + 1])
+      const url = URL.createObjectURL(new Blob([r.bytes], { type: r.mime || 'audio/mpeg' }))
+      const a = new Audio(url)
+      estado.audio = a
+      await new Promise((ok) => {
+        a.onended = a.onerror = ok
+        a.play().catch(ok)
+      })
+      URL.revokeObjectURL(url)
+      if (estado.parado) return
+    }
+    if (falando === estado) pararFala()
   }
   if (window.speechSynthesis) speechSynthesis.getVoices()
   // "Abrir no editor" em todo vídeo do chat (spec 37): cria um projeto com o vídeo e abre o editor integrado nele
@@ -679,6 +724,7 @@
     d.className = 'msg ' + m.role
     if (m.role === 'user') {
       d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
+      for (const a of m.midias || []) d.insertBefore(midia(a), d.querySelector('.hora-msg')) // foto mandada pela pessoa (conversas de exemplo)
     } else {
       d.innerHTML = `${QUEM}<button class="ouvir" data-ouvir title="Ouvir a resposta" aria-label="Ouvir a resposta">${IC.volume}</button></div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
       renderPartes(d.querySelector('.partes'), partesDe(m), true)
@@ -911,68 +957,125 @@
       aviso('Não consegui acessar o microfone: ' + (e.message || e))
     }
   }
-  // Ditado: clica no microfone, fala, clica de novo. O áudio inteiro vai ao servidor de transcrição (Whisper) e o texto cai na caixa
-  // de mensagem. Igual no app (Windows, Mac, Linux) e na web. Sem tempo real: o texto aparece quando a gravação termina.
-  let gravandoVoz = null // { rec, fluxo, ctx, raf, limite }
+  // Ditado por frases (spec 38 D): clica no microfone e fala. A cada pausa curta, a frase já falada vai ao servidor de
+  // transcrição (Whisper) e o texto entra na caixa enquanto a pessoa continua falando. Ao clicar de novo, só falta a última
+  // frase. Cada frase é uma gravação completa (MediaRecorder novo no mesmo microfone), então o servidor não muda.
+  // Igual no app (Windows, Mac, Linux) e na web.
+  let gravandoVoz = null // { fluxo, ctx, mime, raf, limite, rec, frase, encerrando }
   let transcrevendo = false
-  let ultimoAudio = null // { bytes, mime, em, falhou }: guardado para tentar de novo se a transcrição falhar
+  let ultimoAudio = null // { trechos:[{bytes,mime}], em }: frases que falharam, para tentar de novo
+  const filaDit = { prox: 0, entregue: 0, prontos: new Map(), pendentes: 0, falhas: [] }
   const barras = () => [...document.querySelectorAll('#ditado-barras i')]
   function pintarMic(estado) {
     const b = $('microfone')
     b.classList.toggle('gravando', estado === 'ouvindo')
     b.classList.toggle('preparando', estado === 'transcrevendo')
     $('ditado-barras').hidden = estado !== 'ouvindo'
-    b.title = b.ariaLabel = estado === 'ouvindo' ? 'Parar e transcrever' : estado === 'transcrevendo' ? 'Transcrevendo…' : 'Ditar por voz'
+    b.title = b.ariaLabel = estado === 'ouvindo' ? 'Parar' : estado === 'transcrevendo' ? 'Terminando de transcrever…' : 'Ditar por voz'
     if (estado !== 'ouvindo') barras().forEach((i) => (i.style.height = ''))
   }
-  async function transcreverAudio(audio) {
-    transcrevendo = true
-    pintarMic('transcrevendo')
-    aviso('Transcrevendo o áudio…', true)
-    let r
-    try {
-      r = await window.sb.ditadoServidor(audio.bytes, audio.mime)
-    } catch {
-      r = { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
+  function colocarTexto(txt) {
+    if (!txt) return
+    const t = $('texto')
+    t.value = [t.value.trim(), txt].filter(Boolean).join(' ')
+    t.dispatchEvent(new Event('input'))
+    t.scrollTop = t.scrollHeight
+  }
+  // entrega na ordem em que foi falado, mesmo que uma frase curta volte antes da anterior
+  function entregarEmOrdem() {
+    while (filaDit.prontos.has(filaDit.entregue)) {
+      colocarTexto(filaDit.prontos.get(filaDit.entregue))
+      filaDit.prontos.delete(filaDit.entregue)
+      filaDit.entregue++
     }
+  }
+  async function transcreverTrecho(trecho, n) {
+    filaDit.pendentes++
+    let r
+    for (let tent = 0; tent < 2; tent++) {
+      try {
+        r = await window.sb.ditadoServidor(trecho.bytes, trecho.mime)
+      } catch {
+        r = { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
+      }
+      if (r && r.ok) break
+    }
+    filaDit.pendentes--
+    if (r && r.ok) filaDit.prontos.set(n, r.texto || '')
+    else {
+      filaDit.prontos.set(n, '')
+      filaDit.falhas.push({ ...trecho, erro: r && r.erro })
+    }
+    entregarEmOrdem()
+    terminarSePronto()
+  }
+  function terminarSePronto() {
+    if (gravandoVoz || filaDit.pendentes || !transcrevendo) return
     transcrevendo = false
     pintarMic(null)
-    const t = $('texto')
-    if (r && r.ok && r.texto) {
-      ultimoAudio = null
-      t.value = [t.value.trim(), r.texto].filter(Boolean).join(' ')
-      t.dispatchEvent(new Event('input'))
-      t.scrollTop = t.scrollHeight
-      aviso('')
-      t.focus()
-    } else if (r && r.ok) {
-      ultimoAudio = null
-      aviso('Não entendi nenhuma fala nesse áudio. Tente de novo, mais perto do microfone.')
-    } else if (audio.falhou) {
-      ultimoAudio = null // já tentou de novo: a próxima gravação é nova
-      aviso((r && r.erro) || 'Não consegui transcrever agora. Grave de novo em instantes.')
-    } else {
-      ultimoAudio = { ...audio, falhou: true }
-      aviso(((r && r.erro) || 'Não consegui transcrever agora.') + ' Clique no microfone para tentar de novo com a mesma gravação.')
+    if (filaDit.falhas.length) {
+      const erro = filaDit.falhas[0].erro
+      ultimoAudio = { trechos: filaDit.falhas.map(({ bytes, mime }) => ({ bytes, mime })), em: Date.now() }
+      filaDit.falhas = []
+      aviso((erro || 'Parte da fala não foi transcrita.') + ' Clique no microfone para tentar de novo essa parte.')
+    } else if (!$('texto').value.trim()) aviso('Não entendi nenhuma fala. Tente de novo, mais perto do microfone.')
+    else aviso('')
+    $('texto').focus()
+  }
+  function tentarDeNovo(a) {
+    ultimoAudio = null
+    transcrevendo = true
+    pintarMic('transcrevendo')
+    aviso('Transcrevendo de novo…', true)
+    for (const tr of a.trechos) transcreverTrecho(tr, filaDit.prox++)
+  }
+  // começa uma frase nova no mesmo microfone; o onstop da frase manda o áudio dela ao servidor
+  function novaFrase(g) {
+    const rec = new MediaRecorder(g.fluxo, g.mime ? { mimeType: g.mime, audioBitsPerSecond: 32000 } : {})
+    const partes = []
+    const frase = { rec, falou: 0, ini: performance.now() }
+    rec.ondataavailable = (e) => e.data && e.data.size && partes.push(e.data)
+    rec.onstop = async () => {
+      const blob = new Blob(partes, { type: rec.mimeType || g.mime || 'audio/webm' })
+      // sem medidor de volume (navegador sem AudioContext) a frase conta como falada
+      if ((frase.falou >= 250 || !g.ctx) && blob.size >= 1500) {
+        const n = filaDit.prox++
+        transcreverTrecho({ bytes: new Uint8Array(await blob.arrayBuffer()), mime: blob.type }, n)
+      }
+      if (g.encerrando && g.rec === rec) {
+        try { g.fluxo.getTracks().forEach((t) => t.stop()) } catch {}
+        try { g.ctx && g.ctx.close() } catch {}
+        terminarSePronto()
+      }
     }
+    rec.start(500)
+    g.rec = rec
+    g.frase = frase
+  }
+  function cortarFrase(g) {
+    const velho = g.rec
+    novaFrase(g)
+    try { velho.stop() } catch {}
   }
   function pararGravacao() {
     const g = gravandoVoz
     if (!g) return
     gravandoVoz = null
+    g.encerrando = true
     clearTimeout(g.limite)
     cancelAnimationFrame(g.raf)
-    pintarMic('transcrevendo') // o "parar" do gravador entrega o áudio logo em seguida
+    transcrevendo = true
+    pintarMic('transcrevendo')
     try {
       g.rec.stop()
     } catch {
-      pintarMic(null)
+      terminarSePronto()
     }
   }
   async function alternarGravacao() {
     if (transcrevendo) return
     if (gravandoVoz) return pararGravacao()
-    if (ultimoAudio && Date.now() - ultimoAudio.em < 5 * 60 * 1000) return transcreverAudio(ultimoAudio) // tentar de novo
+    if (ultimoAudio && Date.now() - ultimoAudio.em < 5 * 60 * 1000) return tentarDeNovo(ultimoAudio)
     ultimoAudio = null
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return aviso('Este navegador não permite gravar áudio aqui. Use o Chrome ou o app instalado.')
     let fluxo
@@ -982,26 +1085,11 @@
       return aviso(e && e.name === 'NotAllowedError' ? 'Permita o uso do microfone para ditar.' : 'Não consegui acessar o microfone.')
     }
     const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find((m) => window.MediaRecorder.isTypeSupported(m)) || ''
-    const rec = new MediaRecorder(fluxo, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : {})
-    const partes = []
-    rec.ondataavailable = (e) => e.data && e.data.size && partes.push(e.data)
     const AC = window.AudioContext || window.webkitAudioContext
     const ctx = AC ? new AC() : null
-    const g = { rec, fluxo, ctx, raf: 0, limite: 0 }
-    rec.onstop = async () => {
-      try {
-        fluxo.getTracks().forEach((t) => t.stop())
-      } catch {}
-      try {
-        ctx && ctx.close()
-      } catch {}
-      const blob = new Blob(partes, { type: rec.mimeType || mime || 'audio/webm' })
-      if (blob.size < 1500) {
-        pintarMic(null)
-        return aviso('Não ouvi nada. Tente de novo, mais perto do microfone.')
-      }
-      await transcreverAudio({ bytes: new Uint8Array(await blob.arrayBuffer()), mime: blob.type, em: Date.now() })
-    }
+    const g = { fluxo, ctx, mime, raf: 0, limite: 0, encerrando: false }
+    aviso('')
+    novaFrase(g)
     if (ctx) {
       try {
         const an = ctx.createAnalyser()
@@ -1009,6 +1097,9 @@
         ctx.createMediaStreamSource(fluxo).connect(an)
         const amostra = new Uint8Array(an.fftSize)
         const f = [0.55, 0.8, 1, 0.8, 0.55]
+        let antes = performance.now()
+        let quieto = 0
+        let piso = 0.01
         const medir = () => {
           an.getByteTimeDomainData(amostra)
           let soma = 0
@@ -1016,14 +1107,28 @@
             const v = (amostra[i] - 128) / 128
             soma += v * v
           }
-          const n = Math.min(1, Math.sqrt(soma / amostra.length) * 4)
+          const rms = Math.sqrt(soma / amostra.length)
+          const agora = performance.now()
+          const dt = agora - antes
+          antes = agora
+          // piso de ruído adaptativo: fala = bem acima do ruído do ambiente
+          piso = rms < piso ? rms * 0.2 + piso * 0.8 : piso * 0.999 + rms * 0.001
+          const fala = rms > Math.max(0.012, piso * 2.5)
+          const fr = g.frase
+          if (fala) {
+            fr.falou += dt
+            quieto = 0
+          } else quieto += dt
+          const dur = agora - fr.ini
+          // frase pronta: falou algo e fez pausa de 0,7 s; ou passou de 25 s (corta na próxima pausa curta)
+          if (!g.encerrando && fr.falou >= 400 && ((quieto >= 700 && dur >= 1500) || (dur >= 25000 && quieto >= 150))) cortarFrase(g)
+          const n = Math.min(1, rms * 4)
           barras().forEach((i, k) => (i.style.height = 4 + Math.round(n * f[k] * 16) + 'px'))
           g.raf = requestAnimationFrame(medir)
         }
         medir()
       } catch {}
     }
-    rec.start(1000)
     gravandoVoz = g
     g.limite = setTimeout(pararGravacao, 15 * 60 * 1000) // trava de segurança: 15 minutos por gravação
     pintarMic('ouvindo')
@@ -2259,6 +2364,7 @@
     $('cortina').onclick = () => recolher(true)
     $('abrir-config').onclick = () => window.SBConfig.abrir()
     $('bv-ir').onclick = () => window.SBConfig.abrir('prov')
+    setTimeout(() => window.SBTour && window.SBTour.talvezAbrir(), 3000) // tour de boas-vindas (spec 38 A): 1x por versão do tour
     window.SBConfig.aoFechar = async () => {
       cfg = await window.sb.cfg()
       preencherAlvo()
