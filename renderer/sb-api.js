@@ -70,6 +70,8 @@
         criar: (d) => invoke('rotinas:criar', d),
         acao: (id, a) => invoke('rotinas:acao', id, a),
         saida: (id) => invoke('rotinas:saida', id),
+        editar: (id, d) => invoke('rotinas:editar', id, d),
+        rodar: (id) => invoke('rotinas:rodar', id),
         aoRodar: (fn) => on('rotinas:rodou', fn),
       },
       skills: {

@@ -24,7 +24,9 @@ const NOMES_DIA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 
 // frase em português para a tela, a partir da expressão do Hermes
 function descrever(sched) {
   const s = String(sched || '').trim()
-  let m = /^every (\d+)m$/.exec(s)
+  let m = /^once (?:at|in) (\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s)
+  if (m) return `Uma vez, ${m[3]}/${m[2]} às ${m[4]}:${m[5]}`
+  m = /^every (\d+)m$/.exec(s)
   if (m) { const n = +m[1]; return n % 1440 === 0 ? (n === 1440 ? 'Todo dia' : `A cada ${n / 1440} dias`) : n % 60 === 0 ? (n === 60 ? 'Toda hora' : `A cada ${n / 60} horas`) : `A cada ${n} minutos` }
   m = /^every (\d+)([hd])$/.exec(s)
   if (m) return m[2] === 'h' ? (+m[1] === 1 ? 'Toda hora' : `A cada ${m[1]} horas`) : +m[1] === 1 ? 'Todo dia' : +m[1] === 7 ? 'Toda semana' : `A cada ${m[1]} dias`
@@ -101,6 +103,21 @@ function criar({ app, obterGateway, home }) {
       return { ok: true, id: r.job_id }
     },
     saida: (id) => ({ ok: true, saida: ultimaSaida(home(), id) }),
+    // editar direto (nome, o que faz, quando) e rodar agora: a ponte chama a ferramenta de cron do Hermes (o gateway não expõe)
+    async editar(id, { nome, pedido, frequencia, horario, dias, expressao } = {}) {
+      const params = { action: 'update', name: String(id) }
+      if (nome && String(nome).trim()) params.name_novo = String(nome).trim().slice(0, 80)
+      if (pedido && String(pedido).trim()) params.prompt = String(pedido).trim().slice(0, 4000)
+      if (frequencia || expressao) params.schedule = agendamento({ frequencia, horario, dias, expressao })
+      const r = await gw().rpc('local.cron', params, 30000)
+      if (r && r.success === false) throw new Error(r.error || 'Não consegui salvar.')
+      return { ok: true }
+    },
+    async rodar(id) {
+      const r = await gw().rpc('local.cron', { action: 'run', name: String(id) }, 15000)
+      if (r && r.success === false) throw new Error(r.error || 'Não consegui rodar agora.')
+      return { ok: true }
+    },
     async acao(id, acao) {
       if (!['pause', 'resume', 'remove'].includes(acao)) throw new Error('Ação desconhecida.')
       const r = await chamar({ action: acao, name: String(id) })

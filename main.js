@@ -1208,6 +1208,8 @@ app.whenReady().then(() => {
   ipcMain.handle('rotinas:criar', seguro((d) => rotinas.criar(d || {})))
   ipcMain.handle('rotinas:acao', seguro((id, a) => rotinas.acao(id, a)))
   ipcMain.handle('rotinas:saida', seguro((id) => rotinas.saida(id)))
+  ipcMain.handle('rotinas:editar', seguro((id, d) => rotinas.editar(id, d || {})))
+  ipcMain.handle('rotinas:rodar', seguro((id) => rotinas.rodar(id)))
   const rotinasVistas = new Map()
   rotinasMod.novasExecucoes(caminhosHermes.homeAgente(app), rotinasVistas)
   setInterval(() => {
