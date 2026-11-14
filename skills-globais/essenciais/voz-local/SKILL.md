@@ -30,6 +30,11 @@ Script: `scripts/voz_local.py` desta skill. Pacotes e modelos vêm dos snapshots
 4. **Rápido:** a primeira fala sobe um servidor local com o modelo na memória (de 20 s a 1 min); as seguintes só geram, sem recarregar modelo nem amostra. Então gere várias falas em sequência com a MESMA amostra. Ele fecha sozinho depois de 20 min parado (`voz_local.py parar` fecha na hora).
 5. **Entregar:** a saída é uma linha JSON (`arquivo`, `segundos`, `tempo_s`). Entregue o caminho completo numa linha própria (o app toca o áudio no chat). MP3: `ffmpeg -i fala.wav -b:a 160k fala.mp3`.
 
+## Trocar a voz de um áudio ou vídeo (mesmas palavras, outro timbre)
+`python "<pasta da skill>/scripts/voz_local.py" trocar --entrada arquivo.mp4 --amostra amostra.wav --saida Videos/trocado.mp4`
+Vídeo na entrada e `.mp4` na saída: devolve o vídeo com o áudio trocado. Saída `.wav`: só o áudio. Mantém ritmo e entonação, muda só o timbre (OpenVoice, rápido).
+Reel narrado com animação, dublagem com texto novo e montagem completa: skill `reel-narrado`.
+
 ## Redublar um vídeo com a voz de alguém (sem créditos)
 Ex.: "coloca a voz do Fulano neste reel". Só com autorização da pessoa dona da voz (peça confirmação se não estiver claro).
 1. **Vídeo:** link do Instagram/TikTok/YouTube: `python -m pip install yt-dlp` (uma vez) e `yt-dlp -o "Videos/original.%(ext)s" "<link>"`. Se pedir login, use o navegador integrado logado e baixe por lá.

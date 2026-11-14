@@ -71,7 +71,20 @@ function proximaPintura(wc, ms = 2000) {
   })
 }
 async function quadro(wc, o, ms) {
+  // primeiro quadro da página: o navegador ainda está montando a 1ª pintura (saía vazio). Desenha uma vez e descarta.
+  if (!wc.__sbAquecido) {
+    wc.__sbAquecido = true
+    await quadro(wc, o, ms)
+  }
   await wc.executeJavaScript(`window.__sbSeek(${ms})`)
+  // espera o navegador DESENHAR o quadro novo (2 ciclos de desenho): sem isso a pintura seguinte às vezes ainda era a anterior
+  // e o quadro saía vazio ou atrasado (achado em 13/11/2026 no reel narrado: quadros pretos na prévia)
+  // (na janela invisível o requestAnimationFrame pode não disparar: limite de 120 ms)
+  await wc.executeJavaScript('new Promise((r) => { setTimeout(() => r(false), 120); requestAnimationFrame(() => requestAnimationFrame(() => r(true))) })')
+  // a 1ª pintura depois da mudança pode ser a que já estava a caminho (conteúdo anterior): descarta e usa a seguinte
+  const primeira = proximaPintura(wc, 500)
+  wc.invalidate()
+  await primeira
   const espera = proximaPintura(wc)
   wc.invalidate()
   let img = (await espera) || (await wc.capturePage())

@@ -388,10 +388,24 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt"):
     return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "openvoice"}
 
 
+def trocar_timbre(entrada, amostra, saida):
+    """Troca o timbre de uma fala que já existe (OpenVoice): mesmas palavras, ritmo e entonação, com a voz da amostra."""
+    t0 = time.time()
+    conv = _conversor()
+    chave = ("openvoice", _sha(amostra))
+    if chave not in _CACHE:
+        _CACHE[chave] = conv.extract_se([str(Path(amostra).resolve())])
+    origem = conv.extract_se([str(entrada)])
+    saida = Path(saida).resolve()
+    saida.parent.mkdir(parents=True, exist_ok=True)
+    conv.convert(audio_src_path=str(entrada), src_se=origem, tgt_se=_CACHE[chave], output_path=str(saida), message="")
+    return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "openvoice-troca"}
+
+
 # ------------------------------- servidor residente (modelo fica na memória) -------------------------------
 def servir():
     import threading
-    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     trava = threading.Lock()
     ultimo = [time.time()]
 
@@ -415,13 +429,16 @@ def servir():
                 a = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
                 with trava:
                     ultimo[0] = time.time()
-                    r = gerar(a["texto"], a.get("amostra"), a["saida"], a.get("motor") or "openvoice", a.get("idioma") or "pt")
+                    if a.get("acao") == "trocar":
+                        r = trocar_timbre(a["entrada"], a["amostra"], a["saida"])
+                    else:
+                        r = gerar(a["texto"], a.get("amostra"), a["saida"], a.get("motor") or "openvoice", a.get("idioma") or "pt")
                     ultimo[0] = time.time()
                 self._resp(r)
             except Exception as e:  # noqa: BLE001
                 self._resp({"ok": False, "erro": f"{type(e).__name__}: {e}"}, 500)
 
-    srv = HTTPServer(("127.0.0.1", 0), H)
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)  # responde "estou vivo" mesmo gerando (a geração tem trava própria)
 
     def vigia():
         while True:
@@ -491,6 +508,58 @@ def falar(texto, amostra, saida, motor="openvoice", idioma="pt", sem_servidor=Fa
     sys.exit(0 if r.get("ok") else 1)
 
 
+def _ffmpeg():
+    exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    cands = [shutil.which("ffmpeg")]
+    for b in (os.environ.get("APPDATA", ""), str(Path.home() / ".config"), str(Path.home() / "Library" / "Application Support")):
+        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro"):
+            cands += sorted(glob.glob(os.path.join(b, nome, "hermes*", "tools", "ffmpeg-*", "bin", exe)), reverse=True)
+    c = next((c for c in cands if c and os.path.isfile(c)), None)
+    if not c:
+        sys.exit(json.dumps({"ok": False, "erro": "não achei o ffmpeg (vem com o Segundo Cérebro)"}, ensure_ascii=False))
+    return c
+
+
+EH_VIDEO = (".mp4", ".mov", ".mkv", ".webm", ".m4v")
+
+
+def trocar(entrada, amostra, saida):
+    """Áudio ou vídeo com fala -> mesma fala com a voz da amostra. Vídeo na entrada e .mp4 na saída: devolve o vídeo com o áudio trocado."""
+    for arq, nome in ((entrada, "entrada"), (amostra, "amostra")):
+        if not arq or not os.path.isfile(arq):
+            sys.exit(json.dumps({"ok": False, "erro": f"{nome} não encontrada: {arq}"}, ensure_ascii=False))
+    if not PY.exists():
+        sys.exit(json.dumps({"ok": False, "erro": "voz local não preparada: rode 'voz_local.py instalar' (uma vez)"}, ensure_ascii=False))
+    t0 = time.time()
+    ff = _ffmpeg()
+    tmp = RAIZ / "tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    marca = hashlib.sha256((str(Path(entrada).resolve()) + str(time.time())).encode()).hexdigest()[:10]
+    wav_in = tmp / f"trocar-{marca}.wav"
+    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(entrada), "-vn", "-ac", "1", "-ar", "22050", str(wav_in)], check=True)
+    quer_video = str(saida).lower().endswith(EH_VIDEO) and str(entrada).lower().endswith(EH_VIDEO)
+    wav_out = tmp / f"trocar-{marca}-voz.wav" if quer_video else Path(saida).resolve()
+    info = _servidor_vivo() or _subir_servidor()
+    if not info:
+        sys.exit(json.dumps({"ok": False, "erro": "o servidor da voz não subiu (veja servidor.log)"}, ensure_ascii=False))
+    pedido = {"acao": "trocar", "entrada": str(wav_in), "amostra": str(Path(amostra).resolve()), "saida": str(wav_out)}
+    req = urllib.request.Request(f"http://127.0.0.1:{info['porta']}/", data=json.dumps(pedido).encode("utf-8"), headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=3600) as r:
+            res = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        print(e.read().decode("utf-8"))
+        sys.exit(1)
+    if quer_video and res.get("ok"):
+        Path(saida).resolve().parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(entrada), "-i", str(wav_out), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(Path(saida).resolve())], check=True)
+        res["arquivo"] = str(Path(saida).resolve())
+        wav_out.unlink(missing_ok=True)
+    wav_in.unlink(missing_ok=True)
+    res["tempo_s"] = round(time.time() - t0, 1)
+    print(json.dumps(res, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -507,8 +576,14 @@ if __name__ == "__main__":
     f.add_argument("--amostra")
     f.add_argument("--saida", required=True)
     f.add_argument("--sem-servidor", action="store_true")
+    tr = sub.add_parser("trocar", help="troca a voz de um áudio ou vídeo pela voz da amostra (mesmas palavras e ritmo)")
+    tr.add_argument("--entrada", required=True)
+    tr.add_argument("--amostra", required=True)
+    tr.add_argument("--saida", required=True)
     a = ap.parse_args()
-    if a.cmd == "instalar":
+    if a.cmd == "trocar":
+        trocar(a.entrada, a.amostra, a.saida)
+    elif a.cmd == "instalar":
         instalar(a.motor)
     elif a.cmd == "estado":
         estado()
