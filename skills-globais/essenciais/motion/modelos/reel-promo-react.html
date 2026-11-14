@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#0d0b0a;font-family:"Segoe UI",system-ui,sans-serif;color:#f5efe8}
+  #raiz{position:absolute;inset:0}
+  .fundo{position:absolute;inset:-200px;background:radial-gradient(900px 900px at var(--x) var(--y),rgba(217,119,87,.55),transparent 60%),radial-gradient(800px 800px at 80% 85%,rgba(120,70,200,.35),transparent 60%),#0d0b0a}
+  .grade{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:90px 90px;mask-image:radial-gradient(circle at 50% 45%,#000 30%,transparent 75%)}
+  .selo{position:absolute;top:260px;left:50%;transform:translateX(-50%);padding:14px 30px;border-radius:999px;border:2px solid rgba(217,119,87,.7);font-size:34px;letter-spacing:.18em;text-transform:uppercase;color:#f0a988;background:rgba(217,119,87,.08);white-space:nowrap}
+  .titulo{position:absolute;top:520px;left:80px;right:80px;font-size:128px;font-weight:800;line-height:1.02;letter-spacing:-.02em}
+  .titulo span{display:inline-block}
+  .destaque{color:#d97757}
+  .barra{position:absolute;left:80px;height:12px;border-radius:6px;background:linear-gradient(90deg,#d97757,#f2c14e);top:1040px}
+  .num{position:absolute;top:1120px;left:80px;font-size:220px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff}
+  .num small{font-size:60px;font-weight:600;color:#cfc4ba;margin-left:16px}
+  .sub{position:absolute;top:1390px;left:80px;right:80px;font-size:52px;line-height:1.3;color:#d9cfc6}
+  .cta{position:absolute;bottom:230px;left:50%;padding:34px 70px;border-radius:28px;background:#d97757;color:#1a0f0a;font-size:54px;font-weight:800;box-shadow:0 30px 80px rgba(217,119,87,.45);white-space:nowrap}
+  .p{position:absolute;width:10px;height:10px;border-radius:50%;background:#f2c14e}
+</style></head><body><div id="raiz"></div>
+<script>
+const { prog, spring, ease, mix, noise, stagger } = SB
+const PALAVRAS = ['Seu', 'conteúdo', 'no', 'piloto', 'automático']
+const P = Array.from({ length: 36 }, (_, i) => ({ x: (i * 137) % 1080, y: (i * 251) % 1920, v: 40 + (i % 7) * 18, r: 4 + (i % 5) * 3 }))
+function Cena({ t }) {
+  const cx = 30 + 40 * prog(t, 0, 6, 'inOut'), cy = 20 + 25 * Math.sin(t * 0.8)
+  const selo = spring(t, 0.2)
+  const barra = prog(t, 1.6, 0.9, 'outExpo')
+  const n = Math.round(mix(0, 327, prog(t, 2.0, 1.6, 'outExpo')))
+  const sub = prog(t, 2.8, 0.7)
+  const cta = spring(t, 3.6, { freq: 1.6, damp: 5 })
+  const pulso = 1 + 0.03 * Math.sin(Math.max(0, t - 4.4) * 6)
+  const saida = prog(t, 5.5, 0.5, 'in')
+  return html`<div style=${{ position: 'absolute', inset: 0, opacity: 1 - saida, transform: `scale(${1 + saida * 0.06})` }}>
+    <div class="fundo" style=${{ '--x': cx + '%', '--y': cy + '%' }}></div>
+    <div class="grade" style=${{ transform: `translateY(${-t * 30}px)` }}></div>
+    ${P.map((p, i) => html`<i class="p" key=${i} style=${{ left: p.x + noise(t + i) * 30 + 'px', top: ((p.y - t * p.v) % 1920 + 1920) % 1920 + 'px', width: p.r + 'px', height: p.r + 'px', opacity: 0.25 + 0.35 * prog(t, i * 0.03, 0.8) }}></i>`)}
+    <div class="selo" style=${{ opacity: Math.min(1, selo), transform: `translateX(-50%) translateY(${(1 - selo) * -60}px) scale(${0.8 + 0.2 * selo})` }}>Segundo Cérebro · Motion</div>
+    <div class="titulo">${PALAVRAS.map((w, i) => {
+      const k = spring(t, stagger(i, 0.5, 0.14), { freq: 1.9, damp: 7 })
+      return html`<span key=${i} class=${i >= 3 ? 'destaque' : ''} style=${{ opacity: Math.min(1, k * 1.4), transform: `translateY(${(1 - k) * 120}px) rotate(${(1 - k) * 8}deg)`, marginRight: '0.25em' }}>${w}</span>`
+    })}</div>
+    <div class="barra" style=${{ width: 920 * barra + 'px' }}></div>
+    <div class="num" style=${{ opacity: prog(t, 2.0, 0.3) }}>${n}<small>posts por mês</small></div>
+    <div class="sub" style=${{ opacity: sub, transform: `translateY(${(1 - sub) * 40}px)` }}>Roteiro, arte, legenda e agenda. Você aprova, o agente publica.</div>
+    <div class="cta" style=${{ transform: `translateX(-50%) scale(${Math.max(0, cta) * pulso})`, opacity: Math.min(1, cta * 2) }}>Comece hoje →</div>
+  </div>`
+}
+const root = ReactDOM.createRoot(document.getElementById('raiz'))
+window.sbFrame = (t) => { ReactDOM.flushSync(() => root.render(html`<${Cena} t=${t} />`)) }
+</script></body></html>

@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- Vídeo cinematográfico a partir de UMA imagem (motion_animar): câmera lenta (zoom + deslize), luz que passa, poeira no ar, barras e cor de cinema.
+     Troque FOTO pelo caminho da imagem (relativo à pasta do vídeo) e o texto. Funciona com foto de imóvel, produto, prato, pessoa, paisagem. -->
+<style>
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:"Segoe UI",system-ui,sans-serif}
+  #cena{position:absolute;inset:0;overflow:hidden}
+  #foto{position:absolute;inset:-12%;background:center/cover no-repeat;will-change:transform;filter:saturate(1.08) contrast(1.06)}
+  #luz{position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 35%,rgba(255,214,160,.22) 48%,rgba(255,240,220,.08) 52%,transparent 65%);mix-blend-mode:screen}
+  #vinheta{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.65) 100%)}
+  #cor{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,30,60,.25),rgba(80,40,10,.18));mix-blend-mode:soft-light}
+  .barra{position:absolute;left:0;right:0;height:0;background:#000}
+  #topo{top:0}#base{bottom:0}
+  #grao{position:absolute;inset:0;opacity:.07;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .p{position:absolute;border-radius:50%;background:rgba(255,236,210,.8);filter:blur(1px)}
+  #txt{position:absolute;left:90px;right:90px;bottom:330px;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6)}
+  #txt small{display:block;font-size:34px;letter-spacing:.32em;text-transform:uppercase;color:#f2d3a6;margin-bottom:22px}
+  #txt b{display:block;font-size:96px;line-height:1.02;font-weight:800;letter-spacing:-.01em}
+</style></head><body><div id="cena">
+  <div id="foto" style="background-image:url('FOTO')"></div>
+  <div id="cor"></div><div id="luz"></div><div id="vinheta"></div><div id="grao"></div>
+  <div id="particulas"></div>
+  <div id="txt"><small>SUBTITULO</small><b>TITULO</b></div>
+  <div class="barra" id="topo"></div><div class="barra" id="base"></div>
+</div>
+<script>
+const { prog, ease, mix, noise } = SB
+const D = 8 // duração em segundos (igual ao "duracao" do motion_animar)
+const box = document.getElementById('particulas')
+const P = Array.from({ length: 46 }, (_, i) => { const e = document.createElement('i'); e.className = 'p'; box.appendChild(e); return { e, x: (i * 211) % 1080, y: (i * 389) % 1920, r: 2 + (i % 5), v: 8 + (i % 7) * 4, f: i * 0.37 } })
+window.sbFrame = (t) => {
+  const p = t / D
+  // câmera: aproxima devagar e desliza, com micro tremido de mão
+  const z = mix(1.0, 1.16, ease.inOut(p))
+  const x = mix(-30, 30, ease.inOut(p)) + noise(t * 0.6) * 4
+  const y = mix(20, -20, ease.inOut(p)) + noise(t * 0.5 + 9) * 3
+  document.getElementById('foto').style.transform = `translate(${x}px,${y}px) scale(${z})`
+  // luz passando da esquerda para a direita
+  document.getElementById('luz').style.transform = `translateX(${mix(-55, 55, ease.inOut(p))}%)`
+  // barras de cinema abrindo no começo e fechando no fim
+  const b = 150 * (1 - prog(t, 0, 1.2, 'outExpo')) + 150 * prog(t, D - 0.9, 0.9, 'in') + 70
+  document.getElementById('topo').style.height = b + 'px'; document.getElementById('base').style.height = b + 'px'
+  // texto entra depois de 1,5 s e sai no fim
+  const a = prog(t, 1.5, 1.2, 'out') * (1 - prog(t, D - 1.2, 0.8, 'in'))
+  const tx = document.getElementById('txt'); tx.style.opacity = a; tx.style.transform = `translateY(${(1 - prog(t, 1.5, 1.4, 'out')) * 50}px)`
+  // poeira no ar
+  for (const q of P) { q.e.style.width = q.e.style.height = q.r + 'px'; q.e.style.left = (q.x + noise(t * 0.3 + q.f) * 60) + 'px'; q.e.style.top = (((q.y - t * q.v) % 1920) + 1920) % 1920 + 'px'; q.e.style.opacity = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 1.3 + q.f)) }
+  // fade preto no início e no fim
+  document.getElementById('cena').style.opacity = prog(t, 0, 0.6, 'out') * (1 - prog(t, D - 0.5, 0.5, 'in'))
+}
+</script></body></html>

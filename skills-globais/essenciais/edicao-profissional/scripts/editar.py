@@ -285,7 +285,7 @@ def montar(pasta, plano, formato="9x16", recorte=None):
                       "saida_sugerida": str(pasta / f"editado-{formato}.mp4"), "previa_sugerida": list(marcos)[:8]}, ensure_ascii=False))
 
 
-def acabamento(video, pasta, arroba="", cta="", cta_seg=4.5, cor="#22d3a6"):
+def acabamento(video, pasta, arroba="", cta="", cta_seg=4.5, cor="#22d3a6", arroba_y=None):
     """Acabamento leve num vídeo pronto: moldura fina, @ do perfil e chamada final ("Se quiser saber mais|digita *IA* nos comentários")."""
     pasta = Path(pasta).resolve()
     pasta.mkdir(parents=True, exist_ok=True)
@@ -299,6 +299,8 @@ def acabamento(video, pasta, arroba="", cta="", cta_seg=4.5, cor="#22d3a6"):
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(video), "-vn", "-ac", "2", "-ar", "48000", str(audio)], check=True)
     dur = round(ffprobe_dur(video), 3)
     dados = {"W": W, "H": H, "dur": dur, "video": base.name, "arroba": arroba, "cta": cta, "ctaSeg": cta_seg, "cor": cor}
+    if arroba_y is not None:
+        dados["arrobaY"] = arroba_y
     html = (AQUI.parent / "modelos" / "acabamento.html").read_text(encoding="utf-8")
     a0, b0 = html.index("/*DADOS*/"), html.index("/*FIM*/")
     html = html[: a0 + len("/*DADOS*/")] + json.dumps(dados, ensure_ascii=False) + html[b0:]
@@ -334,12 +336,13 @@ if __name__ == "__main__":
     p4.add_argument("--cta", default="", help='duas linhas separadas por |, destaque com *: "Se quiser saber mais|digita *IA* nos comentários"')
     p4.add_argument("--cta-seg", type=float, default=4.5)
     p4.add_argument("--cor", default="#22d3a6")
+    p4.add_argument("--arroba-y", type=float, help="altura do @ como fração da tela (0.04 = topo; padrão). Olhe a prévia: o @ não pode encostar em título do vídeo")
     a = ap.parse_args()
     if a.cmd == "preparar":
         preparar(a.video, a.pasta, a.palavras, a.legenda_youtube)
     elif a.cmd == "cortes":
         cortes(a.pasta, a.silencio, a.inicio, a.fim)
     elif a.cmd == "acabamento":
-        acabamento(a.video, a.pasta, a.arroba, a.cta, a.cta_seg, a.cor)
+        acabamento(a.video, a.pasta, a.arroba, a.cta, a.cta_seg, a.cor, a.arroba_y)
     else:
         montar(a.pasta, a.plano, a.formato, a.recorte)

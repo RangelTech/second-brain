@@ -354,7 +354,7 @@ def _piper():
     return _CACHE["piper"]
 
 
-def gerar(texto, amostra, saida, motor="openvoice", idioma="pt"):
+def gerar(texto, amostra, saida, motor="openvoice", idioma="pt", temperatura=None, semente=None):
     import wave
     t0 = time.time()
     saida = Path(saida).resolve()
@@ -370,8 +370,12 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt"):
         # divide em frases aqui (o enable_text_splitting do coqui exige spaCy, que não vem no pacote) e junta com pausas curtas
         import numpy as np
         partes = []
-        for frase in _frases(texto):
-            partes.append(np.asarray(m.inference(frase, idioma, gpt, spk)["wav"], dtype="float32").reshape(-1))
+        if semente is not None:
+            import torch
+            torch.manual_seed(int(semente))
+        extra = {"temperature": float(temperatura)} if temperatura is not None else {}
+        for frase in _frases(_por_extenso(texto, idioma)):
+            partes.append(np.asarray(m.inference(frase, idioma, gpt, spk, **extra)["wav"], dtype="float32").reshape(-1))
             partes.append(np.zeros(int(24000 * 0.18), dtype="float32"))
         _gravar_wav(saida, np.concatenate(partes[:-1]) if partes else np.zeros(1, dtype="float32"), 24000)
         return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "xtts"}
@@ -632,6 +636,44 @@ def separar_voz(wav, pasta):
     return pasta / "voz.wav", pasta / "fundo.wav"
 
 
+def _por_extenso(texto, idioma="pt"):
+    """Números por extenso antes de falar (o XTTS lê algarismos mal: "1,4" saía "um vírgula quatro" ou sumia)."""
+    import re
+    try:
+        from num2words import num2words
+    except Exception:  # noqa: BLE001
+        return texto
+    lang = "pt_BR" if idioma.startswith("pt") else idioma
+
+    def troca(m):
+        n = m.group(0)
+        try:
+            if "," in n or "." in n.strip(".,"):
+                inteiro, dec = re.split(r"[,.]", n, 1)
+                return num2words(int(inteiro), lang=lang) + " vírgula " + " ".join(num2words(int(d), lang=lang) for d in dec)
+            return num2words(int(n), lang=lang)
+        except Exception:  # noqa: BLE001
+            return n
+    return re.sub(r"\d+(?:[,.]\d+)?", troca, texto)
+
+
+def _semelhanca(a, b):
+    import difflib
+    import re
+    n = lambda x: re.sub(r"[^\w ]", " ", x.lower()).split()
+    return difflib.SequenceMatcher(None, n(_por_extenso(a)), n(_por_extenso(b))).ratio()
+
+
+def _ouvir(arq, idioma="pt"):
+    """O que foi realmente dito no áudio (faster-whisper), para conferir a fala gerada."""
+    from faster_whisper import WhisperModel
+    os.environ.setdefault("HF_HOME", str(RAIZ / "modelos" / "hf"))
+    m = _CACHE.get("whisper") or WhisperModel(MODELO_TRANSCRICAO, device="cpu", compute_type="int8", cpu_threads=max(1, (os.cpu_count() or 2) - 1))
+    _CACHE["whisper"] = m
+    segs, _ = m.transcribe(_audio16k(arq), language=idioma, beam_size=1, vad_filter=False, condition_on_previous_text=False)
+    return " ".join(s.text.strip() for s in segs)
+
+
 def _frases_com_tempo(audio, idioma="pt"):
     """Frases da fala com início e fim (faster-whisper, tempo por palavra)."""
     from faster_whisper import WhisperModel
@@ -701,9 +743,26 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
     trilha = np.zeros(max(tot, int(sf.info(str(orig)).duration * taxa) + taxa), dtype="float32")
     for i, f in enumerate(frases):
         fw = trab / f"f{i:03d}.wav"
-        r = gerar(f["texto"], str(amostra), str(fw), motor, idioma)
-        if not r.get("ok"):
+        # gera e CONFERE: transcreve o que saiu e compara com o texto; abaixo de 85% refaz com outra variação (até 3x) e fica com a melhor
+        melhor, nota = None, -1.0
+        for tentativa, temp in enumerate((0.65, 0.5, 0.8)):
+            fx = trab / f"f{i:03d}-t{tentativa}.wav"
+            r = gerar(f["texto"], str(amostra), str(fx), motor, idioma, temperatura=temp if motor == "xtts" else None, semente=1234 + tentativa)
+            if not r.get("ok"):
+                continue
+            try:
+                ouvido = _ouvir(fx, idioma)
+                n = _semelhanca(f["texto"], ouvido)
+            except Exception:  # noqa: BLE001
+                n = 1.0
+            if n > nota:
+                melhor, nota = fx, n
+            if n >= 0.85:
+                break
+        if melhor is None:
             continue
+        f["conferencia"] = round(nota, 2)
+        shutil.copy(melhor, fw)
         a, sr = _ler_som(fw, taxa)
         a = a.mean(1)
         # encaixe: a frase nova ocupa o tempo da original (pode avançar até 0,35 s na pausa seguinte)
@@ -733,7 +792,10 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
         subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(video), "-i", str(final_audio), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(saida)], check=True)
     else:
         shutil.copy(final_audio, saida)
+    (trab / "frases.json").write_text(json.dumps(frases, ensure_ascii=False, indent=1), encoding="utf-8")
+    notas = [f.get("conferencia", 1.0) for f in frases]
     return {"ok": True, "arquivo": str(saida), "frases": len(frases), "motor": motor, "tempo_s": round(time.time() - t0, 1),
+            "conferencia_media": round(sum(notas) / max(1, len(notas)), 2), "frases_abaixo_de_85": sum(1 for x in notas if x < 0.85),
             "textos": str(trab / "frases.json"), "dica": "Para corrigir uma palavra, edite frases.json e rode de novo com --textos (as frases já vêm com o tempo)."}
 
 

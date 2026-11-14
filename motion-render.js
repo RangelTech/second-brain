@@ -70,24 +70,46 @@ function proximaPintura(wc, ms = 2000) {
     wc.on('paint', f)
   })
 }
-async function quadro(wc, o, ms) {
-  // primeiro quadro da página: o navegador ainda está montando a 1ª pintura (saía vazio). Desenha uma vez e descarta.
-  if (!wc.__sbAquecido) {
-    wc.__sbAquecido = true
-    await quadro(wc, o, ms)
+// pixel (0,0) da pintura em BGRA → [r, g, b]
+function carimbo(img) {
+  const b = img.toBitmap()
+  return [b[2], b[1], b[0]]
+}
+// tira o carimbo do canto: copia os pixels vizinhos por cima (o quadro final sai limpo)
+function semCarimbo(img) {
+  const { nativeImage } = require('electron')
+  const s = img.getSize()
+  const b = img.toBitmap()
+  const linha = s.width * 4
+  for (let y = 0; y < 3 && y < s.height; y++) for (let x = 0; x < 3 && x < s.width; x++) {
+    const de = (Math.min(s.height - 1, 4) * linha) + Math.min(s.width - 1, 4) * 4
+    const para = y * linha + x * 4
+    b[para] = b[de]; b[para + 1] = b[de + 1]; b[para + 2] = b[de + 2]; b[para + 3] = b[de + 3]
   }
-  await wc.executeJavaScript(`window.__sbSeek(${ms})`)
-  // espera o navegador DESENHAR o quadro novo (2 ciclos de desenho): sem isso a pintura seguinte às vezes ainda era a anterior
-  // e o quadro saía vazio ou atrasado (achado em 13/11/2026 no reel narrado: quadros pretos na prévia)
-  // (na janela invisível o requestAnimationFrame pode não disparar: limite de 120 ms)
-  await wc.executeJavaScript('new Promise((r) => { setTimeout(() => r(false), 120); requestAnimationFrame(() => requestAnimationFrame(() => r(true))) })')
-  // a 1ª pintura depois da mudança pode ser a que já estava a caminho (conteúdo anterior): descarta e usa a seguinte
-  const primeira = proximaPintura(wc, 500)
-  wc.invalidate()
-  await primeira
-  const espera = proximaPintura(wc)
-  wc.invalidate()
-  let img = (await espera) || (await wc.capturePage())
+  return nativeImage.createFromBitmap(b, { width: s.width, height: s.height })
+}
+async function quadro(wc, o, ms) {
+  let serie = await wc.executeJavaScript(`window.__sbSeek(${ms})`)
+  if (serie === -1) {
+    // há vídeo na página: uma pintura para o Chromium trocar o quadro do <video>, depois copia para o canvas e carimba
+    const espera = proximaPintura(wc, 700)
+    wc.invalidate()
+    await espera
+    serie = await wc.executeJavaScript('window.__sbPintar()')
+  }
+  const quer = [(serie & 31) * 8, (serie >> 5) * 8, 77]
+  // pega pinturas até chegar a que tem o carimbo DESTE quadro (no máximo ~12 tentativas; depois o capturePage)
+  let img = null
+  for (let i = 0; i < 12 && !img; i++) {
+    const espera = proximaPintura(wc, 700)
+    wc.invalidate()
+    const p = await espera
+    if (!p) continue
+    const c = carimbo(p)
+    if (Math.abs(c[0] - quer[0]) <= 3 && Math.abs(c[1] - quer[1]) <= 3 && Math.abs(c[2] - 77) <= 3) img = p
+  }
+  if (!img) img = await wc.capturePage()
+  img = semCarimbo(img)
   const s = img.getSize()
   if (s.width !== o.largura || s.height !== o.altura) img = img.resize({ width: o.largura, height: o.altura, quality: 'best' })
   return img

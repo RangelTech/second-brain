@@ -1,0 +1,157 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- Modelo de edição profissional (skill edicao-profissional). A linha DADOS é preenchida pelo editar.py montar. -->
+<style>
+  :root{--d:#ffcc00;--fundo:#0b0d14}
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:"Segoe UI",system-ui,sans-serif;color:#fff}
+  #raiz{position:absolute;inset:0}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .vinheta{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,transparent 55%,rgba(0,0,0,.45));pointer-events:none}
+  .barra{position:absolute;left:0;top:0;height:calc(10px * var(--s));background:var(--d);transform-origin:left}
+  .tit{position:absolute;left:6%;right:6%;display:flex;flex-wrap:wrap;justify-content:center;gap:0 .25em;text-align:center;font-weight:900;text-transform:uppercase;line-height:1.02;letter-spacing:-.01em}
+  .tit span{display:inline-block;padding:.06em .18em;background:#fff;color:#111;border-radius:.12em;margin:.04em 0;box-shadow:0 .15em .4em rgba(0,0,0,.35)}
+  .tit span.hl{background:var(--d);color:#111}
+  .nome{position:absolute;left:5%;display:flex;flex-direction:column;align-items:flex-start}
+  .nome b{background:#fff;color:#111;font-weight:900;padding:.18em .5em;border-radius:.15em .15em .15em 0}
+  .nome i{font-style:normal;background:var(--d);color:#111;font-weight:700;padding:.12em .5em;border-radius:0 0 .15em .15em}
+  .leg{position:absolute;left:5%;right:5%;display:flex;flex-wrap:wrap;justify-content:center;font-weight:900;text-transform:uppercase;line-height:1.12;color:#fff;-webkit-text-stroke:calc(4px * var(--s)) #000;paint-order:stroke fill;text-shadow:0 .08em 0 rgba(0,0,0,.6);text-align:center}
+  .leg span{display:inline-block;padding:0 .13em}
+  .leg span.agora{color:var(--d)}
+  .dest{position:absolute;left:0;right:0;display:flex;justify-content:center}
+  .dest div{font-weight:900;text-transform:uppercase;color:#111;background:var(--d);padding:.08em .35em;border-radius:.1em;box-shadow:0 .2em .6em rgba(0,0,0,.5);letter-spacing:-.02em;white-space:nowrap}
+  .img{position:absolute;overflow:hidden;border-radius:calc(28px * var(--s));box-shadow:0 30px 90px rgba(0,0,0,.6);border:calc(6px * var(--s)) solid #fff;background:#111}
+  .img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .img span{position:absolute;left:0;right:0;bottom:0;padding:.4em .6em;background:linear-gradient(transparent,rgba(0,0,0,.8));font-weight:800}
+  .painel{position:absolute;background:rgba(11,13,20,.86);border:calc(3px * var(--s)) solid var(--d);border-radius:calc(28px * var(--s));padding:1em 1.1em;backdrop-filter:blur(6px)}
+  .painel::before{content:'';position:absolute;inset:-2px;border-radius:inherit;background:radial-gradient(60% 80% at var(--bx,20%) 0%,color-mix(in srgb,var(--d) 28%,transparent),transparent 70%);z-index:-1}
+  .painel h3{margin:0 0 .5em;font-size:1.1em;font-weight:900;color:var(--d);text-transform:uppercase}
+  .painel div{display:flex;gap:.55em;align-items:center;font-weight:700;margin:.35em 0}
+  .painel div b{width:1.1em;height:1.1em;border-radius:50%;background:var(--d);color:#111;display:inline-flex;align-items:center;justify-content:center;font-size:.8em;flex:none}
+  .num{position:absolute;left:0;right:0;text-align:center}
+  .num b{display:block;font-weight:900;color:var(--d);line-height:1;-webkit-text-stroke:calc(4px * var(--s)) #000;paint-order:stroke fill}
+  .num span{display:inline-block;margin-top:.2em;background:#fff;color:#111;font-weight:800;padding:.15em .5em;border-radius:.2em}
+  .cta{position:absolute;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:.35em}
+  .cta b{background:var(--d);color:#111;font-weight:900;padding:.45em 1.1em;border-radius:.6em;box-shadow:0 .3em .9em rgba(0,0,0,.5);white-space:nowrap}
+  .cta span{font-weight:800;text-shadow:0 .1em .4em rgba(0,0,0,.8)}
+</style></head><body><div id="raiz"></div>
+<script>
+window.D = /*DADOS*/{"W":1080,"H":1920,"dur":5,"video":"base.mp4","palavras":[],"plano":{}}/*FIM*/
+const { prog, spring, mix } = SB
+const D = window.D, P = D.plano || {}, W = D.W, H = D.H
+const VERT = H > W, S = Math.min(W, H) / 1080
+document.documentElement.style.setProperty('--s', S)
+for (const [k, v] of Object.entries(P.cores || {})) document.documentElement.style.setProperty('--' + k, v)
+const px = (n) => n * S + 'px'
+// posições por formato (vertical: rosto no meio-alto, legenda no terço de baixo; horizontal: legenda embaixo)
+// REGRAS DE LAYOUT (não tampar o rosto): título grande EM CIMA; legenda no RODAPÉ; destaques no terço de baixo;
+// quadros (lista, imagem, número): no vertical, na metade de baixo (a legenda some enquanto o quadro está na tela);
+// no horizontal, do lado OPOSTO ao rosto (plano.rosto = "esquerda" | "centro" | "direita").
+const Y = VERT ? { tit: 0.06, leg: 0.76, nome: 0.62, dest: 0.60, img: 0.50, num: 0.50, cta: 0.70, painel: 0.50 } : { tit: 0.06, leg: 0.82, nome: 0.66, dest: 0.66, img: 0.14, num: 0.20, cta: 0.62, painel: 0.14 }
+const ROSTO = P.rosto || 'centro'
+const LADO_X = (larg) => VERT ? (W - larg) / 2 : (ROSTO === 'direita' ? W * 0.04 : W * 0.96 - larg) // horizontal: lado sem rosto
+const QUADRO_ATIVO = (t) => ['imagens', 'listas', 'numeros'].some((k) => (P[k] || []).some((x) => t >= x.t - 0.05 && t < x.t + (x.dur || 3) + 0.3))
+const ativo = (t, ini, dur) => t >= ini - 0.05 && t < ini + dur + 0.35
+const entra = (t, ini, dur, sai = 0.3) => Math.min(prog(t, ini, 0.35, 'outExpo'), 1 - prog(t, ini + dur, sai, 'in'))
+
+function Titulo({ t }) {
+  const T = P.titulo
+  if (!T || t > (T.ate || 3) + 0.4) return null
+  const partes = String(T.texto).split(' ')
+  const sai = prog(t, (T.ate || 3), 0.35, 'in')
+  return html`<div class="tit" style=${{ top: H * Y.tit + 'px', fontSize: px(VERT ? 70 : 76), opacity: 1 - sai }}>${partes.map((w, i) => {
+    const k = spring(t, 0.08 + i * 0.07, { freq: 2.2, damp: 7 })
+    const d = /^\*|\*$/.test(w)
+    return html`<span key=${i} class=${d ? 'hl' : ''} style=${{ transform: `scale(${Math.max(0, Math.min(1.15, k))}) rotate(${(1 - Math.min(1, k)) * -6}deg)` }}>${w.replace(/\*/g, '')}</span>`
+  })}</div>`
+}
+function Nome({ t }) {
+  const N = P.nome
+  if (!N || !ativo(t, N.de ?? 1, (N.ate ?? 5) - (N.de ?? 1))) return null
+  const a = entra(t, N.de ?? 1, (N.ate ?? 5) - (N.de ?? 1))
+  return html`<div class="nome" style=${{ top: H * Y.nome + 'px', fontSize: px(44), transform: `translateX(${(1 - a) * -120}%)` }}><b>${N.nome}</b>${N.cargo ? html`<i style=${{ fontSize: '.72em' }}>${N.cargo}</i>` : null}</div>`
+}
+function Legenda({ t }) {
+  const pal = D.palavras
+  if (!pal.length) return null
+  // blocos de até 3 palavras, quebrando em pausa ou pontuação (lê no ritmo da fala)
+  if (!window.__blocos) {
+    const bl = []; let cur = []
+    pal.forEach((p, i) => { cur.push(p); const prox = pal[i + 1]; if (cur.length >= 3 || !prox || prox.t - p.f > 0.3 || /[.?!,;:]$/.test(p.w)) { bl.push(cur); cur = [] } })
+    window.__blocos = bl
+  }
+  const bl = window.__blocos
+  const k = bl.findIndex((b, i) => t >= b[0].t - 0.05 && t < (bl[i + 1] ? bl[i + 1][0].t - 0.05 : b[b.length - 1].f + 0.4))
+  if (k < 0) return null
+  const b = bl[k]
+  // some a legenda quando um destaque grande ocupa a tela
+  if ((P.destaques || []).some((d) => t >= d.t && t < d.t + (d.dur || 1.4))) return null
+  if (VERT && QUADRO_ATIVO(t)) return null
+  const pop = spring(t, b[0].t - 0.05, { freq: 2.6, damp: 9 })
+  return html`<div class="leg" style=${{ top: H * Y.leg + 'px', fontSize: px(VERT ? 78 : 64), transform: `scale(${0.88 + 0.12 * Math.min(1.08, pop)})` }}>${b.map((p, i) => {
+    const agora = t >= p.t && t < (b[i + 1] ? b[i + 1].t : p.f + 0.4)
+    return html`<span key=${i} class=${agora ? 'agora' : ''} style=${{ transform: agora ? 'scale(1.05)' : 'none', padding: '0 .2em' }}>${p.w.replace(/[.,;:]$/, '')}</span>`
+  })}</div>`
+}
+function Destaques({ t }) {
+  return (P.destaques || []).filter((d) => ativo(t, d.t, d.dur || 1.4)).map((d, i) => {
+    const k = spring(t, d.t, { freq: 2.4, damp: 6 })
+    const sai = prog(t, d.t + (d.dur || 1.4), 0.25, 'in')
+    const treme = Math.sin(t * 60) * 4 * S * (1 - prog(t, d.t, 0.25))
+    return html`<div key=${'d' + i} class="dest" style=${{ top: H * Y.dest + 'px', fontSize: px(Math.min(VERT ? 120 : 110, (VERT ? 1500 : 2600) / Math.max(6, String(d.texto).length))), opacity: 1 - sai, transform: `translateX(${treme}px) scale(${Math.max(0, Math.min(1.2, k)) * (1 - 0.3 * sai)}) rotate(-3deg)` }}><div>${d.texto}</div></div>`
+  })
+}
+function Imagens({ t }) {
+  return (P.imagens || []).filter((im) => ativo(t, im.t, im.dur || 3)).map((im, i) => {
+    const a = entra(t, im.t, im.dur || 3)
+    const w = VERT ? W * 0.86 : W * 0.40, h = VERT ? H * 0.30 : w * 0.66
+    const kb = 1.06 + 0.08 * prog(t, im.t, im.dur || 3, 'linear')
+    const left = LADO_X(w)
+    return html`<div key=${'i' + i} class="img" style=${{ left: left + 'px', top: H * Y.img + 'px', width: w + 'px', height: h + 'px', opacity: a, transform: `translateY(${(1 - a) * -40}px) rotate(${(1 - a) * 4 - 1.5}deg) scale(${0.9 + 0.1 * a})`, fontSize: px(40) }}>
+      <img src=${im.arquivo} style=${{ transform: `scale(${kb})` }} />${im.legenda ? html`<span>${im.legenda}</span>` : null}</div>`
+  })
+}
+function Listas({ t }) {
+  return (P.listas || []).filter((l) => ativo(t, l.t, l.dur || 5)).map((l, i) => {
+    const a = entra(t, l.t, l.dur || 5)
+    const n = (l.itens || []).length || 1
+    return html`<div key=${'l' + i} class="painel" style=${{ left: LADO_X(VERT ? W * 0.86 : W * 0.38) + 'px', width: VERT ? W * 0.86 + 'px' : W * 0.38 + 'px', top: H * Y.painel + 'px', fontSize: px(VERT ? 54 : 46), opacity: a, transform: `translateY(${(1 - a) * 50}px)`, boxSizing: 'border-box', '--bx': 20 + 60 * (0.5 + 0.5 * Math.sin(t * 0.8)) + '%', isolation: 'isolate' }}>
+      <h3>${l.titulo || ''}</h3>${(l.itens || []).map((it, k) => {
+        const b = prog(t, l.t + 0.3 + k * Math.min(1.2, ((l.dur || 5) - 1) / n), 0.35, 'outBack')
+        return html`<div key=${k} style=${{ opacity: b, transform: `translateX(${(1 - b) * -40}px)` }}><b>✓</b>${it}</div>`
+      })}</div>`
+  })
+}
+function Numeros({ t }) {
+  return (P.numeros || []).filter((n) => ativo(t, n.t, n.dur || 3)).map((n, i) => {
+    const a = entra(t, n.t, n.dur || 3)
+    const alvo = parseFloat(String(n.valor).replace(',', '.')) || 0
+    const casas = /[.,]\d/.test(String(n.valor)) ? 1 : 0
+    const suf = String(n.valor).replace(/^[\d.,]+/, '')
+    const v = mix(0, alvo, prog(t, n.t, Math.min(1.4, (n.dur || 3) * 0.5), 'outExpo'))
+    return html`<div key=${'n' + i} class="num" style=${{ top: H * Y.num + 'px', left: VERT ? 0 : LADO_X(W * 0.4) + 'px', right: 'auto', width: VERT ? '100%' : W * 0.4 + 'px', opacity: a, transform: `scale(${0.8 + 0.2 * a})` }}><b style=${{ fontSize: px(VERT ? 260 : 220) }}>${v.toFixed(casas).replace('.', ',')}${suf}</b><span style=${{ fontSize: px(48) }}>${n.rotulo || ''}</span></div>`
+  })
+}
+function Cta({ t }) {
+  const C = P.cta
+  if (!C) return null
+  const ini = C.t || Math.max(0, D.dur - 4)
+  if (t < ini - 0.05) return null
+  const k = spring(t, ini, { freq: 1.7, damp: 5 })
+  const pulso = 1 + 0.035 * Math.sin(Math.max(0, t - ini - 0.8) * 6)
+  return html`<div class="cta" style=${{ top: H * Y.cta + 'px', fontSize: px(VERT ? 58 : 50) }}><b style=${{ transform: `scale(${Math.max(0, k) * pulso})` }}>${C.texto}</b>${C.sub ? html`<span style=${{ opacity: prog(t, ini + 0.4, 0.4), fontSize: '.7em' }}>${C.sub}</span>` : null}</div>`
+}
+function Edicao({ t }) {
+  const cta = P.cta && t >= (P.cta.t || Math.max(0, D.dur - 4))
+  return html`<div style=${{ position: 'absolute', inset: 0 }}>
+    <video src=${D.video} data-inicio="0"></video>
+    <div class="vinheta"></div>
+    <div class="barra" style=${{ width: '100%', transform: `scaleX(${Math.min(1, t / D.dur)})` }}></div>
+    <${Imagens} t=${t} /><${Listas} t=${t} /><${Numeros} t=${t} />
+    <${Titulo} t=${t} /><${Nome} t=${t} />
+    ${cta ? null : html`<${Legenda} t=${t} />`}
+    <${Destaques} t=${t} /><${Cta} t=${t} />
+  </div>`
+}
+const root = ReactDOM.createRoot(document.getElementById('raiz'))
+// erro de desenho aparece ESCRITO no quadro (a prévia mostra o motivo em vez de um quadro vazio)
+window.sbFrame = (t) => { try { ReactDOM.flushSync(() => root.render(html`<${Edicao} t=${t} />`)) } catch (e) { document.body.insertAdjacentHTML('beforeend', `<pre style="position:absolute;left:20px;top:20px;right:20px;z-index:99;color:#ff4d4d;background:#000c;font:28px monospace;white-space:pre-wrap">ERRO t=${t.toFixed(2)}: ${String(e && e.stack || e).slice(0, 600)}</pre>`) } }
+</script></body></html>

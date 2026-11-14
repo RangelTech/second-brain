@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{MARCA}} · {{PROMESSA_CURTA}}</title>
+<meta name="description" content="{{DESCRICAO}}">
+<!-- Modelo de landing cinematográfica (skill sites-cinematograficos). Um arquivo só, sem dependências: troque os {{CAMPOS}},
+     os vídeos (videos/hero.mp4, videos/card-1.mp4...) e as cores em :root. Vídeos: Motion (camera-cinema.html) de graça, ou Estúdio em créditos. -->
+<style>
+:root{--bg:#0b0a09;--bg2:#141210;--tx:#f5efe8;--mut:#b9afa4;--ac:#e8a34a;--ac2:#ff7a45;--bd:rgba(255,255,255,.09);--r:22px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.grade{background-image:linear-gradient(var(--bd) 1px,transparent 1px),linear-gradient(90deg,var(--bd) 1px,transparent 1px);background-size:64px 64px;-webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 75%);position:absolute;inset:0;pointer-events:none}
+.brilho{position:absolute;border-radius:50%;filter:blur(110px);pointer-events:none;opacity:.35}
+/* topo */
+header{position:fixed;top:0;left:0;right:0;z-index:20;backdrop-filter:blur(14px);background:rgba(11,10,9,.55);border-bottom:1px solid var(--bd)}
+header .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+.marca{font-weight:800;letter-spacing:-.01em;font-size:18px;display:flex;gap:10px;align-items:center}
+.marca i{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--ac),var(--ac2));display:inline-block}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:14px;padding:16px 26px;font-weight:800;font-size:16px;text-decoration:none;cursor:pointer;color:#170d05;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 18px 50px -12px rgba(232,163,74,.55);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 24px 60px -12px rgba(232,163,74,.7)}
+.btn.pulsa{animation:pulsa 2.2s ease-in-out infinite}
+@keyframes pulsa{0%,100%{box-shadow:0 18px 50px -12px rgba(232,163,74,.55),0 0 0 0 rgba(232,163,74,.45)}50%{box-shadow:0 18px 50px -12px rgba(232,163,74,.55),0 0 0 14px rgba(232,163,74,0)}}
+.btn.sec{background:transparent;color:var(--tx);border:1px solid var(--bd);box-shadow:none}
+/* hero */
+.hero{position:relative;min-height:clamp(620px,100vh,980px);display:flex;align-items:flex-end;padding:140px 0 90px;overflow:hidden}
+.hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.55}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,10,9,.2) 0%,rgba(11,10,9,.35) 50%,var(--bg) 100%)}
+.hero .wrap{position:relative;z-index:2}
+.selo{display:inline-flex;gap:8px;align-items:center;padding:8px 16px;border-radius:999px;border:1px solid rgba(232,163,74,.45);background:rgba(232,163,74,.08);color:#f3c98d;font-size:13px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+.selo b{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 12px var(--ac)}
+h1{font-size:clamp(40px,6.4vw,84px);line-height:1.02;letter-spacing:-.03em;margin:22px 0 18px;font-weight:850;max-width:16ch}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:clamp(17px,2vw,21px);color:var(--mut);max-width:56ch;margin:0 0 30px}
+.acoes{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.prova{display:flex;gap:10px;align-items:center;color:var(--mut);font-size:14px}
+.prova span{display:flex}.prova span i{width:30px;height:30px;border-radius:50%;border:2px solid var(--bg);margin-left:-8px;background:linear-gradient(135deg,#6b4f3a,#c48b5a)}
+/* faixa correndo */
+.faixa{position:relative;border-block:1px solid var(--bd);background:linear-gradient(90deg,rgba(232,163,74,.12),rgba(255,122,69,.12));overflow:hidden;padding:14px 0;transform:rotate(-1.2deg);margin:10px -20px}
+.faixa div{display:flex;gap:48px;white-space:nowrap;width:max-content;animation:corre 26s linear infinite;font-weight:800;letter-spacing:.18em;font-size:14px;text-transform:uppercase}
+.faixa div span::before{content:"✦";color:var(--ac);margin-right:48px}
+@keyframes corre{to{transform:translateX(-50%)}}
+/* seções */
+section{position:relative;padding:110px 0}
+.olho{color:var(--ac);font-size:13px;letter-spacing:.18em;text-transform:uppercase;font-weight:700}
+h2{font-size:clamp(30px,4vw,52px);letter-spacing:-.02em;line-height:1.08;margin:12px 0 16px;font-weight:800;max-width:20ch}
+.sub{color:var(--mut);max-width:60ch;font-size:18px;margin:0}
+/* cartões de vídeo 9:16 */
+.videos{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:48px}
+.v916{position:relative;aspect-ratio:9/16;border-radius:var(--r);overflow:hidden;background:#000;border:1px solid var(--bd);box-shadow:0 30px 60px -30px rgba(0,0,0,.8)}
+.v916 video{width:100%;height:100%;object-fit:cover}
+.v916 .tag{position:absolute;top:12px;left:12px;padding:5px 10px;border-radius:999px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);font-size:11px;font-weight:700;letter-spacing:.06em}
+.v916 .leg{position:absolute;left:0;right:0;bottom:0;padding:40px 16px 16px;background:linear-gradient(transparent,rgba(0,0,0,.8));font-weight:700;font-size:15px}
+/* passos */
+.passos{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+.passo{padding:28px;border-radius:var(--r);border:1px solid var(--bd);background:linear-gradient(180deg,rgba(255,255,255,.035),transparent)}
+.passo b{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:rgba(232,163,74,.12);color:var(--ac);font-size:18px;margin-bottom:18px}
+.passo h3{margin:0 0 8px;font-size:21px}.passo p{margin:0;color:var(--mut)}
+/* depoimentos */
+.deps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+.dep{padding:26px;border-radius:var(--r);border:1px solid var(--bd);background:var(--bg2)}
+.dep p{margin:0 0 18px;font-size:17px}.dep footer{display:flex;gap:12px;align-items:center;color:var(--mut);font-size:14px}
+.dep footer i{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5b4636,#b9824f)}
+.estrelas{color:var(--ac);letter-spacing:3px;margin-bottom:12px}
+/* oferta */
+.oferta{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding:48px;border-radius:30px;border:1px solid rgba(232,163,74,.35);background:radial-gradient(800px 400px at 20% 0%,rgba(232,163,74,.16),transparent 60%),var(--bg2)}
+.lista{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:12px}
+.lista li{display:flex;gap:12px}.lista li::before{content:"✓";color:var(--ac);font-weight:900}
+.preco{text-align:center}
+.de{color:var(--mut);text-decoration:line-through;font-size:18px}
+.por{font-size:clamp(54px,7vw,84px);font-weight:900;letter-spacing:-.03em;line-height:1;margin:6px 0}
+.por small{font-size:.35em;vertical-align:top;margin-right:6px}
+.relogio{display:flex;gap:10px;justify-content:center;margin:18px 0 24px}
+.relogio div{min-width:70px;padding:10px;border-radius:12px;background:rgba(0,0,0,.35);border:1px solid var(--bd)}
+.relogio b{display:block;font-size:26px}.relogio span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em}
+.garantia{display:flex;gap:14px;align-items:center;justify-content:center;color:var(--mut);font-size:14px;margin-top:18px}
+/* faq */
+details{border-bottom:1px solid var(--bd);padding:22px 0}
+summary{cursor:pointer;font-weight:700;font-size:19px;list-style:none;display:flex;justify-content:space-between;gap:20px}
+summary::after{content:"+";color:var(--ac);font-size:26px;line-height:1;transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{color:var(--mut);margin:12px 0 0;max-width:70ch}
+footer.rodape{padding:50px 0 120px;color:var(--mut);font-size:14px;text-align:center}
+/* barra fixa no celular */
+.fixa{position:fixed;left:12px;right:12px;bottom:12px;z-index:30;display:none}
+/* entrada ao rolar */
+.rev{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+.rev.on{opacity:1;transform:none}
+@media (max-width:900px){.videos{grid-template-columns:repeat(2,1fr)}.passos,.deps{grid-template-columns:1fr}.oferta{grid-template-columns:1fr;padding:28px}.fixa{display:block}.fixa .btn{width:100%}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rev{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><div class="marca"><i></i>{{MARCA}}</div><a class="btn" href="#oferta" style="padding:11px 18px;font-size:14px">{{CTA_CURTO}}</a></div></header>
+
+<div class="hero">
+  <video src="videos/hero.mp4" autoplay muted loop playsinline poster="imagens/hero.jpg"></video>
+  <div class="grade"></div>
+  <div class="brilho" style="width:520px;height:520px;background:var(--ac);top:10%;left:-8%"></div>
+  <div class="brilho" style="width:420px;height:420px;background:var(--ac2);top:30%;right:-6%;opacity:.22"></div>
+  <div class="wrap">
+    <span class="selo rev"><b></b>{{SELO}}</span>
+    <h1 class="rev">{{TITULO_INICIO}} <em>{{TITULO_DESTAQUE}}</em></h1>
+    <p class="lead rev">{{SUBTITULO}}</p>
+    <div class="acoes rev"><a class="btn pulsa" href="#oferta">{{CTA}} →</a><div class="prova"><span><i></i><i></i><i></i><i></i></span>{{PROVA_SOCIAL}}</div></div>
+  </div>
+</div>
+
+<div class="faixa"><div><span>{{FAIXA_1}}</span><span>{{FAIXA_2}}</span><span>{{FAIXA_3}}</span><span>{{FAIXA_4}}</span><span>{{FAIXA_1}}</span><span>{{FAIXA_2}}</span><span>{{FAIXA_3}}</span><span>{{FAIXA_4}}</span></div></div>
+
+<section><div class="wrap">
+  <div class="olho rev">{{OLHO_VIDEOS}}</div>
+  <h2 class="rev">{{TITULO_VIDEOS}}</h2>
+  <p class="sub rev">{{TEXTO_VIDEOS}}</p>
+  <div class="videos">
+    <div class="v916 rev"><video src="videos/card-1.mp4" autoplay muted loop playsinline></video><span class="tag">{{TAG_1}}</span><div class="leg">{{LEG_1}}</div></div>
+    <div class="v916 rev"><video src="videos/card-2.mp4" autoplay muted loop playsinline></video><span class="tag">{{TAG_2}}</span><div class="leg">{{LEG_2}}</div></div>
+    <div class="v916 rev"><video src="videos/card-3.mp4" autoplay muted loop playsinline></video><span class="tag">{{TAG_3}}</span><div class="leg">{{LEG_3}}</div></div>
+    <div class="v916 rev"><video src="videos/card-4.mp4" autoplay muted loop playsinline></video><span class="tag">{{TAG_4}}</span><div class="leg">{{LEG_4}}</div></div>
+  </div>
+</div></section>
+
+<section style="padding-top:20px"><div class="wrap">
+  <div class="olho rev">Como funciona</div>
+  <h2 class="rev">{{TITULO_PASSOS}}</h2>
+  <div class="passos">
+    <div class="passo rev"><b>1</b><h3>{{PASSO_1}}</h3><p>{{PASSO_1_TXT}}</p></div>
+    <div class="passo rev"><b>2</b><h3>{{PASSO_2}}</h3><p>{{PASSO_2_TXT}}</p></div>
+    <div class="passo rev"><b>3</b><h3>{{PASSO_3}}</h3><p>{{PASSO_3_TXT}}</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="olho rev">Quem já usa</div>
+  <h2 class="rev">{{TITULO_DEPOIMENTOS}}</h2>
+  <div class="deps">
+    <div class="dep rev"><div class="estrelas">★★★★★</div><p>{{DEP_1}}</p><footer><i></i>{{DEP_1_NOME}}</footer></div>
+    <div class="dep rev"><div class="estrelas">★★★★★</div><p>{{DEP_2}}</p><footer><i></i>{{DEP_2_NOME}}</footer></div>
+    <div class="dep rev"><div class="estrelas">★★★★★</div><p>{{DEP_3}}</p><footer><i></i>{{DEP_3_NOME}}</footer></div>
+  </div>
+</div></section>
+
+<section id="oferta"><div class="wrap">
+  <div class="oferta rev">
+    <div><div class="olho">{{OLHO_OFERTA}}</div><h2 style="margin-bottom:0">{{TITULO_OFERTA}}</h2>
+      <ul class="lista"><li>{{ITEM_1}}</li><li>{{ITEM_2}}</li><li>{{ITEM_3}}</li><li>{{ITEM_4}}</li></ul></div>
+    <div class="preco"><div class="de">de {{PRECO_DE}}</div><div class="por"><small>R$</small>{{PRECO_POR}}</div><div style="color:var(--mut)">{{PARCELAS}}</div>
+      <div class="relogio" data-fim="{{FIM_OFERTA_ISO}}"><div><b data-u="h">00</b><span>horas</span></div><div><b data-u="m">00</b><span>min</span></div><div><b data-u="s">00</b><span>seg</span></div></div>
+      <a class="btn pulsa" href="{{LINK_CHECKOUT}}" style="width:100%">{{CTA}} →</a>
+      <div class="garantia">🔒 {{GARANTIA}}</div></div>
+  </div>
+</div></section>
+
+<section style="padding-top:20px"><div class="wrap" style="max-width:860px">
+  <div class="olho rev">Dúvidas</div><h2 class="rev">Perguntas frequentes</h2>
+  <details class="rev"><summary>{{PERGUNTA_1}}</summary><p>{{RESPOSTA_1}}</p></details>
+  <details class="rev"><summary>{{PERGUNTA_2}}</summary><p>{{RESPOSTA_2}}</p></details>
+  <details class="rev"><summary>{{PERGUNTA_3}}</summary><p>{{RESPOSTA_3}}</p></details>
+</div></section>
+
+<footer class="rodape">© {{ANO}} {{MARCA}} · {{RODAPE}}</footer>
+<div class="fixa"><a class="btn pulsa" href="#oferta">{{CTA}} →</a></div>
+
+<script>
+// entrada suave ao rolar
+const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target) } }), { threshold: 0.12 })
+document.querySelectorAll('.rev').forEach((el, i) => { el.style.transitionDelay = (i % 4) * 0.08 + 's'; io.observe(el) })
+// contagem regressiva da oferta (se a data for inválida, conta até a meia-noite)
+const rel = document.querySelector('.relogio')
+const alvo = Date.parse(rel.dataset.fim) || new Date().setHours(24, 0, 0, 0)
+const pad = (n) => String(Math.max(0, n)).padStart(2, '0')
+const tic = () => { const s = Math.max(0, Math.floor((alvo - Date.now()) / 1000)); rel.querySelector('[data-u=h]').textContent = pad(Math.floor(s / 3600)); rel.querySelector('[data-u=m]').textContent = pad(Math.floor((s % 3600) / 60)); rel.querySelector('[data-u=s]').textContent = pad(s % 60) }
+tic(); setInterval(tic, 1000)
+</script>
+</body>
+</html>

@@ -155,7 +155,7 @@ def main():
     # 4) animação: modelo + linha do tempo
     html = MODELO.read_text(encoding="utf-8")
     ini_tl, fim_tl = html.index("/*TL*/"), html.index("/*FIM*/")
-    dados = {"total": total, "marca": r.get("marca", ""), "cores": r.get("cores") or {}, "cenas": tl}
+    dados = {"total": total, "marca": r.get("marca", ""), "cores": r.get("cores") or {}, "legenda": r.get("legenda", "karaoke"), "cenas": tl}
     html = html[: ini_tl + len("/*TL*/")] + json.dumps(dados, ensure_ascii=False) + html[fim_tl:]
     arq_html = pasta / "reel.html"
     arq_html.write_text(html, encoding="utf-8")

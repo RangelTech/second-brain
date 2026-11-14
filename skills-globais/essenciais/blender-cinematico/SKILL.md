@@ -18,7 +18,7 @@ Referência que inspirou: um curta de 36 s feito pelo Claude Code comandando o B
    `blender -b -P cena_produto.py -- --saida "Videos/3d/teste" --quadros 3 --largura 640 --altura 360 --amostras 16`
    A primeira vez leva ~3 min (o Blender compila os shaders); depois ~3 s por quadro pequeno.
 2. Ajuste e repita até ficar bom: produto apoiado no pedestal (não flutuando), enquadramento com o produto inteiro em todos os quadros, luz sem estourar.
-3. Render final: `--quadros 120 --largura 1280 --altura 720 --amostras 32` (≈ 5 a 8 s por quadro num notebook; 120 quadros ≈ 10 a 15 min). Rode em primeiro plano e acompanhe até o fim.
+3. Render final: `--quadros 120 --largura 1280 --altura 720 --amostras 64` (32 deixa granulado no chão) (≈ 5 a 8 s por quadro num notebook; 120 quadros ≈ 10 a 15 min). Rode em primeiro plano e acompanhe até o fim.
 4. Vídeo: `ffmpeg -framerate 30 -i "pasta/%04d.png" -c:v libx264 -pix_fmt yuv420p -crf 16 produto.mp4`.
 5. Use: rolagem do site (`sites-cinematograficos/scripts/quadros.py` direto da pasta de PNGs ou do MP4), reel (Motion por cima), apresentação.
 
