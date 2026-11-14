@@ -1,6 +1,6 @@
 # segundo_cerebro_site
 
-Site de venda do Segundo Cérebro (`https://brain.rangeltech.net`). HTML, CSS e JS estáticos servidos por nginx, sem etapa de build.
+Site de venda do Cérebro Pro (`https://brain.rangeltech.net`). HTML, CSS e JS estáticos servidos por nginx, sem etapa de build.
 
 - `public/assets/config.js`: `checkout.pro|max|ultra|infinity|vm` (links `https://pay.cakto.com.br/<oferta>`), `web` (acesso pelo navegador) e `api` (llm-access). Link vazio faz o botão mostrar "Em breve".
 - Download: o JS lê a última release de `RangelTech/second-brain` e aponta cada botão para o instalador do sistema do visitante.

@@ -56,7 +56,7 @@ if (!s.includes('id="ecossistema"')) {
     <div class="grade">
       <article class="cartao"><h3>Todos os provedores num lugar</h3><p>Claude, GPT e a nossa IA sem censura na mesma conversa. Você escolhe quem faz cada tarefa, sem trocar de programa.</p></article>
       <article class="cartao"><h3>O mesmo conhecimento para todos</h3><p>A memória das suas conversas e todas as nossas skills ficam disponíveis para qualquer IA conectada. Cada uma trabalha com o que as outras já sabem.</p></article>
-      <article class="cartao"><h3>Aproveite o que você já paga</h3><p>Já tem Claude Code ou ChatGPT? Conecte a sua conta e use junto com o agente do Segundo Cérebro, que controla o seu computador e usa as nossas ferramentas.</p></article>
+      <article class="cartao"><h3>Aproveite o que você já paga</h3><p>Já tem Claude Code ou ChatGPT? Conecte a sua conta e use junto com o agente do Cérebro Pro, que controla o seu computador e usa as nossas ferramentas.</p></article>
     </div>
   </div>
 </section>
@@ -65,7 +65,7 @@ if (!s.includes('id="ecossistema"')) {
 }
 
 s = s.replace(/<details><summary>Posso usar o Claude e o GPT\?<\/summary><p>[^]*?<\/p><\/details>/,
-  '<details><summary>Posso usar o ChatGPT e o Claude Code junto com a nossa IA?</summary><p>Sim, em todos os planos. Você conecta a sua conta do Claude, do GPT e de outros provedores e escolhe qual usar em cada conversa, ou deixa todos trabalharem juntos. Todos passam a ter acesso à mesma memória e às mesmas skills do Segundo Cérebro.</p></details>')
+  '<details><summary>Posso usar o ChatGPT e o Claude Code junto com a nossa IA?</summary><p>Sim, em todos os planos. Você conecta a sua conta do Claude, do GPT e de outros provedores e escolhe qual usar em cada conversa, ou deixa todos trabalharem juntos. Todos passam a ter acesso à mesma memória e às mesmas skills do Cérebro Pro.</p></details>')
 s = s.replace(/<details><summary>Qual a diferença entre o Lite e os outros planos\?<\/summary><p>[^]*?<\/p><\/details>/,
   '<details><summary>Qual a diferença entre o Lite, o Max e o Ultra?</summary><p>O Lite tem filtro de conteúdo (censura), em texto e em imagens, e não traz o pacote de skills. A partir do Max a IA é <b>sem censura</b> (inclusive nas imagens), a clonagem é liberada e o pacote de skills profissional já vem configurado. Entre o Max e o Ultra a diferença é a quantidade de uso: o Max dá 5 vezes o uso do Lite e o Ultra dá 20 vezes, com mais imagens por mês.</p></details>')
 

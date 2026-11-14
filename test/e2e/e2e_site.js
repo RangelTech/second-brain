@@ -77,7 +77,7 @@ const post = (porta, p, body, h = {}) => new Promise((res, rej) => { const d = J
     const acc = await new Promise((r) => http.get({ host: '127.0.0.1', port: API_PORT, path: '/admin/api/termos/aceites?email=cli@exemplo.com', headers: { cookie } }, (x) => { let b = ''; x.on('data', (c) => (b += c)); x.on('end', () => r(JSON.parse(b))) }))
     ok(acc.aceites.length === 1 && acc.aceites[0].canal === 'checkout', 'aceite dos termos gravado com canal checkout')
     // 3. webhook de aprovação -> a página muda sozinha
-    const wh = await post(API_PORT, '/v1/billing/cakto', { event: 'purchase_approved', event_id: 'ev-e2e', data: { id: 'ev-e2e', customer: { email: 'cli@exemplo.com', name: 'Cli' }, product: { name: 'Segundo Cérebro Max' }, amount: 447.3, callback: token, subscription: { id: 's1' } } }, { 'x-webhook-secret': 'seg' })
+    const wh = await post(API_PORT, '/v1/billing/cakto', { event: 'purchase_approved', event_id: 'ev-e2e', data: { id: 'ev-e2e', customer: { email: 'cli@exemplo.com', name: 'Cli' }, product: { name: 'Cérebro Pro Max' }, amount: 447.3, callback: token, subscription: { id: 's1' } } }, { 'x-webhook-secret': 'seg' })
     ok(wh.s === 200, 'webhook aprovado recebido')
     await p.espera(() => '!document.querySelector("#pag-ok").hidden', 12000)
     ok(true, '/assinar: a página mostrou "Pagamento aprovado" sozinha')

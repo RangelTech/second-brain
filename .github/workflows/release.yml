@@ -26,7 +26,7 @@ jobs:
           docker build -t "brain-site:${V}" .
           cid=$(docker run -d --rm -p 18080:8080 "brain-site:${V}")
           for _ in $(seq 1 20); do curl -fsS http://127.0.0.1:18080/health >/dev/null 2>&1 && break; sleep 1; done
-          curl -fsS http://127.0.0.1:18080/health && curl -fsS http://127.0.0.1:18080/ | grep -q "Segundo Cérebro"
+          curl -fsS http://127.0.0.1:18080/health && curl -fsS http://127.0.0.1:18080/ | grep -q "Cérebro Pro"
           docker stop "$cid" >/dev/null
           docker save "brain-site:${V}" | gzip -9 > image.tar.gz
           echo "IMAGE_ID=sha256:$(gunzip -c image.tar.gz | tar -xO manifest.json | python3 -c "import sys,json,re;print(re.sub(r'^.*/','',json.load(sys.stdin)[0]['Config']).replace('.json',''))")" >> "$GITHUB_ENV"

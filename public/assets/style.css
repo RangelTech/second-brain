@@ -1,4 +1,4 @@
-/* Segundo Cérebro · site de vendas. Claro e escuro automáticos (ou pelo botão); sem framework, sem fonte externa. */
+/* Cérebro Pro · site de vendas. Claro e escuro automáticos (ou pelo botão); sem framework, sem fonte externa. */
 :root{
   --bg:#faf6f0;--bg2:#f3ede4;--card:#fffdf9;--ink:#1d1b18;--mut:#6b655c;--line:#e6dfd3;
   --ac:#cc6a47;--ac-ink:#fff;--ac2:#e08a64;--ok:#3f8f5a;--dark:#1f1d1a;--dark-ink:#ece9e4;--shadow:0 18px 50px rgba(60,40,20,.12);
@@ -273,7 +273,7 @@ body.modal-aberto{overflow:hidden}
 @media (max-width:1180px){.planos.cinco{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:820px){.planos.cinco{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:640px){.planos.cinco{grid-template-columns:1fr}}
-/* Segundo Cérebro · site de vendas. Claro e escuro automáticos (ou pelo botão); sem framework, sem fonte externa. */
+/* Cérebro Pro · site de vendas. Claro e escuro automáticos (ou pelo botão); sem framework, sem fonte externa. */
 :root{
   --bg:#faf6f0;--bg2:#f3ede4;--card:#fffdf9;--ink:#1d1b18;--mut:#6b655c;--line:#e6dfd3;
   --ac:#cc6a47;--ac-ink:#fff;--ac2:#e08a64;--ok:#3f8f5a;--dark:#1f1d1a;--dark-ink:#ece9e4;--shadow:0 18px 50px rgba(60,40,20,.12);
