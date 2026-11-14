@@ -24,6 +24,27 @@ def escrever(obj) -> None:
     sys.stdout.flush()
 
 
+def cron_local(p: dict) -> dict:
+    acao = p.get("action")
+    jid = str(p.get("name") or "")
+    if acao == "update":
+        from tools.cronjob_tools import cronjob
+        campos = {k: p[k] for k in ("prompt", "schedule", "name_novo") if p.get(k)}
+        if "name_novo" in campos:
+            campos["name"] = campos.pop("name_novo")
+        return json.loads(cronjob(action="update", job_id=jid, **campos))
+    if acao == "run":
+        # roda num processo separado (o CLI executa até o fim e grava a saída); a ponte não fica presa
+        import subprocess
+        import os
+        flags = 0x08000000 if os.name == "nt" else 0  # sem janela de console
+        subprocess.Popen([sys.executable, "-m", "hermes_cli.main", "cron", "run", jid], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags,
+                         env={**os.environ, "PYTHONPATH": os.pathsep.join(x for x in sys.path if x)})
+        return {"success": True, "started": True}
+    raise ValueError(f"ação desconhecida: {acao}")
+
+
 async def principal() -> None:
     t0 = time.perf_counter()
     from hermes_cli.gateway_client import connect_gateway, GatewayRPCError
@@ -43,6 +64,13 @@ async def principal() -> None:
 
         async def atender(pedido):
             rid = pedido.get("id")
+            if pedido.get("method") == "local.cron":
+                # o gateway só cria/pausa/apaga; editar e rodar agora vão direto na ferramenta do Hermes (mesmo jobs.json)
+                try:
+                    escrever({"id": rid, "result": await asyncio.to_thread(cron_local, pedido.get("params") or {})})
+                except Exception as e:  # noqa: BLE001
+                    escrever({"id": rid, "error": {"message": f"{type(e).__name__}: {e}", "code": "cron"}})
+                return
             try:
                 r = await cliente.rpc(pedido["method"], _timeout=pedido.get("timeout"), **(pedido.get("params") or {}))
                 escrever({"id": rid, "result": r})

@@ -347,6 +347,42 @@ def _conversor():
     return _CACHE["conv"]
 
 
+def _se(arquivo):
+    """Voz (timbre) de um áudio para o OpenVoice, do jeito do extrator oficial: só os trechos com fala (VAD),
+    em pedaços de ~10 s, e a média. Medido 14/11: +0,03 de semelhança contra o arquivo inteiro. Cache em disco por sha."""
+    import numpy as np
+    import soundfile as sf
+    import torch
+    conv = _conversor()
+    pasta = RAIZ / "se"
+    pasta.mkdir(parents=True, exist_ok=True)
+    cache = pasta / f"{_sha(arquivo)[:16]}.pth"
+    if cache.exists():
+        return torch.load(str(cache))
+    try:
+        import librosa
+        from faster_whisper.vad import VadOptions, get_speech_timestamps
+        a, _ = librosa.load(str(arquivo), sr=16000)
+        ts = get_speech_timestamps(a, VadOptions(min_silence_duration_ms=300, speech_pad_ms=60))
+        fala = np.concatenate([a[t["start"]:t["end"]] for t in ts]) if ts else a
+        n = max(1, int(round(len(fala) / 16000 / 10.0)))
+        passo = len(fala) // n
+        tmp = pasta / ("tmp-" + cache.stem)
+        tmp.mkdir(exist_ok=True)
+        arqs = []
+        for i in range(n):
+            q = tmp / f"{i}.wav"
+            sf.write(str(q), fala[i * passo:(i + 1) * passo], 16000)
+            arqs.append(str(q))
+        se = conv.extract_se(arqs)
+        shutil.rmtree(tmp, ignore_errors=True)
+    except Exception as e:  # noqa: BLE001
+        _log(f"VAD falhou ({e}); voz do arquivo inteiro")
+        se = conv.extract_se([str(Path(arquivo).resolve())])
+    torch.save(se, str(cache))
+    return se
+
+
 def _piper():
     if "piper" not in _CACHE:
         from piper import PiperVoice
@@ -383,7 +419,7 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt", temperatura=Non
             try:
                 bruto = saida.with_name(saida.stem + ".xtts.wav")
                 shutil.move(str(saida), str(bruto))
-                trocar_timbre(str(bruto), str(amostra), str(saida))
+                trocar_timbre(str(bruto), str(amostra), str(saida), passadas=1)
                 bruto.unlink(missing_ok=True)
             except Exception as e:  # noqa: BLE001
                 _log(f"refino de timbre falhou: {e}")
@@ -395,25 +431,27 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt", temperatura=Non
         _piper().synthesize_wav(texto, wf)
     if amostra:
         conv = _conversor()
-        if chave_amostra not in _CACHE:
-            _CACHE[chave_amostra] = conv.extract_se([str(Path(amostra).resolve())])
-        origem = conv.extract_se([str(base)])
-        conv.convert(audio_src_path=str(base), src_se=origem, tgt_se=_CACHE[chave_amostra], output_path=str(saida), message="")
+        origem = _se(base)
+        conv.convert(audio_src_path=str(base), src_se=origem, tgt_se=_se(amostra), output_path=str(saida), message="")
         base.unlink(missing_ok=True)
     return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "openvoice"}
 
 
-def trocar_timbre(entrada, amostra, saida):
-    """Troca o timbre de uma fala que já existe (OpenVoice): mesmas palavras, ritmo e entonação, com a voz da amostra."""
+def trocar_timbre(entrada, amostra, saida, passadas=2):
+    """Troca o timbre de uma fala que já existe (OpenVoice): mesmas palavras, ritmo e entonação, com a voz da amostra.
+    Duas passadas pelo conversor (medido 14/11: 0,44 -> 0,48 de semelhança com a voz real; a 3ª não ajuda)."""
     t0 = time.time()
     conv = _conversor()
-    chave = ("openvoice", _sha(amostra))
-    if chave not in _CACHE:
-        _CACHE[chave] = conv.extract_se([str(Path(amostra).resolve())])
-    origem = conv.extract_se([str(entrada)])
+    alvo = _se(amostra)
     saida = Path(saida).resolve()
     saida.parent.mkdir(parents=True, exist_ok=True)
-    conv.convert(audio_src_path=str(entrada), src_se=origem, tgt_se=_CACHE[chave], output_path=str(saida), message="")
+    atual = Path(entrada)
+    for i in range(max(1, int(passadas))):
+        destino = saida if i == int(passadas) - 1 else saida.with_name(saida.stem + f".p{i}.wav")
+        conv.convert(audio_src_path=str(atual), src_se=_se(atual), tgt_se=alvo, output_path=str(destino), message="")
+        if atual != Path(entrada):
+            atual.unlink(missing_ok=True)
+        atual = destino
     return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "openvoice-troca"}
 
 
@@ -783,7 +821,7 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None, mod
         if refinar and motor == "xtts":
             # o XTTS acerta o texto e a entonação, mas o timbre fica "parecido"; o conversor do OpenVoice puxa para a voz real
             try:
-                trocar_timbre(str(melhor), str(amostra), str(fw))
+                trocar_timbre(str(melhor), str(amostra), str(fw), passadas=1)
             except Exception as e:  # noqa: BLE001
                 _log(f"refino falhou na frase {i}: {e}")
                 shutil.copy(melhor, fw)
