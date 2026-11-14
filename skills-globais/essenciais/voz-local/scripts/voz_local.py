@@ -873,6 +873,7 @@ if __name__ == "__main__":
                 args += ["--amostra", str(Path(am).resolve())]
             if a.textos:
                 args += ["--textos", str(Path(a.textos).resolve())]
+            args += ["--modo", a.modo] + (["--sem-refino"] if a.sem_refino else [])  # sem isso o modo se perdia na reexecução
             sys.exit(subprocess.run(args).returncode)
         print(json.dumps(redublar(a.video, a.amostra, a.saida, a.motor, a.idioma, a.textos, a.modo, not a.sem_refino), ensure_ascii=False))
     elif a.cmd == "transcrever":
