@@ -12,16 +12,16 @@ async function pintar() {
     texto = e.erro || 'Entre na sua conta pelo site. Ao entrar, esta extensão fica conectada sozinha, sem senha aqui.'
     botoes.entrar = true
   } else if (e.pausada) {
-    ponto = 'pausa'; titulo = 'Pausada'; texto = 'O Segundo Cérebro não pode usar o seu Chrome enquanto estiver pausada.'
+    ponto = 'pausa'; titulo = 'Pausada'; texto = 'O Cérebro Pro não pode usar o seu Chrome enquanto estiver pausada.'
     botoes.pausar = true; botoes.desconectar = true
   } else if (e.agindo) {
-    ponto = 'age'; titulo = 'Trabalhando no seu Chrome'; texto = 'O Segundo Cérebro está usando uma aba do grupo "Segundo Cérebro". Pause se quiser assumir.'
+    ponto = 'age'; titulo = 'Trabalhando no seu Chrome'; texto = 'O Cérebro Pro está usando uma aba do grupo "Cérebro Pro". Pause se quiser assumir.'
     botoes.pausar = true; botoes.desconectar = true
   } else if (e.conectado) {
-    ponto = 'ok'; titulo = 'Conectado'; texto = 'O Segundo Cérebro pode usar este Chrome quando você pedir, com as suas contas abertas.'
+    ponto = 'ok'; titulo = 'Conectado'; texto = 'O Cérebro Pro pode usar este Chrome quando você pedir, com as suas contas abertas.'
     botoes.pausar = true; botoes.desconectar = true
   } else {
-    titulo = 'Conectando…'; texto = 'Tentando falar com o Segundo Cérebro.'
+    titulo = 'Conectando…'; texto = 'Tentando falar com o Cérebro Pro.'
     botoes.desconectar = true
   }
   $('ponto').className = 'ponto ' + ponto

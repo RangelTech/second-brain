@@ -1,4 +1,4 @@
-// Service worker do Segundo Cérebro no Chrome. Mantém um WebSocket com a ponte (remoto.rangeltech.net/ws/extensao), recebe os comandos
+// Service worker do Cérebro Pro no Chrome. Mantém um WebSocket com a ponte (remoto.rangeltech.net/ws/extensao), recebe os comandos
 // do Hermes (abrir, ler, clicar, digitar, rolar, voltar, js, print, oauth_capturar) e executa no Chrome do usuário.
 // Sem login aqui: o pareamento vem do app (mensageria nativa) ou do site do remoto (content-remoto.js).
 import { ehRetorno, lerRetorno, urlPermitida, textoLer, MAX_TEXTO } from './nucleo.js'
@@ -136,7 +136,7 @@ async function abaAgente(criar = true) {
   try {
     const g = await chrome.tabs.group(grupoId != null ? { tabIds: [t.id], groupId: grupoId } : { tabIds: [t.id] })
     grupoId = g
-    await chrome.tabGroups.update(g, { title: 'Segundo Cérebro', color: 'purple' })
+    await chrome.tabGroups.update(g, { title: 'Cérebro Pro', color: 'purple' })
   } catch {}
   return t
 }

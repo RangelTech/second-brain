@@ -1,10 +1,10 @@
-# Segundo Cérebro no Chrome
+# Cérebro Pro no Chrome
 
 Extensão (Manifest V3) que deixa o Hermes usar o Chrome do usuário, com as sessões dele. Sem tela de login: a conta vem do app (mensageria nativa)
 ou do site do remoto (cookie da página). Ferramentas: `abrir`, `ler`, `clicar`, `digitar`, `rolar`, `voltar`, `js`, `print` e `oauth_capturar`
 (login de provedor: pega o retorno `localhost:8080/callback`).
 
-- `background.js`: WebSocket com a ponte (`/ws/extensao`), ferramentas, depurador (solto após 20 s sem uso), grupo de abas "Segundo Cérebro".
+- `background.js`: WebSocket com a ponte (`/ws/extensao`), ferramentas, depurador (solto após 20 s sem uso), grupo de abas "Cérebro Pro".
 - `content-remoto.js`: roda só em `remoto.rangeltech.net`; pareia pela sessão da página ou por `#sbp=<token>` (entregue pelo app).
 - `popup.*`: estado, pausar, desconectar, entrar. `nucleo.js`: lógica pura.
 - ID fixo pela chave pública em `chave.json` (a privada `chave-privada.pem` fica no cofre e fora do git).
