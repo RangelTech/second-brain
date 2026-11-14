@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala o Segundo Cérebro em modo SERVIDOR (sem tela) numa máquina Linux (Debian/Ubuntu), para ser usado só pelo site
+# Instala o Cérebro Pro em modo SERVIDOR (sem tela) numa máquina Linux (Debian/Ubuntu), para ser usado só pelo site
 # de acesso web (https://remoto.rangeltech.net). Roda como serviço, reinicia sozinho e se atualiza por reinstalação.
 #
 # Uso (como root):
@@ -42,7 +42,7 @@ if [ -z "$DEB" ]; then
   DEB="$(mktemp --suffix=.deb)"
   trap 'rm -f "$DEB"' EXIT
   if [ -n "${SB_VERSAO:-}" ]; then BASE="https://github.com/$REPO/releases/download/${SB_VERSAO}"; else BASE="https://github.com/$REPO/releases/latest/download"; fi
-  LOG "Baixando o Segundo Cérebro (${SB_VERSAO:-última versão})…"
+  LOG "Baixando o Cérebro Pro (${SB_VERSAO:-última versão})…"
   curl -fL --retry 3 --retry-delay 3 -o "$DEB" "$BASE/Segundo-Cerebro-Linux.deb" || FALHA "não consegui baixar o pacote."
 fi
 LOG "Instalando o pacote…"
@@ -72,7 +72,7 @@ fi
 
 cat > /etc/systemd/system/segundo-cerebro.service <<UNIT
 [Unit]
-Description=Segundo Cérebro (servidor)
+Description=Cérebro Pro (servidor)
 After=network-online.target
 Wants=network-online.target
 
@@ -83,7 +83,7 @@ Environment=SB_DATA_DIR=$DADOS SB_SERVIDOR=1 HOME=$DADOS
 ExecStart=/usr/bin/env bash -c '$CMD'
 Restart=always
 RestartSec=5
-# a VM é do cliente: o agente roda como o dono dela (sudo, Docker, instalar pacotes). Só o próprio Segundo Cérebro é protegido (build/liberdade-vm.sh).
+# a VM é do cliente: o agente roda como o dono dela (sudo, Docker, instalar pacotes). Só o próprio Cérebro Pro é protegido (build/liberdade-vm.sh).
 
 [Install]
 WantedBy=multi-user.target
@@ -91,7 +91,7 @@ UNIT
 # atualizador diário: se houver versão nova publicada, baixa o .deb, instala e reinicia o serviço (a VM do cliente nunca fica para trás)
 cat > /usr/local/bin/segundo-cerebro-atualizar <<'ATU'
 #!/usr/bin/env bash
-# Atualizador do Segundo Cérebro (servidor/VM). NÃO depende da API do GitHub (que dá 504 e limita 60 consultas por hora por IP):
+# Atualizador do Cérebro Pro (servidor/VM). NÃO depende da API do GitHub (que dá 504 e limita 60 consultas por hora por IP):
 #  1) versão pelo redirecionamento de https://github.com/<repo>/releases/latest (página normal, segue de pé quando a API cai)
 #  2) plano B: o endpoint do nosso servidor (guarda a última versão boa), 3) plano C: a API.
 # Se nenhuma responder, sai com sucesso e tenta de novo no próximo ciclo (a VM nunca fica "com erro" por causa do GitHub).
@@ -127,14 +127,14 @@ ATU
 chmod 755 /usr/local/bin/segundo-cerebro-atualizar
 cat > /etc/systemd/system/segundo-cerebro-atualizar.service <<UNIT2
 [Unit]
-Description=Atualiza o Segundo Cérebro (servidor)
+Description=Atualiza o Cérebro Pro (servidor)
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/segundo-cerebro-atualizar
 UNIT2
 cat > /etc/systemd/system/segundo-cerebro-atualizar.timer <<UNIT3
 [Unit]
-Description=Procura versão nova do Segundo Cérebro todo dia
+Description=Procura versão nova do Cérebro Pro todo dia
 [Timer]
 OnCalendar=*-*-* 00,06,12,18:00:00
 RandomizedDelaySec=1h
@@ -152,7 +152,7 @@ systemctl enable --now segundo-cerebro-atualizar.timer
 curl -fsSL --retry 3 https://raw.githubusercontent.com/RangelTech/second-brain/main/scripts/proxy-vm.sh -o /usr/local/bin/segundo-cerebro-proxy && chmod 755 /usr/local/bin/segundo-cerebro-proxy || LOG "aviso: não baixei o script do proxy do navegador"
 cat > /etc/systemd/system/segundo-cerebro-proxy.service <<UNIT4
 [Unit]
-Description=Proxy do navegador do Segundo Cérebro (IP do Brasil para redes sociais)
+Description=Proxy do navegador do Cérebro Pro (IP do Brasil para redes sociais)
 After=network-online.target segundo-cerebro.service
 [Service]
 Type=oneshot
@@ -160,7 +160,7 @@ ExecStart=/usr/local/bin/segundo-cerebro-proxy
 UNIT4
 cat > /etc/systemd/system/segundo-cerebro-proxy.timer <<UNIT5
 [Unit]
-Description=Confere o proxy do navegador do Segundo Cérebro
+Description=Confere o proxy do navegador do Cérebro Pro
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=6h

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nome do Produto — experiência</title>
+<!-- Modelo: ROLAGEM QUADRO A QUADRO (skill sites-cinematograficos). O vídeo avança conforme a pessoa rola, como nas páginas da Apple.
+     Troque: CONFIG (pasta dos quadros, textos, cores), o título, o rodapé. Quadros gerados por scripts/quadros.py. -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{--fundo:#050506;--texto:#f5f5f7;--sutil:#a1a1a6;--destaque:#d4af37}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:auto}
+  body{background:var(--fundo);color:var(--texto);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  header{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:center;padding:22px 5vw;z-index:20;mix-blend-mode:difference}
+  header b{letter-spacing:.3em;font-size:13px}
+  header a{color:var(--texto);text-decoration:none;font-size:13px;border:1px solid currentColor;padding:8px 16px;border-radius:999px}
+  .palco{position:relative;height:var(--altura,500vh)}
+  .fixo{position:sticky;top:0;height:100vh;overflow:hidden}
+  canvas{position:absolute;inset:0;width:100%;height:100%}
+  .veu{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.55));pointer-events:none}
+  .carregando{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);font-size:12px;letter-spacing:.2em;color:var(--sutil)}
+  .frase{position:absolute;left:6vw;right:6vw;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0}
+  .frase small{display:block;font-size:13px;letter-spacing:.35em;text-transform:uppercase;color:var(--destaque);margin-bottom:18px}
+  .frase h2{font-size:clamp(40px,7vw,104px);font-weight:800;line-height:1;letter-spacing:-.03em;max-width:14ch}
+  .frase p{margin-top:22px;font-size:clamp(16px,1.6vw,21px);color:var(--sutil);max-width:44ch;line-height:1.5}
+  .frase h2,.frase p,.frase small{text-shadow:0 2px 24px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.5)}
+  .frase::before{content:'';position:absolute;inset:-30vh -10vw;z-index:-1;background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.25) 55%,transparent);pointer-events:none}
+  .frase.dir::before{background:linear-gradient(270deg,rgba(0,0,0,.72),rgba(0,0,0,.25) 55%,transparent)}
+  .frase.dir{text-align:right}.frase.dir h2,.frase.dir p{margin-left:auto}
+  .final{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10vh 6vw;gap:26px}
+  .final h3{font-size:clamp(34px,5vw,72px);font-weight:800;letter-spacing:-.02em}
+  .final a{background:var(--destaque);color:#111;text-decoration:none;font-weight:800;padding:18px 34px;border-radius:999px}
+  .final p{color:var(--sutil)}
+  /* tela em pé (celular): frase embaixo, o produto fica livre no meio */
+  @media (max-aspect-ratio: 1/1){.frase,.frase.dir{top:auto;bottom:9vh;transform:none;text-align:left}.frase.dir h2,.frase.dir p{margin-left:0}.frase::before,.frase.dir::before{inset:-12vh -10vw -10vh;background:linear-gradient(0deg,rgba(0,0,0,.85),rgba(0,0,0,.4) 60%,transparent)}}
+  @media (prefers-reduced-motion: reduce){.frase{transition:none}}
+</style>
+</head>
+<body>
+<header><b>NOME</b><a href="#final">Quero conhecer</a></header>
+<section class="palco" id="palco">
+  <div class="fixo">
+    <canvas id="tela"></canvas>
+    <div class="veu"></div>
+    <div class="carregando" id="carregando">CARREGANDO 0%</div>
+    <!-- frases: aparecem entre "de" e "ate" (0 a 1 = começo ao fim da rolagem do palco) -->
+    <div class="frase" data-de="0.02" data-ate="0.22"><small>Apresentando</small><h2>Feito para ser visto.</h2><p>Uma frase curta que vende a ideia principal.</p></div>
+    <div class="frase dir" data-de="0.30" data-ate="0.50"><small>Detalhe</small><h2>Cada ângulo conta.</h2><p>O benefício número um, em uma linha.</p></div>
+    <div class="frase" data-de="0.58" data-ate="0.78"><small>Experiência</small><h2>Por dentro, outra história.</h2><p>O segundo benefício, em uma linha.</p></div>
+    <div class="frase dir" data-de="0.84" data-ate="1.01"><small>Agora</small><h2>É a sua vez.</h2></div>
+  </div>
+</section>
+<section class="final" id="final">
+  <h3>Pronto para ver de perto?</h3>
+  <p>Chamada final com o próximo passo.</p>
+  <a href="https://wa.me/5500000000000">Falar no WhatsApp</a>
+</section>
+<script>
+const CONFIG = { pasta: 'quadros/', alturaVh: 500 } // alturaVh: quanto de rolagem o vídeo inteiro ocupa (400 a 700)
+const tela = document.getElementById('tela'), ctx = tela.getContext('2d')
+const palco = document.getElementById('palco')
+palco.style.setProperty('--altura', CONFIG.alturaVh + 'vh')
+let info = { total: 0 }, imgs = [], atual = -1, alvo = 0
+function ajustar() {
+  const r = Math.min(window.devicePixelRatio || 1, 2)
+  tela.width = innerWidth * r; tela.height = innerHeight * r
+  atual = -1; desenhar()
+}
+function desenhar() {
+  const i = Math.round(alvo)
+  if (i === atual) return
+  // quadro mais próximo já carregado (a rolagem nunca fica preta enquanto carrega)
+  let k = i
+  while (k > 0 && !(imgs[k] && imgs[k].complete && imgs[k].naturalWidth)) k--
+  const im = imgs[k]
+  if (!im || !im.naturalWidth) return
+  atual = i
+  const s = Math.max(tela.width / im.naturalWidth, tela.height / im.naturalHeight) // cobre a tela (como object-fit: cover)
+  const w = im.naturalWidth * s, h = im.naturalHeight * s
+  ctx.drawImage(im, (tela.width - w) / 2, (tela.height - h) / 2, w, h)
+}
+function progresso() {
+  const r = palco.getBoundingClientRect()
+  const total = palco.offsetHeight - innerHeight
+  return Math.min(1, Math.max(0, -r.top / total))
+}
+function aoRolar() {
+  const p = progresso()
+  alvo = p * (info.total - 1)
+  for (const f of document.querySelectorAll('.frase')) {
+    const de = +f.dataset.de, ate = +f.dataset.ate
+    const meio = Math.min(1, Math.max(0, Math.min((p - de) / 0.06, (ate - p) / 0.06)))
+    f.style.opacity = meio
+    f.style.transform = matchMedia('(max-aspect-ratio: 1/1)').matches ? `translateY(${(1 - meio) * 30}px)` : `translateY(calc(-50% + ${(1 - meio) * 30}px))`
+  }
+}
+function laco() { desenhar(); requestAnimationFrame(laco) }
+async function iniciar() {
+  info = await (await fetch(CONFIG.pasta + 'quadros.json')).json()
+  imgs = new Array(info.total)
+  let prontos = 0
+  const carregar = (i) => new Promise((ok) => {
+    const im = new Image()
+    im.decoding = 'async'
+    im.onload = im.onerror = () => { prontos++; document.getElementById('carregando').textContent = 'CARREGANDO ' + Math.round(prontos / info.total * 100) + '%'; ok() }
+    im.src = CONFIG.pasta + String(i + 1).padStart(4, '0') + '.webp'
+    imgs[i] = im
+  })
+  await carregar(0); ajustar()
+  // carrega em passos (1 a cada 8 primeiro, depois o resto): a rolagem já funciona com a versão grossa
+  const ordem = []; for (let p = 8; p >= 1; p = p / 2 | 0) { for (let i = 0; i < info.total; i += p) if (!ordem.includes(i)) ordem.push(i); if (p === 1) break }
+  for (let i = 0; i < ordem.length; i += 6) await Promise.all(ordem.slice(i, i + 6).map(carregar))
+  document.getElementById('carregando').style.display = 'none'
+}
+addEventListener('resize', ajustar)
+addEventListener('scroll', aoRolar, { passive: true })
+iniciar().then(aoRolar)
+laco()
+</script>
+</body>
+</html>

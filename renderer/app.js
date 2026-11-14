@@ -77,7 +77,8 @@
   const CAT = Object.fromEntries(((window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []).map((p) => [p.id, p]))
 
   // caminho completo de um arquivo gerado pelo agente (C:\...\a.xlsx ou /home/.../a.pdf): vira link (abre no app, baixa na web)
-  const EXT_ARQ = 'xlsx?|xlsm|docx?|pptx?|pdf|csv|zip|txt|md|json|png|jpe?g|gif|webp|svg|mp3|wav|mp4|mov|html?'
+  const EXT_ARQ = 'xlsx?|xlsm|docx?|pptx?|odt|ods|odp|rtf|pdf|csv|zip|txt|md|json|png|jpe?g|gif|webp|svg|mp3|wav|ogg|mp4|mov|html?'
+  const EXT_ESCRITORIO = /\.(docx?|xlsx?|xlsm|pptx?|odt|ods|odp|csv|rtf)$/i // abrem no editor de documentos (spec 37)
   const CAMINHO_ARQ = new RegExp('(?:[A-Za-z]:\\\\[^<>"\'`|*?\\n]{1,180}?|(?<![\\w:./-])/(?:home|root|var|opt|tmp|Users|srv|mnt)/[^<>"\'`|*?\\n]{1,180}?)\\.(?:' + EXT_ARQ + ')(?![\\w])', 'gi')
   // markdown mínimo: blocos de código, código em linha, negrito, títulos, listas, links http(s)
   function md(t) {
@@ -122,7 +123,7 @@
         if (lista) saida.push('</ul>')
         return saida
           .join('')
-          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>`)
+          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>${!ehWeb && EXT_ESCRITORIO.test(m) && window.sb.escritorio ? `<button class="arq-editar" data-escritorio="${m}" title="Abrir no editor de documentos do Cérebro Pro">Abrir no editor</button>` : ''}`)
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
           .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)]+)/g, (m, rotulo, urlMd, urlSolta) => {
@@ -523,8 +524,10 @@
     d.innerHTML = `<details open data-chave="sub"><summary><span class="fi">${IC.sparkles}</span><span class="ft"><b>Ajudantes</b> ${feitos} de ${itens.length} terminaram</span></summary><ol class="pl-itens">${itens.map((i) => `<li class="pl-${i.estado}"><span class="pl-m">${marca[i.estado] || ''}</span><span><span>${esc(i.objetivo)}</span>${i.detalhe ? `<span class="mut" style="display:block;font-size:12px">${esc(i.detalhe)}</span>` : ''}</span></li>`).join('')}</ol></details>`
     return d
   }
-  function cartaoPlano(pl) {
+  function cartaoPlano(pl, encerrado) {
     const d = document.createElement('div')
+    // resposta já terminou e o agente não marcou os itens: nada de rodinha eterna (o item "fazendo" vira pendente, sem animação)
+    if (encerrado) pl = { ...pl, itens: pl.itens.map((i) => (i.estado === 'fazendo' ? { ...i, estado: 'pendente' } : i)) }
     const feitos = pl.itens.filter((i) => i.estado === 'feito').length
     d.className = 'ferr plano'
     const marca = { feito: IC.check, fazendo: '<span class="rodando"></span>', pendente: '<span class="pl-vazio"></span>', cancelado: IC.x }
@@ -568,7 +571,7 @@
     if (ehWeb || !window.sb.editor || !caminho) return ''
     return `<button data-editor="${attr(caminho)}">${IC.film || IC.file}Abrir no editor</button>`
   }
-  function renderPartes(el, partes) {
+  function renderPartes(el, partes, encerrado = false) {
     // o usuário abre e fecha os blocos de passos à mão: redesenhar (a cada evento do agente) não pode mudar isso
     const abertos = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => d.open).map((d) => d.dataset.chave))
     const fechados = new Set([...el.querySelectorAll('details[data-chave]')].filter((d) => !d.open).map((d) => d.dataset.chave))
@@ -615,7 +618,7 @@
         el.appendChild(cartaoSubagentes(p.itens))
       } else if (p.t === 'plano') {
         fechaGrupo()
-        el.appendChild(cartaoPlano(p.plano))
+        el.appendChild(cartaoPlano(p.plano, encerrado))
       } else if (p.t === 'ferr') {
         if (ehMidia(p.f)) {
           const sig = (p.f.id || '') + '|' + (p.f.status || '') + '|' + String(p.f.conteudo || '').length
@@ -644,7 +647,7 @@
     }
   }
 
-  const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Segundo Cérebro`
+  const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Cérebro Pro`
   // ---------- horário, tempo e tokens por resposta ----------
   const hhmm = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   const duracao = (ms) => {
@@ -678,7 +681,7 @@
       d.innerHTML = `<div class="corpo">${md(m.content)}</div>${(m.anexos || []).map((a) => `<div class="anexo-msg">${IC.clip}${esc(a.nome)}</div>`).join('')}${m.em ? `<div class="hora-msg">${hhmm(m.em)}</div>` : ''}`
     } else {
       d.innerHTML = `${QUEM}<button class="ouvir" data-ouvir title="Ouvir a resposta" aria-label="Ouvir a resposta">${IC.volume}</button></div><div class="partes"></div>${resumoResposta(m)}${m.raciocinio ? `<details class="raciocinio"><summary>Raciocínio</summary><div class="rtxt">${esc(m.raciocinio)}</div></details>` : ''}`
-      renderPartes(d.querySelector('.partes'), partesDe(m))
+      renderPartes(d.querySelector('.partes'), partesDe(m), true)
       const nosCartoes = (m.partes || []).filter((p) => p.t === 'ferr').map((p) => String(p.f.conteudo || '')).join(' ')
       for (const a of m.midias || []) if (!nosCartoes.includes(a)) d.appendChild(midia(a)) // o cartão da ferramenta já mostra: não repete como anexo
     }
@@ -1572,7 +1575,7 @@
     salvar()
     if (c.id === atual) desenhar()
     listar()
-    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Segundo Cérebro', { body: ok ? 'Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo.' }) } catch {}
+    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Cérebro Pro', { body: ok ? 'Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo.' }) } catch {}
   })
   // o agente está sendo preparado (primeira abertura, ou depois de uma instalação que não terminou): tela de carregamento com o cérebro animado,
   // o passo atual e o tempo, no lugar do chat. Impede a pessoa de mandar um pedido que ficaria minutos "enviando"; some sozinha quando termina.
@@ -1699,7 +1702,7 @@
         b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;background:#2a1f14;color:#f3ece4;border:1px solid #5a4630;border-radius:12px;padding:12px 14px;font:13px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:340px;display:flex;flex-direction:column;gap:8px'
         document.body.appendChild(b)
       }
-      const txt = e.fase === 'baixando' ? 'Baixando a nova versão…' : e.fase === 'pronta' ? 'Nova versão pronta. Reinicie para usar.' : 'Tem uma nova atualização do Segundo Cérebro (' + e.versao + ').'
+      const txt = e.fase === 'baixando' ? 'Baixando a nova versão…' : e.fase === 'pronta' ? 'Nova versão pronta. Reinicie para usar.' : 'Tem uma nova atualização do Cérebro Pro (' + e.versao + ').'
       b.innerHTML = '<span></span><div style="display:flex;gap:8px;justify-content:flex-end"></div>'
       b.firstChild.textContent = txt + (e.erro ? ' ' + e.erro : '')
       const acoes = b.lastChild
@@ -1780,6 +1783,19 @@
     if (ab) return ehWeb ? baixarArquivo(ab.dataset.abrir, ab) : window.sb.abrirArquivo(ab.dataset.abrir)
     const ou = e.target.closest('[data-ouvir]')
     if (ou) return ouvir(ou)
+    const btEsc = e.target.closest('[data-escritorio]')
+    if (btEsc) {
+      if (btEsc.disabled) return
+      btEsc.disabled = true
+      const rot = btEsc.textContent
+      btEsc.textContent = 'Abrindo…'
+      const fim = window.sb.escritorio.aoProgresso?.((p) => { if (p && p.fase === 'baixando' && btEsc.disabled) btEsc.textContent = `Preparando o editor ${p.pct}%` })
+      window.sb.escritorio.abrir(btEsc.dataset.escritorio).then((r) => {
+        if (!r || !r.ok) aviso('Editor de documentos: ' + ((r && r.erro) || 'não abriu'))
+        else if (r.padrao) aviso('Abri no programa padrão do computador. ' + (r.aviso || ''))
+      }).finally(() => { btEsc.disabled = false; btEsc.textContent = rot; if (typeof fim === 'function') fim() })
+      return
+    }
     const ed = e.target.closest('[data-editor]')
     if (ed) {
       if (ed.disabled) return

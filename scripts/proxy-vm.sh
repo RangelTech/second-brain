@@ -2,7 +2,7 @@
 # Proxy do navegador na VM (spec 31): as VMs saem por IP de datacenter fora do Brasil e o Instagram e afins barram.
 # Busca no servidor (com a chave da própria VM) o proxy da conta e configura:
 #   1) Squid LOCAL só em 127.0.0.1:3129, que repassa para o proxy da conta com a senha (se o proxy cair, sai direto: o cliente nunca fica sem a rede);
-#   2) /etc/segundo-cerebro/navegador.pac: só as redes sociais vão pelo 127.0.0.1:3129, o resto sai direto;
+#   2) /etc/segundo-cerebro/navegador.pac: TODA a navegação vai pelo 127.0.0.1:3129 (só o local sai direto);
 #   3) o app sobe com --proxy-pac-url apontando para esse arquivo (vale para qualquer versão do app).
 # Sem proxy cadastrado no servidor, desfaz tudo (saída direta). Idempotente; roda na instalação e no atualizador diário.
 # Uso (root): /usr/local/bin/segundo-cerebro-proxy   (lê SB_CONTA_CHAVE de /etc/segundo-cerebro/env)
@@ -52,14 +52,14 @@ print(p.scheme, u.unquote(p.username or ""), u.unquote(p.password or ""), p.host
   if ! cmp -s "$NOVO" "$CONF"; then install -m 640 -o root -g proxy "$NOVO" "$CONF"; systemctl enable squid >/dev/null 2>&1; systemctl restart squid; log "squid local atualizado"; fi
   rm -f "$NOVO"
   systemctl is-active --quiet squid || systemctl restart squid
-  # PAC: só as redes sociais pelo squid local
+  # PAC: TUDO pelo squid local (que repassa ao proxy do Brasil), menos endereços locais. Proxiar só alguns domínios
+  # misturava IPs (site por um, captcha/CDN por outro) e os antifraudes travavam login (14/11/2026).
   NOVO=$(mktemp)
   {
     echo "function FindProxyForURL(url, host) {"
     echo "  host = host.toLowerCase();"
-    echo -n "  var d = ["; for x in $DOMINIOS; do echo -n "\"$x\","; done; echo "];"
-    echo "  for (var i = 0; i < d.length; i++) { if (host === d[i] || dnsDomainIs(host, '.' + d[i])) return 'PROXY 127.0.0.1:3129; DIRECT'; }"
-    echo "  return 'DIRECT';"
+    echo "  if (isPlainHostName(host) || host === 'localhost' || shExpMatch(host, '127.*') || shExpMatch(host, '10.*') || shExpMatch(host, '192.168.*') || host === '::1') return 'DIRECT';"
+    echo "  return 'PROXY 127.0.0.1:3129';"
     echo "}"
   } > "$NOVO"
   if ! cmp -s "$NOVO" "$PAC"; then install -m 644 "$NOVO" "$PAC"; mudou=1; fi

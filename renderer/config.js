@@ -1,4 +1,4 @@
-// Configurações do Segundo Cérebro: Provedores, Combos, Uso e Cota.
+// Configurações do Cérebro Pro: Provedores, Combos, Uso e Cota.
 // As telas são nativas; os dados vêm do motor de provedores (rotas /api/* via window.sb.api).
 ;(() => {
   const CAT = (window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []
@@ -136,7 +136,7 @@
     })
     const chip = (id, nome) => `<button class="chip ${S.filtro === id ? 'on' : ''}" data-filtro="${id}">${nome}</button>`
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Provedores</h1><p>Contas e chaves que o Segundo Cérebro usa para responder. Conecte quantas quiser e depois monte combos com elas.</p></div>
+      <div class="cfg-cab"><div><h1>Provedores</h1><p>Contas e chaves que o Cérebro Pro usa para responder. Conecte quantas quiser e depois monte combos com elas.</p></div>
         <div class="cfg-acoes"><button data-acao="compat">＋ Compatível com OpenAI</button></div></div>
       <div class="destaque">
         <img src="img/unlimited.svg" alt="">
@@ -235,8 +235,8 @@
     const dispositivo = OAUTH_DISPOSITIVO.includes(p.id)
     const j = janela(`
       <h3>${logoHtml(p.id)} Conectar ${esc(p.nome)}</h3>
-      ${suportado ? `<div class="passo" id="m-passo">Entre com a sua conta ${esc(p.nome)}. ${window.sb.oauthJanela ? 'O login abre numa janela do Segundo Cérebro' : 'O login abre no navegador'} e o acesso fica guardado neste computador.</div>
-      <div id="m-area"></div>` : `<div class="alerta">A entrada por conta de ${esc(p.nome)} ainda não está disponível no Segundo Cérebro.${modoChave ? ' Você pode usar uma chave de API.' : ''}</div>`}
+      ${suportado ? `<div class="passo" id="m-passo">Entre com a sua conta ${esc(p.nome)}. ${window.sb.oauthJanela ? 'O login abre numa janela do Cérebro Pro' : 'O login abre no navegador'} e o acesso fica guardado neste computador.</div>
+      <div id="m-area"></div>` : `<div class="alerta">A entrada por conta de ${esc(p.nome)} ainda não está disponível no Cérebro Pro.${modoChave ? ' Você pode usar uma chave de API.' : ''}</div>`}
       <div class="alerta" id="m-msg" hidden></div>
       <div class="rodape-j"><button id="m-cancelar">Fechar</button>${modoChave ? '<button id="m-chave">Usar chave de API</button>' : ''}${suportado ? '<button class="btn-pri" id="m-ok">Entrar com a conta</button>' : ''}</div>`)
     j.q('#m-cancelar').onclick = () => (parar(), j.fechar())
@@ -450,7 +450,7 @@
       })
       .join('')
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Combos</h1><p>Um combo agrupa modelos sob um nome. O chat usa o nome do combo e o Segundo Cérebro decide qual modelo responde, na ordem ou em rodízio.</p></div>
+      <div class="cfg-cab"><div><h1>Combos</h1><p>Um combo agrupa modelos sob um nome. O chat usa o nome do combo e o Cérebro Pro decide qual modelo responde, na ordem ou em rodízio.</p></div>
         <div class="cfg-acoes"><button class="btn-pri" data-acao="novo">＋ Novo combo</button></div></div>
       ${S.combos.length ? `<div class="combos">${cartoes}</div>` : `<div class="vazio-cfg">${S.modelos.some((m) => m.grupo === 'Modelos') ? 'Nenhum combo ainda. Crie o primeiro.' : 'Conecte um provedor antes de criar combos.'}</div>`}`
   }
@@ -588,7 +588,7 @@
         <div class="uso-lista">${lista.map((l) => `<div class="uso-linha"><div class="uso-nome"><b>${esc(l.nome)}</b><span class="mut">${l.pedidos} pedidos · ${nt(l.entrada)} enviados · ${nt(l.saida)} recebidos${l.custo > 0.005 ? ' · ~US$ ' + l.custo.toFixed(2) + ' no preço de tabela' : ''}</span></div>
           <div class="uso-barra"><i style="width:${Math.max(3, Math.round((l.tokens / maior) * 100))}%"></i></div><div class="uso-tok">${nt(l.tokens)}</div></div>`).join('')}</div>
         ${modelos.length ? `<h3 style="margin:20px 0 8px;font-size:14px">Modelos mais usados</h3><div class="uso-lista">${modelos.map((x) => `<div class="uso-linha"><div class="uso-nome"><b>${esc(x.m)}</b><span class="mut">${esc(x.p)} · ${x.n} pedidos</span></div><div class="uso-tok">${nt(x.t)}</div></div>`).join('')}</div>` : ''}
-        <p class="mut" style="margin-top:12px;font-size:12px">O que você usa pelo Claude, ChatGPT e outras contas conta no limite delas, não no da assinatura do Segundo Cérebro. Só o que passa pelo Unlimited (nossa IA) conta nas janelas acima.</p>`
+        <p class="mut" style="margin-top:12px;font-size:12px">O que você usa pelo Claude, ChatGPT e outras contas conta no limite delas, não no da assinatura do Cérebro Pro. Só o que passa pelo Unlimited (nossa IA) conta nas janelas acima.</p>`
     }
     document.querySelectorAll('.uso-periodo button').forEach((b) => (b.onclick = () => pintarProv(b.dataset.p)))
     pintarProv('7d')
@@ -692,7 +692,7 @@
   async function telaSobre() {
     const i = await window.sb.info()
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Sobre</h1><p>Segundo Cérebro, da Rangel Tech.</p></div></div>
+      <div class="cfg-cab"><div><h1>Sobre</h1><p>Cérebro Pro, da Rangel Tech.</p></div></div>
       <div class="kpis"><div class="kpi"><span>Versão</span><b>${esc(i.versao)}</b></div><div class="kpi"><span>Sistema</span><b>${esc(i.so)}</b></div><div class="kpi"><span>Electron</span><b>${esc(i.electron)}</b></div></div>
       <h2>Atualizações</h2>
       <p class="mut" id="at-txt">Verificando…</p>
@@ -710,7 +710,7 @@
       <div class="cfg-acoes"><button id="so-exp">Exportar dados…</button><button id="so-imp">Importar dados…</button></div>
       <div class="alerta" id="so-msg" hidden style="margin-top:10px"></div>
       <h2>Licenças</h2>
-      <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Segundo Cérebro é MIT.</p>`
+      <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Cérebro Pro é MIT.</p>`
     const at = window.sb.atualizacao
     if (!window.__sbRaw || !at) {
       $('#at-txt').parentElement.querySelectorAll('#at-txt,#at-auto,#at-conf,#at-baixar').forEach((x) => (x.closest('label') || x).remove())
@@ -783,17 +783,17 @@
   }
 
   // =====================================================================
-  // CHROME (extensão "Segundo Cérebro no Chrome")
+  // CHROME (extensão "Cérebro Pro no Chrome")
   // =====================================================================
   async function telaChrome() {
     const e = await window.sb.extensao.estado().catch(() => ({}))
     const ponto = e.conectado ? (e.pausada ? '#8b8f98' : '#4caf7d') : '#e0a030'
     const titulo = e.conectado ? (e.pausada ? 'Chrome conectado, mas pausado' : 'Chrome conectado') : 'Chrome não conectado'
     const texto = e.conectado
-      ? (e.pausada ? 'A extensão está pausada. Clique no ícone dela no Chrome e em Continuar para o Segundo Cérebro voltar a usar o seu Chrome.' : `O Segundo Cérebro pode usar o seu Chrome${e.nome ? ' (' + esc(e.nome) + ')' : ''}, com as suas contas já abertas, quando você pedir "use o meu Chrome" ou quando a tarefa precisar delas.`)
-      : 'Instale a extensão uma vez e o Segundo Cérebro passa a poder usar o seu Chrome, com as suas contas (WhatsApp, Instagram, Gmail e outras) já abertas, e entrar no Claude e no ChatGPT sem copiar e colar endereço.'
+      ? (e.pausada ? 'A extensão está pausada. Clique no ícone dela no Chrome e em Continuar para o Cérebro Pro voltar a usar o seu Chrome.' : `O Cérebro Pro pode usar o seu Chrome${e.nome ? ' (' + esc(e.nome) + ')' : ''}, com as suas contas já abertas, quando você pedir "use o meu Chrome" ou quando a tarefa precisar delas.`)
+      : 'Instale a extensão uma vez e o Cérebro Pro passa a poder usar o seu Chrome, com as suas contas (WhatsApp, Instagram, Gmail e outras) já abertas, e entrar no Claude e no ChatGPT sem copiar e colar endereço.'
     $('.cfg-corpo').innerHTML = `
-      <div class="cfg-cab"><div><h1>Chrome</h1><p>Use o seu Chrome com o Segundo Cérebro. Neste aplicativo o padrão continua sendo o navegador de dentro dele; o Chrome entra quando você pedir.</p></div></div>
+      <div class="cfg-cab"><div><h1>Chrome</h1><p>Use o seu Chrome com o Cérebro Pro. Neste aplicativo o padrão continua sendo o navegador de dentro dele; o Chrome entra quando você pedir.</p></div></div>
       <div class="kpi" style="max-width:640px">
         <span>Extensão do Chrome</span>
         <b style="font-size:18px;display:flex;align-items:center;gap:8px"><i style="width:10px;height:10px;border-radius:50%;background:${ponto};display:inline-block"></i>${titulo}</b>

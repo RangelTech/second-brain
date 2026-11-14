@@ -1,9 +1,9 @@
-# Segundo Cérebro
+# Cérebro Pro
 
 Agente de IA para desktop da Rangel Tech. Windows e Linux (macOS em uma segunda etapa).
 
 - **Chat que age de verdade:** o Hermes é o motor do agente. Ele lê arquivos (inclusive PDF, Word e planilha), roda comandos, cria sites e documentos e chama o Claude Code e o Codex quando precisa. Cada ferramenta aparece como um cartão na conversa.
-- **Provedores e combos:** conecte contas e chaves (Claude, Codex, Gemini, GitHub, OpenRouter, Groq e dezenas de outros), monte combos (em ordem ou rodízio) e acompanhe **Uso** e **Cota**. O motor por trás é o [9Router](https://github.com/decolua/9router) (MIT), que roda escondido neste computador; as telas são do Segundo Cérebro.
+- **Provedores e combos:** conecte contas e chaves (Claude, Codex, Gemini, GitHub, OpenRouter, Groq e dezenas de outros), monte combos (em ordem ou rodízio) e acompanhe **Uso** e **Cota**. O motor por trás é o [9Router](https://github.com/decolua/9router) (MIT), que roda escondido neste computador; as telas são do Cérebro Pro.
 - **Unlimited:** a IA da casa. Cole a chave que você recebeu e pronto.
 - **Anexos e áudio:** anexe arquivos (clipe ou arrastar e soltar), cole imagens e grave áudio pelo microfone.
 
@@ -15,7 +15,7 @@ Agente de IA para desktop da Rangel Tech. Windows e Linux (macOS em uma segunda 
 
 Na primeira conversa o agente prepara o ambiente do Hermes (alguns minutos, uma vez só).
 
-A pasta de trabalho padrão é `Documentos/Segundo Cérebro` e muda em **Configurações > Agente**. O agente pergunta antes de rodar comandos, escrever fora da pasta ou apagar arquivos.
+A pasta de trabalho padrão é `Documentos/Cérebro Pro` e muda em **Configurações > Agente**. O agente pergunta antes de rodar comandos, escrever fora da pasta ou apagar arquivos.
 
 ## Desenvolvimento
 

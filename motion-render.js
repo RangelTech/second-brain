@@ -6,7 +6,7 @@ const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 
-const LIM = { largura: [160, 3840], altura: [160, 3840], fps: [12, 60], duracao: [0.5, 180] }
+const LIM = { largura: [160, 3840], altura: [160, 3840], fps: [12, 60], duracao: [0.5, 1200] } // até 20 min (VSL longa)
 const faixa = (v, [a, b], padrao) => (Number.isFinite(+v) && +v > 0 ? Math.min(b, Math.max(a, +v)) : padrao)
 const par = (n) => Math.round(n / 2) * 2
 
@@ -70,11 +70,46 @@ function proximaPintura(wc, ms = 2000) {
     wc.on('paint', f)
   })
 }
+// pixel (0,0) da pintura em BGRA → [r, g, b]
+function carimbo(img) {
+  const b = img.toBitmap()
+  return [b[2], b[1], b[0]]
+}
+// tira o carimbo do canto: copia os pixels vizinhos por cima (o quadro final sai limpo)
+function semCarimbo(img) {
+  const { nativeImage } = require('electron')
+  const s = img.getSize()
+  const b = img.toBitmap()
+  const linha = s.width * 4
+  for (let y = 0; y < 3 && y < s.height; y++) for (let x = 0; x < 3 && x < s.width; x++) {
+    const de = (Math.min(s.height - 1, 4) * linha) + Math.min(s.width - 1, 4) * 4
+    const para = y * linha + x * 4
+    b[para] = b[de]; b[para + 1] = b[de + 1]; b[para + 2] = b[de + 2]; b[para + 3] = b[de + 3]
+  }
+  return nativeImage.createFromBitmap(b, { width: s.width, height: s.height })
+}
 async function quadro(wc, o, ms) {
-  await wc.executeJavaScript(`window.__sbSeek(${ms})`)
-  const espera = proximaPintura(wc)
-  wc.invalidate()
-  let img = (await espera) || (await wc.capturePage())
+  let serie = await wc.executeJavaScript(`window.__sbSeek(${ms})`)
+  if (serie === -1) {
+    // há vídeo na página: uma pintura para o Chromium trocar o quadro do <video>, depois copia para o canvas e carimba
+    const espera = proximaPintura(wc, 700)
+    wc.invalidate()
+    await espera
+    serie = await wc.executeJavaScript('window.__sbPintar()')
+  }
+  const quer = [(serie & 31) * 8, (serie >> 5) * 8, 77]
+  // pega pinturas até chegar a que tem o carimbo DESTE quadro (no máximo ~12 tentativas; depois o capturePage)
+  let img = null
+  for (let i = 0; i < 12 && !img; i++) {
+    const espera = proximaPintura(wc, 700)
+    wc.invalidate()
+    const p = await espera
+    if (!p) continue
+    const c = carimbo(p)
+    if (Math.abs(c[0] - quer[0]) <= 3 && Math.abs(c[1] - quer[1]) <= 3 && Math.abs(c[2] - 77) <= 3) img = p
+  }
+  if (!img) img = await wc.capturePage()
+  img = semCarimbo(img)
   const s = img.getSize()
   if (s.width !== o.largura || s.height !== o.altura) img = img.resize({ width: o.largura, height: o.altura, quality: 'best' })
   return img
@@ -91,6 +126,8 @@ async function previa(args) {
     fs.mkdirSync(pasta, { recursive: true })
     const base = path.join(pasta, path.basename(o.saida).replace(/\.mp4$/i, ''))
     const arquivos = []
+    // aquecimento: a 1ª pintura (fontes, WebGL compilando shaders) às vezes chega atrasada; descarta um quadro
+    await quadro(p.wc, o, Math.min(o.duracao, tempos[0] || 0) * 1000).catch(() => {})
     for (const t of tempos) {
       const img = await quadro(p.wc, o, Math.min(o.duracao, t) * 1000)
       const f = `${base}-quadro-${String(t.toFixed(2)).replace('.', '_')}s.png`
@@ -120,6 +157,7 @@ async function renderizar(args, { ffmpeg, aoProgresso } = {}) {
   const terminou = new Promise((ok) => ff.on('close', ok))
   const t0 = Date.now()
   try {
+    await quadro(p.wc, o, 0).catch(() => {}) // aquecimento (ver prévia)
     for (let i = 0; i < total; i++) {
       const img = await quadro(p.wc, o, (i * 1000) / o.fps)
       const buf = img.toBitmap()

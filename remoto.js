@@ -101,7 +101,7 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
     if (!cfg.ativo) return
     const k = await Promise.resolve(chave()).catch(() => '')
     if (!k) {
-      erro = 'Entre na sua conta no Segundo Cérebro para ligar o acesso web.'
+      erro = 'Entre na sua conta no Cérebro Pro para ligar o acesso web.'
       avisar()
       return agendar(15000)
     }
@@ -148,7 +148,7 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
     })
     // a ponte recusou a chave (conta sem assinatura ativa ou chave revogada)
     meu.on('unexpected-response', (req, res) => {
-      erro = res.statusCode === 401 || res.statusCode === 403 ? 'A ponte não aceitou esta conta. Entre de novo no Segundo Cérebro.' : `A ponte respondeu ${res.statusCode}.`
+      erro = res.statusCode === 401 || res.statusCode === 403 ? 'A ponte não aceitou esta conta. Entre de novo no Cérebro Pro.' : `A ponte respondeu ${res.statusCode}.`
       req.destroy()
       if (ws === meu) {
         conectado = false
@@ -194,7 +194,7 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
   // pede à ponte um pareamento da extensão para esta conta (usado pelo host nativo e pelo botão "Conectar o Chrome")
   async function extPareamento() {
     const k = await Promise.resolve(chave()).catch(() => '')
-    if (!k) throw new Error('Entre na sua conta no Segundo Cérebro.')
+    if (!k) throw new Error('Entre na sua conta no Cérebro Pro.')
     const r = await fetch(cfg.url + '/api/extensao/parear-app', { method: 'POST', headers: { Authorization: 'Bearer ' + k }, signal: AbortSignal.timeout(15000) })
     const j = await r.json().catch(() => ({}))
     if (!r.ok || !j.token) throw new Error(j.erro || 'A ponte não aceitou o pareamento.')

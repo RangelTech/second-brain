@@ -1,8 +1,8 @@
-// Segundo Cérebro (Rangel Tech): janela de chat, agente e ponte para o motor de provedores.
+// Cérebro Pro (Rangel Tech): janela de chat, agente e ponte para o motor de provedores.
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = require('electron')
 
 // Sem identidade própria o Windows agrupa o app com o Electron e mostra o ícone do .exe (o átomo) na barra de tarefas.
-// Com o AppUserModelID próprio e o .ico (vários tamanhos), a barra usa a logo do Segundo Cérebro, instalado ou em desenvolvimento.
+// Com o AppUserModelID próprio e o .ico (vários tamanhos), a barra usa a logo do Cérebro Pro, instalado ou em desenvolvimento.
 if (process.platform === 'win32') app.setAppUserModelId('net.rangeltech.secondbrain')
 function iconeDoApp() {
   const fs = require('fs')
@@ -113,7 +113,7 @@ async function chaveLocal() {
   try {
     return decifrar(fs.readFileSync(arqChave, 'utf8'))
   } catch {}
-  const r = await embed.api('POST', '/api/keys', { name: 'Segundo Cérebro (local)' })
+  const r = await embed.api('POST', '/api/keys', { name: 'Cérebro Pro (local)' })
   const chave = r.json?.key
   if (!chave) throw new Error('Não consegui criar a chave local do motor de provedores.')
   fs.writeFileSync(arqChave, cifrar(chave))
@@ -174,6 +174,8 @@ const ponteLLM = require('./ponte-llm').criar({
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
+let atendimento = null
+let atendimentoIg = null
 let remoto = null // acesso web remoto (spec 21 §12)
 const hermesInstalar = hermesInstalarMod.criar({ app, localizar: () => localizarBinario(app) })
 // Teste de instalação: uma conversa de verdade com o agente (modelo local de mentira). Passou uma vez, não repete.
@@ -584,6 +586,20 @@ ipcMain.handle('editor:abrir-video', async (_e, video) => {
     return { ok: false, erro: String(e.message || e) }
   }
 })
+// suíte de escritório (spec 37): docx/xlsx/pptx/csv do chat abrem no editor de documentos integrado (ONLYOFFICE portátil)
+const escritorio = require('./escritorio')
+ipcMain.handle('escritorio:estado', () => escritorio.estado(app))
+ipcMain.handle('escritorio:abrir', async (_e, arq) => {
+  const alvo = String(arq || '')
+  try {
+    if (!escritorio.executavel(app)) await escritorio.instalar(app, (p) => janela?.webContents.send('escritorio:progresso', p))
+    return escritorio.abrir(app, alvo)
+  } catch (e) {
+    // sem editor para este sistema (ou a instalação falhou): abre no programa padrão do computador e avisa
+    const r = fs.existsSync(alvo) ? await shell.openPath(alvo) : 'Arquivo não encontrado'
+    return r ? { ok: false, erro: String(e.message || e) } : { ok: true, padrao: true, aviso: String(e.message || e) }
+  }
+})
 ipcMain.handle('editor:abrir', (_e, projeto) => { try { return editorVideo.abrirJanela(app, projeto || path.join(cfg.pasta, 'Videos')) } catch (e) { return { ok: false, erro: String(e.message || e) } } })
 
 // conversas que pediram edição de vídeo: só nelas o motor do editor entra (ele pesa ~47 mil tokens por chamada)
@@ -640,13 +656,13 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   return sessao
 }
 async function responder(alvo, msgs, ctx) {
-  if (!cfg.unlimitedEmail) throw new Error('Entre na sua conta para usar o Segundo Cérebro.') // vale também para as ordens vindas do celular
+  if (!cfg.unlimitedEmail) throw new Error('Entre na sua conta para usar o Cérebro Pro.') // vale também para as ordens vindas do celular
   const est = embed.estado()
   if (!est.pronto) throw new Error(est.erro || 'O motor de provedores ainda está iniciando. Tente de novo em instantes.')
   if (!alvo) throw new Error('Escolha um modelo ou combo no topo do chat (cadastre um provedor em Configurações > Provedores).')
   if (cfg.soConversa) {
     const chave = await chaveLocal()
-    return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
+    return chamarOpenAI({ nome: 'Cérebro Pro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
   }
   // roteador: pedido que não precisa de ferramenta sai numa chamada direta (rápido); se o modelo pedir o agente, segue para o Hermes
   const ultimoPedido = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
@@ -745,7 +761,7 @@ function criarJanela() {
     minWidth: 760,
     minHeight: 520,
     backgroundColor: '#1f1d1a',
-    title: 'Segundo Cérebro',
+    title: 'Cérebro Pro',
     show: !MODO_SERVIDOR && !OCULTO,
     icon: iconeDoApp(),
     autoHideMenuBar: true,
@@ -844,6 +860,32 @@ app.whenReady().then(() => {
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })
+  // atendimento automático do WhatsApp (gatilho a cada N segundos; ver atendimento.js)
+  const opcoesAtendimento = {
+    app,
+    responder,
+    // resposta curta e rápida: uma chamada direta ao modelo (sem agente, sem raciocínio). Medido: agente 42 s; direto poucos segundos.
+    direto: async (alvo, texto, sinal) => {
+      const est = embed.estado()
+      if (!est.pronto) throw new Error(est.erro || 'motor de provedores iniciando')
+      const chave = await chaveLocal()
+      const r = await fetch(est.origem + '/v1/chat/completions', {
+        method: 'POST', signal: sinal,
+        headers: { 'Content-Type': 'application/json', ...(chave ? { Authorization: 'Bearer ' + chave } : {}) },
+        body: JSON.stringify({ model: alvo, stream: false, max_tokens: 700, temperature: 0.6, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: 'user', content: texto }] }),
+      })
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200))
+      const j = await r.json()
+      return String(j.choices?.[0]?.message?.content || '')
+    },
+    alvo: () => cfg.atendimentoAlvo || cfg.ativo,
+    avisar: (e) => janela?.webContents.send('atendimento:evento', e),
+    registrar: (l) => registrarAgente(app, l),
+  }
+  atendimento = require('./atendimento').criar({ ...opcoesAtendimento, wa: nav.whatsapp, canal: 'whatsapp' })
+  atendimentoIg = require('./atendimento').criar({ ...opcoesAtendimento, wa: nav.instagram, canal: 'instagram', avisar: (e) => janela?.webContents.send('atendimento:evento', { ...e, canal: 'instagram' }) })
+  nav.definirAtendimentoIg(atendimentoIg)
+  nav.definirAtendimento(atendimento)
   nav.iniciarServidor().then((i) => {
     navInfo = i
     // workflows rodam numa sessão sem a tela: as ferramentas do app acham este endereço pelo arquivo (só este usuário lê)
@@ -904,6 +946,10 @@ app.whenReady().then(() => {
     app, session, net: require('electron').net, registrar: (t) => registrarAgente(app, t),
     buscar: async () => {
       if (process.env.SB_PROXY_NAV) return { proxy: process.env.SB_PROXY_NAV, dominios: require('./proxy-navegador').DOMINIOS_PADRAO } // teste e VMs provisionadas sem o painel
+      // Proxy SÓ nas VMs (modo servidor, IP de datacenter que as redes barram). No computador do cliente o navegador sai pela internet
+      // da casa dele: passar pelo proxy (que também é datacenter) fazia a Meta e o Google desconfiarem e pedirem captcha/verificação
+      // que nem carregava (achado em 14/11/2026 no login do Instagram pelo Facebook).
+      if (!MODO_SERVIDOR && cfg.proxyNavegador !== 'sempre') return { proxy: null }
       if (!cfg.unlimitedChave) return { proxy: null }
       const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
       const r = await fetch(base + '/app/proxy-navegador', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
@@ -1048,7 +1094,7 @@ app.whenReady().then(() => {
     const atuais = ler('favoritos.json', [])
     const i = atuais.findIndex((x) => x.url === f.url)
     if (i >= 0) atuais.splice(i, 1)
-    else if (/^https?:/i.test(f.url)) atuais.unshift({ titulo: f.titulo || f.url, url: f.url, pasta: '', origem: 'Segundo Cérebro' })
+    else if (/^https?:/i.test(f.url)) atuais.unshift({ titulo: f.titulo || f.url, url: f.url, pasta: '', origem: 'Cérebro Pro' })
     gravar('favoritos.json', atuais)
     return atuais
   })
@@ -1154,6 +1200,10 @@ app.whenReady().then(() => {
     return n
   }))
   const rotinas = rotinasMod.criar({ app, home: () => caminhosHermes.homeAgente(app), obterGateway: () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app)) })
+  const qualAtend = (c) => (c === 'instagram' ? atendimentoIg : atendimento)
+  ipcMain.handle('atendimento:estado', seguro((c) => qualAtend(c)?.estado() || {}))
+  ipcMain.handle('atendimento:configurar', seguro((d, c) => { const a = qualAtend(c); if (!a) throw new Error('O atendimento ainda está iniciando.'); return a.configurar(d || {}) }))
+  ipcMain.handle('atendimento:mostrar', seguro((c) => (c === 'instagram' ? nav.mostrarInstagram() : nav.mostrarWhatsApp(), true)))
   ipcMain.handle('rotinas:listar', seguro(() => rotinas.listar()))
   ipcMain.handle('rotinas:criar', seguro((d) => rotinas.criar(d || {})))
   ipcMain.handle('rotinas:acao', seguro((id, a) => rotinas.acao(id, a)))
@@ -1183,7 +1233,7 @@ app.whenReady().then(() => {
   ipcMain.handle('skills:versao', seguro((r, h) => skills.versao(r, h)))
   // exportar e importar dados (conversas, configuração sem chaves, skills do usuário, combos)
   ipcMain.handle('dados:exportar', async () => {
-    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'segundo-cerebro-dados.json', filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'segundo-cerebro-dados.json', filters: [{ name: 'Dados do Cérebro Pro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
     const pacote = { versao: 1, em: new Date().toISOString(), chats: ler('chats.json', []), config: { ...publica(), unlimitedCodigo: undefined, maquinaId: undefined, unlimitedLigado: undefined }, skills: {}, combos: [], estrategias: {} }
     for (const it of skills.listar()) if (it.tipo === 'arquivo' && !it.somenteLeitura && it.tamanho < 300000) pacote.skills[it.caminho] = skills.ler(it.caminho)
@@ -1195,7 +1245,7 @@ app.whenReady().then(() => {
     return { ok: true, caminho: r.filePath, chats: pacote.chats.length, skills: Object.keys(pacote.skills).length, combos: pacote.combos.length }
   })
   ipcMain.handle('dados:importar', async () => {
-    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Cérebro Pro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
     const pacote = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'))
     if (pacote.versao !== 1) return { ok: false, erro: 'Arquivo de outra versão.' }
@@ -1343,6 +1393,8 @@ app.whenReady().then(() => {
             editorVideo.instalar(app, (p) => janela?.webContents.send('editor:progresso', p)).catch((e) => registrarAgente(app, 'editor em segundo plano: ' + (e.message || e)))
           }
         } catch {}
+        // e o que as skills precisam (voz local, editor de documentos): do snapshot nosso, um de cada vez, sem tela
+        require('./extras').preparar(app, { log: (m) => registrarAgente(app, m), progressoEscritorio: (p) => janela?.webContents.send('escritorio:progresso', p) }).catch(() => {})
       }, 15000)
     })
     .catch((e) => {

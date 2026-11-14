@@ -45,7 +45,7 @@ function escreverHost({ pasta, execPath, scriptHost, plataforma = process.platfo
   if (plataforma === 'win32') fs.writeFileSync(lancador, `@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\nset "SB_DADOS=${pasta}"\r\n"${execPath}" "${scriptHost}" %*\r\n`)
   else fs.writeFileSync(lancador, `#!/bin/sh\nexport ELECTRON_RUN_AS_NODE=1\nexport SB_DADOS="${pasta}"\nexec "${execPath}" "${scriptHost}" "$@"\n`, { mode: 0o755 })
   const manifesto = path.join(dir, HOST + '.json')
-  fs.writeFileSync(manifesto, JSON.stringify({ name: HOST, description: 'Segundo Cérebro: pareia a extensão do Chrome com a sua conta', path: lancador, type: 'stdio', allowed_origins: [`chrome-extension://${ID_EXTENSAO}/`] }, null, 2))
+  fs.writeFileSync(manifesto, JSON.stringify({ name: HOST, description: 'Cérebro Pro: pareia a extensão do Chrome com a sua conta', path: lancador, type: 'stdio', allowed_origins: [`chrome-extension://${ID_EXTENSAO}/`] }, null, 2))
   return { lancador, manifesto }
 }
 

@@ -31,7 +31,7 @@ function capturar({ BrowserWindow, url, retorno, pai, userAgent, particao = 'per
       modal: false,
       autoHideMenuBar: true,
       title: 'Entrar com a conta',
-      webPreferences: { partition: particao, contextIsolation: true, nodeIntegration: false, sandbox: true },
+      webPreferences: { partition: particao, contextIsolation: true, nodeIntegration: false, sandbox: true, preload: require('path').join(__dirname, 'navegador-preload.js') },
     })
     let feito = false
     const terminar = (fn, valor) => {
@@ -55,6 +55,7 @@ function capturar({ BrowserWindow, url, retorno, pai, userAgent, particao = 'per
     }
     const wc = w.webContents
     if (userAgent) wc.setUserAgent(userAgent)
+    if (userAgent) require('./navegador').loginGoogleComoFirefox(wc, userAgent) // login do Google recusa navegador embutido: nessas páginas vira Firefox
     wc.on('will-redirect', (ev, alvo) => olhar(ev, alvo))
     wc.on('will-navigate', (ev, alvo) => olhar(ev, alvo))
     wc.on('did-navigate', (_ev, alvo) => olhar(null, alvo))

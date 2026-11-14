@@ -92,7 +92,7 @@ async function ferramentasAppleComDialogo(falar, { esperarMs = 40 * 60000, inter
     await new Promise((r) => setTimeout(r, intervaloMs))
     if (ferramentasApple()) return true
   }
-  throw new Error('As ferramentas da Apple não foram instaladas. Clique em Instalar na janela da Apple (ou rode "xcode-select --install" no Terminal) e abra o Segundo Cérebro de novo.')
+  throw new Error('As ferramentas da Apple não foram instaladas. Clique em Instalar na janela da Apple (ou rode "xcode-select --install" no Terminal) e abra o Cérebro Pro de novo.')
 }
 
 // Garante o que o instalador do Hermes precisa. Devolve a pasta extra do PATH (ferramentas portáteis) ou ''.

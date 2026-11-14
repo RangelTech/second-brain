@@ -1,4 +1,4 @@
-// Conta do Segundo Cérebro na interface (spec 37): duas bolinhas na barra do chat, ao lado da do contexto
+// Conta do Cérebro Pro na interface (spec 37): duas bolinhas na barra do chat, ao lado da do contexto
 // (limite da sessão de 5 h e saldo de créditos) e o painel "Sua conta" no topo da aba Créditos e limites (créditos, pacotes, limites, plano e nível de segurança).
 ;(() => {
   if (!window.sb?.contaPainel) return
@@ -96,7 +96,7 @@ ${tok(s.used || 0)} de ${tok(s.limit)} tokens · ${renova(s.resets_at).replace(/
     el.innerHTML = '<div class="ct-grade"><div class="ct-card carregando"></div><div class="ct-card carregando"></div><div class="ct-card carregando"></div></div>'
     const d = await buscar()
     if (!d) {
-      el.innerHTML = '<div class="ct-card ct-vazio">Entre na sua conta do Segundo Cérebro para ver créditos, limites e o seu plano.</div><h2 class="ct-sub">Contas conectadas</h2>'
+      el.innerHTML = '<div class="ct-card ct-vazio">Entre na sua conta do Cérebro Pro para ver créditos, limites e o seu plano.</div><h2 class="ct-sub">Contas conectadas</h2>'
       return
     }
     const nivel = NIVEIS[d.nivel] || null

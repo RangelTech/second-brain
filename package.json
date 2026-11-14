@@ -1,8 +1,8 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.6.69",
-  "description": "Segundo Cérebro, da Rangel Tech: agente de IA para desktop com provedores e combos",
+  "version": "0.6.70",
+  "description": "Cérebro Pro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
     "name": "Rangel Tech",
@@ -37,10 +37,13 @@
       "gateway-cliente.js",
       "dublagem.js",
       "rotinas.js",
+      "atendimento.js",
+      "instagram-dm.js",
       "memoria-hermes.js",
       "sessao-gateway.js",
       "ponte_gateway.py",
       "navegador.js",
+      "navegador-preload.js",
       "unlimited.js",
       "main.js",
       "preload.js",
@@ -61,6 +64,8 @@
       "mcp-motion.js",
       "bandeja.js",
       "whatsapp-web.js",
+      "escritorio.js",
+      "extras.js",
       "proxy-navegador.js",
       "motion-render.js",
       "motion-preload.js",
@@ -90,7 +95,7 @@
       "category": "Utility",
       "maintainer": "Rangel Tech <contato@rangeltech.net>",
       "synopsis": "Agente de IA para desktop",
-      "description": "Segundo Cérebro: agente de IA com provedores, combos e a IA Unlimited",
+      "description": "Cérebro Pro: agente de IA com provedores, combos e a IA Unlimited",
       "artifactName": "Segundo-Cerebro-Linux.${ext}",
       "icon": "build/icon.png"
     },
@@ -99,21 +104,21 @@
       "icon": "build/icon.png",
       "artifactName": "Segundo-Cerebro-macOS-${arch}.${ext}",
       "extendInfo": {
-        "CFBundleDisplayName": "Segundo Cérebro"
+        "CFBundleDisplayName": "Cérebro Pro"
       },
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": "-"
     },
     "dmg": {
-      "title": "Segundo Cérebro ${version}"
+      "title": "Cérebro Pro ${version}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "artifactName": "Segundo-Cerebro-Windows.${ext}",
-      "shortcutName": "Segundo Cérebro",
+      "shortcutName": "Cérebro Pro",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",

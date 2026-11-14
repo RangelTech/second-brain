@@ -10,7 +10,7 @@
   function desenhar() {
     if (!K.corpo()) return // a tela de configuração ainda não existe (não desenha antes de abrir)
     K.corpo().innerHTML = `
-      <div class="cfg-cab"><div><h1>Acesso web</h1><p>Controle este Segundo Cérebro pelo celular ou por outro computador, entrando com o e-mail e a senha da sua conta. O computador precisa estar ligado e com o app aberto.</p></div></div>
+      <div class="cfg-cab"><div><h1>Acesso web</h1><p>Controle este Cérebro Pro pelo celular ou por outro computador, entrando com o e-mail e a senha da sua conta. O computador precisa estar ligado e com o app aberto.</p></div></div>
       <div class="cartao-rem">
         <div class="linha-rem"><div><b>Permitir acesso pela web</b><div class="mut" id="aw-status"></div></div><label class="interruptor"><input type="checkbox" id="aw-ativo"><span></span></label></div>
         <div class="alerta" id="aw-msg" hidden></div>

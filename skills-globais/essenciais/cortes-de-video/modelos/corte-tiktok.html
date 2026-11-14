@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- Modelo de corte para TikTok/Reels/Shorts (skill cortes-de-video). A linha DADOS é preenchida pelo cortes.py montar. -->
+<style>
+  :root{--cor:#ff2d55}
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:"Segoe UI",system-ui,sans-serif}
+  #raiz{position:absolute;inset:0}
+  video{position:absolute;inset:0;width:1080px;height:1920px;object-fit:cover}
+  .titulo{position:absolute;top:250px;left:70px;right:70px;display:flex;justify-content:center}
+  .titulo div{background:#fff;color:#111;font-size:66px;font-weight:900;line-height:1.08;text-align:center;padding:26px 36px 30px;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.45);text-transform:uppercase;letter-spacing:-.01em}
+  .titulo b{color:var(--cor)}
+  .moldura{position:absolute;left:0;right:0;top:596px;height:608px;pointer-events:none}
+  .moldura i{position:absolute;width:90px;height:90px;border:8px solid var(--cor)}
+  .moldura .a{left:24px;top:-22px;border-right:0;border-bottom:0;border-radius:18px 0 0 0}
+  .moldura .b{right:24px;top:-22px;border-left:0;border-bottom:0;border-radius:0 18px 0 0}
+  .moldura .c{left:24px;bottom:-22px;border-right:0;border-top:0;border-radius:0 0 0 18px}
+  .moldura .d{right:24px;bottom:-22px;border-left:0;border-top:0;border-radius:0 0 18px 0}
+  .leg{position:absolute;left:60px;right:60px;top:1250px;display:flex;flex-wrap:wrap;justify-content:center;gap:0;font-size:76px;font-weight:900;line-height:1.15;text-transform:uppercase;color:#fff;-webkit-text-stroke:3px #000;paint-order:stroke fill;text-shadow:0 6px 0 rgba(0,0,0,.55)}
+  .leg span{display:inline-block;margin:0}
+  .leg span.agora{color:var(--cor)}
+  .camb{position:absolute;border:6px solid var(--cor);border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .arroba{position:absolute;left:0;right:0;top:1520px;text-align:center;font-size:40px;font-weight:700;color:rgba(255,255,255,.85);text-shadow:0 2px 10px rgba(0,0,0,.7)}
+  .barra{position:absolute;left:70px;right:70px;top:190px;height:8px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden}
+  .barra i{position:absolute;inset:0;background:var(--cor);transform-origin:left}
+</style></head><body><div id="raiz"></div>
+<script>
+window.D = /*DADOS*/{"video":"exemplo-base.mp4","dur":20,"titulo":"O MOMENTO *MAIS INSANO*","arroba":"@seucanal","cor":"#ff2d55","palavras":[]}/*FIM*/
+const { prog, spring } = SB
+const D = window.D
+document.documentElement.style.setProperty('--cor', D.cor)
+// vídeo do meio: altura real (a base põe o vídeo centrado 60 px acima do meio); moldura e legenda acompanham
+const VH = D.vh || 608, VW = D.vw || 1080
+const VTOP = D.vtop || Math.max(480, Math.round((1920 - VH) / 2 - 60)) // abaixo do título
+const CAM = D.cam // layout jogo + câmera: {top, h, w} da câmera embaixo
+const POR_VEZ = 3 // palavras por vez na legenda (estilo TikTok)
+const blocos = []
+for (let i = 0; i < D.palavras.length; i += POR_VEZ) blocos.push(D.palavras.slice(i, i + POR_VEZ))
+const fimBloco = (k) => (blocos[k + 1] ? blocos[k + 1][0].t : Math.min(D.dur, blocos[k][blocos[k].length - 1].t + 1.2))
+function Titulo({ t }) {
+  const k = spring(t, 0.15, { freq: 1.8, damp: 6 })
+  const partes = String(D.titulo).split(/(\*[^*]+\*)/).filter(Boolean)
+  return html`<div class="titulo"><div style=${{ transform: `scale(${Math.max(0, k)}) rotate(${(1 - Math.min(1, k)) * -4}deg)`, opacity: Math.min(1, k * 2) }}>${partes.map((p, i) => (p.startsWith('*') ? html`<b key=${i}>${p.slice(1, -1)}</b>` : p))}</div></div>`
+}
+function Legenda({ t }) {
+  const k = blocos.findIndex((b, i) => t >= b[0].t - 0.05 && t < fimBloco(i))
+  if (k < 0) return null
+  const b = blocos[k]
+  const pop = spring(t, b[0].t - 0.05, { freq: 2.4, damp: 8 })
+  return html`<div class="leg" style=${{ top: (CAM ? VTOP + VH + 30 : Math.min(1560, VTOP + VH + 50)) + 'px', fontSize: CAM ? '64px' : undefined, transform: `scale(${0.85 + 0.15 * Math.min(1.1, pop)})` }}>${b.map((p, i) => {
+    const agora = t >= p.t && (i === b.length - 1 || t < b[i + 1].t)
+    return html`<span key=${i} class=${agora ? 'agora' : ''} style=${{ transform: agora ? 'scale(1.08)' : 'none', padding: '0 0.13em' }}>${p.w.replace(/[\[\]]/g, '')}</span>`
+  })}</div>`
+}
+function Corte({ t }) {
+  const m = prog(t, 0.0, 0.5, 'outExpo')
+  return html`<div style=${{ position: 'absolute', inset: 0 }}>
+    <video src=${D.video} data-inicio="0"></video>
+    <div class="barra"><i style=${{ transform: `scaleX(${Math.min(1, t / D.dur)})` }}></i></div>
+    <${Titulo} t=${t} />
+    <div class="moldura" style=${{ top: VTOP + 'px', height: VH + 'px', left: (1080 - VW) / 2 + 'px', right: (1080 - VW) / 2 + 'px', opacity: m, transform: `scale(${1.04 - 0.04 * m})` }}><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+    <${Legenda} t=${t} />
+    ${CAM ? html`<div class="camb" style=${{ top: CAM.top - 6 + 'px', height: CAM.h + 12 + 'px', width: CAM.w + 12 + 'px', left: (1080 - CAM.w) / 2 - 6 + 'px', opacity: m }}></div>` : null}
+    ${D.arroba ? html`<div class="arroba" style=${{ top: (CAM ? CAM.top + CAM.h + 24 : Math.min(1640, VTOP + VH + 290)) + 'px' }}>${D.arroba}</div>` : null}
+  </div>`
+}
+const root = ReactDOM.createRoot(document.getElementById('raiz'))
+// erro de desenho aparece ESCRITO no quadro (a prévia mostra o motivo em vez de um quadro vazio)
+window.sbFrame = (t) => { try { ReactDOM.flushSync(() => root.render(html`<${Corte} t=${t} />`)) } catch (e) { document.body.insertAdjacentHTML('beforeend', `<pre style="position:absolute;left:20px;top:20px;right:20px;z-index:99;color:#ff4d4d;background:#000c;font:28px monospace;white-space:pre-wrap">ERRO t=${t.toFixed(2)}: ${String(e && e.stack || e).slice(0, 600)}</pre>`) } }
+</script></body></html>

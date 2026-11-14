@@ -11,7 +11,7 @@ test('instala só na nossa pasta, sem assistente: flags silenciosas do Inno Setu
   assert.ok(!/\['\/S'/.test(src))
   assert.match(src, /SHA-256/)
 })
-test('o editor fica na pasta própria do Segundo Cérebro e o MCP só existe depois de instalado', () => {
+test('o editor fica na pasta própria do Cérebro Pro e o MCP só existe depois de instalado', () => {
   process.env.SB_EDITOR_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ed-'))
   process.env.SB_EDITOR = '1'
   try {
@@ -56,7 +56,7 @@ test('configuração predefinida do editor: português, automação ligada, JSON
     assert.strictEqual(E.prepararConfig().server.token, novo.server.token) // não troca o token a cada abertura
   } finally { delete process.env.APPDATA; delete process.env.XDG_CONFIG_HOME }
 })
-test('origens: o fork com o nome do Segundo Cérebro vem primeiro e o Concat oficial é a reserva com hash fixo', () => {
+test('origens: o fork com o nome do Cérebro Pro vem primeiro e o Concat oficial é a reserva com hash fixo', () => {
   assert.match(E.ORIGENS[0].repo, /segundo-cerebro-editor/)
   assert.strictEqual(E.ORIGENS[1].repo, 'jub0t/Concat')
   assert.match(E.ORIGENS[1].win32.sha256, /^[0-9a-f]{64}$/)

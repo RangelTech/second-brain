@@ -1,7 +1,7 @@
 ---
 name: midia-cotas-e-plataformas
 description: |
-  Explicar ao cliente, quando ele perguntar, como funcionam os limites mensais de imagem, vídeo e áudio do plano, e ajudá-lo a usar plataformas externas de IA (Higgsfield, Runway, ElevenLabs, fal.ai, Replicate etc.) conectando-as ao Segundo Cérebro por MCP: como conectar, como escolher, quanto custa. Use quando o usuário perguntar "quantas imagens/vídeos posso gerar", "meu limite acabou", "como uso o Higgsfield/Runway/ElevenLabs", "qual plataforma é melhor/mais barata", "conectar um MCP", ou quando o pedido pedir algo que a mídia do plano não cobre.
+  Explicar ao cliente, quando ele perguntar, como funcionam os limites mensais de imagem, vídeo e áudio do plano, e ajudá-lo a usar plataformas externas de IA (Higgsfield, Runway, ElevenLabs, fal.ai, Replicate etc.) conectando-as ao Cérebro Pro por MCP: como conectar, como escolher, quanto custa. Use quando o usuário perguntar "quantas imagens/vídeos posso gerar", "meu limite acabou", "como uso o Higgsfield/Runway/ElevenLabs", "qual plataforma é melhor/mais barata", "conectar um MCP", ou quando o pedido pedir algo que a mídia do plano não cobre.
 ---
 
 # Cotas de mídia e plataformas externas
@@ -21,7 +21,7 @@ Como se conta:
 - Quando acabar, ofereça: (a) esperar a renovação, (b) mudar de plano em rangeltech.net, (c) usar uma plataforma externa (seção 2), que o usuário paga direto a ela.
 
 ## 2. Plataformas externas por MCP
-O usuário pode conectar serviços de IA de terceiros ao Segundo Cérebro, como se faz no Claude Code. Isso é separado do plano: cada serviço tem conta e cobrança próprias, e o usuário usa o próprio login. Você nunca deve pedir nem guardar senha de ninguém: use login por navegador (OAuth) ou uma chave de API que o próprio usuário cola.
+O usuário pode conectar serviços de IA de terceiros ao Cérebro Pro, como se faz no Claude Code. Isso é separado do plano: cada serviço tem conta e cobrança próprias, e o usuário usa o próprio login. Você nunca deve pedir nem guardar senha de ninguém: use login por navegador (OAuth) ou uma chave de API que o próprio usuário cola.
 
 Quando usar uma externa em vez da mídia do plano: o usuário quer um modelo específico (Kling, Veo, Sora, Seedance, Midjourney-like), vídeo mais longo ou em 1080p, voz profissional de estúdio, ou acabou a cota do mês.
 

@@ -1,7 +1,7 @@
 ---
 name: ferramentas-do-app
 description: |
-  Quais ferramentas o próprio Segundo Cérebro oferece ao agente e quando usar cada uma: gerar imagem na GPU
+  Quais ferramentas o próprio Cérebro Pro oferece ao agente e quando usar cada uma: gerar imagem na GPU
   (midia_gerar_imagem), memória das conversas antigas (memoria_buscar, memoria_ler_conversa), navegador integrado
   (navegador_abrir, ler, clicar, digitar, rolar, esperar, js, print) e vídeo (skill video-motion, no computador).
   Use ao receber pedidos como "crie uma imagem/arte/banner", "você lembra do que combinamos?", "abra o site e
@@ -10,7 +10,7 @@ description: |
 
 # Ferramentas do app
 
-Estas ferramentas existem só aqui, dentro do Segundo Cérebro. Prefira-as ao improvisar com comandos soltos.
+Estas ferramentas existem só aqui, dentro do Cérebro Pro. Prefira-as ao improvisar com comandos soltos.
 
 ## Gerar imagem (`midia_gerar_imagem`)
 - Roda numa GPU do servidor (cerca de 10 a 30 s). Salva um PNG na pasta `Imagens` da pasta de trabalho e devolve o caminho.

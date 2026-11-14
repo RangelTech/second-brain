@@ -59,6 +59,12 @@
         estado: () => invoke('memoria-agente:estado'),
         gravar: (q, l) => invoke('memoria-agente:gravar', q, l),
       },
+      atendimento: {
+        estado: (c) => invoke('atendimento:estado', c),
+        configurar: (d, c) => invoke('atendimento:configurar', d, c),
+        mostrar: (c) => invoke('atendimento:mostrar', c),
+        aoEvento: (fn) => on('atendimento:evento', fn),
+      },
       rotinas: {
         listar: () => invoke('rotinas:listar'),
         criar: (d) => invoke('rotinas:criar', d),
@@ -139,6 +145,11 @@
         aoReposicionar: (fn) => on('navegador:reposicionar', () => fn()),
       },
       // editor de vídeo (spec 25 §21): janela própria, como o navegador destacado
+      escritorio: {
+        estado: () => invoke('escritorio:estado'),
+        abrir: (arq) => invoke('escritorio:abrir', arq),
+        aoProgresso: (fn) => on('escritorio:progresso', fn),
+      },
       editor: {
         estado: () => invoke('editor:estado'),
         instalar: () => invoke('editor:instalar'),

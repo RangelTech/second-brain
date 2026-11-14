@@ -306,7 +306,7 @@ function exigirDetalhe(tipo, prompt, minimo) {
 async function gerarImagem(args) {
   const { prompt, formato, nome } = args
   exigirDetalhe('imagem', prompt, Array.isArray(args.referencias) && args.referencias.length ? 8 : 30)
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor (Unlimited). Abra Configurações e conclua o cadastro.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor (Unlimited). Abra Configurações e conclua o cadastro.')
   if (process.env.SB_MIDIA_MOCK) return simular('imagem', prompt, process.env.SB_MIDIA_MOCK_IMG || path.join(__dirname, 'renderer', 'img', 'segundo-cerebro-64.png'))
   const corpo = { prompt: String(prompt || '').slice(0, 3500), size: FORMATOS[formato] || FORMATOS[PREFS.proporcao] || FORMATOS.quadrado, ...paramsComuns(args, false) }
   const estilo = ESTILO_SERVIDOR[args.estilo] || ESTILO_SERVIDOR[PREFS.estilo]
@@ -327,7 +327,7 @@ function dataUri(caminho, rotulo, maxMb) {
 const brl = (v) => (v == null ? '' : 'R$ ' + Number(v).toFixed(2).replace('.', ','))
 const minutos = (s) => Math.max(1, Math.round((Number(s) || 60) / 60))
 async function orcar(args) {
-  if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   const corpo = { efeito: args.efeito, segundos: args.segundos, texto: args.texto, qualidade: args.qualidade }
   let o
   if (process.env.SB_MIDIA_MOCK) o = { rotulo: 'Simulação', preco_brl: 13.75, preco_usd: 2.5, tempo_estimado_s: 100, quantidade: args.segundos || 10, unidade: 'segundo', qualidade: args.qualidade || '480p', disponivel: true, acima_do_teto: false }
@@ -347,7 +347,7 @@ async function orcar(args) {
 }
 async function estudio(args) {
   if (!args.confirmado) throw new Error('Antes de criar, chame midia_orcar, mostre o preço ao usuário e espere ele aceitar. Depois chame de novo com confirmado=true.')
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular(args.efeito === 'voz' || args.efeito === 'voz-hd' ? 'video' : 'video', args.prompt || args.efeito, process.env.SB_MIDIA_MOCK_ARQ || '')
   const inputs = {}
   if (args.video) inputs.video = dataUri(args.video, 'Vídeo', 40)
@@ -365,7 +365,7 @@ async function estudio(args) {
 // ---- Redublagem com a voz do usuário (dublagem.js): etapa 1 orça, etapa 2 gera e remonta
 async function dublarVideo(args) {
   const dub = require('./dublagem')
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   const video = String(args.video || '')
   if (!fs.existsSync(video) || !dub.temVideo(video)) throw new Error('O vídeo não foi encontrado nesse caminho (use MP4, MOV, WEBM ou MKV).')
   if (!fs.existsSync(String(args.amostra || ''))) throw new Error('A amostra de voz não foi encontrada nesse caminho.')
@@ -408,7 +408,7 @@ function lerArquivo(caminho, rotulo, maxMb) {
 }
 
 async function clonarVoz(args) {
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   const texto = String(args.texto || '').trim()
   if (!texto) throw new Error('Diga o texto que será falado (texto).')
   if (process.env.SB_MIDIA_MOCK) return simular('video', 'clonagem de voz', process.env.SB_MIDIA_MOCK_ARQ || '')
@@ -418,14 +418,14 @@ async function clonarVoz(args) {
 }
 
 async function trocarVoz(args) {
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular('video', 'troca de voz', process.env.SB_MIDIA_MOCK_ARQ || '')
   const corpo = { media: lerArquivo(args.arquivo, 'Arquivo', 40).toString('base64'), target_voice: lerArquivo(args.voz_alvo, 'Voz alvo', 12).toString('base64'), keep_background: args.manter_fundo !== false }
   return rodarJob({ tipo: 'video', salvar: ehArquivoVideo(args.arquivo) ? 'video' : 'audio', rota: '/audio/voice-convert', corpo, prompt: 'troca de voz', nome: args.nome || 'voz-trocada', limiteMs: 60 * 60 * 1000, assincrono: process.env.SB_MIDIA_SINCRONO !== '1' })
 }
 
 async function redublarVideo(args) {
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular('video', 'redublagem', process.env.SB_MIDIA_MOCK_ARQ || '')
   const corpo = { video: lerArquivo(args.video, 'Vídeo', 40).toString('base64'), target_language: args.idioma, keep_background: args.manter_fundo !== false }
   if (args.idioma_origem) corpo.source_language = args.idioma_origem
@@ -435,7 +435,7 @@ async function redublarVideo(args) {
 
 async function trocarPersonagem(args) {
   const { video, foto, resolucao, nome } = args
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular('video', 'troca de personagem', process.env.SB_MIDIA_MOCK_ARQ || '')
   const v = fs.readFileSync(String(video))
   const f = fs.readFileSync(String(foto))
@@ -448,7 +448,7 @@ async function trocarPersonagem(args) {
 async function gerarVideo(args) {
   const { prompt, formato, segundos, nome } = args
   exigirDetalhe('vídeo', prompt, args.imagem ? 20 : 40)
-  if (!CHAVE) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+  if (!CHAVE) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
   if (process.env.SB_MIDIA_MOCK) return simular('video', prompt, process.env.SB_MIDIA_MOCK_ARQ || '')
   const alta = (args.qualidade || PREFS.qualidade || 'alta') !== 'rapida' // qualidade é o produto: alta é o padrão, rápida só quando pedida
   const corpo = {
@@ -535,7 +535,7 @@ async function tratar(msg) {
     const nome = String(params?.name || '').replace(/^midia_/, '')
     try {
       if (nome === 'detalhar_prompt') {
-        if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Segundo Cérebro ainda não tem a chave do servidor. Entre na sua conta.')
+        if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
         const ctx = { base: BASE, chave: CHAVE, fetchFn: process.env.SB_MIDIA_MOCK ? async () => { throw new Error('mock') } : undefined }
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: formatarSaida(await detalhar(params?.arguments || {}, ctx)) }] } })
       }

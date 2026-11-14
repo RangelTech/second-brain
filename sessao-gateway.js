@@ -44,7 +44,7 @@ class SessaoGateway {
     this.estado = {}
     this.permitirSempre = false
     this.turnosVivos = ''
-    const home = agente.prepararHome(app, { base, modelo: 'principal', pasta, raciocinio, nivel, gateway: true, filhos: filhos || 3, visao: midia ? { base: midia.base, modelo: 'qwen-abliterated', chave: midia.chave } : null })
+    const home = agente.prepararHome(app, { base, modelo: 'principal', pasta, raciocinio, nivel, gateway: true, filhos: filhos || 3, visao: midia ? { base: midia.base, modelo: 'visao', chave: midia.chave } : null })
     this.home = home
     this.gw = gateway || obterGateway(app, home) // `gateway`: injetado nos testes
     this.cai = () => { this.sid = null } // a ponte caiu: a próxima pergunta cria a conversa de novo

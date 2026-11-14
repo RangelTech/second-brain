@@ -9,4 +9,5 @@ router/node_modules/
 router/
 
 renderer/vendor/vosk-model-pt.tar.gz
-modelos/
+/modelos/
+__pycache__/

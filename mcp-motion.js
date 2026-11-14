@@ -10,7 +10,7 @@ function ponte() {
     URL_APP = j.url
     TOKEN = j.token
   } catch {
-    throw new Error('O Segundo Cérebro precisa estar aberto (pode ser só na bandeja) para usar o navegador, o WhatsApp e o Motion.')
+    throw new Error('O Cérebro Pro precisa estar aberto (pode ser só na bandeja) para usar o navegador, o WhatsApp e o Motion.')
   }
 }
 const obj = (props, req = []) => ({ type: 'object', properties: props, required: req })
@@ -21,7 +21,7 @@ const ARGS = {
   largura: { type: 'number', description: 'Pixels. Padrão 1080.' },
   altura: { type: 'number', description: 'Pixels. Padrão 1920 (vertical 9:16). Use 1080x1080 (1:1), 1920x1080 (16:9), 1080x1350 (4:5).' },
   fps: { type: 'number', description: 'Quadros por segundo, 24 a 60. Padrão 30.' },
-  duracao: { type: 'number', description: 'Segundos, 0,5 a 180. Padrão 6.' },
+  duracao: { type: 'number', description: 'Segundos, 0,5 a 1200 (20 min). Padrão 6.' },
 }
 const FERRAMENTAS = [
   { nome: 'previa', desc: 'Tira alguns quadros (PNG) da animação HTML sem gerar o vídeo, para você OLHAR com vision_analyze antes de renderizar. Sempre rode antes de motion_animar e corrija o que estiver feio (texto cortado, fora da área segura, sobreposto, cor sem contraste).', schema: obj({ ...ARGS, quadros: { type: 'array', items: { type: 'number' }, description: 'Tempos em segundos (até 8). Padrão: começo, meio e fim.' } }, ['saida']) },

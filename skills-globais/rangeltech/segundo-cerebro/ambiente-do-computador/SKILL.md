@@ -1,7 +1,7 @@
 ---
 name: ambiente-do-computador
 description: |
-  O que existe de verdade no computador (ou na máquina virtual) onde o Segundo Cérebro roda e como usar sem pedir ajuda: Node, npm, Python, uv, FFmpeg, Chromium e ripgrep embutidos no Hermes, pasta de trabalho, limites de uma VM sem root e sem Docker. Use antes de instalar qualquer coisa, ao receber "instale", "rode", "converta vídeo", "abra um navegador", "suba um servidor" ou ao ver `command not found`.
+  O que existe de verdade no computador (ou na máquina virtual) onde o Cérebro Pro roda e como usar sem pedir ajuda: Node, npm, Python, uv, FFmpeg, Chromium e ripgrep embutidos no Hermes, pasta de trabalho, limites de uma VM sem root e sem Docker. Use antes de instalar qualquer coisa, ao receber "instale", "rode", "converta vídeo", "abra um navegador", "suba um servidor" ou ao ver `command not found`.
 ---
 
 # Ambiente do computador: o que já existe e o que não existe
@@ -25,7 +25,7 @@ Use sempre o caminho completo da ferramenta, ou acrescente a pasta `bin` dela ao
 
 ## Pasta de trabalho
 
-Arquivos do usuário vão na pasta de trabalho do app (`Documentos/Segundo Cérebro` no computador; `/var/lib/segundo-cerebro/Segundo Cerebro/` na VM). Imagens geradas ficam em `Imagens/` e vídeos em `Videos/`. Código e ambientes temporários vão em `hermes-home/cache/scratch/`, não dentro da pasta do usuário.
+Arquivos do usuário vão na pasta de trabalho do app (`Documentos/Cérebro Pro` no computador; `/var/lib/segundo-cerebro/Segundo Cerebro/` na VM). Imagens geradas ficam em `Imagens/` e vídeos em `Videos/`. Código e ambientes temporários vão em `hermes-home/cache/scratch/`, não dentro da pasta do usuário.
 
 ## Máquina virtual do cliente (Linux)
 

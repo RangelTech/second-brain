@@ -26,6 +26,20 @@ Objetivo: o agente aprende a usar o sistema do cliente **uma vez** e depois exec
    - Em último caso, visão: print da janela (`vision_analyze`) e clique por coordenada relativa à janela.
    - Peça ao usuário para mostrar o caminho uma vez ("me diz os passos que você faz para lançar uma nota") e transforme em macro.
 
+## Ferramentas prontas para a tela (USE ESTAS, não escreva automação do zero)
+Pasta `scripts/` desta skill (testado no Windows 11 com programas antigos e novos):
+- `janela.py`: `abrir(exe, titulo_regex, argumentos=[...])`, `achar(titulo_regex)`, `preencher(w, "Cliente", "Ana")`, `clicar(w, "Lançar")`, `ler(w, "Status")`, `atalho(w, "^s")`, `salvar_como(w, caminho)`, `fechar(w)`, `listar_controles(w)` (para descobrir os nomes dos campos e botões).
+- `lancar_nota_exemplo.py`: MACRO modelo (parâmetros, campos, botão, conferência no banco, saída JSON, **fecha a janela sempre**, mesmo com erro). Copie para `sistemas/<sistema>/<tarefa>.py` e troque nomes e passos.
+- `mini_erp_teste.ps1`: um "ERP" de treino (janela Windows clássica). Para testar uma macro sem mexer em nenhum programa do usuário.
+Antes do primeiro uso: `python -m pip install pywinauto` (no Python que roda a macro).
+
+Regras para não bagunçar o computador do usuário:
+1. **Uma janela por vez.** Abra, faça, feche (`try/finally` com `fechar(w)`). Se `abrir` falhar, não tente abrir de novo em loop: pare, olhe com `listar_controles` e corrija.
+2. **Nunca use o Bloco de Notas do Windows 11 para testar**: ele reabre sozinho todas as janelas da sessão anterior e enche a tela. Para treinar use `mini_erp_teste.ps1`.
+3. **Tempo máximo**: rode cada macro com limite (ex.: 90 s). Se estourar, mate só o processo que você abriu.
+4. **Descubra antes de agir**: `w = abrir(...)`, `print(listar_controles(w))`, e só então escreva a macro com os nomes reais.
+5. Digite sempre com `preencher`/`digitar` (área de transferência), nunca tecla por tecla: acentos e símbolos saem certos.
+
 ## 2. Transformar em comando (o jeito CLI-Anything)
 Para cada tarefa repetida, crie um script em `<pasta desta skill>/sistemas/<sistema>/` com:
 - **Parâmetros** claros (`--cliente`, `--produto`, `--quantidade`, `--valor`).

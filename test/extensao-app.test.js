@@ -41,7 +41,7 @@ test('o servidor local só atende o host (token certo, sem Origin) e entrega o p
 
 test('conta sem login: o app responde erro e o host repassa à extensão', async () => {
   const pasta = tmp()
-  const h = await A.iniciarServidor({ pasta, pareamento: async () => { throw new Error('Entre na sua conta no Segundo Cérebro.') } })
+  const h = await A.iniciarServidor({ pasta, pareamento: async () => { throw new Error('Entre na sua conta no Cérebro Pro.') } })
   const m = await conversarComHost(pasta, { t: 'parear' })
   assert.strictEqual(m.t, 'erro')
   assert.match(m.erro, /Entre na sua conta/)
@@ -84,12 +84,12 @@ test('registro no Linux e no Mac: manifesto copiado para as pastas dos navegador
 
 test('registro no Windows: chaves do registro do usuário para Chrome, Edge e Brave, e lançador .cmd com a pasta de dados', () => {
   const pasta = tmp(), chamadas = []
-  A.registrar({ pasta, execPath: 'C:\\App\\Segundo Cérebro.exe', scriptHost: 'C:\\App\\resources\\native-host.js', plataforma: 'win32', executar: (cmd, args) => chamadas.push([cmd, ...args]) })
+  A.registrar({ pasta, execPath: 'C:\\App\\Cérebro Pro.exe', scriptHost: 'C:\\App\\resources\\native-host.js', plataforma: 'win32', executar: (cmd, args) => chamadas.push([cmd, ...args]) })
   const chaves = chamadas.map((c) => c[2])
   assert.ok(chaves.some((k) => /HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\net\.rangeltech\.segundocerebro/.test(k)))
   assert.ok(chaves.some((k) => /Microsoft\\Edge/.test(k)) && chaves.some((k) => /Brave/.test(k)))
   assert.ok(chamadas.every((c) => c[0] === 'reg' && c[1] === 'add' && c.includes('/f') && /\.json$/.test(c[c.indexOf('/d') + 1])))
   const cmd = fs.readFileSync(path.join(pasta, 'native', 'host.cmd'), 'utf8')
   assert.match(cmd, /ELECTRON_RUN_AS_NODE=1/)
-  assert.ok(cmd.includes('Segundo Cérebro.exe') && cmd.includes('native-host.js') && cmd.includes('SB_DADOS'))
+  assert.ok(cmd.includes('Cérebro Pro.exe') && cmd.includes('native-host.js') && cmd.includes('SB_DADOS'))
 })

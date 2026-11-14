@@ -28,7 +28,7 @@ Teste (página propositalmente ruim: Inter, gradiente roxo/azul, texto cinza, ca
 
 ## Armadilhas
 - A saída repete o mesmo achado por seletor; resuma por regra antes de agir.
-- Não testei os comandos de revisão por IA (`critique`, `audit`, `polish`, `bolder`): são prompts para o agente instalados com `npx impeccable install`, que escreve na pasta de skills do assistente. No Segundo Cérebro essas skills precisam ser convertidas para a pasta do Hermes.
+- Não testei os comandos de revisão por IA (`critique`, `audit`, `polish`, `bolder`): são prompts para o agente instalados com `npx impeccable install`, que escreve na pasta de skills do assistente. No Cérebro Pro essas skills precisam ser convertidas para a pasta do Hermes.
 - O CLI envia telemetria anônima por padrão: desligue com `npx impeccable telemetry off`.
 - Falso positivo: contraste de texto sobre imagem de fundo não é calculado de verdade.
 
