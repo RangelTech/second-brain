@@ -698,6 +698,9 @@
       <p class="mut" id="at-txt">Verificando…</p>
       <label class="cfg-linha" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="at-auto"> Atualizar automaticamente</label>
       <div class="cfg-acoes"><button id="at-conf">Verificar agora</button><button id="at-baixar" hidden>Atualizar</button></div>
+      <h2>Primeiros passos</h2>
+      <p class="mut">Um passeio rápido pela tela, mostrando onde fica cada coisa.</p>
+      <div class="cfg-acoes"><button id="ver-tour">Ver o tour</button></div>
       <div id="so-plano" hidden><h2>Segundo plano</h2>
       <p class="mut">O agente fica rodando com o computador, mesmo com esta janela fechada: é assim que os seus workflows acontecem na hora marcada. O ícone fica na bandeja do sistema, perto do relógio.</p>
       <label class="cfg-linha" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="so-inicio"> Iniciar com o computador</label>
@@ -711,6 +714,7 @@
       <div class="alerta" id="so-msg" hidden style="margin-top:10px"></div>
       <h2>Licenças</h2>
       <p class="mut">Hermes Agent (motor do agente), 9Router (MIT, motor de provedores) e Electron (MIT). O Cérebro Pro é MIT.</p>`
+    $('#ver-tour').onclick = () => { window.SBConfig.fechar(); setTimeout(() => window.SBTour && window.SBTour.abrir(), 250) }
     const at = window.sb.atualizacao
     if (!window.__sbRaw || !at) {
       $('#at-txt').parentElement.querySelectorAll('#at-txt,#at-auto,#at-conf,#at-baixar').forEach((x) => (x.closest('label') || x).remove())

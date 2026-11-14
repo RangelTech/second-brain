@@ -210,7 +210,7 @@
       b.className = 'chat' + (c.id === atual ? ' ativo' : '') + (c.fixado ? ' fixado' : '')
       b.tabIndex = 0
       b.setAttribute('role', 'button')
-      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span><span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
+      b.innerHTML = `${c.fixado ? `<span class="pin-marca">${IC.pin}</span>` : ''}${respostas.has(c.id) ? '<span class="ponto-vivo mini" title="Respondendo"></span>' : ''}<span class="nome" title="${attr(c.titulo)}">${esc(c.titulo)}</span>${c.exemplo ? '<span class="selo-exemplo">Exemplo</span>' : ''}<span class="acoes"><button class="btn-ic fixar" title="${c.fixado ? 'Desafixar' : 'Fixar no topo'}" aria-label="${c.fixado ? 'Desafixar conversa' : 'Fixar conversa'}">${IC.pin}</button><button class="btn-ic ren" title="Renomear" aria-label="Renomear conversa">${IC.pencil}</button><button class="apagar btn-ic" title="Apagar" aria-label="Apagar conversa">${IC.x}</button></span>`
       b.onclick = async (e) => {
         if (e.target.closest('.fixar')) {
           c.fixado = !c.fixado
@@ -2363,6 +2363,7 @@
     $('cortina').onclick = () => recolher(true)
     $('abrir-config').onclick = () => window.SBConfig.abrir()
     $('bv-ir').onclick = () => window.SBConfig.abrir('prov')
+    setTimeout(() => window.SBTour && window.SBTour.talvezAbrir(), 3000) // tour de boas-vindas (spec 38 A): 1x por versão do tour
     window.SBConfig.aoFechar = async () => {
       cfg = await window.sb.cfg()
       preencherAlvo()
