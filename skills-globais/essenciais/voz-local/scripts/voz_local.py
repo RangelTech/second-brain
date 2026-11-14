@@ -365,7 +365,7 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt"):
             return {"ok": False, "erro": "o XTTS precisa de uma amostra da voz (--amostra, 6 a 30 s de fala limpa)"}
         m = _xtts()
         if chave_amostra not in _CACHE:  # a voz da amostra é calculada uma vez só por amostra
-            _CACHE[chave_amostra] = m.get_conditioning_latents(audio_path=[str(Path(amostra).resolve())])
+            _CACHE[chave_amostra] = m.get_conditioning_latents(audio_path=[str(Path(amostra).resolve())], gpt_cond_len=30, max_ref_length=60)
         gpt, spk = _CACHE[chave_amostra]
         # divide em frases aqui (o enable_text_splitting do coqui exige spaCy, que não vem no pacote) e junta com pausas curtas
         import numpy as np
@@ -508,6 +508,33 @@ def falar(texto, amostra, saida, motor="openvoice", idioma="pt", sem_servidor=Fa
     sys.exit(0 if r.get("ok") else 1)
 
 
+PIP_TRANSCRICAO = ["faster-whisper==1.2.1"]
+MODELO_TRANSCRICAO = os.environ.get("VOZ_LOCAL_WHISPER", "small")
+
+
+def _audio16k(arq):
+    """Áudio mono 16 kHz em float32 (o faster-whisper recebe o array pronto: não depende do PyAV, que muda de versão)."""
+    a, _ = _ler_som(arq, 16000)
+    return a.mean(1).astype("float32")
+
+
+def transcrever_local(audio, saida, idioma="pt"):
+    """Transcrição com o tempo de CADA palavra (faster-whisper no processador). Roda dentro do ambiente da voz."""
+    from faster_whisper import WhisperModel
+    os.environ.setdefault("HF_HOME", str(RAIZ / "modelos" / "hf"))
+    t0 = time.time()
+    m = WhisperModel(MODELO_TRANSCRICAO, device="cpu", compute_type="int8", cpu_threads=max(1, (os.cpu_count() or 2) - 1))
+    segs, info = m.transcribe(_audio16k(audio), language=idioma, word_timestamps=True, vad_filter=True, beam_size=1, condition_on_previous_text=False)
+    pal = []
+    for sg in segs:
+        for w in sg.words or []:
+            txt = w.word.strip()
+            if txt:
+                pal.append({"t": round(w.start, 2), "f": round(w.end, 2), "w": txt})
+    Path(saida).write_text(json.dumps(pal, ensure_ascii=False), encoding="utf-8")
+    return {"ok": True, "arquivo": str(saida), "palavras": len(pal), "duracao": round(info.duration, 1), "tempo_s": round(time.time() - t0, 1)}
+
+
 def _ffmpeg():
     exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     cands = [shutil.which("ffmpeg")]
@@ -560,6 +587,142 @@ def trocar(entrada, amostra, saida):
     print(json.dumps(res, ensure_ascii=False))
 
 
+PIP_SEPARACAO = ["demucs==4.0.1"]
+
+
+def _ler_som(arq, taxa=None):
+    import soundfile as sf
+    import numpy as np
+    a, sr = sf.read(str(arq), dtype="float32", always_2d=True)
+    if taxa and sr != taxa:
+        import torch
+        import torchaudio.functional as taf
+        a = taf.resample(torch.from_numpy(a.T.copy()), sr, taxa).numpy().T
+        sr = taxa
+    return a, sr
+
+
+def separar_voz(wav, pasta):
+    """Demucs (htdemucs): separa a voz do resto (música, efeitos). Devolve (voz.wav, fundo.wav)."""
+    import numpy as np
+    import soundfile as sf
+    import torch
+    from demucs.apply import apply_model
+    from demucs.pretrained import get_model
+    _threads()
+    os.environ.setdefault("TORCH_HOME", str(RAIZ / "modelos" / "torch"))
+    m = _CACHE.get("demucs") or get_model("htdemucs")
+    m.eval()
+    _CACHE["demucs"] = m
+    a, sr = _ler_som(wav, m.samplerate)
+    if a.shape[1] == 1:
+        a = np.repeat(a, 2, axis=1)
+    x = torch.from_numpy(a.T.copy())
+    ref = x.mean(0)
+    x = (x - ref.mean()) / (ref.std() + 1e-8)
+    with torch.no_grad():
+        fontes = apply_model(m, x[None], device="cpu", split=True, overlap=0.25, progress=False)[0]
+    fontes = fontes * (ref.std() + 1e-8) + ref.mean()
+    nomes = list(m.sources)
+    voz = fontes[nomes.index("vocals")].numpy().T
+    fundo = sum(fontes[i] for i, n in enumerate(nomes) if n != "vocals").numpy().T
+    pasta = Path(pasta)
+    sf.write(str(pasta / "voz.wav"), voz, m.samplerate)
+    sf.write(str(pasta / "fundo.wav"), fundo, m.samplerate)
+    return pasta / "voz.wav", pasta / "fundo.wav"
+
+
+def _frases_com_tempo(audio, idioma="pt"):
+    """Frases da fala com início e fim (faster-whisper, tempo por palavra)."""
+    from faster_whisper import WhisperModel
+    os.environ.setdefault("HF_HOME", str(RAIZ / "modelos" / "hf"))
+    m = _CACHE.get("whisper") or WhisperModel(MODELO_TRANSCRICAO, device="cpu", compute_type="int8", cpu_threads=max(1, (os.cpu_count() or 2) - 1))
+    _CACHE["whisper"] = m
+    segs, _ = m.transcribe(_audio16k(audio), language=idioma, word_timestamps=True, vad_filter=True, beam_size=1, condition_on_previous_text=False)
+    pal = [w for sg in segs for w in (sg.words or []) if w.word.strip()]
+    frases, cur = [], []
+    for i, w in enumerate(pal):
+        cur.append(w)
+        prox = pal[i + 1] if i + 1 < len(pal) else None
+        fim_frase = w.word.strip()[-1:] in ".?!…" or (prox and prox.start - w.end > 0.45) or len(cur) >= 22 or not prox
+        if fim_frase:
+            frases.append({"ini": round(cur[0].start, 2), "fim": round(cur[-1].end, 2), "texto": "".join(x.word for x in cur).strip()})
+            cur = []
+    return frases
+
+
+def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
+    """Mesma fala do vídeo (ou o texto corrigido em textos.json) com a voz da amostra, no MESMO tempo de cada frase,
+    e a música/efeitos originais por baixo (sem ruído: a voz original sai antes, pela separação)."""
+    import numpy as np
+    import soundfile as sf
+    t0 = time.time()
+    trab = RAIZ / "tmp" / ("redub-" + hashlib.sha256(str(Path(video).resolve()).encode()).hexdigest()[:8])
+    trab.mkdir(parents=True, exist_ok=True)
+    ff = _ffmpeg()
+    orig = trab / "original.wav"
+    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(video), "-vn", "-ac", "2", "-ar", "44100", str(orig)], check=True)
+    _log("1/4 separando a voz da música...")
+    voz, fundo = separar_voz(orig, trab)
+    _log("2/4 transcrevendo as frases...")
+    frases = json.loads(Path(textos).read_text(encoding="utf-8")) if textos else _frases_com_tempo(voz, idioma)
+    (trab / "frases.json").write_text(json.dumps(frases, ensure_ascii=False, indent=1), encoding="utf-8")
+    # amostra: junta as amostras, tira música/ruído (separação) e normaliza
+    _log("3/4 preparando a amostra da voz...")
+    partes = []
+    for i, am in enumerate(amostras):
+        w = trab / f"am{i}.wav"
+        subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(am), "-ac", "2", "-ar", "44100", str(w)], check=True)
+        partes.append(w)
+    junta = trab / "amostra-junta.wav"
+    subprocess.run([ff, "-y", "-loglevel", "error", *sum([["-i", str(w)] for w in partes], []), "-filter_complex", f"concat=n={len(partes)}:v=0:a=1", str(junta)], check=True)
+    sub = trab / "amostra-sep"
+    sub.mkdir(exist_ok=True)
+    vz_am, _ = separar_voz(junta, sub)
+    amostra = trab / "amostra-limpa.wav"
+    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(vz_am), "-af", "highpass=f=70,silenceremove=stop_periods=-1:stop_duration=0.4:stop_threshold=-40dB,loudnorm=I=-18", "-ac", "1", "-ar", "22050", str(amostra)], check=True)
+    _log(f"4/4 gerando {len(frases)} frases com a voz clonada ({motor})...")
+    taxa = 44100
+    tot = int((max(f["fim"] for f in frases) + 3) * taxa) if frases else taxa
+    trilha = np.zeros(max(tot, int(sf.info(str(orig)).duration * taxa) + taxa), dtype="float32")
+    for i, f in enumerate(frases):
+        fw = trab / f"f{i:03d}.wav"
+        r = gerar(f["texto"], str(amostra), str(fw), motor, idioma)
+        if not r.get("ok"):
+            continue
+        a, sr = _ler_som(fw, taxa)
+        a = a.mean(1)
+        # encaixe: a frase nova ocupa o tempo da original (pode avançar até 0,35 s na pausa seguinte)
+        prox = frases[i + 1]["ini"] if i + 1 < len(frases) else f["fim"] + 1.0
+        alvo = max(0.4, min(prox, f["fim"] + 0.35) - f["ini"])
+        fator = (len(a) / taxa) / alvo
+        if abs(fator - 1) > 0.03:
+            fator = min(1.45, max(0.8, fator))
+            fa = trab / f"f{i:03d}-ajust.wav"
+            sf.write(str(fa), a, taxa)
+            fb = trab / f"f{i:03d}-ok.wav"
+            subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(fa), "-af", f"atempo={fator:.4f}", str(fb)], check=True)
+            a, _ = _ler_som(fb, taxa)
+            a = a.mean(1)
+        ini = int(f["ini"] * taxa)
+        fim = min(len(trilha), ini + len(a))
+        trilha[ini:fim] += a[: fim - ini]
+    nova = trab / "voz-nova.wav"
+    sf.write(str(nova), trilha, taxa)
+    final_audio = trab / "mix.wav"
+    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(nova), "-i", str(fundo), "-filter_complex",
+                    "[0:a]loudnorm=I=-16:TP=-1.5,aformat=channel_layouts=stereo[v];[1:a]volume=0.9[m];[v][m]amix=inputs=2:normalize=0:duration=longest,alimiter=limit=0.95[o]",
+                    "-map", "[o]", "-ar", "48000", str(final_audio)], check=True)
+    saida = Path(saida).resolve()
+    saida.parent.mkdir(parents=True, exist_ok=True)
+    if str(saida).lower().endswith(EH_VIDEO):
+        subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(video), "-i", str(final_audio), "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", str(saida)], check=True)
+    else:
+        shutil.copy(final_audio, saida)
+    return {"ok": True, "arquivo": str(saida), "frases": len(frases), "motor": motor, "tempo_s": round(time.time() - t0, 1),
+            "textos": str(trab / "frases.json"), "dica": "Para corrigir uma palavra, edite frases.json e rode de novo com --textos (as frases já vêm com o tempo)."}
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -576,12 +739,55 @@ if __name__ == "__main__":
     f.add_argument("--amostra")
     f.add_argument("--saida", required=True)
     f.add_argument("--sem-servidor", action="store_true")
+    rd = sub.add_parser("redublar", help="refaz a fala do vídeo com a voz clonada, frase por frase no mesmo tempo, mantendo a música original")
+    rd.add_argument("--video", required=True)
+    rd.add_argument("--amostra", required=True, action="append", help="pode repetir: vários áudios da mesma pessoa (melhor: 1 a 3 min no total)")
+    rd.add_argument("--saida", required=True)
+    rd.add_argument("--motor", choices=["xtts", "openvoice"], default="xtts")
+    rd.add_argument("--idioma", default="pt")
+    rd.add_argument("--textos", help="frases.json corrigido (de uma rodada anterior)")
+    tc = sub.add_parser("transcrever", help="transcreve áudio/vídeo com o tempo de cada palavra (para legenda e edição)")
+    tc.add_argument("--audio", required=True)
+    tc.add_argument("--saida", required=True)
+    tc.add_argument("--idioma", default="pt")
     tr = sub.add_parser("trocar", help="troca a voz de um áudio ou vídeo pela voz da amostra (mesmas palavras e ritmo)")
     tr.add_argument("--entrada", required=True)
     tr.add_argument("--amostra", required=True)
     tr.add_argument("--saida", required=True)
     a = ap.parse_args()
-    if a.cmd == "trocar":
+    if a.cmd == "redublar":
+        dentro = Path(sys.prefix).resolve() == VENV.resolve()
+        if not dentro:
+            if not PY.exists():
+                sys.exit(json.dumps({"ok": False, "erro": "voz local não preparada: rode 'voz_local.py instalar' (uma vez)"}, ensure_ascii=False))
+            faltam = [p for m, p in (("faster_whisper", PIP_TRANSCRICAO), ("demucs", PIP_SEPARACAO)) if subprocess.run([str(PY), "-c", f"import {m}"], capture_output=True).returncode != 0]
+            for p in faltam:
+                _log("preparando " + p[0] + " (uma vez)...")
+                _pip(*p)
+            args = [str(PY), __file__, "redublar", "--video", str(Path(a.video).resolve()), "--saida", str(Path(a.saida).resolve()), "--motor", a.motor, "--idioma", a.idioma]
+            for am in a.amostra:
+                args += ["--amostra", str(Path(am).resolve())]
+            if a.textos:
+                args += ["--textos", str(Path(a.textos).resolve())]
+            sys.exit(subprocess.run(args).returncode)
+        print(json.dumps(redublar(a.video, a.amostra, a.saida, a.motor, a.idioma, a.textos), ensure_ascii=False))
+    elif a.cmd == "transcrever":
+        dentro = Path(sys.prefix).resolve() == VENV.resolve()
+        if not dentro:
+            if not PY.exists():
+                sys.exit(json.dumps({"ok": False, "erro": "voz local não preparada: rode 'voz_local.py instalar' (uma vez)"}, ensure_ascii=False))
+            if subprocess.run([str(PY), "-c", "import faster_whisper"], capture_output=True).returncode != 0:
+                _log("preparando a transcrição local (uma vez)...")
+                _pip(*PIP_TRANSCRICAO)
+            entrada = Path(a.audio).resolve()
+            wav = RAIZ / "tmp" / ("transc-" + str(abs(hash(str(entrada))) % 10**8) + ".wav")
+            wav.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-i", str(entrada), "-vn", "-ac", "1", "-ar", "16000", str(wav)], check=True)
+            r = subprocess.run([str(PY), __file__, "transcrever", "--audio", str(wav), "--saida", str(Path(a.saida).resolve()), "--idioma", a.idioma])
+            wav.unlink(missing_ok=True)
+            sys.exit(r.returncode)
+        print(json.dumps(transcrever_local(a.audio, a.saida, a.idioma), ensure_ascii=False))
+    elif a.cmd == "trocar":
         trocar(a.entrada, a.amostra, a.saida)
     elif a.cmd == "instalar":
         instalar(a.motor)

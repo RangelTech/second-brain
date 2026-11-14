@@ -44,8 +44,22 @@ Lê informações, transcrição automática (português ou inglês) e, se for l
 Para cada candidato bom: `python cortes.py ler --pasta P --inicio <cand-90> --fim <cand+40>`. Mostra frase por frase com o tempo. Encontre onde o assunto **começa** e onde a reação **termina**. Descarte candidatos que são só leitura de doação, "salve fulano", silêncio, ou que precisam de contexto que não está no trecho.
 Escolha os 3 a 6 melhores; para cada um defina: início, fim, título-gancho, e se é versão alcance ou monetização.
 
+### 2b. VER o vídeo antes de escolher (obrigatório em jogo, filme, anime)
+`python cortes.py mapa --pasta P` → folhas de miniaturas da live/vídeo INTEIRO (uma a cada ~30 s, com o horário escrito em amarelo), sem baixar o vídeo (usa as miniaturas do YouTube). Olhe com visão e anote onde aparece o que interessa: jogo/cutscene em tela cheia, câmera do streamer, cena do filme.
+Detalhe de um trecho: `python cortes.py mapa --pasta P --inicio 4300 --fim 4500` (miniaturas maiores a cada ~10 s): mostra os CORTES DE CENA (onde a cena começa e termina).
+Live de "conversa" sem jogo na tela NÃO serve para corte de jogo: procure outra (reação a trailer, gameplay).
+
 ### 3. Olhar o quadro e enquadrar
+**Medir com precisão:** depois de cortar uma vez, `python cortes.py quadro --pasta P --nome corte-01 --t 10` gera o quadro em alta com uma GRADE de 5 em 5 % (amarelo = x, azul = y): leia as frações direto na imagem.
 Tire um quadro do momento para ver o layout: `cortar` uma vez sem `--recorte`, e olhe com `vision_analyze` um quadro de `<nome>-base.mp4` (`ffmpeg -ss 5 -i base.mp4 -frames:v 1 q.png`). Live com câmera pequena num canto e chat na tela: corte SÓ a câmera para o rosto ficar grande, com `--recorte x:y:largura:altura` em frações do quadro original (ex.: câmera à direita em cima `0.46:0.03:0.43:0.63`). Gameplay/cutscene em tela cheia: sem recorte (o jogo inteiro no meio) ou recorte central `0.2:0:0.6:1` se a ação está no centro.
+
+**Layouts:**
+| Conteúdo | Layout | Como |
+|---|---|---|
+| Live só de conversa | rosto grande | `--recorte` só na câmera |
+| **Jogo/cutscene com câmera do streamer** | **jogo em cima, câmera embaixo** (o foco é o JOGO) | `--recorte` = área do jogo SEM a câmera (ex.: `0:0:0.83:1` se a câmera fica na direita) + `--recorte-camera` = a câmera (ex.: `0.842:0.188:0.142:0.285`) |
+| Jogo sem câmera, filme, anime, série | tela única | sem recorte (16:9 inteiro) ou `0.12:0:0.76:1` para aproximar se a ação é no centro (confira que ninguém fica cortado) |
+Cutscene ou filme que JÁ tem legenda na imagem: use `--sem-legenda` no `cortar` e no `montar` (não duplica; a câmera sobe para perto do jogo).
 
 ### 4. Cortar
 `python cortes.py cortar --url "<link>" --pasta P --inicio <s> --fim <s> --nome corte-01 [--recorte x:y:l:a]`
@@ -62,6 +76,16 @@ Vídeo em outro idioma para público brasileiro: traduza as falas para um JSON `
 
 ### 7. Entregar
 Para cada corte: caminho do MP4 numa linha própria, duração, e uma sugestão de legenda do post (1 linha + 3 a 5 hashtags do nicho + crédito "@criador"). Diga qual é para monetizar (mais de 1 min) e qual é para alcance.
+
+## Filmes, animes e séries ("melhores momentos")
+- Fonte: vídeos de "melhores momentos/cenas engraçadas" no YouTube (têm mapa de "mais assistidos" e transcrição). Não há chat: a nota vem do mapa + fala.
+- O corte é a CENA inteira: comece no corte de câmera em que a cena começa (veja no `mapa` detalhe) e termine na piada + reação, antes do corte para a próxima cena. Anime: a transcrição automática vem sem pontuação; decida pelas imagens.
+- Embaixo vai o NOME DA OBRA (`--arroba "Corra que a Polícia Vem Aí! (1988)"`); título em cima é o gancho da cena.
+- Direitos: trechos de filme/anime/série têm dono. Para monetizar, transforme (narração/comentário próprio, edição) e saiba que pode haver reivindicação de direitos; diga isso ao usuário uma vez.
+
+## Narrador, sons e acabamento
+- Narrador estilo série de comédia ("esse foi o dia em que..."): escreva 2 ou 3 falas curtas e engraçadas, gere com `voz-local` (voz do usuário ou padrão; nunca clone a voz de dublador/ator famoso) e mixe nas pausas com `motion/scripts/sons.py mixar`.
+- Efeitos: `motion/scripts/sons.py` (boing, buzina, tchan, erro para zoeira; woosh/pop para destaque). Passe a lista em `sons.json` e misture no áudio do corte antes do `motion_animar`.
 
 ## Erros conhecidos (já resolvidos; não contorne de outro jeito)
 - Vídeo preto no Motion: era a captura invisível que não fotografa `<video>`; o app copia o quadro para um canvas. Se aparecer preto, o arquivo base não existe ou o nome está errado.

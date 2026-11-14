@@ -67,7 +67,7 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     await wc().insertText(nome)
     await esperar(1500)
     const alvo = JSON.stringify(nome.toLowerCase())
-    const ok = await clicarEm(`(() => { const its = [...document.querySelectorAll('#pane-side [data-testid="cell-frame-title"]')]; const q = ${alvo}; const t = its.find((e) => e.innerText.toLowerCase().trim() === q) || its.find((e) => e.innerText.toLowerCase().includes(q)); return t ? (t.closest('[role="listitem"],[role="row"]') || t) : null })()`)
+    const ok = await clicarEm(`(() => { const its = [...document.querySelectorAll('#pane-side [data-testid="cell-frame-title"], #pane-side span[title]')]; const nome = (e) => (e.getAttribute('title') || e.innerText || '').replace(/[‪‬]/g, '').toLowerCase().trim(); const q = ${alvo}; const t = its.find((e) => nome(e) === q) || its.find((e) => nome(e).includes(q)); return t ? (t.closest('[role="listitem"],[role="row"]') || t) : null })()`)
     if (!ok) throw new Error(`Não achei a conversa "${nome}". Confira o nome como aparece no WhatsApp ou use o número.`)
     for (let i = 0; i < 15; i++) {
       await esperar(400)
@@ -162,7 +162,8 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     const lista = await js(`[...document.querySelectorAll('#pane-side [role="listitem"], #pane-side [role="row"]')].map((r) => {
       const t = r.querySelector('[data-testid="cell-frame-title"]')
       if (!t) return null
-      const nome = t.innerText.split('\\n').pop().trim()
+      // o WhatsApp passou a guardar o nome no atributo title (nov/2026); o texto visível pode vir vazio
+      const nome = ((r.querySelector('span[title]') || {}).getAttribute?.('title') || t.innerText.split('\\n').pop()).replace(/[\\u202a\\u202c]/g, '').trim()
       if (nome === 'Arquivadas') return null
       const linhas = r.innerText.split('\\n').map((x) => x.trim()).filter(Boolean)
       const nl = (r.querySelector('[aria-label*="não lida"], [aria-label*="unread"]') || {}).getAttribute?.('aria-label') || ''

@@ -35,14 +35,24 @@ Script: `scripts/voz_local.py` desta skill. Pacotes e modelos vêm dos snapshots
 Vídeo na entrada e `.mp4` na saída: devolve o vídeo com o áudio trocado. Saída `.wav`: só o áudio. Mantém ritmo e entonação, muda só o timbre (OpenVoice, rápido).
 Reel narrado com animação, dublagem com texto novo e montagem completa: skill `reel-narrado`.
 
-## Redublar um vídeo com a voz de alguém (sem créditos)
-Ex.: "coloca a voz do Fulano neste reel". Só com autorização da pessoa dona da voz (peça confirmação se não estiver claro).
-1. **Vídeo:** link do Instagram/TikTok/YouTube: `python -m pip install yt-dlp` (uma vez) e `yt-dlp -o "Videos/original.%(ext)s" "<link>"`. Se pedir login, use o navegador integrado logado e baixe por lá.
-2. **Amostra da voz:** mensagens de voz da pessoa no WhatsApp: `navegador_whatsapp_baixar` com `contato="<nome>"`, `tipo="audio"`, `de="contato"`, `limite=5` (baixa os .ogg sem tocar som; se vier vazio, `navegador_rolar direcao=cima` umas vezes e repita). Ou um vídeo dela. Junte e limpe: `ffmpeg -i a1.ogg -i a2.ogg ... -filter_complex concat=n=N:v=0:a=1,highpass=f=80,loudnorm -ac 1 -ar 22050 amostra.wav` (30 s a 2 min bastam).
-3. **O que é falado no vídeo:** extraia o áudio (`ffmpeg -i original.mp4 -vn -ac 1 -ar 16000 fala.wav`) e transcreva com a ferramenta de transcrição do app (ou `faster-whisper` local). Revise o texto (pontuação ajuda a entonação).
-4. **Nova fala:** grave o texto em `fala.txt` e rode `voz_local.py falar --texto-arquivo fala.txt --amostra amostra.wav --saida nova.wav --motor xtts` (XTTS fica mais parecido; uso pessoal).
-5. **Encaixar no tempo do vídeo:** compare as durações (`ffprobe`) e ajuste com `atempo` (entre 0,8 e 1,25; fora disso, encurte o texto). Troque o áudio mantendo a imagem: `ffmpeg -i original.mp4 -i nova_ajustada.wav -map 0:v -map 1:a -c:v copy -shortest Videos/redublado.mp4`. Se quiser manter a música de fundo, misture baixinho o áudio original (`volume=0.15`) com `amix`.
-6. Entregue o MP4 (caminho completo) e diga com honestidade os limites: sem sincronia labial (para boca acompanhando, só no Estúdio, em créditos).
+## Redublar um vídeo com a voz de alguém (sem créditos): use `redublar`
+Ex.: "coloca a voz do Fulano neste reel". Só com autorização da pessoa dona da voz.
+1. **Vídeo:** link → `yt-dlp` (o `cortes-de-video/scripts/cortes.py ferramenta` baixa o yt-dlp); Instagram logado: navegador integrado.
+2. **Amostras:** TODOS os áudios de voz da pessoa que existirem (`navegador_whatsapp_baixar` com `tipo="audio"`, `de="contato"`, `limite=20`). Quanto mais, mais parecido: 30 s funciona, 1 a 3 min fica bem melhor. Se houver pouco áudio, diga ao usuário que pedir mais áudios melhora a semelhança.
+3. **Um comando faz tudo:**
+   `python voz_local.py redublar --video original.mp4 --amostra a1.ogg --amostra a2.ogg ... --saida Videos/redublado.mp4`
+   - separa a voz da música do vídeo (Demucs) e também limpa as amostras (tira ruído/música);
+   - transcreve as frases com o tempo de cada uma (faster-whisper);
+   - gera CADA frase com a voz clonada (XTTS, o mais parecido) e encaixa no tempo da frase original;
+   - devolve a MÚSICA ORIGINAL por baixo (sem ruído) e troca o áudio do vídeo.
+   - Leva alguns minutos (1 min de vídeo ≈ 8 a 15 min em notebook). Rode em primeiro plano e acompanhe até o fim.
+   - Palavra errada? Edite o `frases.json` indicado na saída e rode de novo com `--textos frases.json`.
+4. **Acabamento (ofereça):** "Quer que eu coloque o @ dele, uma moldura fina e uma chamada no fim, tipo 'digita IA nos comentários'?" → skill edicao-profissional, comando `acabamento`.
+5. Entregue o MP4 (caminho completo) e diga com honestidade: sem sincronia labial (boca acompanhando só no Estúdio, em créditos).
+- `trocar` (OpenVoice) é o atalho rápido: mantém a fala original e só muda o timbre, mas fica MENOS parecido e passa o ruído da música junto. Use só para teste rápido ou áudio sem música.
+
+## Transcrever com tempo por palavra
+`python voz_local.py transcrever --audio video.mp4 --saida palavras.json` → `[{"t": início, "f": fim, "w": palavra}]` (local, ~2x mais rápido que a duração). Base da legenda e da edição (skill edicao-profissional).
 
 ## Expectativa (diga ao usuário)
 - Em CPU, com o servidor já de pé: OpenVoice ~1x o tamanho do áudio, XTTS 2x a 4x. A primeira fala demora mais (carrega o modelo).

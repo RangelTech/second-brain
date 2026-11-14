@@ -325,6 +325,50 @@ def mapa(pasta, inicio=None, fim=None, passo=None):
     print(json.dumps({"ok": True, "folhas": folhas, "dica": "olhe cada folha com vision_analyze; o horário amarelo de cada miniatura é o tempo no vídeo"}, ensure_ascii=False))
 
 
+# ---------------------------------------------------------------- quadro com grade (medir recortes com precisão)
+QUADRO_PY = """
+import json, sys
+from PIL import Image, ImageDraw, ImageFont
+c = json.loads(sys.argv[1])
+im = Image.open(c["png"]).convert("RGB")
+W, H = im.size
+d = ImageDraw.Draw(im)
+try:
+    f = ImageFont.truetype(c["fonte"], max(14, W // 70)) if c.get("fonte") else ImageFont.load_default()
+except Exception:
+    f = ImageFont.load_default()
+for k in range(1, 20):
+    x = W * k / 20
+    y = H * k / 20
+    forte = k % 2 == 0
+    d.line([(x, 0), (x, H)], fill=(255, 230, 0) if forte else (255, 230, 0, 90), width=2 if forte else 1)
+    d.line([(0, y), (W, y)], fill=(0, 230, 255) if forte else (0, 230, 255, 90), width=2 if forte else 1)
+    if forte:
+        d.text((x + 3, 3), "%.1f" % (k / 20), fill=(255, 230, 0), font=f)
+        d.text((3, y + 3), "%.1f" % (k / 20), fill=(0, 230, 255), font=f)
+im.save(c["saida"])
+print(json.dumps({"ok": True, "arquivo": c["saida"], "largura": W, "altura": H}))
+"""
+
+
+def quadro(pasta, nome, t, url=None):
+    """Quadro do trecho baixado (ou do vídeo, com --url) com grade de 5 em 5 %: amarelo = x, azul = y.
+    Use para medir --recorte e --recorte-camera (x:y:largura:altura em frações)."""
+    pasta = Path(pasta).resolve()
+    ff = ffmpeg()
+    brutos = sorted(pasta.glob(f"{nome}-bruto-*.mp4"))
+    if not brutos:
+        sair(f"baixe o trecho antes (cortar --nome {nome}) ou use outro nome")
+    png = pasta / f"{nome}-quadro-{t:g}.png"
+    subprocess.run([ff, "-y", "-loglevel", "error", "-ss", str(t), "-i", str(brutos[-1]), "-frames:v", "1", str(png)], check=True)
+    fonte = next((f for f in ("C:/Windows/Fonts/arialbd.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf") if os.path.isfile(f)), "")
+    saida = pasta / f"{nome}-grade-{t:g}.png"
+    p = subprocess.run([python_com_pillow(), "-c", QUADRO_PY, json.dumps({"png": str(png), "saida": str(saida), "fonte": fonte})], capture_output=True, text=True, encoding="utf-8")
+    if p.returncode:
+        sair("falhou a grade: " + p.stderr[-300:])
+    print(p.stdout.strip().splitlines()[-1])
+
+
 # ---------------------------------------------------------------- ler (contexto em volta do momento)
 def ler(pasta, inicio, fim):
     leg = achar_legenda(pasta)
@@ -354,7 +398,7 @@ def ajustar(pasta, inicio, fim):
 
 
 # ---------------------------------------------------------------- cortar
-def cortar(url, pasta, inicio, dur, nome, fim=None, sem_ajuste=False, recorte=None):
+def cortar(url, pasta, inicio, dur, nome, fim=None, sem_ajuste=False, recorte=None, recorte_camera=None, sem_legenda=False):
     pasta = Path(pasta).resolve()
     pasta.mkdir(parents=True, exist_ok=True)
     fim = fim if fim else inicio + dur
@@ -370,29 +414,50 @@ def cortar(url, pasta, inicio, dur, nome, fim=None, sem_ajuste=False, recorte=No
                 "--merge-output-format", "mp4", "-o", str(bruto), url])
         if p.returncode or not bruto.exists():
             sair("não consegui baixar o trecho: " + p.stderr[-400:])
-    # base vertical: fundo = o próprio vídeo ampliado e desfocado; vídeo inteiro no meio (largura 1080)
+    # base vertical 1080x1920: fundo = o próprio vídeo ampliado e desfocado. Dois layouts:
+    #  - tela (padrão): o quadro inteiro (ou --recorte) no meio, largura 1080.
+    #  - jogo + câmera (--recorte-camera): o JOGO grande em cima (quadro inteiro ou --recorte) e o rosto do streamer
+    #    recortado embaixo, com a legenda entre os dois. É o formato de corte de gameplay/reação.
     base = pasta / f"{nome}-base.mp4"
-    # recorte opcional "x:y:l:a" em frações do quadro (0 a 1): ex. só a câmera do streamer, para o rosto aparecer grande
-    corte = ""
-    if recorte:
-        x, y, l, a = [float(v) for v in recorte.split(":")]
-        corte = f"crop=iw*{l}:ih*{a}:iw*{x}:ih*{y},"
-    filtro = ("[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:2,eq=brightness=-0.18[f];"
-              f"[0:v]{corte}scale=1080:-2,scale=min(1080\,iw):min(1000\,ih):force_original_aspect_ratio=decrease[v];[f][v]overlay=(W-w)/2:max(480\,(H-h)/2-60),fps=30,format=yuv420p[out]")
+    pr = subprocess.run([str(Path(ff).with_name("ffprobe" + Path(ff).suffix)), "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", str(bruto)], capture_output=True, text=True).stdout.strip().split(",")
+    try:
+        sw0, sh0 = float(pr[0]), float(pr[1])
+    except Exception:  # noqa: BLE001
+        sw0, sh0 = 1920.0, 1080.0
+
+    def frac(r):
+        x, y, l, a = [float(v) for v in r.split(":")]
+        return x, y, l, a
+
+    def crop(r):
+        if not r:
+            return "", sw0, sh0
+        x, y, l, a = frac(r)
+        return f"crop=iw*{l}:ih*{a}:iw*{x}:ih*{y},", sw0 * l, sh0 * a
+
+    cj, gw, gh = crop(recorte)
+    fundo = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:2,eq=brightness=-0.18[f];"
+    meta = {"inicio": inicio, "fim": fim, "url": url}
+    if recorte_camera:
+        vh = min(760, round(1080 * gh / gw))  # jogo
+        vw = round(min(1080, 760 * gw / gh))
+        vtop = 470
+        cc, cw, ch = crop(recorte_camera)
+        cam_h = 400
+        cam_w = min(900, round(cam_h * cw / ch))
+        cam_top = vtop + vh + (50 if sem_legenda else 190)  # espaço da legenda entre jogo e câmera
+        filtro = (fundo + f"[0:v]{cj}scale={vw}:{vh}[g];[0:v]{cc}scale={cam_w}:{cam_h}[c];"
+                  f"[f][g]overlay=(W-w)/2:{vtop}[t];[t][c]overlay=(W-w)/2:{cam_top},fps=30,format=yuv420p[out]")
+        meta.update({"vw": vw, "vh": vh, "vtop": vtop, "cam": {"top": cam_top, "h": cam_h, "w": cam_w}})
+    else:
+        vh = min(1000, round(1080 * gh / gw))
+        vw = round(1080 if 1080 * gh / gw <= 1000 else 1000 * gw / gh)
+        vtop = max(480, round((1920 - vh) / 2 - 60))
+        filtro = fundo + f"[0:v]{cj}scale={vw}:{vh}[v];[f][v]overlay=(W-w)/2:{vtop},fps=30,format=yuv420p[out]"
+        meta.update({"vw": vw, "vh": vh, "vtop": vtop})
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(bruto), "-filter_complex", filtro, "-map", "[out]", "-map", "0:a?",
                     "-t", str(dur), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(base)], check=True)
-    # altura do vídeo no meio da tela (para a moldura e a legenda acompanharem)
-    try:
-        pr = subprocess.run([str(Path(ff).with_name("ffprobe" + Path(ff).suffix)), "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", str(bruto)], capture_output=True, text=True).stdout.strip().split(",")
-        sw, sh = float(pr[0]), float(pr[1])
-        if recorte:
-            _, _, l, a = [float(v) for v in recorte.split(":")]
-            sw, sh = sw * l, sh * a
-        vh = min(1000, round(1080 * sh / sw))
-        vw = round(1080 if 1080 * sh / sw <= 1000 else 1000 * sw / sh)
-    except Exception:  # noqa: BLE001
-        vw, vh = 1080, 608
-    (pasta / f"{nome}-meta.json").write_text(json.dumps({"vw": vw, "vh": vh, "inicio": inicio, "fim": fim, "url": url}), encoding="utf-8")
+    (pasta / f"{nome}-meta.json").write_text(json.dumps(meta), encoding="utf-8")
     audio = pasta / f"{nome}-audio.wav"
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(base), "-vn", "-ac", "2", "-ar", "48000", "-af", "loudnorm=I=-14:TP=-1.5", str(audio)], check=True)
     leg = achar_legenda(pasta)
@@ -403,7 +468,7 @@ def cortar(url, pasta, inicio, dur, nome, fim=None, sem_ajuste=False, recorte=No
 
 
 # ---------------------------------------------------------------- montar (HTML do Motion)
-def montar(pasta, nome, titulo, arroba, cor, traduzida, dur):
+def montar(pasta, nome, titulo, arroba, cor, traduzida, dur, sem_legenda=False):
     pasta = Path(pasta).resolve()
     base = pasta / f"{nome}-base.mp4"
     if not base.exists():
@@ -427,7 +492,9 @@ def montar(pasta, nome, titulo, arroba, cor, traduzida, dur):
         meta = json.loads((pasta / f"{nome}-meta.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         meta = {"vw": 1080, "vh": 608}
-    dados = {"video": base.name, "dur": dur, "vw": meta["vw"], "vh": meta["vh"], "titulo": titulo, "arroba": arroba or "", "cor": cor or "#ff2d55", "palavras": pal}
+    if sem_legenda:  # o vídeo já tem legenda própria (cutscene, filme legendado): não duplica
+        pal = []
+    dados = {"video": base.name, "dur": dur, "vw": meta["vw"], "vh": meta["vh"], "vtop": meta.get("vtop"), "cam": meta.get("cam"), "titulo": titulo, "arroba": arroba or "", "cor": cor or "#ff2d55", "palavras": pal}
     html = MODELO.read_text(encoding="utf-8")
     a, b = html.index("/*DADOS*/"), html.index("/*FIM*/")
     html = html[: a + len("/*DADOS*/")] + json.dumps(dados, ensure_ascii=False) + html[b:]
@@ -452,13 +519,19 @@ if __name__ == "__main__":
     a2.add_argument("--duracao", type=float, default=20)
     a2.add_argument("--fim", type=float, help="fim do corte em segundos (melhor que --duracao: escolha lendo as frases)")
     a2.add_argument("--sem-ajuste", action="store_true", help="não encaixar nas bordas das frases")
-    a2.add_argument("--recorte", help="x:y:largura:altura em frações do quadro (0 a 1), ex. 0.47:0.03:0.41:0.63 = só a câmera")
+    a2.add_argument("--recorte", help="x:y:largura:altura em frações do quadro (0 a 1) do conteúdo principal (jogo, filme, rosto)")
+    a2.add_argument("--sem-legenda", action="store_true", help="o vídeo já tem legenda na imagem: a câmera sobe para perto do jogo")
+    a2.add_argument("--recorte-camera", help="x:y:largura:altura da câmera do streamer: liga o layout jogo em cima + câmera embaixo")
     a2.add_argument("--nome", required=True)
     a5 = sub.add_parser("mapa")
     a5.add_argument("--pasta", required=True)
     a5.add_argument("--inicio", type=float)
     a5.add_argument("--fim", type=float)
     a5.add_argument("--passo", type=float)
+    a6 = sub.add_parser("quadro")
+    a6.add_argument("--pasta", required=True)
+    a6.add_argument("--nome", required=True)
+    a6.add_argument("--t", type=float, default=5)
     a4 = sub.add_parser("ler")
     a4.add_argument("--pasta", required=True)
     a4.add_argument("--inicio", type=float, required=True)
@@ -470,18 +543,21 @@ if __name__ == "__main__":
     a3.add_argument("--arroba", default="")
     a3.add_argument("--cor", default="#ff2d55")
     a3.add_argument("--legenda-traduzida")
+    a3.add_argument("--sem-legenda", action="store_true", help="o vídeo já tem legenda na imagem (cutscene, filme legendado)")
     a3.add_argument("--duracao", type=float, default=20)
     sub.add_parser("ferramenta")
     x = ap.parse_args()
     if x.cmd == "analisar":
         analisar(x.url, x.pasta, x.duracao, x.quantos)
     elif x.cmd == "cortar":
-        cortar(x.url, x.pasta, x.inicio, x.duracao, x.nome, x.fim, x.sem_ajuste, x.recorte)
+        cortar(x.url, x.pasta, x.inicio, x.duracao, x.nome, x.fim, x.sem_ajuste, x.recorte, x.recorte_camera, x.sem_legenda)
     elif x.cmd == "mapa":
         mapa(x.pasta, x.inicio, x.fim, x.passo)
+    elif x.cmd == "quadro":
+        quadro(x.pasta, x.nome, x.t)
     elif x.cmd == "ler":
         ler(x.pasta, x.inicio, x.fim)
     elif x.cmd == "montar":
-        montar(x.pasta, x.nome, x.titulo, x.arroba, x.cor, x.legenda_traduzida, x.duracao)
+        montar(x.pasta, x.nome, x.titulo, x.arroba, x.cor, x.legenda_traduzida, x.duracao, x.sem_legenda)
     else:
         print(json.dumps({"ok": True, "yt_dlp": ytdlp(), "ffmpeg": ffmpeg()}, ensure_ascii=False))

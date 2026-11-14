@@ -25,7 +25,7 @@ Não instale nada: rode os scripts com o Python que houver (ou o do app, `SB_PYT
 | "faz um reels de 1 minuto com a minha voz sobre X" | roteiro + narração + animação + legenda | **A** |
 | "fala este texto com a minha voz" / "narra isso" | `voz_local.py falar` | **B** |
 | "troca a voz deste áudio/vídeo pela minha" | `voz_local.py trocar` (mesma fala, outro timbre) | **C** |
-| "dubla este vídeo com a minha voz" (mesmo texto) | transcrever, falar com a voz dele, encaixar no tempo | **D** |
+| "dubla este vídeo com a minha voz" (mesmo texto) | `voz_local.py redublar` (faz tudo: separa música, frase por frase no tempo) | **D** |
 | "pega este vídeo e coloca uma narração minha por cima" | B + mixar por cima do áudio original baixo | **D** |
 | "quero mexer junto" / ajustes finos | abrir no Editor | **E** |
 
@@ -93,6 +93,7 @@ Texto longo: pode mandar inteiro; o script divide em frases sozinho.
 - Funciona melhor com fala limpa. Se o original tiver música alta, avise que a música também passa pelo conversor; nesse caso prefira a seção D (narração nova por cima da música baixa).
 
 ## D. "Dubla este vídeo com a minha voz"
+**Caminho padrão:** `voz_local.py redublar --video v.mp4 --amostra a1 --amostra a2 ... --saida Videos/dublado.mp4` (skill voz-local). Os passos abaixo são o que ele faz por dentro; use-os só para texto NOVO ou outro idioma.
 1. Baixe/ache o vídeo (link: `yt-dlp`; Instagram logado: navegador integrado).
 2. Áudio para transcrever: `ffmpeg -i video.mp4 -vn -ac 1 -ar 16000 fala16k.wav`; transcreva com a ferramenta de transcrição do app (ou faster-whisper local). Revise a pontuação. Se o usuário quer outro idioma, traduza o texto.
 3. Duas formas:

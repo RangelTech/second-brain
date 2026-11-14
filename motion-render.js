@@ -6,7 +6,7 @@ const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 
-const LIM = { largura: [160, 3840], altura: [160, 3840], fps: [12, 60], duracao: [0.5, 180] }
+const LIM = { largura: [160, 3840], altura: [160, 3840], fps: [12, 60], duracao: [0.5, 1200] } // até 20 min (VSL longa)
 const faixa = (v, [a, b], padrao) => (Number.isFinite(+v) && +v > 0 ? Math.min(b, Math.max(a, +v)) : padrao)
 const par = (n) => Math.round(n / 2) * 2
 
