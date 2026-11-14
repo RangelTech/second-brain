@@ -378,6 +378,17 @@ def gerar(texto, amostra, saida, motor="openvoice", idioma="pt", temperatura=Non
             partes.append(np.asarray(m.inference(frase, idioma, gpt, spk, **extra)["wav"], dtype="float32").reshape(-1))
             partes.append(np.zeros(int(24000 * 0.18), dtype="float32"))
         _gravar_wav(saida, np.concatenate(partes[:-1]) if partes else np.zeros(1, dtype="float32"), 24000)
+        if os.environ.get("SB_VOZ_REFINO", "1") != "0" and temperatura is None:
+            # texto→voz: o XTTS acerta fala e entonação; o conversor do OpenVoice puxa o timbre para a voz real (mais parecido)
+            try:
+                bruto = saida.with_name(saida.stem + ".xtts.wav")
+                shutil.move(str(saida), str(bruto))
+                trocar_timbre(str(bruto), str(amostra), str(saida))
+                bruto.unlink(missing_ok=True)
+            except Exception as e:  # noqa: BLE001
+                _log(f"refino de timbre falhou: {e}")
+                if not saida.exists() and bruto.exists():
+                    shutil.move(str(bruto), str(saida))
         return {"ok": True, "arquivo": str(saida), "segundos": round(_segundos(saida), 1), "tempo_s": round(time.time() - t0, 1), "motor": "xtts"}
     base = saida.with_name(saida.stem + ".base.wav") if amostra else saida
     with wave.open(str(base), "wb") as wf:
