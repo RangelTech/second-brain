@@ -37,6 +37,8 @@
       "gateway-cliente.js",
       "dublagem.js",
       "rotinas.js",
+      "atendimento.js",
+      "instagram-dm.js",
       "memoria-hermes.js",
       "sessao-gateway.js",
       "ponte_gateway.py",

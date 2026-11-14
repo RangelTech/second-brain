@@ -59,6 +59,12 @@
         estado: () => invoke('memoria-agente:estado'),
         gravar: (q, l) => invoke('memoria-agente:gravar', q, l),
       },
+      atendimento: {
+        estado: (c) => invoke('atendimento:estado', c),
+        configurar: (d, c) => invoke('atendimento:configurar', d, c),
+        mostrar: (c) => invoke('atendimento:mostrar', c),
+        aoEvento: (fn) => on('atendimento:evento', fn),
+      },
       rotinas: {
         listar: () => invoke('rotinas:listar'),
         criar: (d) => invoke('rotinas:criar', d),

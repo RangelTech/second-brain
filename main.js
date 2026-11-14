@@ -174,6 +174,8 @@ const ponteLLM = require('./ponte-llm').criar({
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
+let atendimento = null
+let atendimentoIg = null
 let remoto = null // acesso web remoto (spec 21 §12)
 const hermesInstalar = hermesInstalarMod.criar({ app, localizar: () => localizarBinario(app) })
 // Teste de instalação: uma conversa de verdade com o agente (modelo local de mentira). Passou uma vez, não repete.
@@ -858,6 +860,32 @@ app.whenReady().then(() => {
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })
+  // atendimento automático do WhatsApp (gatilho a cada N segundos; ver atendimento.js)
+  const opcoesAtendimento = {
+    app,
+    responder,
+    // resposta curta e rápida: uma chamada direta ao modelo (sem agente, sem raciocínio). Medido: agente 42 s; direto poucos segundos.
+    direto: async (alvo, texto, sinal) => {
+      const est = embed.estado()
+      if (!est.pronto) throw new Error(est.erro || 'motor de provedores iniciando')
+      const chave = await chaveLocal()
+      const r = await fetch(est.origem + '/v1/chat/completions', {
+        method: 'POST', signal: sinal,
+        headers: { 'Content-Type': 'application/json', ...(chave ? { Authorization: 'Bearer ' + chave } : {}) },
+        body: JSON.stringify({ model: alvo, stream: false, max_tokens: 700, temperature: 0.6, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: 'user', content: texto }] }),
+      })
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200))
+      const j = await r.json()
+      return String(j.choices?.[0]?.message?.content || '')
+    },
+    alvo: () => cfg.atendimentoAlvo || cfg.ativo,
+    avisar: (e) => janela?.webContents.send('atendimento:evento', e),
+    registrar: (l) => registrarAgente(app, l),
+  }
+  atendimento = require('./atendimento').criar({ ...opcoesAtendimento, wa: nav.whatsapp, canal: 'whatsapp' })
+  atendimentoIg = require('./atendimento').criar({ ...opcoesAtendimento, wa: nav.instagram, canal: 'instagram', avisar: (e) => janela?.webContents.send('atendimento:evento', { ...e, canal: 'instagram' }) })
+  nav.definirAtendimentoIg(atendimentoIg)
+  nav.definirAtendimento(atendimento)
   nav.iniciarServidor().then((i) => {
     navInfo = i
     // workflows rodam numa sessão sem a tela: as ferramentas do app acham este endereço pelo arquivo (só este usuário lê)
@@ -1172,6 +1200,10 @@ app.whenReady().then(() => {
     return n
   }))
   const rotinas = rotinasMod.criar({ app, home: () => caminhosHermes.homeAgente(app), obterGateway: () => require('./sessao-gateway').obterGateway(app, caminhosHermes.homeAgente(app)) })
+  const qualAtend = (c) => (c === 'instagram' ? atendimentoIg : atendimento)
+  ipcMain.handle('atendimento:estado', seguro((c) => qualAtend(c)?.estado() || {}))
+  ipcMain.handle('atendimento:configurar', seguro((d, c) => { const a = qualAtend(c); if (!a) throw new Error('O atendimento ainda está iniciando.'); return a.configurar(d || {}) }))
+  ipcMain.handle('atendimento:mostrar', seguro((c) => (c === 'instagram' ? nav.mostrarInstagram() : nav.mostrarWhatsApp(), true)))
   ipcMain.handle('rotinas:listar', seguro(() => rotinas.listar()))
   ipcMain.handle('rotinas:criar', seguro((d) => rotinas.criar(d || {})))
   ipcMain.handle('rotinas:acao', seguro((id, a) => rotinas.acao(id, a)))

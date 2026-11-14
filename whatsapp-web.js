@@ -7,7 +7,7 @@ const path = require('path')
 const URL_WA = 'https://web.whatsapp.com/'
 const soDigitos = (n) => String(n || '').replace(/\D/g, '')
 
-function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
+function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads, aoPrecisarQr }) {
   const wc = () => vista().webContents
   const js = (codigo) => wc().executeJavaScript(codigo, true)
 
@@ -38,7 +38,7 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     throw new Error('O WhatsApp não terminou de carregar em 60 s.')
   }
   async function exigirLogin() {
-    if ((await pronto()) === 'qr') throw new Error('O WhatsApp não está conectado: o QR code está na tela do navegador. Peça para o usuário escanear (WhatsApp no celular > Aparelhos conectados > Conectar um aparelho) ou entrar por Configurações > Conexões.')
+    if ((await pronto()) === 'qr') { try { await aoPrecisarQr?.() } catch {} ; throw new Error('O WhatsApp não está conectado: o QR code está na tela do navegador. Peça para o usuário escanear (WhatsApp no celular > Aparelhos conectados > Conectar um aparelho) ou entrar por Configurações > Conexões.') }
   }
 
   const titulo = () => js(`(document.querySelector('#main [data-testid="conversation-info-header-chat-title"]') || {}).innerText || ''`)
@@ -304,7 +304,62 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     return { conectado: s === 'ok', precisa_qr: s === 'qr' }
   }
 
-  return { estado, conversas, abrir, ler, enviar, baixar }
+  // ---------- atendimento automático (vigia de 10 s) ----------
+  // conversas com bolinha de não lida, SEM clicar em nada (só lê a lista). Grupos vêm marcados.
+  async function novas() {
+    const s = await js(`document.querySelector('#pane-side') ? 'ok' : (document.querySelector('canvas[aria-label], [data-ref]') ? 'qr' : 'carregando')`)
+    if (s !== 'ok') return { estado: s, conversas: [] }
+    // String.raw: as barras (\d, \n, \s) chegam inteiras na página
+    const lista = await js(String.raw`[...document.querySelectorAll('#pane-side [role="listitem"], #pane-side [role="row"]')].map((r) => {
+      const t = r.querySelector('span[title]') || r.querySelector('[data-testid="cell-frame-title"]')
+      if (!t) return null
+      const nome = ((t.getAttribute && t.getAttribute('title')) || t.innerText || '').replace(/[\u202a\u202c]/g, '').trim()
+      const nl = (r.querySelector('[aria-label*="não lida"], [aria-label*="unread"], [aria-label*="não lidas"]') || {}).getAttribute?.('aria-label') || ''
+      const n = (nl.match(/\d+/) || [0])[0] * 1
+      if (!nome || !n || nome === 'Arquivadas') return null
+      const previa = r.innerText.split('\n').slice(2).join(' ').slice(0, 160)
+      // grupo: ícone de grupo, ou a prévia mostra quem falou ("~Maria : oi" / "Maria: oi")
+      const grupo = !!r.querySelector('[data-icon*="group"], [data-icon*="community"]') || /(^|\s)~[^:]{1,40}\s?:/.test(previa)
+      return { nome, nao_lidas: n, grupo, previa }
+    }).filter(Boolean)`)
+    return { estado: 'ok', conversas: lista }
+  }
+  // abre a conversa clicando na linha da lista (mais rápido e certeiro que a busca)
+  async function abrirLinha(nome) {
+    const alvo = JSON.stringify(String(nome))
+    const ok = await clicarEm(`(() => { const t = [...document.querySelectorAll('#pane-side span[title]')].find((e) => (e.getAttribute('title') || '').replace(/[‪‬]/g, '').trim() === ${alvo}); return t ? (t.closest('[role="listitem"],[role="row"]') || t) : null })()`)
+    if (!ok) return abrir({ contato: nome })
+    for (let i = 0; i < 20; i++) {
+      await esperar(250)
+      if (await js(`!!document.querySelector('#main footer [contenteditable="true"]')`)) break
+    }
+    await mensagensCarregadas()
+    return { titulo: await titulo() }
+  }
+  // últimas mensagens da conversa ABERTA (sem reabrir)
+  const lerAberta = (limite = 15) => js(LER_MSGS(Math.min(80, Math.max(1, limite))))
+  // escreve e envia na conversa ABERTA
+  async function enviarAberta(texto) {
+    const msg = String(texto || '')
+    if (!msg.trim()) throw new Error('Mensagem vazia.')
+    const ok = await clicarEm(`document.querySelector('#main footer [contenteditable="true"]')`)
+    if (!ok) throw new Error('Não achei a caixa de mensagem.')
+    await esperar(150)
+    limparCampo()
+    const linhas = msg.split(/\r?\n/)
+    for (let i = 0; i < linhas.length; i++) {
+      if (i) tecla('Return', ['shift'])
+      if (linhas[i]) await wc().insertText(linhas[i])
+    }
+    await esperar(250)
+    const naCaixa = await js(`(document.querySelector('#main footer [contenteditable="true"]') || {}).innerText || ''`)
+    if (!naCaixa.trim()) throw new Error('O texto não entrou na caixa de mensagem; nada foi enviado.')
+    tecla('Return')
+    await esperar(800)
+    return { enviado: true }
+  }
+
+  return { estado, conversas, abrir, ler, enviar, baixar, novas, abrirLinha, lerAberta, enviarAberta, pronto }
 }
 
 module.exports = { criar, soDigitos }

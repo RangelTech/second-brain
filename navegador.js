@@ -265,7 +265,86 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   })()`
 
   // WhatsApp (spec 37): atalhos testados (whatsapp-web.js), sempre no navegador integrado
-  const wa = require('./whatsapp-web').criar({ vista: () => vista, carregar, garantirVisivel, esperar, pastaDownloads: () => app.getPath('downloads') })
+  // O WhatsApp roda numa JANELA PRÓPRIA escondida (mesma sessão/login do navegador): o atendimento automático confere a cada
+  // poucos segundos e o agente usa as ferramentas whatsapp_* sem tirar o navegador do que ele está fazendo.
+  // O WhatsApp Web só aceita UMA aba aberta por sessão: o QR (quando precisa) aparece nessa janela (computador) ou no painel (VM).
+  let janelaWa = null
+  let ganchoAtendimento = null
+  let qrNoPainel = false
+  function garantirWa() {
+    if (janelaWa && !janelaWa.isDestroyed()) return janelaWa
+    janelaWa = new BrowserWindow({
+      show: false, width: 1200, height: 900, title: 'WhatsApp — Segundo Cérebro', autoHideMenuBar: true, paintWhenInitiallyHidden: true,
+      webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, preload: path.join(__dirname, 'navegador-preload.js') },
+    })
+    const ua = userAgentChrome()
+    janelaWa.webContents.setUserAgent(ua)
+    janelaWa.webContents.session.setUserAgent(ua, IDIOMAS) // a sessão inteira (service worker do WhatsApp) como Chrome comum; sem isso a sincronização trava
+    janelaWa.webContents.setAudioMuted(true)
+    janelaWa.webContents.loadURL('https://web.whatsapp.com/').catch(() => {}) // nasce no WhatsApp (página vazia deixa o executeJavaScript pendurado)
+    janelaWa.webContents.setWindowOpenHandler(({ url }) => { require('electron').shell.openExternal(url).catch(() => {}); return { action: 'deny' } })
+    // fechar a janela só esconde (o atendimento continua)
+    janelaWa.on('close', (e) => { if (!janelaWa.__sair) { e.preventDefault(); janelaWa.hide() } })
+    app.on('before-quit', () => { if (janelaWa && !janelaWa.isDestroyed()) janelaWa.__sair = true })
+    return janelaWa
+  }
+  const vistaWa = { get webContents() { return garantirWa().webContents } }
+  async function carregarWa(url) {
+    const wc = garantirWa().webContents
+    await Promise.race([wc.loadURL(url).catch((e) => { if (!/ERR_ABORTED/.test(String(e))) throw e }), esperar(TEMPO_CARGA_MS)])
+    await esperar(400)
+  }
+  async function mostrarQrWa() {
+    if (modoServidor) {
+      // VM: a pessoa só vê o painel. Fecha a janela própria (uma aba só) e abre o WhatsApp no painel para escanear.
+      if (janelaWa && !janelaWa.isDestroyed()) { janelaWa.__sair = true; janelaWa.destroy(); janelaWa = null }
+      qrNoPainel = true
+      await garantirVisivel()
+      await carregar('https://web.whatsapp.com/')
+      return
+    }
+    const j = garantirWa()
+    j.show()
+    j.focus()
+  }
+  // QR escaneado no painel (VM): devolve o WhatsApp para a janela própria
+  async function qrResolvido() {
+    if (!qrNoPainel || !vista) return false
+    const ok = await js(`!!document.querySelector('#pane-side')`).catch(() => false)
+    if (!ok) return false
+    qrNoPainel = false
+    await carregar(PAGINA_INICIAL).catch(() => {})
+    return true
+  }
+
+  // Instagram Direct: janela própria escondida, igual ao WhatsApp (o Instagram aceita várias abas)
+  let janelaIg = null
+  function garantirIg() {
+    if (janelaIg && !janelaIg.isDestroyed()) return janelaIg
+    janelaIg = new BrowserWindow({
+      show: false, width: 1200, height: 900, title: 'Instagram — Direct', autoHideMenuBar: true, paintWhenInitiallyHidden: true,
+      webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, preload: path.join(__dirname, 'navegador-preload.js') },
+    })
+    const ua = userAgentChrome()
+    janelaIg.webContents.setUserAgent(ua)
+    janelaIg.webContents.session.setUserAgent(ua, IDIOMAS)
+    janelaIg.webContents.setAudioMuted(true)
+    janelaIg.webContents.loadURL('https://www.instagram.com/direct/inbox/').catch(() => {})
+    janelaIg.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    janelaIg.on('close', (e) => { if (!janelaIg.__sair) { e.preventDefault(); janelaIg.hide() } })
+    app.on('before-quit', () => { if (janelaIg && !janelaIg.isDestroyed()) janelaIg.__sair = true })
+    return janelaIg
+  }
+  const ig = require('./instagram-dm').criar({
+    vista: () => ({ get webContents() { return garantirIg().webContents } }),
+    carregar: async (url) => { const wc = garantirIg().webContents; await Promise.race([wc.loadURL(url).catch(() => {}), esperar(TEMPO_CARGA_MS)]); await esperar(800) },
+    esperar,
+  })
+  let ganchoAtendimentoIg = null
+  const wa = require('./whatsapp-web').criar({
+    vista: () => vistaWa, carregar: carregarWa, garantirVisivel: async () => { if (qrNoPainel && !(await qrResolvido())) throw new Error('O WhatsApp ainda está esperando o QR code no painel do navegador.'); garantirWa() }, esperar,
+    pastaDownloads: () => app.getPath('downloads'), aoPrecisarQr: mostrarQrWa,
+  })
   const textoWa = (o) => ({ texto: JSON.stringify(o, null, 1) })
   const ferramentas = {
     whatsapp_estado: async () => textoWa(await wa.estado()),
@@ -273,6 +352,16 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     whatsapp_ler: async (a) => textoWa(await wa.ler(a)),
     whatsapp_enviar: async (a) => textoWa(await wa.enviar(a)),
     whatsapp_baixar: async (a) => textoWa(await wa.baixar(a)),
+    instagram_atendimento: async (a) => {
+      if (!ganchoAtendimentoIg) throw new Error('O atendimento do Instagram ainda está iniciando. Tente de novo em instantes.')
+      const mudar = Object.keys(a || {}).filter((k) => a[k] !== undefined && a[k] !== null && a[k] !== '')
+      return textoWa(mudar.length ? await ganchoAtendimentoIg.configurar(a) : await ganchoAtendimentoIg.estado())
+    },
+    whatsapp_atendimento: async (a) => {
+      if (!ganchoAtendimento) throw new Error('O atendimento automático ainda está iniciando. Tente de novo em instantes.')
+      const mudar = Object.keys(a || {}).filter((k) => a[k] !== undefined && a[k] !== null && a[k] !== '')
+      return textoWa(mudar.length ? await ganchoAtendimento.configurar(a) : await ganchoAtendimento.estado())
+    },
     async abrir({ url }) {
       await garantirVisivel()
       await carregar(url)
@@ -397,7 +486,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     if (nome.startsWith('motion_') && motion) return motion(nome.slice(7), args) // Motion desenhado: HTML vira MP4 (mcp-motion.js)
     if (nome === 'chrome_estado') return estadoChrome()
     const onde = ['integrado', 'chrome'].includes(args.onde) ? args.onde : 'auto'
-    const querChrome = nome !== 'esperar' && !nome.startsWith('whatsapp_') && (onde === 'chrome' || (onde === 'auto' && modoServidor))
+    const querChrome = nome !== 'esperar' && !nome.startsWith('whatsapp_') && !nome.startsWith('instagram_') && (onde === 'chrome' || (onde === 'auto' && modoServidor))
     if (querChrome) {
       marcarControle()
       try {
@@ -442,6 +531,12 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   }
 
   return {
+    whatsapp: wa,
+    definirAtendimento: (g) => { ganchoAtendimento = g },
+    instagram: ig,
+    definirAtendimentoIg: (g) => { ganchoAtendimentoIg = g },
+    mostrarInstagram: () => { const j = garantirIg(); j.show(); j.focus() },
+    mostrarWhatsApp: () => { const j = garantirWa(); j.show(); j.focus() },
     iniciarServidor,
     estado,
     definirLimites,
