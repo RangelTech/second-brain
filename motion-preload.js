@@ -14,7 +14,8 @@ window.cancelAnimationFrame = (id) => { if (fila[id - 1]) fila[id - 1] = null }
 performance.now = () => T
 Date.now = () => INICIO + T
 
-for (const f of ['react.production.min.js', 'react-dom.production.min.js', 'htm.umd.js', 'sb-anima.js']) {
+// three.min.js (r160, último em arquivo único): cenas 3D por código (skill animacao-narrada)
+for (const f of ['react.production.min.js', 'react-dom.production.min.js', 'htm.umd.js', 'sb-anima.js', 'three.min.js']) {
   try {
     window.eval(fs.readFileSync(path.join(__dirname, 'motion-vendor', f), 'utf8'))
   } catch (e) {

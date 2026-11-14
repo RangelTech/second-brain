@@ -80,6 +80,7 @@ def main():
     ap.add_argument("--roteiro", required=True)
     ap.add_argument("--pasta", required=True, help="pasta do reel (dentro de Videos/): falas, trilha e o HTML ficam aqui")
     ap.add_argument("--motor", choices=["xtts", "openvoice"])
+    ap.add_argument("--modelo", help="outro modelo HTML com a marca /*TL*/.../*FIM*/ (ex.: animacao-narrada/modelos/animacao.html)")
     a = ap.parse_args()
     try:
         r = json.loads(Path(a.roteiro).read_text(encoding="utf-8"))
@@ -153,11 +154,11 @@ def main():
     subprocess.run([ff, "-y", "-loglevel", "error", *entradas, "-filter_complex", ";".join(filtros), "-map", saida_rot, "-ac", "2", "-ar", "48000", str(narr)], check=True)
 
     # 4) animação: modelo + linha do tempo
-    html = MODELO.read_text(encoding="utf-8")
+    html = Path(a.modelo).read_text(encoding="utf-8") if a.modelo else MODELO.read_text(encoding="utf-8")
     ini_tl, fim_tl = html.index("/*TL*/"), html.index("/*FIM*/")
-    dados = {"total": total, "marca": r.get("marca", ""), "cores": r.get("cores") or {}, "legenda": r.get("legenda", "karaoke"), "cenas": tl}
+    dados = {"total": total, "marca": r.get("marca", ""), "estilo": r.get("estilo", "escuro"), "arroba": r.get("arroba", ""), "cores": r.get("cores") or {}, "legenda": r.get("legenda", "karaoke"), "cenas": tl}
     html = html[: ini_tl + len("/*TL*/")] + json.dumps(dados, ensure_ascii=False) + html[fim_tl:]
-    arq_html = pasta / "reel.html"
+    arq_html = pasta / ("animacao.html" if a.modelo else "reel.html")
     arq_html.write_text(html, encoding="utf-8")
     print(json.dumps({"ok": True, "html": str(arq_html), "audio": str(narr), "duracao": total, "motor": motor,
                       "previa_sugerida": [round(x["falaIni"] + 0.9, 2) for x in tl][:8],

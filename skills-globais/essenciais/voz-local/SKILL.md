@@ -39,16 +39,21 @@ Reel narrado com animação, dublagem com texto novo e montagem completa: skill 
 Ex.: "coloca a voz do Fulano neste reel". Só com autorização da pessoa dona da voz.
 1. **Vídeo:** link → `yt-dlp` (o `cortes-de-video/scripts/cortes.py ferramenta` baixa o yt-dlp); Instagram logado: navegador integrado.
 2. **Amostras:** TODOS os áudios de voz da pessoa que existirem (`navegador_whatsapp_baixar` com `tipo="audio"`, `de="contato"`, `limite=20`). Quanto mais, mais parecido: 30 s funciona, 1 a 3 min fica bem melhor. Se houver pouco áudio, diga ao usuário que pedir mais áudios melhora a semelhança.
-3. **Um comando faz tudo:**
-   `python voz_local.py redublar --video original.mp4 --amostra a1.ogg --amostra a2.ogg ... --saida Videos/redublado.mp4`
+3. **Escolha o modo (decide a qualidade):**
+   - **O texto é o MESMO do vídeo** (só trocar quem fala): `--modo conversao`. Converte a fala original direto para a voz da amostra: ritmo, pausas e emoção ficam idênticos, sem frase robótica nem fora do tempo, e é muito mais rápido. É o melhor resultado local.
+   - **Texto NOVO ou corrigido** (traduzir, mudar o que diz): modo padrão `texto` (abaixo). Cada frase é gerada pelo XTTS e depois passa pelo conversor de timbre (fica mais parecida com a voz real).
+   - Nos dois modos a música original volta por baixo, e o fundo ABAIXA sozinho onde a pessoa falava, então o resto da voz antiga que a separação deixa não aparece mais ("voz antiga batendo com a nova", queixa real do usuário em 14/11/2026).
+4. **Um comando faz tudo:**
+   `python voz_local.py redublar --video original.mp4 --amostra a1.ogg --amostra a2.ogg ... --saida Videos/redublado.mp4 [--modo conversao]`
    - separa a voz da música do vídeo (Demucs) e também limpa as amostras (tira ruído/música);
    - transcreve as frases com o tempo de cada uma (faster-whisper);
    - gera CADA frase com a voz clonada (XTTS, o mais parecido) e encaixa no tempo da frase original;
    - devolve a MÚSICA ORIGINAL por baixo (sem ruído) e troca o áudio do vídeo.
    - Leva alguns minutos (1 min de vídeo ≈ 8 a 15 min em notebook). Rode em primeiro plano e acompanhe até o fim.
    - Palavra errada? Edite o `frases.json` indicado na saída e rode de novo com `--textos frases.json`.
-4. **Acabamento (ofereça):** "Quer que eu coloque o @ dele, uma moldura fina e uma chamada no fim, tipo 'digita IA nos comentários'?" → skill edicao-profissional, comando `acabamento`.
-5. Entregue o MP4 (caminho completo) e diga com honestidade: sem sincronia labial (boca acompanhando só no Estúdio, em créditos).
+5. **OUÇA antes de entregar:** transcreva o resultado (`transcrever`) e compare com o original; escute 3 trechos (início, meio, fim). Voz pouco parecida = peça mais áudios da pessoa (1 a 3 min limpos) e rode de novo.
+6. **Acabamento (ofereça):** "Quer que eu coloque o @ dele, uma moldura fina e uma chamada no fim, tipo 'digita IA nos comentários'?" → skill edicao-profissional, comando `acabamento`.
+7. Entregue o MP4 (caminho completo) e diga com honestidade: sem sincronia labial (boca acompanhando só no Estúdio, em créditos).
 - `trocar` (OpenVoice) é o atalho rápido: mantém a fala original e só muda o timbre, mas fica MENOS parecido e passa o ruído da música junto. Use só para teste rápido ou áudio sem música.
 
 ## Transcrever com tempo por palavra
@@ -59,5 +64,8 @@ Ex.: "coloca a voz do Fulano neste reel". Só com autorização da pessoa dona d
 - A semelhança depende da amostra: quanto mais limpa e longa, melhor.
 - Só clone a voz do próprio usuário ou de quem autorizou.
 
+## Limite honesto da clonagem local (diga ao usuário)
+A voz local (XTTS/OpenVoice) fica PARECIDA, não idêntica: bom para conteúdo, paródia, rascunho e teste. Para "ninguém percebe" (comercial, voz do dono da marca), o caminho é voz em nuvem de ponta (tipo ElevenLabs), pelos créditos do Estúdio.
+
 ## Quando ir para o Estúdio (créditos)
-Dublagem de vídeo com a boca acompanhando (sincronia labial), voz de altíssima qualidade para comercial, ou computador muito fraco. Use `midia_orcar` e mostre o preço antes.
+Dublagem com a boca acompanhando (sincronia labial), voz de altíssima qualidade para comercial, ou computador fraco (menos de 8 GB de RAM livre: o XTTS não carrega). Diga "seu computador não tem potência para isso; posso fazer na nuvem por X créditos". Use `midia_orcar` e mostre o preço antes.

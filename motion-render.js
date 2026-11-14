@@ -126,6 +126,8 @@ async function previa(args) {
     fs.mkdirSync(pasta, { recursive: true })
     const base = path.join(pasta, path.basename(o.saida).replace(/\.mp4$/i, ''))
     const arquivos = []
+    // aquecimento: a 1ª pintura (fontes, WebGL compilando shaders) às vezes chega atrasada; descarta um quadro
+    await quadro(p.wc, o, Math.min(o.duracao, tempos[0] || 0) * 1000).catch(() => {})
     for (const t of tempos) {
       const img = await quadro(p.wc, o, Math.min(o.duracao, t) * 1000)
       const f = `${base}-quadro-${String(t.toFixed(2)).replace('.', '_')}s.png`
@@ -155,6 +157,7 @@ async function renderizar(args, { ffmpeg, aoProgresso } = {}) {
   const terminou = new Promise((ok) => ff.on('close', ok))
   const t0 = Date.now()
   try {
+    await quadro(p.wc, o, 0).catch(() => {}) // aquecimento (ver prévia)
     for (let i = 0; i < total; i++) {
       const img = await quadro(p.wc, o, (i * 1000) / o.fps)
       const buf = img.toBitmap()

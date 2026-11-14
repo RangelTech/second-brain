@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Animação narrada</title>
+<style>
+  :root { --fundo:#0b0b0d; --texto:#f5f3ef; --d1:#ff7a1a; --d2:#ffd166; --sub:#9a9aa3; }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html,body { width:1080px; height:1920px; overflow:hidden; background:var(--fundo); font-family:"Segoe UI",Inter,Arial,sans-serif; color:var(--texto) }
+  #fundo { position:absolute; inset:0 }
+  #c3d { position:absolute; inset:0; width:1080px; height:1920px }
+  #raiz { position:absolute; inset:0 }
+  .arroba { position:absolute; top:86px; left:0; right:0; text-align:center; font-size:30px; font-weight:600; color:var(--sub); letter-spacing:.5px }
+  .arroba i { display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--d1); margin-right:12px; vertical-align:2px }
+  .titulo { position:absolute; left:70px; right:70px; top:200px; text-align:center; font-weight:800; font-size:96px; line-height:1.05; letter-spacing:-1px }
+  .titulo b { color:var(--d1); font-weight:800 }
+  .texto { position:absolute; left:90px; right:90px; top:1240px; text-align:center; font-size:44px; color:var(--sub); line-height:1.3 }
+  .num { position:absolute; left:0; right:0; top:330px; text-align:center; font-size:230px; font-weight:900; color:var(--d1); letter-spacing:-6px }
+  .rotulo { position:absolute; left:0; right:0; top:600px; text-align:center; font-size:46px; color:var(--texto); font-weight:600 }
+  .lista { position:absolute; left:150px; right:150px; top:520px; display:flex; flex-direction:column; gap:26px }
+  .lista div { display:flex; align-items:center; gap:26px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); border-radius:20px; padding:26px 32px; font-size:48px; font-weight:600 }
+  .lista span.ic { width:52px; height:52px; border-radius:12px; border:3px solid var(--d1); color:var(--d1); display:flex; align-items:center; justify-content:center; font-size:34px; flex:none }
+  .cta { position:absolute; left:0; right:0; top:820px; display:flex; flex-direction:column; align-items:center; gap:60px }
+  .cta .bt { background:var(--d1); color:#111; font-weight:800; font-size:58px; padding:34px 70px; border-radius:22px; box-shadow:0 20px 60px rgba(0,0,0,.4) }
+  .cta .seta { width:6px; height:120px; background:var(--d1); position:relative }
+  .cta .seta:after { content:""; position:absolute; left:-22px; bottom:-6px; width:44px; height:44px; border-right:6px solid var(--d1); border-bottom:6px solid var(--d1); transform:rotate(45deg) }
+  .cta .sub { font-size:50px; font-weight:700 }
+  .leg { position:absolute; left:60px; right:60px; top:1480px; text-align:center; font-size:66px; font-weight:800; line-height:1.15; text-shadow:0 4px 18px rgba(0,0,0,.7) }
+  .leg span { opacity:.95; margin:0 .14em; display:inline-block }
+  .leg span.agora { color:var(--d1) }
+  /* estilos */
+  body.quadro-negro { --fundo:#173328; --texto:#f2f0e6; --d1:#ffe08a; --sub:#cfd8cc; font-family:"Comic Sans MS","Segoe Print",cursive }
+  body.quadro-negro #fundo { background: radial-gradient(ellipse at center, #1f4434 0%, #11271e 85%); }
+  body.quadro-negro #fundo:after { content:""; position:absolute; inset:0; opacity:.25; background-image:repeating-linear-gradient(17deg, rgba(255,255,255,.035) 0 2px, transparent 2px 7px) }
+  body.neon { --fundo:#03030a; --texto:#eaf7ff; --d1:#2ef2ff; --d2:#ff3df2; --sub:#7f8fb0 }
+  body.neon .titulo, body.neon .num { text-shadow:0 0 18px var(--d1), 0 0 48px var(--d1) }
+  body.neon #fundo { background: linear-gradient(transparent 60%, rgba(46,242,255,.08)), repeating-linear-gradient(90deg, rgba(46,242,255,.07) 0 2px, transparent 2px 90px), #03030a }
+  body.pixel { --fundo:#2b1b4a; --texto:#fff7d6; --d1:#ffcc33; --d2:#ff4f6d; --sub:#d7c9ff; font-family:"Consolas","Courier New",monospace }
+  body.pixel #fundo { background: linear-gradient(#3b1e6e, #c2457a 70%, #f6a15b) }
+  body.pixel #c3d { image-rendering: pixelated }
+  body.pixel .titulo { font-size:84px; text-shadow:6px 6px 0 #000 }
+  body.pixel .leg { text-shadow:5px 5px 0 #000 }
+  body.quadrinhos { --fundo:#ffd84a; --texto:#111; --d1:#e8202a; --d2:#1b5cff; --sub:#222; font-family:Impact,"Arial Black",sans-serif }
+  body.quadrinhos #fundo { background: radial-gradient(circle, rgba(0,0,0,.18) 22%, transparent 24%) 0 0/26px 26px, #ffd84a }
+  body.quadrinhos .titulo { background:#fff; border:6px solid #111; border-radius:30px; padding:20px 30px; box-shadow:10px 10px 0 #111; font-weight:400; letter-spacing:1px }
+  body.quadrinhos .leg { color:#111; text-shadow:none; background:#fff; border:5px solid #111; border-radius:20px; padding:16px 20px; box-shadow:8px 8px 0 #111; font-weight:400 }
+  body.papel { --fundo:#f3ede2; --texto:#1d1b18; --d1:#e2572c; --d2:#2c7be5; --sub:#6b645a }
+  body.papel .leg { text-shadow:none }
+  body.papel #fundo { background: radial-gradient(ellipse at 50% 40%, #fbf8f2, #e9e1d2) }
+  .erro { position:absolute; left:20px; right:20px; top:20px; z-index:99; color:#ff4d4d; background:#000c; font:26px monospace; white-space:pre-wrap }
+</style>
+</head>
+<body>
+<div id="fundo"></div>
+<canvas id="c3d" width="1080" height="1920"></canvas>
+<div id="raiz"></div>
+<script>
+window.TL = /*TL*/{"total":6,"estilo":"escuro","arroba":"@seuperfil","cores":{},"legenda":"karaoke","cenas":[{"tipo":"objeto","fala":"Você escolhe o tema","titulo":"Você escolhe o *tema*","objetos":["balao"],"ini":0,"fim":3,"falaIni":0.3,"falaFim":2.6,"palavras":[{"w":"Você","ini":0.3},{"w":"escolhe","ini":0.7},{"w":"o","ini":1.2},{"w":"tema","ini":1.4}]},{"tipo":"objeto","fala":"E a IA faz o resto","titulo":"A IA faz o *resto.*","objetos":["lupa","microfone","papel","caixa"],"ini":3,"fim":6,"falaIni":3.2,"falaFim":5.6,"palavras":[{"w":"E","ini":3.2},{"w":"a","ini":3.4},{"w":"IA","ini":3.6},{"w":"faz","ini":4},{"w":"o","ini":4.4},{"w":"resto","ini":4.6}]}]}/*FIM*/
+</script>
+<script>
+(() => {
+const TL = window.TL
+const ESTILO = TL.estilo || 'escuro'
+document.body.classList.add(ESTILO)
+for (const [k, v] of Object.entries(TL.cores || {})) document.documentElement.style.setProperty('--' + k, v)
+const css = (n) => getComputedStyle(document.body).getPropertyValue('--' + n).trim() || getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim()
+const COR = { d1: css('d1'), d2: css('d2'), texto: css('texto'), fundo: css('fundo') }
+const W = 1080, H = 1920
+const PIXEL = ESTILO === 'pixel'
+const LINHAS = ESTILO === 'neon' || ESTILO === 'quadro-negro'
+const TOON = ESTILO === 'quadrinhos' || ESTILO === 'papel'
+const { clamp, ease } = window.SB || { clamp: (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), ease: { out: (x) => 1 - Math.pow(1 - x, 3) } }
+const prog = (t, ini, dur, e = 'out') => { const x = clamp((t - ini) / dur); return (ease[e] || ease.out)(x) }
+const mola = (t, ini) => { const x = Math.max(0, t - ini); return 1 - Math.exp(-6 * x) * Math.cos(11 * x) }
+
+// ---------- 3D ----------
+const T3 = window.THREE
+const canvas = document.getElementById('c3d')
+const ren = new T3.WebGLRenderer({ canvas, antialias: !PIXEL, alpha: true, preserveDrawingBuffer: true })
+ren.setPixelRatio(1)
+ren.setSize(PIXEL ? W / 9 : W, PIXEL ? H / 9 : H, false)
+canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
+ren.shadowMap.enabled = !LINHAS && !PIXEL
+ren.outputColorSpace = T3.SRGBColorSpace
+const cena3 = new T3.Scene()
+const cam = new T3.PerspectiveCamera(32, W / H, 0.1, 100)
+cam.position.set(0, 0.6, 11)
+cam.lookAt(0, 0.2, 0)
+cena3.add(new T3.HemisphereLight(0xffffff, 0x333344, TOON ? 1.4 : 0.9))
+const chave = new T3.DirectionalLight(0xffffff, TOON ? 1.4 : 2.4)
+chave.position.set(4, 7, 6); chave.castShadow = true; chave.shadow.mapSize.set(1024, 1024)
+cena3.add(chave)
+const recorte = new T3.DirectionalLight(new T3.Color(COR.d1), 1.2); recorte.position.set(-5, 3, -4); cena3.add(recorte)
+const chao = new T3.Mesh(new T3.PlaneGeometry(40, 40), new T3.ShadowMaterial({ opacity: ESTILO === 'escuro' ? 0.45 : 0.18 }))
+chao.rotation.x = -Math.PI / 2; chao.position.y = -1.45; chao.receiveShadow = true; cena3.add(chao)
+
+function mat(cor, o = {}) {
+  const c = new T3.Color(cor)
+  if (TOON) return new T3.MeshToonMaterial({ color: c })
+  if (PIXEL) return new T3.MeshLambertMaterial({ color: c, flatShading: true })
+  return new T3.MeshStandardMaterial({ color: c, roughness: o.rug ?? 0.45, metalness: o.metal ?? 0.05, emissive: o.brilho ? c : 0x000000, emissiveIntensity: o.brilho || 0 })
+}
+const P = { // paleta por objeto (cores "reais"; o estilo muda o material)
+  massa: '#e9b26a', queijo: '#f6d36b', calabresa: '#c8402f', branco: '#f2efe9', cinza: '#3a3a40', escuro: '#1b1b20', ouro: '#f2b632', verde: '#3fbf6a', vermelho: '#e8443a', azul: '#3b82f6', rosa: '#f08fb0', vidro: '#a8d8ff', madeira: '#b07a47',
+}
+function malha(geo, cor, o) { const m = new T3.Mesh(geo, mat(cor, o)); m.castShadow = true; m.receiveShadow = true; return m }
+function grupo(...ms) { const g = new T3.Group(); ms.forEach((m) => g.add(m)); return g }
+function extrudar(forma, prof = 0.4) { return new T3.ExtrudeGeometry(forma, { depth: prof, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.08, bevelSegments: 4, curveSegments: 24 }) }
+const OBJ = {
+  pizza() { const g = grupo(malha(new T3.CylinderGeometry(1.6, 1.6, 0.22, 48), P.massa), malha(new T3.CylinderGeometry(1.42, 1.42, 0.06, 48), P.queijo)); g.children[1].position.y = 0.13
+    for (let i = 0; i < 9; i++) { const a = i * 2.4, r = 0.35 + (i % 3) * 0.38; const p = malha(new T3.CylinderGeometry(0.2, 0.2, 0.05, 20), P.calabresa); p.position.set(Math.cos(a) * r, 0.18, Math.sin(a) * r); g.add(p) }
+    g.rotation.x = 0.55; return g },
+  balao() { const corpo = malha(new T3.SphereGeometry(1.3, 48, 32), P.branco); corpo.scale.set(1.25, 0.95, 0.75)
+    const rabo = malha(new T3.ConeGeometry(0.38, 0.9, 24), P.branco); rabo.position.set(-0.85, -1.05, 0); rabo.rotation.z = -2.6
+    const g = grupo(corpo, rabo); [-0.5, 0, 0.5].forEach((x, i) => { const p = malha(new T3.SphereGeometry(0.16, 20, 16), i === 1 ? COR.d1 : P.cinza); p.position.set(x, 0.05, 0.98); g.add(p) }); return g },
+  lupa() { const aro = malha(new T3.TorusGeometry(0.75, 0.15, 20, 48), COR.d1, { metal: 0.3 }); const vidro = malha(new T3.CylinderGeometry(0.72, 0.72, 0.05, 40), P.vidro, { rug: 0.05 }); vidro.rotation.x = Math.PI / 2; vidro.material.transparent = true; vidro.material.opacity = 0.5
+    const cabo = malha(new T3.CylinderGeometry(0.13, 0.16, 1.3, 20), P.escuro); cabo.position.set(0.85, -0.95, 0); cabo.rotation.z = 0.75; return grupo(aro, vidro, cabo) },
+  microfone() { const cab = malha(new T3.SphereGeometry(0.42, 32, 24), P.cinza, { metal: 0.6, rug: 0.3 }); cab.position.y = 0.75; const corpo = malha(new T3.CylinderGeometry(0.22, 0.17, 1.4, 24), P.massa); return grupo(cab, corpo) },
+  papel() { const f = malha(new T3.BoxGeometry(1.3, 1.7, 0.06), P.branco); const g = grupo(f); for (let i = 0; i < 5; i++) { const l = malha(new T3.BoxGeometry(i === 0 ? 0.6 : 0.95, 0.07, 0.02), i === 0 ? COR.d1 : '#9a9aa3'); l.position.set(i === 0 ? -0.2 : 0, 0.55 - i * 0.26, 0.05); g.add(l) } return g },
+  caixa() { return malha(new T3.BoxGeometry(1.1, 0.9, 1.1), P.madeira) },
+  celular() { const c = malha(new T3.BoxGeometry(1.25, 2.5, 0.14), P.escuro, { metal: 0.3 }); const t = malha(new T3.BoxGeometry(1.1, 2.3, 0.02), COR.d1, { brilho: 0.35 }); t.position.z = 0.08; return grupo(c, t) },
+  carro() { const base = malha(new T3.BoxGeometry(2.6, 0.55, 1.2), P.vermelho, { metal: 0.4, rug: 0.25 }); const cab = malha(new T3.BoxGeometry(1.3, 0.5, 1.0), P.vermelho, { metal: 0.4, rug: 0.25 }); cab.position.set(-0.15, 0.5, 0)
+    const g = grupo(base, cab); [[0.85, 0.6], [0.85, -0.6], [-0.85, 0.6], [-0.85, -0.6]].forEach(([x, z]) => { const r = malha(new T3.CylinderGeometry(0.3, 0.3, 0.22, 24), P.escuro); r.rotation.x = Math.PI / 2; r.position.set(x, -0.3, z); g.add(r) }); g.rotation.y = -0.6; return g },
+  moeda() { const m = malha(new T3.CylinderGeometry(1, 1, 0.18, 48), P.ouro, { metal: 0.85, rug: 0.25 }); m.rotation.x = Math.PI / 2; const borda = malha(new T3.TorusGeometry(0.85, 0.06, 12, 48), '#d99a12', { metal: 0.9 }); borda.position.z = 0.1; return grupo(m, borda) },
+  foguete() { const corpo = malha(new T3.CylinderGeometry(0.42, 0.42, 1.8, 32), P.branco); const nariz = malha(new T3.ConeGeometry(0.42, 0.8, 32), COR.d1); nariz.position.y = 1.3
+    const jan = malha(new T3.CylinderGeometry(0.18, 0.18, 0.1, 24), P.azul); jan.rotation.x = Math.PI / 2; jan.position.set(0, 0.35, 0.42); const g = grupo(corpo, nariz, jan)
+    for (let i = 0; i < 3; i++) { const a = malha(new T3.BoxGeometry(0.06, 0.55, 0.5), COR.d1); const ang = (i / 3) * Math.PI * 2; a.position.set(Math.cos(ang) * 0.45, -0.75, Math.sin(ang) * 0.45); a.rotation.y = -ang; g.add(a) } g.rotation.z = -0.35; return g },
+  coracao() { const s = new T3.Shape(); s.moveTo(0, 0.5); s.bezierCurveTo(0, 0.8, -0.5, 1.2, -1, 1.2); s.bezierCurveTo(-1.8, 1.2, -1.8, 0.2, -1.8, 0.2); s.bezierCurveTo(-1.8, -0.4, -1.1, -1.0, 0, -1.6); s.bezierCurveTo(1.1, -1.0, 1.8, -0.4, 1.8, 0.2); s.bezierCurveTo(1.8, 0.2, 1.8, 1.2, 1, 1.2); s.bezierCurveTo(0.5, 1.2, 0, 0.8, 0, 0.5)
+    const m = malha(extrudar(s, 0.5), P.vermelho); m.scale.setScalar(0.7); m.position.z = -0.2; return grupo(m) },
+  estrela() { const s = new T3.Shape(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 0.55 : 1.3, a = (i / 10) * Math.PI * 2 + Math.PI / 2; i ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r) : s.moveTo(Math.cos(a) * r, Math.sin(a) * r) } return grupo(malha(extrudar(s, 0.35), P.ouro, { metal: 0.6, rug: 0.3 })) },
+  trofeu() { const copo = malha(new T3.CylinderGeometry(0.8, 0.35, 1.1, 32, 1, true), P.ouro, { metal: 0.85, rug: 0.25 }); copo.material.side = T3.DoubleSide; copo.position.y = 0.55
+    const pe = malha(new T3.CylinderGeometry(0.12, 0.12, 0.6, 16), P.ouro, { metal: 0.85 }); pe.position.y = -0.3; const base = malha(new T3.BoxGeometry(1.0, 0.3, 0.7), P.escuro); base.position.y = -0.7
+    const a1 = malha(new T3.TorusGeometry(0.3, 0.07, 12, 24, Math.PI), P.ouro, { metal: 0.85 }); a1.position.set(-0.8, 0.6, 0); a1.rotation.z = Math.PI / 2; const a2 = a1.clone(); a2.position.x = 0.8; a2.rotation.z = -Math.PI / 2; return grupo(copo, pe, base, a1, a2) },
+  lampada() { const v = malha(new T3.SphereGeometry(0.85, 40, 30), P.queijo, { brilho: 0.6, rug: 0.2 }); v.position.y = 0.4; const r = malha(new T3.CylinderGeometry(0.38, 0.32, 0.6, 24), P.cinza, { metal: 0.7 }); r.position.y = -0.65; return grupo(v, r) },
+  grafico() { const g = grupo(); [0.6, 1.0, 1.5, 2.2].forEach((h, i) => { const b = malha(new T3.BoxGeometry(0.42, h, 0.42), i === 3 ? COR.d1 : '#6b6b75'); b.position.set(-0.8 + i * 0.55, h / 2 - 1, 0); b.userData.cresce = h; g.add(b) }); return g },
+  dinheiro() { const g = grupo(); for (let i = 0; i < 5; i++) { const n = malha(new T3.BoxGeometry(1.8, 0.12, 0.9), P.verde); n.position.y = -0.4 + i * 0.13; n.rotation.y = (i % 2 ? 0.08 : -0.06); g.add(n) } return g },
+  globo() { const s = malha(new T3.SphereGeometry(1.15, 40, 30), P.azul); const w = new T3.LineSegments(new T3.WireframeGeometry(new T3.SphereGeometry(1.17, 16, 12)), new T3.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })); return grupo(s, w) },
+  relogio() { const c = malha(new T3.CylinderGeometry(1.1, 1.1, 0.25, 48), P.branco); c.rotation.x = Math.PI / 2; const aro = malha(new T3.TorusGeometry(1.1, 0.1, 12, 48), COR.d1); const p1 = malha(new T3.BoxGeometry(0.08, 0.7, 0.05), P.escuro); p1.position.set(0, 0.33, 0.16)
+    const p2 = malha(new T3.BoxGeometry(0.5, 0.08, 0.05), P.escuro); p2.position.set(0.24, 0, 0.16); return grupo(c, aro, p1, p2) },
+  cerebro() { const g = grupo(); for (let i = 0; i < 14; i++) { const b = malha(new T3.SphereGeometry(0.45 + (i % 3) * 0.08, 20, 16), P.rosa); b.position.set(Math.sin(i * 1.7) * 0.8, Math.cos(i * 2.3) * 0.45, Math.sin(i * 0.9) * 0.4); g.add(b) } return g },
+  cubo() { return malha(new T3.BoxGeometry(1.3, 1.3, 1.3), COR.d1) },
+  esfera() { return malha(new T3.SphereGeometry(1, 40, 30), COR.d1) },
+}
+// estilo de linhas (neon / quadro-negro): troca cada malha pelo contorno
+function contorno(g) {
+  const cor = ESTILO === 'neon' ? COR.d1 : '#f4f1e4'
+  const out = new T3.Group()
+  g.updateMatrixWorld(true)
+  g.traverse((o) => { if (o.isMesh) {
+    const geo = new T3.EdgesGeometry(o.geometry, 18)
+    const l = new T3.LineSegments(geo, new T3.LineBasicMaterial({ color: cor, transparent: true, opacity: 0.95 })); o.matrixWorld.decompose(l.position, l.quaternion, l.scale); out.add(l)
+    if (ESTILO === 'neon') { for (const [f, op, c2] of [[1.025, 0.45, COR.d2], [1.05, 0.25, cor]]) { const h = new T3.LineSegments(geo, new T3.LineBasicMaterial({ color: c2, transparent: true, opacity: op, blending: T3.AdditiveBlending })); o.matrixWorld.decompose(h.position, h.quaternion, h.scale); h.scale.multiplyScalar(f); out.add(h) } }
+  } })
+  return out
+}
+// quadrinhos: contorno preto grosso (casco invertido)
+function tinta(g) { g.traverse((o) => { if (o.isMesh && !o.userData.casco) { const c = new T3.Mesh(o.geometry, new T3.MeshBasicMaterial({ color: 0x111111, side: T3.BackSide })); c.scale.setScalar(1.06); c.userData.casco = true; o.add(c) } }); return g }
+function criarObjeto(nome) {
+  const f = OBJ[String(nome || '').toLowerCase()] || OBJ.esfera
+  let g = f()
+  if (LINHAS) g = contorno(g)
+  else if (ESTILO === 'quadrinhos') g = tinta(g)
+  const caixa = new T3.Box3().setFromObject(g)
+  const tam = caixa.getSize(new T3.Vector3())
+  const esc = 2.6 / Math.max(tam.x, tam.y, tam.z, 0.01)
+  const piv = new T3.Group(); g.position.sub(caixa.getCenter(new T3.Vector3())); piv.add(g); piv.userData.esc = esc
+  return piv
+}
+// cache de objetos por cena (criados uma vez)
+const objsCena = TL.cenas.map((c) => (c.objetos || (c.objeto ? [c.objeto] : [])).slice(0, 4).map(criarObjeto))
+
+// ---------- HTML ----------
+const raiz = document.getElementById('raiz')
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const destaque = (s) => esc(s).replace(/\*([^*]+)\*/g, '<b>$1</b>')
+function legenda(c, t) {
+  if (TL.legenda === 'nenhuma' || !c.palavras) return ''
+  const ps = c.palavras
+  let k = -1
+  for (let i = 0; i < ps.length; i++) if (t >= ps[i].ini) k = i
+  if (k < 0 || t > c.falaFim + 0.25) return ''
+  const ini = Math.floor(k / 4) * 4
+  return `<div class="leg">${ps.slice(ini, ini + 4).map((p, i) => `<span class="${ini + i === k ? 'agora' : ''}">${esc(p.w)}</span>`).join('')}</div>`
+}
+function titulo(c, t, ini) {
+  if (!c.titulo) return ''
+  const p = prog(t, ini, 0.45)
+  return `<div class="titulo" style="opacity:${p};transform:translateY(${(1 - p) * 40}px)">${destaque(c.titulo)}</div>`
+}
+
+window.sbFrame = (t) => {
+  try {
+    const i = Math.max(0, TL.cenas.findIndex((c) => t >= c.ini && t < c.fim))
+    const c = TL.cenas[i] || TL.cenas[TL.cenas.length - 1]
+    const ini = c.ini
+    const saida = clamp((t - (c.fim - 0.25)) / 0.25)
+    let corpo = titulo(c, t, ini)
+    if (c.tipo === 'numero') corpo += `<div class="num" style="transform:scale(${0.6 + 0.4 * mola(t, ini + 0.1)})">${esc(c.numero)}</div><div class="rotulo" style="opacity:${prog(t, ini + 0.4, 0.4)}">${esc(c.rotulo || '')}</div>`
+    if (c.tipo === 'lista') corpo += `<div class="lista">${(c.itens || []).map((x, k) => { const a = prog(t, ini + 0.4 + k * Math.min(0.8, (c.fim - ini - 0.8) / Math.max(1, c.itens.length)), 0.35); return `<div style="opacity:${a};transform:translateX(${(1 - a) * -60}px)"><span class="ic">${c.marca || '✕'}</span>${esc(x)}</div>` }).join('')}</div>`
+    if (c.tipo === 'cta') corpo += `<div class="cta" style="opacity:${prog(t, ini + 0.2, 0.4)}"><div class="bt" style="transform:scale(${0.85 + 0.15 * mola(t, ini + 0.2)})">${esc(c.botao || 'Quero agora →')}</div><div class="seta" style="transform:translateY(${Math.sin(t * 5) * 12}px)"></div><div class="sub">${destaque(c.sub || 'comece *hoje.*')}</div></div>`
+    if (c.texto) corpo += `<div class="texto" style="opacity:${prog(t, ini + 0.6, 0.5)}">${destaque(c.texto)}</div>`
+    raiz.innerHTML = (TL.arroba ? `<div class="arroba"><i></i>${esc(TL.arroba)}</div>` : '') + `<div style="opacity:${1 - saida}">${corpo}</div>` + legenda(c, t)
+    // 3D: só os objetos desta cena; entram com mola, giram devagar e flutuam
+    while (cena3.children.length > 4) cena3.remove(cena3.children[4])
+    const objs = objsCena[i] || []
+    const n = objs.length
+    const altura = c.tipo === 'lista' || c.tipo === 'cta' || c.tipo === 'numero' ? -0.3 : 0.15
+    objs.forEach((o, k) => {
+      const e = clamp(mola(t, ini + 0.15 + k * 0.18), 0, 1.15) * (1 - saida)
+      // a tela mostra ~3,5 unidades de largura: 1 objeto grande; 2 lado a lado; 3 em linha pequenos; 4 em grade 2x2
+      const grade = n === 4
+      const lado = grade ? (k % 2 ? 0.85 : -0.85) : n > 1 ? (k - (n - 1) / 2) * (n === 2 ? 1.7 : 1.15) : 0
+      const sobe = grade ? (k < 2 ? 0.95 : -0.95) : 0
+      const s = o.userData.esc * (grade ? 0.5 : n === 3 ? 0.4 : n === 2 ? 0.55 : 1) * (altura < 0 ? 0.62 : 1) // cena com número/lista/botão: objeto menor, longe da legenda
+      o.scale.setScalar(Math.max(0.0001, s * e))
+      o.position.set(lado, altura + sobe + Math.sin(t * 1.6 + k) * 0.12, 0)
+      o.rotation.y = (t - ini) * 0.45 + k * 0.6
+      o.rotation.x = Math.sin(t * 0.7 + k) * 0.08
+      o.traverse((m) => { if (m.userData.cresce) { m.scale.y = Math.max(0.01, prog(t, ini + 0.3 + k * 0.1, 0.9)); } })
+      cena3.add(o)
+    })
+    ren.render(cena3, cam)
+  } catch (e) {
+    document.body.insertAdjacentHTML('beforeend', `<pre class="erro">ERRO t=${t.toFixed(2)}: ${esc(String(e && e.stack || e).slice(0, 600))}</pre>`)
+  }
+}
+window.sbFrame(0)
+})()
+</script>
+</body>
+</html>

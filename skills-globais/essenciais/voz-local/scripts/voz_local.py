@@ -693,7 +693,7 @@ def _frases_com_tempo(audio, idioma="pt"):
     return frases
 
 
-def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
+def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None, modo="texto", refinar=True):
     """Mesma fala do vídeo (ou o texto corrigido em textos.json) com a voz da amostra, no MESMO tempo de cada frase,
     e a música/efeitos originais por baixo (sem ruído: a voz original sai antes, pela separação)."""
     import numpy as np
@@ -737,6 +737,13 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
     gc.collect()
     amostra = trab / "amostra-limpa.wav"
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(vz_am), "-af", "highpass=f=70,silenceremove=stop_periods=-1:stop_duration=0.4:stop_threshold=-40dB,loudnorm=I=-18", "-ac", "1", "-ar", "22050", str(amostra)], check=True)
+    if modo == "conversao":
+        # MESMO texto: converte a fala original separada (voz.wav) direto para o timbre da amostra. Ritmo, pausas e emoção
+        # ficam idênticos ao original e não há frase "robótica" nem fora do tempo. Muito mais rápido que gerar frase por frase.
+        _log("4/4 convertendo a fala original para a voz da amostra (conversão)...")
+        nova = trab / "voz-nova.wav"
+        trocar_timbre(str(voz), str(amostra), str(nova))
+        return _mixar_e_salvar(trab, video, nova, fundo, voz, saida, frases, "conversao", t0)
     _log(f"4/4 gerando {len(frases)} frases com a voz clonada ({motor})...")
     taxa = 44100
     tot = int((max(f["fim"] for f in frases) + 3) * taxa) if frases else taxa
@@ -762,7 +769,15 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
         if melhor is None:
             continue
         f["conferencia"] = round(nota, 2)
-        shutil.copy(melhor, fw)
+        if refinar and motor == "xtts":
+            # o XTTS acerta o texto e a entonação, mas o timbre fica "parecido"; o conversor do OpenVoice puxa para a voz real
+            try:
+                trocar_timbre(str(melhor), str(amostra), str(fw))
+            except Exception as e:  # noqa: BLE001
+                _log(f"refino falhou na frase {i}: {e}")
+                shutil.copy(melhor, fw)
+        else:
+            shutil.copy(melhor, fw)
         a, sr = _ler_som(fw, taxa)
         a = a.mean(1)
         # encaixe: a frase nova ocupa o tempo da original (pode avançar até 0,35 s na pausa seguinte)
@@ -782,9 +797,20 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
         trilha[ini:fim] += a[: fim - ini]
     nova = trab / "voz-nova.wav"
     sf.write(str(nova), trilha, taxa)
+    return _mixar_e_salvar(trab, video, nova, fundo, voz, saida, frases, motor, t0)
+
+
+def _mixar_e_salvar(trab, video, nova, fundo, voz_original, saida, frases, motor, t0):
+    """Voz nova + fundo. O fundo passa por um compressor guiado pela VOZ ORIGINAL separada: onde a pessoa falava, o fundo
+    abaixa forte, e o resto da voz antiga que a separação deixa na música some (era o "voz antiga batendo com a nova")."""
+    ff = _ffmpeg()
     final_audio = trab / "mix.wav"
-    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(nova), "-i", str(fundo), "-filter_complex",
-                    "[0:a]loudnorm=I=-16:TP=-1.5,aformat=channel_layouts=stereo[v];[1:a]volume=0.9[m];[v][m]amix=inputs=2:normalize=0:duration=longest,alimiter=limit=0.95[o]",
+    filtro = ("[0:a]highpass=f=60,loudnorm=I=-16:TP=-1.5,aformat=channel_layouts=stereo[v];"
+              "[2:a]aformat=channel_layouts=stereo,volume=2.5[chave];"
+              "[1:a]aformat=channel_layouts=stereo,volume=0.9[m];"
+              "[m][chave]sidechaincompress=threshold=0.015:ratio=20:attack=8:release=300:makeup=1[mf];"
+              "[v][mf]amix=inputs=2:normalize=0:duration=longest,alimiter=limit=0.95[o]")
+    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(nova), "-i", str(fundo), "-i", str(voz_original), "-filter_complex", filtro,
                     "-map", "[o]", "-ar", "48000", str(final_audio)], check=True)
     saida = Path(saida).resolve()
     saida.parent.mkdir(parents=True, exist_ok=True)
@@ -822,6 +848,8 @@ if __name__ == "__main__":
     rd.add_argument("--motor", choices=["xtts", "openvoice"], default="xtts")
     rd.add_argument("--idioma", default="pt")
     rd.add_argument("--textos", help="frases.json corrigido (de uma rodada anterior)")
+    rd.add_argument("--modo", choices=["texto", "conversao"], default="texto", help="conversao = mesmo texto do vídeo: converte a fala original (natural, rápido). texto = gera cada frase (texto novo/corrigido)")
+    rd.add_argument("--sem-refino", action="store_true", help="não passar as frases do XTTS pelo conversor de timbre")
     tc = sub.add_parser("transcrever", help="transcreve áudio/vídeo com o tempo de cada palavra (para legenda e edição)")
     tc.add_argument("--audio", required=True)
     tc.add_argument("--saida", required=True)
@@ -846,7 +874,7 @@ if __name__ == "__main__":
             if a.textos:
                 args += ["--textos", str(Path(a.textos).resolve())]
             sys.exit(subprocess.run(args).returncode)
-        print(json.dumps(redublar(a.video, a.amostra, a.saida, a.motor, a.idioma, a.textos), ensure_ascii=False))
+        print(json.dumps(redublar(a.video, a.amostra, a.saida, a.motor, a.idioma, a.textos, a.modo, not a.sem_refino), ensure_ascii=False))
     elif a.cmd == "transcrever":
         dentro = Path(sys.prefix).resolve() == VENV.resolve()
         if not dentro:
