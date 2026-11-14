@@ -41,6 +41,7 @@
       "sessao-gateway.js",
       "ponte_gateway.py",
       "navegador.js",
+      "navegador-preload.js",
       "unlimited.js",
       "main.js",
       "preload.js",

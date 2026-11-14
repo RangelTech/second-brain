@@ -92,7 +92,7 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     const midia = r.querySelector('img[src^="blob:"]:not([draggable="false"])') ? '[imagem]' : r.querySelector('video') ? '[vídeo]' : r.querySelector('[data-icon*="audio"], [data-icon*="ptt"], audio, button[aria-label*="mensagem de voz"], button[aria-label*="voice message"]') ? '[áudio]' : r.querySelector('[data-icon*="document"], [title*="Baixar"]') ? '[documento: ' + ((r.innerText.split('\\n')[0]) || '') + ']' : ''
     if (!meta && !midia) { const t = r.innerText.trim(); return t ? { info: t.slice(0, 120) } : null }
     const links = [...new Set([...r.querySelectorAll('a[href^="http"]')].map((x) => x.href))]
-    return { meta, de: ehVoce(q) ? 'você' : q || undefined, texto, midia: midia || undefined, links: links.length ? links : undefined }
+    return { id: (r.querySelector('[data-id]') || {}).dataset?.id, meta, de: ehVoce(q) ? 'você' : q || undefined, texto, midia: midia || undefined, links: links.length ? links : undefined }
   }).filter(Boolean) })()`
 
   // data da mensagem a partir de "[13:28, 13/11/2026] Nome:"
@@ -117,8 +117,25 @@ function criar({ vista, carregar, garantirVisivel, esperar, pastaDownloads }) {
     await mensagensCarregadas()
     if (Number(dias) > 0) {
       const corte = Date.now() - Number(dias) * 86400000
-      await carregarDesde(corte)
-      const todas = await js(LER_MSGS(2000))
+      // a lista do WhatsApp é virtual: colhe o que está na tela e sobe aos poucos, juntando tudo (por id), até passar da data
+      const vistas = new Map()
+      const ordem = []
+      await js(`(() => { let e = document.querySelector('#main [role="row"]'); while (e && e !== document.body) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) { e.scrollTop = e.scrollHeight; return } e = e.parentElement } })()`)
+      await esperar(800)
+      for (let passo = 0, parado = 0; passo < 120 && parado < 3; passo++) {
+        const vis = await js(LER_MSGS(400))
+        let novas = 0
+        for (const m of vis.slice().reverse()) {
+          const k = m.id || (m.meta + '|' + (m.texto || m.info || ''))
+          if (!vistas.has(k)) { vistas.set(k, m); ordem.unshift(k); novas++ }
+        }
+        const maisVelha = vis.map((m) => dataDe(m.meta)).find((t) => t)
+        if (maisVelha && maisVelha < corte) break
+        const subiu = await js(`(() => { let e = document.querySelector('#main [role="row"]'); while (e && e !== document.body) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) { const a = e.scrollTop; e.scrollTop = Math.max(0, a - e.clientHeight * 0.8); return a > 0 } e = e.parentElement } return false })()`)
+        await esperar(1300)
+        parado = !subiu && !novas ? parado + 1 : 0
+      }
+      const todas = ordem.map((k) => vistas.get(k))
       let ultimaData = null
       const filtradas = todas.filter((m) => {
         const t = dataDe(m.meta)

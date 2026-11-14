@@ -25,6 +25,44 @@ function userAgentChrome(plataforma = process.platform, versaoChromium = (proces
   return `Mozilla/5.0 (${so}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${principal}.0.0.0 Safari/537.36`
 }
 const IDIOMAS = 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+
+// Login do Google ("Entrar com o Google" em qualquer site, Gmail, YouTube) recusa navegador embutido: "Esse navegador ou app
+// pode não ser seguro". Ele cruza o user-agent com os Client Hints (sec-ch-ua sem a marca "Google Chrome") e com o que o
+// JavaScript da página vê. Nas páginas de conta do Google o navegador integrado se apresenta como FIREFOX (que não manda
+// Client Hints e o Google aceita); fora delas volta a ser o Chrome. Mesma saída usada por outros apps de desktop (13/11/2026).
+const HOSTS_LOGIN_GOOGLE = /(^|\.)accounts\.google\.[a-z.]+$|(^|\.)accounts\.youtube\.com$/i
+function userAgentFirefox(plataforma = process.platform) {
+  const so = plataforma === 'darwin' ? 'Macintosh; Intel Mac OS X 10.15' : plataforma === 'linux' ? 'X11; Linux x86_64' : 'Windows NT 10.0; Win64; x64'
+  return `Mozilla/5.0 (${so}; rv:133.0) Gecko/20100101 Firefox/133.0`
+}
+const ehLoginGoogle = (url) => {
+  try {
+    return HOSTS_LOGIN_GOOGLE.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+const sessoesComFiltro = new WeakSet()
+function loginGoogleComoFirefox(wc, uaChrome) {
+  const ff = userAgentFirefox()
+  const ses = wc.session
+  if (!sessoesComFiltro.has(ses)) {
+    sessoesComFiltro.add(ses)
+    ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (det, cb) => {
+      if (!ehLoginGoogle(det.url)) return cb({ requestHeaders: det.requestHeaders })
+      const h = { ...det.requestHeaders, 'User-Agent': ff }
+      for (const k of Object.keys(h)) if (/^sec-ch-ua/i.test(k)) delete h[k]
+      cb({ requestHeaders: h })
+    })
+  }
+  // o que o JavaScript da página vê (navigator.userAgent) acompanha: Firefox só enquanto está no login do Google
+  const ajustar = (url) => {
+    const quer = ehLoginGoogle(url) ? ff : uaChrome
+    if (wc.getUserAgent() !== quer) wc.setUserAgent(quer)
+  }
+  wc.on('did-start-navigation', (d) => { if (d.isMainFrame !== false) ajustar(d.url) })
+  wc.on('will-redirect', (d) => { if (d.isMainFrame !== false) ajustar(d.url) })
+}
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
@@ -111,12 +149,13 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
 
   function garantir() {
     if (vista) return vista
-    vista = new WebContentsView({ webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false } })
+    vista = new WebContentsView({ webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'navegador-preload.js') } })
     const wc = vista.webContents
     // antes de qualquer carga: o primeiro pedido já sai com o user-agent e o idioma de um Chrome comum
     const ua = userAgentChrome()
     wc.setUserAgent(ua)
     wc.session.setUserAgent(ua, IDIOMAS)
+    loginGoogleComoFirefox(wc, ua)
     wc.loadURL(PAGINA_INICIAL).catch(() => {})
     wc.setWindowOpenHandler(({ url }) => {
       wc.loadURL(url).catch(() => {})
@@ -496,4 +535,4 @@ function lerMarcadoresDoNavegador() {
   return saida
 }
 
-module.exports = { criar, lerMarcadoresDoNavegador, resolverEntrada, userAgentChrome, PAGINA_INICIAL }
+module.exports = { criar, lerMarcadoresDoNavegador, resolverEntrada, userAgentChrome, userAgentFirefox, loginGoogleComoFirefox, ehLoginGoogle, PAGINA_INICIAL }

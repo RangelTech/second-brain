@@ -662,15 +662,24 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
     ff = _ffmpeg()
     orig = trab / "original.wav"
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(video), "-vn", "-ac", "2", "-ar", "44100", str(orig)], check=True)
-    _log("1/4 separando a voz da música...")
-    voz, fundo = separar_voz(orig, trab)
+    # etapas já feitas numa rodada anterior são reaproveitadas (a pasta de trabalho é por vídeo)
+    if (trab / "voz.wav").exists() and (trab / "fundo.wav").exists():
+        voz, fundo = trab / "voz.wav", trab / "fundo.wav"
+    else:
+        _log("1/4 separando a voz da música...")
+        voz, fundo = separar_voz(orig, trab)
     _log("2/4 transcrevendo as frases...")
-    frases = json.loads(Path(textos).read_text(encoding="utf-8")) if textos else _frases_com_tempo(voz, idioma)
+    if textos:
+        frases = json.loads(Path(textos).read_text(encoding="utf-8"))
+    elif (trab / "frases.json").exists():
+        frases = json.loads((trab / "frases.json").read_text(encoding="utf-8"))
+    else:
+        frases = _frases_com_tempo(voz, idioma)
     (trab / "frases.json").write_text(json.dumps(frases, ensure_ascii=False, indent=1), encoding="utf-8")
     # amostra: junta as amostras, tira música/ruído (separação) e normaliza
     _log("3/4 preparando a amostra da voz...")
     partes = []
-    for i, am in enumerate(amostras):
+    for i, am in enumerate([str(x).strip() for x in amostras]):
         w = trab / f"am{i}.wav"
         subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(am), "-ac", "2", "-ar", "44100", str(w)], check=True)
         partes.append(w)
@@ -679,6 +688,11 @@ def redublar(video, amostras, saida, motor="xtts", idioma="pt", textos=None):
     sub = trab / "amostra-sep"
     sub.mkdir(exist_ok=True)
     vz_am, _ = separar_voz(junta, sub)
+    # libera Demucs e Whisper antes do XTTS (os três juntos estouram a memória de um notebook)
+    import gc
+    for k in ("demucs", "whisper"):
+        _CACHE.pop(k, None)
+    gc.collect()
     amostra = trab / "amostra-limpa.wav"
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(vz_am), "-af", "highpass=f=70,silenceremove=stop_periods=-1:stop_duration=0.4:stop_threshold=-40dB,loudnorm=I=-18", "-ac", "1", "-ar", "22050", str(amostra)], check=True)
     _log(f"4/4 gerando {len(frases)} frases com a voz clonada ({motor})...")
@@ -765,7 +779,7 @@ if __name__ == "__main__":
                 _log("preparando " + p[0] + " (uma vez)...")
                 _pip(*p)
             args = [str(PY), __file__, "redublar", "--video", str(Path(a.video).resolve()), "--saida", str(Path(a.saida).resolve()), "--motor", a.motor, "--idioma", a.idioma]
-            for am in a.amostra:
+            for am in [x.strip() for x in a.amostra]:
                 args += ["--amostra", str(Path(am).resolve())]
             if a.textos:
                 args += ["--textos", str(Path(a.textos).resolve())]
