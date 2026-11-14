@@ -2,7 +2,7 @@
   openvoice (padrão): Piper fala o texto em português do Brasil e o OpenVoice v2 troca o timbre pela voz da amostra. MIT: uso comercial permitido.
   xtts: XTTS v2 (Coqui) clona a voz direto em português a partir de ~6 s de amostra; melhor qualidade. Licença CPML: só uso NÃO comercial.
 
-Este arquivo roda com QUALQUER Python 3.8+ (até o do próprio Segundo Cérebro): ele monta sozinho um ambiente próprio com Python 3.12
+Este arquivo roda com QUALQUER Python 3.8+ (até o do próprio Cérebro Pro): ele monta sozinho um ambiente próprio com Python 3.12
 (pelo uv que vem com o app) e instala os pacotes do PACOTE DE RODAS NOSSO (release voz-local-v2), sem depender do PyPI nem do git.
 
 Preparar (uma vez):  python voz_local.py instalar [--motor openvoice|xtts|ambos]
@@ -107,12 +107,12 @@ def _sistema():
 
 
 def _uv():
-    """O uv que vem com o Segundo Cérebro (ou um do sistema). Ele baixa o Python 3.12 do ambiente e instala rápido."""
+    """O uv que vem com o Cérebro Pro (ou um do sistema). Ele baixa o Python 3.12 do ambiente e instala rápido."""
     cands = [os.environ.get("SB_UV"), shutil.which("uv")]
     exe = "uv.exe" if os.name == "nt" else "uv"
     bases = [os.environ.get("APPDATA", ""), str(Path.home() / ".config"), str(Path.home() / "Library" / "Application Support")]
     for b in bases:
-        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro"):
+        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro", "Cérebro Pro"):
             cands += sorted(glob.glob(os.path.join(b, nome, "hermes*", "tools", "uv-*", exe)), reverse=True)
     cands.append(str(Path.home() / ".local" / "bin" / exe))
     for c in cands:
@@ -189,7 +189,7 @@ def _criar_ambiente():
     elif sys.version_info >= (3, 11):
         _sh([sys.executable, "-m", "venv", VENV])
     else:
-        raise SystemExit(json.dumps({"ok": False, "erro": "preciso do uv (vem com o Segundo Cérebro) ou de Python 3.11+ para montar o ambiente da voz"}))
+        raise SystemExit(json.dumps({"ok": False, "erro": "preciso do uv (vem com o Cérebro Pro) ou de Python 3.11+ para montar o ambiente da voz"}))
 
 
 def _pip(*args):
@@ -543,11 +543,11 @@ def _ffmpeg():
     exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     cands = [shutil.which("ffmpeg")]
     for b in (os.environ.get("APPDATA", ""), str(Path.home() / ".config"), str(Path.home() / "Library" / "Application Support")):
-        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro"):
+        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro", "Cérebro Pro"):
             cands += sorted(glob.glob(os.path.join(b, nome, "hermes*", "tools", "ffmpeg-*", "bin", exe)), reverse=True)
     c = next((c for c in cands if c and os.path.isfile(c)), None)
     if not c:
-        sys.exit(json.dumps({"ok": False, "erro": "não achei o ffmpeg (vem com o Segundo Cérebro)"}, ensure_ascii=False))
+        sys.exit(json.dumps({"ok": False, "erro": "não achei o ffmpeg (vem com o Cérebro Pro)"}, ensure_ascii=False))
     return c
 
 

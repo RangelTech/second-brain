@@ -1,4 +1,4 @@
-/* Chat do Segundo Cérebro: lateral, compositor, menu de modelo, mensagens, sugestões. Carrega depois do style.css. */
+/* Chat do Cérebro Pro: lateral, compositor, menu de modelo, mensagens, sugestões. Carrega depois do style.css. */
 .ic{width:18px;height:18px;flex:none;display:block}
 .btn-ic{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--mut);flex:none}
 .btn-ic:hover{background:var(--card2);color:var(--fg)}

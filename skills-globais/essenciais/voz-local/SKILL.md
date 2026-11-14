@@ -16,7 +16,7 @@ Script: `scripts/voz_local.py` desta skill. Pacotes e modelos vêm dos snapshots
 | `openvoice` (padrão) | uso livre, inclusive comercial; mais rápido | MIT (OpenVoice v2 + Piper) |
 | `xtts` | quando o usuário quer a voz mais natural e o uso é pessoal | CPML: **só uso não comercial**. Diga isso em uma frase e deixe o usuário escolher |
 
-## O que precisa (já vem com o Segundo Cérebro)
+## O que precisa (já vem com o Cérebro Pro)
 - **Python para rodar o script:** qualquer um serve. Se o computador não tiver, use o que vem com o app: variável `SB_PYTHON` (no Windows: `& $env:SB_PYTHON voz_local.py ...`; no Linux/mac: `"$SB_PYTHON" voz_local.py ...`). Não instale Python no computador do usuário.
 - **Ambiente da voz:** o script monta sozinho um ambiente próprio com Python 3.12 usando o `uv` do app (`SB_UV`) e instala tudo do **pacote nosso** (release `voz-local-v2` em `RangelTech/segundo-cerebro-artefatos`, conferido por sha256). Não precisa de git, PyPI nem compilador. Nunca rode `pip install torch` na mão nem troque versões: as versões travadas no script são as que funcionam juntas.
 - **Espaço e tempo:** ~2,5 GB em `~/.segundo-cerebro/voz-local`, de 3 a 10 min uma vez só (depende da internet). O modelo do XTTS (~1,8 GB) baixa no primeiro uso dele.

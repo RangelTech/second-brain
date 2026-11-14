@@ -13,7 +13,7 @@ description: |
 Cliente quer um painel/globo de monitoramento de sinais públicos para demonstração ou estudo (ideia de produto, apresentação).
 
 ## Quando NÃO usar
-Não é infraestrutura do Segundo Cérebro. Pede navegador com WebGL (GPU do usuário); não use em máquina sem tela.
+Não é infraestrutura do Cérebro Pro. Pede navegador com WebGL (GPU do usuário); não use em máquina sem tela.
 
 ## Combina com
 `site-na-maquina-virtual` (publicar o `dist`), `playwright` (conferir a página).

@@ -20,11 +20,11 @@ def ffmpeg():
     exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     cands = [shutil.which("ffmpeg")]
     for b in (os.environ.get("APPDATA", ""), str(Path.home() / ".config"), str(Path.home() / "Library" / "Application Support")):
-        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro"):
+        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro", "Cérebro Pro"):
             cands += sorted(glob.glob(os.path.join(b, nome, "hermes*", "tools", "ffmpeg-*", "bin", exe)), reverse=True)
     c = next((c for c in cands if c and os.path.isfile(c)), None)
     if not c:
-        print(json.dumps({"ok": False, "erro": "não achei o ffmpeg (vem com o Segundo Cérebro)"}))
+        print(json.dumps({"ok": False, "erro": "não achei o ffmpeg (vem com o Cérebro Pro)"}))
         sys.exit(1)
     return c
 

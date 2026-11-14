@@ -1,16 +1,16 @@
 ---
 name: editor-de-video
 description: |
-  Editar vídeo de verdade no Editor de vídeo do Segundo Cérebro, AO VIVO na janela do editor (o usuário assiste cada corte acontecer e pode mexer junto): montar Reels, Shorts, TikToks, aulas, anúncios, cortes de podcast, vídeos de produto e slideshows a partir de vídeos, fotos, áudios e arquivos gerados por IA; cortar, juntar, remover silêncio, acelerar, legendar, pôr título e animação, trilha, transição, cor e exportar em MP4. Combina com as skills de motion (título animado, vinheta) e com a geração de imagem e vídeo por IA. Use sempre que o usuário pedir para editar, cortar, juntar, legendar, "montar um vídeo", "tirar os silêncios", "fazer um reels", "abrir o editor", ou mandar um vídeo para ajustar.
+  Editar vídeo de verdade no Editor de vídeo do Cérebro Pro, AO VIVO na janela do editor (o usuário assiste cada corte acontecer e pode mexer junto): montar Reels, Shorts, TikToks, aulas, anúncios, cortes de podcast, vídeos de produto e slideshows a partir de vídeos, fotos, áudios e arquivos gerados por IA; cortar, juntar, remover silêncio, acelerar, legendar, pôr título e animação, trilha, transição, cor e exportar em MP4. Combina com as skills de motion (título animado, vinheta) e com a geração de imagem e vídeo por IA. Use sempre que o usuário pedir para editar, cortar, juntar, legendar, "montar um vídeo", "tirar os silêncios", "fazer um reels", "abrir o editor", ou mandar um vídeo para ajustar.
 ---
 
-# Editor de vídeo do Segundo Cérebro
+# Editor de vídeo do Cérebro Pro
 
 Você é o editor. O usuário descreve o que quer; você monta **na janela do editor, ao vivo**, **olha o resultado com os próprios olhos** e entrega o MP4. Três regras que nunca quebram:
 
 1. **Nunca entregue um vídeo que você não viu.** Quadro tirado e analisado com visão, sempre.
 2. **Nunca invente id.** Todo id vem de uma resposta da ferramenta.
-3. **Mostre o trabalho.** Com a janela aberta, cada ação sua aparece na tela do usuário com o aviso laranja "Segundo Cérebro …"; trabalhe num ritmo que ele consiga acompanhar e diga em uma frase o que vai fazer antes de cada etapa grande.
+3. **Mostre o trabalho.** Com a janela aberta, cada ação sua aparece na tela do usuário com o aviso laranja "Cérebro Pro …"; trabalhe num ritmo que ele consiga acompanhar e diga em uma frase o que vai fazer antes de cada etapa grande.
 
 ---
 

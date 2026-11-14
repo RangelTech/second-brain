@@ -1,5 +1,5 @@
 // Motor de provedores (9Router, pasta router/): roda escondido, só em 127.0.0.1, com dados na pasta do app.
-// O app não mostra o painel dele: as telas do Segundo Cérebro chamam as rotas /api/* por aqui (mesma ideia do LUAR).
+// O app não mostra o painel dele: as telas do Cérebro Pro chamam as rotas /api/* por aqui (mesma ideia do LUAR).
 const { app, safeStorage, session } = require('electron')
 const path = require('path')
 const fs = require('fs')

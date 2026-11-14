@@ -24,4 +24,4 @@ Rodou em sandbox de CPU: 33.1s, pico de memória 739 MB
 Desktop; modelos por API de terceiros ou local com GPU. Precisa de GPU: Opcional.
 
 ## Combina com
-geração de imagem/vídeo do Segundo Cérebro, `direcao-de-midia`.
+geração de imagem/vídeo do Cérebro Pro, `direcao-de-midia`.

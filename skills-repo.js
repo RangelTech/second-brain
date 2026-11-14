@@ -13,7 +13,7 @@ const PADROES_SEGREDO = [
 
 // Login com GitHub pelo "device flow": o app só precisa do client_id (público, sem segredo) de um OAuth App da Rangel Tech
 // com "Enable Device Flow" ligado. Pode ser trocado por SB_GITHUB_CLIENT_ID.
-const CLIENT_ID = process.env.SB_GITHUB_CLIENT_ID || 'Ov23liyEazvZL9lxJk44' // OAuth App 'Segundo Cérebro' da organização RangelTech (Device Flow ligado)
+const CLIENT_ID = process.env.SB_GITHUB_CLIENT_ID || 'Ov23liyEazvZL9lxJk44' // OAuth App 'Cérebro Pro' da organização RangelTech (Device Flow ligado)
 
 function criar({ app, raiz, abrirNavegador }) {
   const arqCfg = path.join(app.getPath('userData'), 'skills-repo.json')
@@ -37,7 +37,7 @@ function criar({ app, raiz, abrirNavegador }) {
   const guardarToken = (t) => fs.writeFileSync(arqTok, safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(t) : Buffer.from(t, 'utf8'))
 
   function git(args, comToken) {
-    const pre = ['-C', raiz, '-c', 'user.name=Segundo Cérebro', '-c', 'user.email=skills@secondbrain.local']
+    const pre = ['-C', raiz, '-c', 'user.name=Cérebro Pro', '-c', 'user.email=skills@secondbrain.local']
     const t = comToken ? token() : ''
     if (t) pre.push('-c', 'http.extraHeader=Authorization: Basic ' + Buffer.from('x-access-token:' + t).toString('base64'))
     return new Promise((resolve) => {
@@ -197,7 +197,7 @@ function criar({ app, raiz, abrirNavegador }) {
     if (!tok) throw new Error('Entre com o GitHub primeiro.')
     const u = await gh('https://api.github.com/user', null, tok)
     if (!u.json.login) throw new Error('O token não funcionou. Entre de novo com o GitHub.')
-    const r = await gh('https://api.github.com/user/repos', { name: nome, private: true, description: 'Skills do Segundo Cérebro' }, tok)
+    const r = await gh('https://api.github.com/user/repos', { name: nome, private: true, description: 'Skills do Cérebro Pro' }, tok)
     if (r.status !== 201 && r.status !== 422) throw new Error(r.json.message || 'Não consegui criar o repositório.')
     return vincular(`${u.json.login}/${nome}`)
   }

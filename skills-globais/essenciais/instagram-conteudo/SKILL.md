@@ -1,7 +1,7 @@
 ---
 name: instagram-conteudo
 description: |
-  Ajudar o usuário a crescer e vender no Instagram: estratégia de perfil, ganchos que prendem, formatos de Reels (inclusive sem aparecer), stories que vendem, carrossel, legenda, chamariz "comenta PALAVRA" com resposta no direct, rotina de postagem e republicação. Inclui modelos testados por criadores (biblioteca do Segundo Cérebro) e como produzir cada formato com as ferramentas do app (Motion, edicao-profissional, cortes-de-video, reel-narrado, imagem grátis). Use quando pedirem "como crescer no Instagram", "ideia de reels", "gancho", "stories para vender", "carrossel", "legenda", "o que postar", "estratégia de conteúdo", "perfil".
+  Ajudar o usuário a crescer e vender no Instagram: estratégia de perfil, ganchos que prendem, formatos de Reels (inclusive sem aparecer), stories que vendem, carrossel, legenda, chamariz "comenta PALAVRA" com resposta no direct, rotina de postagem e republicação. Inclui modelos testados por criadores (biblioteca do Cérebro Pro) e como produzir cada formato com as ferramentas do app (Motion, edicao-profissional, cortes-de-video, reel-narrado, imagem grátis). Use quando pedirem "como crescer no Instagram", "ideia de reels", "gancho", "stories para vender", "carrossel", "legenda", "o que postar", "estratégia de conteúdo", "perfil".
 ---
 
 # Instagram: conteúdo que cresce e vende

@@ -48,7 +48,7 @@ function criar({ app, wa, canal = 'whatsapp', responder, direto, alvo, avisar = 
       return `${quem}: ${m.texto || ''}${m.midia ? ' ' + m.midia : ''}`
     })
     return [
-      'Você está respondendo o ' + NOME + ' do usuário (o dono deste Segundo Cérebro) AUTOMATICAMENTE, como se fosse ele.',
+      'Você está respondendo o ' + NOME + ' do usuário (o dono deste Cérebro Pro) AUTOMATICAMENTE, como se fosse ele.',
       `Chegou mensagem nova de: ${contato}`,
       '',
       'INSTRUÇÕES DO DONO (siga à risca):',

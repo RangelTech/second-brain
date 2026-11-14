@@ -6,7 +6,7 @@ description: |
 
 # Reel narrado (voz + motion + editor)
 
-Tudo aqui roda no computador do usuário, **de graça**, com o que já vem no Segundo Cérebro:
+Tudo aqui roda no computador do usuário, **de graça**, com o que já vem no Cérebro Pro:
 - **Voz:** skill `voz-local` (`scripts/voz_local.py`): clona a voz de uma amostra (OpenVoice ou XTTS), troca o timbre de uma fala e mantém um servidor com o modelo na memória (as falas seguintes saem rápido).
 - **Animação:** ferramentas `motion_previa` e `motion_animar` (HTML/React vira MP4), skill `motion`.
 - **Montagem pronta:** `scripts/montar_reel.py` desta skill + o modelo `modelos/reel-narrado.html`.

@@ -10,7 +10,7 @@ function ponte() {
     URL_APP = j.url
     TOKEN = j.token
   } catch {
-    throw new Error('O Segundo Cérebro precisa estar aberto (pode ser só na bandeja) para usar o navegador, o WhatsApp e o Motion.')
+    throw new Error('O Cérebro Pro precisa estar aberto (pode ser só na bandeja) para usar o navegador, o WhatsApp e o Motion.')
   }
 }
 const obj = (props, req = []) => ({ type: 'object', properties: props, required: req })

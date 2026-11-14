@@ -6,7 +6,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const NOME = 'Segundo Cérebro'
+const NOME = 'Cérebro Pro'
 
 function arquivoAutostartLinux() {
   return path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'autostart', 'segundo-cerebro.desktop')

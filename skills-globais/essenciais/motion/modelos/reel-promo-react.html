@@ -32,7 +32,7 @@ function Cena({ t }) {
     <div class="fundo" style=${{ '--x': cx + '%', '--y': cy + '%' }}></div>
     <div class="grade" style=${{ transform: `translateY(${-t * 30}px)` }}></div>
     ${P.map((p, i) => html`<i class="p" key=${i} style=${{ left: p.x + noise(t + i) * 30 + 'px', top: ((p.y - t * p.v) % 1920 + 1920) % 1920 + 'px', width: p.r + 'px', height: p.r + 'px', opacity: 0.25 + 0.35 * prog(t, i * 0.03, 0.8) }}></i>`)}
-    <div class="selo" style=${{ opacity: Math.min(1, selo), transform: `translateX(-50%) translateY(${(1 - selo) * -60}px) scale(${0.8 + 0.2 * selo})` }}>Segundo Cérebro · Motion</div>
+    <div class="selo" style=${{ opacity: Math.min(1, selo), transform: `translateX(-50%) translateY(${(1 - selo) * -60}px) scale(${0.8 + 0.2 * selo})` }}>Cérebro Pro · Motion</div>
     <div class="titulo">${PALAVRAS.map((w, i) => {
       const k = spring(t, stagger(i, 0.5, 0.14), { freq: 1.9, damp: 7 })
       return html`<span key=${i} class=${i >= 3 ? 'destaque' : ''} style=${{ opacity: Math.min(1, k * 1.4), transform: `translateY(${(1 - k) * 120}px) rotate(${(1 - k) * 8}deg)`, marginRight: '0.25em' }}>${w}</span>`

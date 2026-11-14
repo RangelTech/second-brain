@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Atualizador do Segundo Cérebro (servidor/VM). NÃO depende da API do GitHub (que dá 504 e limita 60 consultas por hora por IP):
+# Atualizador do Cérebro Pro (servidor/VM). NÃO depende da API do GitHub (que dá 504 e limita 60 consultas por hora por IP):
 #  1) versão pelo redirecionamento de https://github.com/<repo>/releases/latest (página normal, segue de pé quando a API cai)
 #  2) plano B: o endpoint do nosso servidor (guarda a última versão boa), 3) plano C: a API.
 # Se nenhuma responder, sai com sucesso e tenta de novo no próximo ciclo (a VM nunca fica "com erro" por causa do GitHub).

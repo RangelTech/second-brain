@@ -103,7 +103,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     if (principal && principal.contentView.children.includes(vista)) principal.contentView.removeChildView(vista)
     aberto = true
     destacada = new BrowserWindow({
-      width: 1180, height: 820, minWidth: 520, minHeight: 360, backgroundColor: '#16120f', autoHideMenuBar: true, title: 'Navegador do Segundo Cérebro',
+      width: 1180, height: 820, minWidth: 520, minHeight: 360, backgroundColor: '#16120f', autoHideMenuBar: true, title: 'Navegador do Cérebro Pro',
       webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: false },
     })
     const w = destacada
@@ -274,7 +274,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   function garantirWa() {
     if (janelaWa && !janelaWa.isDestroyed()) return janelaWa
     janelaWa = new BrowserWindow({
-      show: false, width: 1200, height: 900, title: 'WhatsApp — Segundo Cérebro', autoHideMenuBar: true, paintWhenInitiallyHidden: true,
+      show: false, width: 1200, height: 900, title: 'WhatsApp — Cérebro Pro', autoHideMenuBar: true, paintWhenInitiallyHidden: true,
       webPreferences: { partition: 'persist:navegador', sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, preload: path.join(__dirname, 'navegador-preload.js') },
     })
     const ua = userAgentChrome()
@@ -469,7 +469,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     throw new Error(r.erro || 'A extensão do Chrome falhou.')
   }
   function textoSemChrome(falhou) {
-    const motivo = falhou === 'pausado' ? 'A extensão do Chrome está pausada pelo usuário.' : falhou === 'timeout' ? 'O Chrome do usuário não respondeu a tempo.' : 'Não há Chrome conectado ao Segundo Cérebro.'
+    const motivo = falhou === 'pausado' ? 'A extensão do Chrome está pausada pelo usuário.' : falhou === 'timeout' ? 'O Chrome do usuário não respondeu a tempo.' : 'Não há Chrome conectado ao Cérebro Pro.'
     return `${motivo} Para usar o Chrome do usuário (com as contas dele já abertas), ele precisa instalar a extensão e conectar: ${LINK_EXTENSAO} (baixar, abrir chrome://extensions, ligar o Modo do desenvolvedor, Carregar sem compactação e clicar em Entrar no ícone). Mande esse link ao usuário. Se ele preferir, use o navegador integrado repetindo a ferramenta com onde="integrado".`
   }
   const estadoChrome = () => {

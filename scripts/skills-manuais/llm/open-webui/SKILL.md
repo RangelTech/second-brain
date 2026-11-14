@@ -13,7 +13,7 @@ description: |
 Dar ao cliente (ou à equipe) uma tela de chat web simples sobre um endpoint OpenAI-compatível.
 
 ## Quando NÃO usar
-Como produto principal: já temos o Segundo Cérebro.
+Como produto principal: já temos o Cérebro Pro.
 
 ## Combina com
 `site-na-maquina-virtual`, gateway `9router`.

@@ -1,5 +1,5 @@
 """Ambiente Python PRONTO para gerar Word, Excel e PowerPoint (python-docx, openpyxl, XlsxWriter, python-pptx, Pillow).
-Roda com qualquer Python 3.8+ (até o do Segundo Cérebro, variável SB_PYTHON). Monta ~/.segundo-cerebro/docs com Python 3.12
+Roda com qualquer Python 3.8+ (até o do Cérebro Pro, variável SB_PYTHON). Monta ~/.segundo-cerebro/docs com Python 3.12
 pelo uv do app, a partir do pacote NOSSO (release escritorio-v1, sha256 conferido). Sem PyPI, sem compilador.
 
     python ambiente_docs.py preparar               -> {"ok": true, "python": "<python do ambiente>"}
@@ -58,7 +58,7 @@ def _uv():
     exe = "uv.exe" if os.name == "nt" else "uv"
     cands = [os.environ.get("SB_UV"), shutil.which("uv")]
     for b in (os.environ.get("APPDATA", ""), str(Path.home() / ".config"), str(Path.home() / "Library" / "Application Support")):
-        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro"):
+        for nome in ("SegundoCerebro", "Segundo Cérebro", "segundo-cerebro", "Cérebro Pro"):
             cands += sorted(glob.glob(os.path.join(b, nome, "hermes*", "tools", "uv-*", exe)), reverse=True)
     return next((c for c in cands if c and os.path.isfile(c)), None)
 

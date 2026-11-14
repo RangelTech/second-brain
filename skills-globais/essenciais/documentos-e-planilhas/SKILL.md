@@ -1,7 +1,7 @@
 ---
 name: documentos-e-planilhas
 description: |
-  Criar e editar arquivos de escritório para o usuário: documento Word (.docx), planilha Excel (.xlsx/.csv), apresentação PowerPoint (.pptx). Já vem tudo pronto no Segundo Cérebro: ambiente Python com python-docx, openpyxl, XlsxWriter e python-pptx (pacote nosso) e o editor de documentos integrado (ONLYOFFICE), onde o usuário abre o arquivo com um clique em "Abrir no editor". Use quando pedirem "faz uma planilha", "monta um relatório em Word", "cria uma apresentação", "orçamento em Excel", "contrato em docx", "edita essa planilha".
+  Criar e editar arquivos de escritório para o usuário: documento Word (.docx), planilha Excel (.xlsx/.csv), apresentação PowerPoint (.pptx). Já vem tudo pronto no Cérebro Pro: ambiente Python com python-docx, openpyxl, XlsxWriter e python-pptx (pacote nosso) e o editor de documentos integrado (ONLYOFFICE), onde o usuário abre o arquivo com um clique em "Abrir no editor". Use quando pedirem "faz uma planilha", "monta um relatório em Word", "cria uma apresentação", "orçamento em Excel", "contrato em docx", "edita essa planilha".
 ---
 
 # Documentos, planilhas e apresentações

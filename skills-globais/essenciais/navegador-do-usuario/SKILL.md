@@ -1,7 +1,7 @@
 ---
 name: navegador-do-usuario
 description: |
-  Usar o Chrome do próprio usuário (extensão "Segundo Cérebro no Chrome") em vez do navegador integrado: com as contas dele já abertas (WhatsApp Web, Instagram, TikTok, Facebook, Gmail), sem pedir login e sem bloqueio de robô. Use quando o usuário pedir "use o meu Chrome", "abre no meu navegador", quando a tarefa precisa das contas dele, quando a página do navegador integrado pedir login ou verificação, quando ele perguntar da extensão, ou SEMPRE na versão web.
+  Usar o Chrome do próprio usuário (extensão "Cérebro Pro no Chrome") em vez do navegador integrado: com as contas dele já abertas (WhatsApp Web, Instagram, TikTok, Facebook, Gmail), sem pedir login e sem bloqueio de robô. Use quando o usuário pedir "use o meu Chrome", "abre no meu navegador", quando a tarefa precisa das contas dele, quando a página do navegador integrado pedir login ou verificação, quando ele perguntar da extensão, ou SEMPRE na versão web.
 ---
 
 # Navegador do usuário (extensão do Chrome)
@@ -21,7 +21,7 @@ Uma frase para o usuário, sempre que trocar de navegador: "Vou usar o seu Chrom
 3. **Não conectado ou pausado:** não invente nem tente de novo em loop. Diga em português simples e mande o link.
 
 ## Como pedir a instalação (mande exatamente isto, adaptando o tom)
-> Para eu usar o seu Chrome, com as suas contas já abertas, instale a extensão do Segundo Cérebro (3 minutos): **https://brain.rangeltech.net/extensao/**
+> Para eu usar o seu Chrome, com as suas contas já abertas, instale a extensão do Cérebro Pro (3 minutos): **https://brain.rangeltech.net/extensao/**
 > Baixe e extraia o arquivo, abra `chrome://extensions`, ligue o **Modo do desenvolvedor**, clique em **Carregar sem compactação** e escolha a pasta. Depois clique no ícone da extensão: se o aplicativo estiver aberto ela se conecta sozinha; se não, clique em **Entrar** e use o seu e-mail e senha uma vez.
 
 Se o usuário estiver no aplicativo e a extensão já estiver instalada mas desconectada, diga para abrir **Configurações** e tocar em **Conectar o Chrome**. Na web, diga para tocar no ícone da extensão e em **Entrar**.
@@ -29,7 +29,7 @@ Se o usuário estiver no aplicativo e a extensão já estiver instalada mas desc
 Se o usuário preferir não instalar, ofereça o navegador integrado e diga que algumas contas podem pedir login de novo.
 
 ## Regras de cuidado (é o computador e as contas dele)
-- Trabalhe só na aba do grupo **"Segundo Cérebro"**. Nunca feche nem mexa nas outras abas do usuário.
+- Trabalhe só na aba do grupo **"Cérebro Pro"**. Nunca feche nem mexa nas outras abas do usuário.
 - **Confira antes de enviar ou publicar:** tire um `navegador_print`, olhe a imagem com `vision_analyze` e só então envie a mensagem, publique ou compre. Mensagem para um cliente, pagamento e exclusão: mostre o que vai fazer e confirme com o usuário se houver dúvida.
 - WhatsApp Web, Instagram e similares: a aba precisa estar na frente para carregar direito; a extensão já faz isso. Se aparecer QR code ou código de verificação, peça ao usuário na hora e espere.
 - Se o usuário pausar a extensão pelo ícone, pare e avise em uma frase. Não tente contornar.

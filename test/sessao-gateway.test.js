@@ -83,7 +83,7 @@ test('SessaoGateway: cria a conversa, envia com a marca da conversa e devolve o 
   const envio = gw.chamadas.find((c) => c.method === 'prompt.submit')
   assert.match(envio.params.text, /diga oi/)
   assert.match(envio.params.text, /<!--sb:chat1-->/)
-  assert.match(envio.params.text, /Segundo Cérebro/, 'o 1º turno leva o contexto do app')
+  assert.match(envio.params.text, /Cérebro Pro/, 'o 1º turno leva o contexto do app')
   s.encerrar()
 })
 
@@ -95,7 +95,7 @@ test('SessaoGateway: 2ª pergunta reaproveita a conversa e não repete o context
   assert.equal(gw.chamadas.filter((c) => c.method === 'session.create').length, 1)
   const envios = gw.chamadas.filter((c) => c.method === 'prompt.submit')
   assert.equal(envios.length, 2)
-  assert.doesNotMatch(envios[1].params.text, /Você é o Segundo Cérebro/)
+  assert.doesNotMatch(envios[1].params.text, /Você é o Cérebro Pro/)
   s.encerrar()
 })
 

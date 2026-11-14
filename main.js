@@ -1,8 +1,8 @@
-// Segundo Cérebro (Rangel Tech): janela de chat, agente e ponte para o motor de provedores.
+// Cérebro Pro (Rangel Tech): janela de chat, agente e ponte para o motor de provedores.
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, session } = require('electron')
 
 // Sem identidade própria o Windows agrupa o app com o Electron e mostra o ícone do .exe (o átomo) na barra de tarefas.
-// Com o AppUserModelID próprio e o .ico (vários tamanhos), a barra usa a logo do Segundo Cérebro, instalado ou em desenvolvimento.
+// Com o AppUserModelID próprio e o .ico (vários tamanhos), a barra usa a logo do Cérebro Pro, instalado ou em desenvolvimento.
 if (process.platform === 'win32') app.setAppUserModelId('net.rangeltech.secondbrain')
 function iconeDoApp() {
   const fs = require('fs')
@@ -113,7 +113,7 @@ async function chaveLocal() {
   try {
     return decifrar(fs.readFileSync(arqChave, 'utf8'))
   } catch {}
-  const r = await embed.api('POST', '/api/keys', { name: 'Segundo Cérebro (local)' })
+  const r = await embed.api('POST', '/api/keys', { name: 'Cérebro Pro (local)' })
   const chave = r.json?.key
   if (!chave) throw new Error('Não consegui criar a chave local do motor de provedores.')
   fs.writeFileSync(arqChave, cifrar(chave))
@@ -656,13 +656,13 @@ async function sessaoDoChat(id, alvo, contexto, historico) {
   return sessao
 }
 async function responder(alvo, msgs, ctx) {
-  if (!cfg.unlimitedEmail) throw new Error('Entre na sua conta para usar o Segundo Cérebro.') // vale também para as ordens vindas do celular
+  if (!cfg.unlimitedEmail) throw new Error('Entre na sua conta para usar o Cérebro Pro.') // vale também para as ordens vindas do celular
   const est = embed.estado()
   if (!est.pronto) throw new Error(est.erro || 'O motor de provedores ainda está iniciando. Tente de novo em instantes.')
   if (!alvo) throw new Error('Escolha um modelo ou combo no topo do chat (cadastre um provedor em Configurações > Provedores).')
   if (cfg.soConversa) {
     const chave = await chaveLocal()
-    return chamarOpenAI({ nome: 'Segundo Cérebro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
+    return chamarOpenAI({ nome: 'Cérebro Pro', base: est.origem + '/v1', modelo: alvo, chave: cifrar(chave) }, msgs, ctx)
   }
   // roteador: pedido que não precisa de ferramenta sai numa chamada direta (rápido); se o modelo pedir o agente, segue para o Hermes
   const ultimoPedido = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
@@ -761,7 +761,7 @@ function criarJanela() {
     minWidth: 760,
     minHeight: 520,
     backgroundColor: '#1f1d1a',
-    title: 'Segundo Cérebro',
+    title: 'Cérebro Pro',
     show: !MODO_SERVIDOR && !OCULTO,
     icon: iconeDoApp(),
     autoHideMenuBar: true,
@@ -1094,7 +1094,7 @@ app.whenReady().then(() => {
     const atuais = ler('favoritos.json', [])
     const i = atuais.findIndex((x) => x.url === f.url)
     if (i >= 0) atuais.splice(i, 1)
-    else if (/^https?:/i.test(f.url)) atuais.unshift({ titulo: f.titulo || f.url, url: f.url, pasta: '', origem: 'Segundo Cérebro' })
+    else if (/^https?:/i.test(f.url)) atuais.unshift({ titulo: f.titulo || f.url, url: f.url, pasta: '', origem: 'Cérebro Pro' })
     gravar('favoritos.json', atuais)
     return atuais
   })
@@ -1233,7 +1233,7 @@ app.whenReady().then(() => {
   ipcMain.handle('skills:versao', seguro((r, h) => skills.versao(r, h)))
   // exportar e importar dados (conversas, configuração sem chaves, skills do usuário, combos)
   ipcMain.handle('dados:exportar', async () => {
-    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'segundo-cerebro-dados.json', filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePath: process.env.SB_TESTE_ARQUIVO } : await dialog.showSaveDialog(janela, { defaultPath: 'segundo-cerebro-dados.json', filters: [{ name: 'Dados do Cérebro Pro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
     const pacote = { versao: 1, em: new Date().toISOString(), chats: ler('chats.json', []), config: { ...publica(), unlimitedCodigo: undefined, maquinaId: undefined, unlimitedLigado: undefined }, skills: {}, combos: [], estrategias: {} }
     for (const it of skills.listar()) if (it.tipo === 'arquivo' && !it.somenteLeitura && it.tamanho < 300000) pacote.skills[it.caminho] = skills.ler(it.caminho)
@@ -1245,7 +1245,7 @@ app.whenReady().then(() => {
     return { ok: true, caminho: r.filePath, chats: pacote.chats.length, skills: Object.keys(pacote.skills).length, combos: pacote.combos.length }
   })
   ipcMain.handle('dados:importar', async () => {
-    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Segundo Cérebro', extensions: ['json'] }] })
+    const r = process.env.SB_TESTE_ARQUIVO ? { canceled: false, filePaths: [process.env.SB_TESTE_ARQUIVO] } : await dialog.showOpenDialog(janela, { properties: ['openFile'], filters: [{ name: 'Dados do Cérebro Pro', extensions: ['json'] }] })
     if (r.canceled) return { ok: false, cancelado: true }
     const pacote = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'))
     if (pacote.versao !== 1) return { ok: false, erro: 'Arquivo de outra versão.' }

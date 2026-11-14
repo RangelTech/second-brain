@@ -93,7 +93,7 @@ function Cena({ c, t, n, total }) {
     const txt = String(c.texto || '')
     const p = prog(t, ini + 0.3, Math.max(0.8, (c.fim - ini) * 0.7), 'linear')
     const vis = txt.slice(0, Math.round(txt.length * p))
-    corpo = html`<${Titulo} t=${t} txt=${c.titulo} ini=${ini} /><div class="janela" style=${{ opacity: prog(t, ini + 0.15, 0.4), transform: `translateY(${(1 - prog(t, ini + 0.15, 0.5, 'outExpo')) * 60}px)` }}><div class="barra-j"><i></i><i></i><i></i><span style=${{ marginLeft: '14px' }}>${c.app || 'Segundo Cérebro'}</span></div><div class="corpo-j">${vis}<span class="cursor" style=${{ opacity: Math.floor(t * 2) % 2 ? 1 : 0.2 }}></span></div></div>`
+    corpo = html`<${Titulo} t=${t} txt=${c.titulo} ini=${ini} /><div class="janela" style=${{ opacity: prog(t, ini + 0.15, 0.4), transform: `translateY(${(1 - prog(t, ini + 0.15, 0.5, 'outExpo')) * 60}px)` }}><div class="barra-j"><i></i><i></i><i></i><span style=${{ marginLeft: '14px' }}>${c.app || 'Cérebro Pro'}</span></div><div class="corpo-j">${vis}<span class="cursor" style=${{ opacity: Math.floor(t * 2) % 2 ? 1 : 0.2 }}></span></div></div>`
   } else if (c.tipo === 'grafico') {
     // barras que sobem uma a uma; valores e rótulos
     const itens = c.itens || []

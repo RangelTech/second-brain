@@ -123,7 +123,7 @@
         if (lista) saida.push('</ul>')
         return saida
           .join('')
-          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>${!ehWeb && EXT_ESCRITORIO.test(m) && window.sb.escritorio ? `<button class="arq-editar" data-escritorio="${m}" title="Abrir no editor de documentos do Segundo Cérebro">Abrir no editor</button>` : ''}`)
+          .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>${!ehWeb && EXT_ESCRITORIO.test(m) && window.sb.escritorio ? `<button class="arq-editar" data-escritorio="${m}" title="Abrir no editor de documentos do Cérebro Pro">Abrir no editor</button>` : ''}`)
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
           .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)]+)/g, (m, rotulo, urlMd, urlSolta) => {
@@ -647,7 +647,7 @@
     }
   }
 
-  const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Segundo Cérebro`
+  const QUEM = `<div class="quem"><img class="av" src="img/segundo-cerebro-64.png" alt="">Cérebro Pro`
   // ---------- horário, tempo e tokens por resposta ----------
   const hhmm = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   const duracao = (ms) => {
@@ -1575,7 +1575,7 @@
     salvar()
     if (c.id === atual) desenhar()
     listar()
-    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Segundo Cérebro', { body: ok ? 'Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo.' }) } catch {}
+    try { if (document.hidden && 'Notification' in window && Notification.permission !== 'denied') new Notification('Cérebro Pro', { body: ok ? 'Seu vídeo ficou pronto.' : 'Não consegui gerar o vídeo.' }) } catch {}
   })
   // o agente está sendo preparado (primeira abertura, ou depois de uma instalação que não terminou): tela de carregamento com o cérebro animado,
   // o passo atual e o tempo, no lugar do chat. Impede a pessoa de mandar um pedido que ficaria minutos "enviando"; some sozinha quando termina.
@@ -1702,7 +1702,7 @@
         b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;background:#2a1f14;color:#f3ece4;border:1px solid #5a4630;border-radius:12px;padding:12px 14px;font:13px system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:340px;display:flex;flex-direction:column;gap:8px'
         document.body.appendChild(b)
       }
-      const txt = e.fase === 'baixando' ? 'Baixando a nova versão…' : e.fase === 'pronta' ? 'Nova versão pronta. Reinicie para usar.' : 'Tem uma nova atualização do Segundo Cérebro (' + e.versao + ').'
+      const txt = e.fase === 'baixando' ? 'Baixando a nova versão…' : e.fase === 'pronta' ? 'Nova versão pronta. Reinicie para usar.' : 'Tem uma nova atualização do Cérebro Pro (' + e.versao + ').'
       b.innerHTML = '<span></span><div style="display:flex;gap:8px;justify-content:flex-end"></div>'
       b.firstChild.textContent = txt + (e.erro ? ' ' + e.erro : '')
       const acoes = b.lastChild

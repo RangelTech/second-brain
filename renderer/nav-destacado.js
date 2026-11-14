@@ -18,7 +18,7 @@
     $('avancar').disabled = !e.podeAvancar
     if (document.activeElement !== $('url')) $('url').value = e.url || ''
     $('agente').classList.toggle('on', !!e.controlando)
-    if (e.titulo) document.title = e.titulo + ' · Navegador do Segundo Cérebro'
+    if (e.titulo) document.title = e.titulo + ' · Navegador do Cérebro Pro'
   }
   N.aoEstado(pintar)
   N.estado().then(pintar).catch(() => {})

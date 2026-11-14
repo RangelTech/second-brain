@@ -6,7 +6,7 @@ description: |
 
 # Motion (edição, sem custo)
 
-Tudo roda com o FFmpeg que vem com o Segundo Cérebro. **Não instale nada** (nem Pillow, nem Node): use os comandos abaixo.
+Tudo roda com o FFmpeg que vem com o Cérebro Pro. **Não instale nada** (nem Pillow, nem Node): use os comandos abaixo.
 
 ## 0. Animação desenhada (o jeito bonito, padrão para "faça uma animação")
 Ferramentas do servidor `motion`: `motion_previa` (tira quadros PNG para você olhar) e `motion_animar` (gera o MP4). Rodam no computador do usuário com o navegador embutido do app: **nada para instalar, sem custo**.

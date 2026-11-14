@@ -1,20 +1,20 @@
-// Editor de vídeo do Segundo Cérebro (spec 25 §21): o motor é o Concat (AGPL, projeto aberto), baixado da release OFICIAL, conferido por SHA-256 e instalado em
+// Editor de vídeo do Cérebro Pro (spec 25 §21): o motor é o Concat (AGPL, projeto aberto), baixado da release OFICIAL, conferido por SHA-256 e instalado em
 // MODO SILENCIOSO na pasta do próprio app (nenhum assistente aparece). O Hermes usa as ferramentas dele pelo MCP (`concat --mcp`), o usuário abre a janela do editor
-// pelo app (`--project <pasta>`). Quando sair o fork com o nome Segundo Cérebro (RangelTech/segundo-cerebro-editor) só mudam as constantes ORIGEM abaixo.
+// pelo app (`--project <pasta>`). Quando sair o fork com o nome Cérebro Pro (RangelTech/segundo-cerebro-editor) só mudam as constantes ORIGEM abaixo.
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
 const { spawn, execFile } = require('child_process')
 
-// Origens da release, em ordem: o fork com o nome do Segundo Cérebro (RangelTech/segundo-cerebro-editor) e, se ele ainda não tiver release, o Concat
+// Origens da release, em ordem: o fork com o nome do Cérebro Pro (RangelTech/segundo-cerebro-editor) e, se ele ainda não tiver release, o Concat
 // oficial (mesmo motor, só muda o nome da janela). O hash vem SEMPRE do SHA256SUMS da própria release; o do Concat oficial também é fixo aqui.
 const ORIGENS = [
   { repo: 'RangelTech/segundo-cerebro-editor', tag: 'v0.2.10-sc.3', win32: { arquivo: 'SegundoCerebroEditor-0.2.10-windows-x86_64-setup.exe', sha256: '', exe: 'concat.exe' } },
   { repo: 'jub0t/Concat', tag: 'v0.2.9', win32: { arquivo: 'Concat-0.2.9-windows-x86_64-setup.exe', sha256: 'bc3e994a592d46c9dce037bf0b41e329de7b3821c25bc27717a8e0d5d34d1a0a', exe: 'concat.exe' } },
 ]
 const ORIGEM = { win32: ORIGENS[0].win32 } // só o nome do executável e o suporte por sistema são lidos daqui
-const NOME_EXIBIDO = 'Editor de vídeo do Segundo Cérebro'
+const NOME_EXIBIDO = 'Editor de vídeo do Cérebro Pro'
 
 // INTERRUPTOR: ligado por padrão desde a spec 37 (o usuário abre o editor pelo botão ao lado do Navegador, sem depender do chat).
 // Desliga com SB_EDITOR=0 ou o arquivo `editor-video.off` na pasta de dados: aí o Hermes não recebe skill nem ferramentas, o app não instala nada e o botão some.
@@ -134,7 +134,7 @@ function instalar(app, progresso = () => {}) {
 }
 
 // abre a janela do editor (a interface dele, em janela própria, não espremida no chat), já com o projeto do Hermes
-// Predefine o editor para o Segundo Cérebro: português e a automação ligada (é por ela que o Hermes conversa com a janela). O arquivo é JSON puro, SEM BOM
+// Predefine o editor para o Cérebro Pro: português e a automação ligada (é por ela que o Hermes conversa com a janela). O arquivo é JSON puro, SEM BOM
 // (com BOM o editor o descarta). Só mexe se o editor não estiver aberto, para não ser sobrescrito.
 function configDir() {
   if (process.platform === 'win32') return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'app.concat.editor')
