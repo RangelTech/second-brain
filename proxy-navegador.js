@@ -3,7 +3,7 @@
 // (economiza GB e não muda nada nos outros sites). Vale só para a partição do navegador integrado. Usuário e senha do proxy
 // respondem ao pedido de autenticação do Chromium e nunca vão para log.
 const PARTICAO = 'persist:navegador'
-const DOMINIOS_PADRAO = ['instagram.com', 'cdninstagram.com', 'facebook.com', 'fbcdn.net', 'messenger.com', 'threads.net', 'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'byteoversea.com', 'whatsapp.com', 'whatsapp.net', 'x.com', 'twitter.com', 'twimg.com', 'linkedin.com', 'licdn.com']
+const DOMINIOS_PADRAO = ['instagram.com', 'cdninstagram.com', 'facebook.com', 'fbcdn.net', 'facebook.net', 'fbsbx.com', 'arkoselabs.com', 'funcaptcha.com', 'arkoselabs.cn', 'messenger.com', 'threads.net', 'tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'byteoversea.com', 'whatsapp.com', 'whatsapp.net', 'x.com', 'twitter.com', 'twimg.com', 'linkedin.com', 'licdn.com']
 
 function pacDe(proxyUrl, dominios) {
   const u = new URL(proxyUrl)
@@ -40,10 +40,11 @@ function criar({ app, session, net, buscar, registrar = () => {} }) {
     }
     const u = new URL(conf.proxy)
     atual = { url: conf.proxy, dominios: conf.dominios || [], host: u.hostname, porta: Number(u.port), usuario: decodeURIComponent(u.username || ''), senha: decodeURIComponent(u.password || '') }
-    const pac = 'data:application/x-ns-proxy-autoconfig;base64,' + Buffer.from(pacDe(conf.proxy, atual.dominios)).toString('base64')
-    await s.setProxy({ mode: 'pac_script', pacScript: pac })
+    // TUDO pelo proxy (só nas VMs; no computador do cliente não há proxy). Proxiar só alguns domínios misturava IPs
+    // (site por um IP, captcha e CDN por outro) e os antifraudes travavam o login (14/11/2026). Só o local fica direto.
+    await s.setProxy({ mode: 'fixed_servers', proxyRules: `http=${u.hostname}:${u.port};https=${u.hostname}:${u.port}`, proxyBypassRules: '<local>;localhost;127.0.0.1;[::1]' })
     await s.closeAllConnections?.()
-    registrar(`navegador: proxy ligado para ${atual.dominios.length} domínios (${u.protocol}//${u.hostname}:${u.port})`)
+    registrar(`navegador: proxy ligado para toda a navegação (${u.protocol}//${u.hostname}:${u.port})`)
     return { ativo: true }
   }
 
