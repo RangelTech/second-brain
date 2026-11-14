@@ -184,7 +184,7 @@ test('web sem sessão ou para máquina offline é recusado; máquina que cai avi
 test('a página de entrada é servida', async () => {
   const r = await get('/')
   assert.equal(r.status, 200)
-  assert.match(await r.text(), /Segundo Cérebro/)
+  assert.match(await r.text(), /Cérebro Pro/)
   assert.equal((await get('/health')).status, 200)
 })
 

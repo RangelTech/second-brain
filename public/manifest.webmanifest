@@ -1,7 +1,7 @@
 {
-  "name": "Segundo Cérebro",
+  "name": "Cérebro Pro",
   "short_name": "Cérebro",
-  "description": "Segundo Cérebro pela web",
+  "description": "Cérebro Pro pela web",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#16110d",

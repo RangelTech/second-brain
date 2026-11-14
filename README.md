@@ -1,6 +1,6 @@
 # segundo-cerebro-remoto
 
-Ponte do acesso web do Segundo Cérebro (`https://remoto.rangeltech.net`). O aplicativo desktop ou a máquina virtual do cliente abre um WebSocket de saída até aqui, e o navegador (ou o celular) usa a interface do próprio app através desse túnel.
+Ponte do acesso web do Cérebro Pro (`https://remoto.rangeltech.net`). O aplicativo desktop ou a máquina virtual do cliente abre um WebSocket de saída até aqui, e o navegador (ou o celular) usa a interface do próprio app através desse túnel.
 
 ## Como funciona
 

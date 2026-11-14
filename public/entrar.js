@@ -47,7 +47,7 @@
       var lista = r.json.lista || []
       var ul = $('ext-lista'); ul.textContent = ''
       $('ext').hidden = false
-      $('ext-txt').textContent = lista.length ? 'O Segundo Cérebro pode abrir e usar o Chrome abaixo, com as suas contas já abertas.' : 'Instale a extensão uma vez e o Segundo Cérebro passa a usar o seu Chrome, com as suas contas (WhatsApp, Instagram e outras) já abertas. Depois de instalar, volte aqui: ela se conecta sozinha.'
+      $('ext-txt').textContent = lista.length ? 'O Cérebro Pro pode abrir e usar o Chrome abaixo, com as suas contas já abertas.' : 'Instale a extensão uma vez e o Cérebro Pro passa a usar o seu Chrome, com as suas contas (WhatsApp, Instagram e outras) já abertas. Depois de instalar, volte aqui: ela se conecta sozinha.'
       $('ext-baixar').hidden = lista.length > 0
       lista.forEach(function (d) {
         var li = document.createElement('li'); li.style.cssText = 'display:flex;justify-content:space-between;gap:8px;align-items:center;margin:6px 0'

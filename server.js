@@ -1,4 +1,4 @@
-// Ponte do acesso web remoto do Segundo Cérebro (spec 21 §12).
+// Ponte do acesso web remoto do Cérebro Pro (spec 21 §12).
 // O app (computador ou VM) abre um WebSocket de SAÍDA até aqui, identificado pela chave da conta. O navegador (celular ou
 // computador) entra com e-mail e senha da mesma conta, escolhe a máquina e carrega a própria interface do app, que a ponte
 // busca no app pelo túnel (assim a tela web é sempre da mesma versão do app instalado). A ponte não guarda nada em disco:

@@ -124,9 +124,9 @@ const CHAVE = 'sk-chave-da-maquina-0001'
     const rd = await cmd('acao_que_nao_existe')
     ok(!rd.ok && rd.codigo === 'desconhecida', 'ação desconhecida recusada')
     pg.fechar()
-    // abas: tudo no grupo "Segundo Cérebro"
+    // abas: tudo no grupo "Cérebro Pro"
     const grupos = await swJs('chrome.tabGroups.query({}).then(g=>g.map(x=>x.title))')
-    ok(grupos.includes('Segundo Cérebro'), 'abas do agente ficam no grupo "Segundo Cérebro"')
+    ok(grupos.includes('Cérebro Pro'), 'abas do agente ficam no grupo "Cérebro Pro"')
 
     // 3. login de provedor capturado pela extensão (retorno em localhost:8080 que nem existe)
     const o1 = await cmd('oauth_capturar', { authUrl: `http://127.0.0.1:${PP}/login?state=EST1`, retorno: 'http://localhost:8080/callback', state: 'EST1' }, 30000)
