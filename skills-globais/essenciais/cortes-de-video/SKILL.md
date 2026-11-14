@@ -77,6 +77,9 @@ Vídeo em outro idioma para público brasileiro: traduza as falas para um JSON `
 ### 7. Entregar
 Para cada corte: caminho do MP4 numa linha própria, duração, e uma sugestão de legenda do post (1 linha + 3 a 5 hashtags do nicho + crédito "@criador"). Diga qual é para monetizar (mais de 1 min) e qual é para alcance.
 
+## Vídeo longo de melhores momentos (YouTube, onde mais paga)
+Depois dos cortes, ofereça juntar os melhores (5 a 15 cortes, na ordem da live) num vídeo 16:9 de 8 a 20 min para o YouTube: cada corte com uma vinheta de 1 s de título (Motion) e transição curta. Monetização do YouTube paga por visualização em vídeo longo (vídeo acima de 8 min permite anúncios no meio). Use `editar.py` (skill edicao-profissional) com formato 16x9 ou junte com FFmpeg concat.
+
 ## Filmes, animes e séries ("melhores momentos")
 - Fonte: vídeos de "melhores momentos/cenas engraçadas" no YouTube (têm mapa de "mais assistidos" e transcrição). Não há chat: a nota vem do mapa + fala.
 - O corte é a CENA inteira: comece no corte de câmera em que a cena começa (veja no `mapa` detalhe) e termine na piada + reação, antes do corte para a próxima cena. Anime: a transcrição automática vem sem pontuação; decida pelas imagens.

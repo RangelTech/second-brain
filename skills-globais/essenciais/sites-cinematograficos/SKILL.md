@@ -12,6 +12,14 @@ O que faz um site desses impressionar: **vídeo de verdade** (topo e cartões), 
 - `modelos/landing-cinema.html`: a página inteira, um arquivo só, sem dependências, responsiva (celular com botão fixo embaixo). Troque os `{{CAMPOS}}`, as cores em `:root` e os vídeos em `videos/`.
 - `modelos/camera-cinema.html`: transforma **uma foto** em vídeo de cinema (câmera lenta com zoom e deslize, luz passando, poeira no ar, barras de cinema, texto entrando). Renderize com `motion_animar` (Motion, de graça, no computador do usuário). Troque `FOTO`, `TITULO`, `SUBTITULO` e a duração `D`.
 
+### Rolagem quadro a quadro (estilo Apple) — `modelos/rolagem-quadros.html` + `scripts/quadros.py`
+O produto gira, a câmera entra no carro, o prédio se monta CONFORME a pessoa rola. É o efeito que mais impressiona e vende (agências cobram caro).
+1. **Vídeo de origem** com UM movimento contínuo (órbita do produto, aproximação, peças se juntando), 3 a 6 s, sem cortes, fundo limpo:
+   - feito no Motion/Blender (grátis) quando dá para desenhar; ou gerado por IA de vídeo no Estúdio (créditos) a partir de uma foto: prompt de câmera do tipo "Arc Right: camera orbits the product, product stays still, smooth, visible parallax" ou "Dolly In".
+2. `python scripts/quadros.py --video origem.mp4 --pasta "Sites/<nome>/quadros" --quadros 120 --largura 1600` (80 a 150 quadros; site leve).
+3. Copie o modelo para `Sites/<nome>/index.html`, troque os textos das `.frase` (cada uma aparece entre `data-de` e `data-ate`, de 0 a 1 da rolagem), as cores e a chamada final. `alturaVh` (400 a 700) controla quanto rola.
+4. Teste com servidor local (o modelo lê `quadros/quadros.json`): `python -m http.server` na pasta e abra no navegador integrado; role e confira os textos legíveis sobre o vídeo.
+
 ## Ritmo (importante)
 O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primeira**: planeje antes (textos, cores, cenas), use os modelos sem reinventar, confira a prévia contra o padrão de qualidade e corrija tudo de uma vez. Escreva o `index.html` **logo depois do primeiro vídeo pronto**, para o usuário já ver a página, e continue refinando (vídeos, textos, prints) até ficar perfeito. Diga em uma frase o que está melhorando a cada rodada.
 
