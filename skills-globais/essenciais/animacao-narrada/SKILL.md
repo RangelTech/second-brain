@@ -69,3 +69,11 @@ Um MP4 vertical 1080x1920 (Reels/TikTok/Shorts), a capa, a legenda do post com h
 
 ## Legenda do post (entregue junto)
 1ª linha = o gancho de novo; 3 a 5 linhas curtas com o fato; as fontes ("Fonte: ..."); chamada; 3 a 5 hashtags do nicho.
+
+## Do acervo Salvar (técnicas que funcionam)
+- Estilos que viralizam: pixel art, giz em quadro-negro, massinha, esboço a lápis, quadrinhos, vetor plano, traço mínimo, CGI, LEGO.
+- Personagem fixo entre cenas: faça antes a **folha de personagem** (frente, perfil, expressões) com o modelo de imagem e use-a como
+  referência em toda cena; o diretor (GPT, melhor modelo) escreve cena a cena já no estilo pedido (ex.: filme 35 mm granulado, flash duro).
+- Gere em **modo rascunho** primeiro e refaça em alta só as tomadas boas (corta muito o custo).
+- Para controlar câmera e movimento, use uma cena simples em 3D como referência (skill `blender-cinematico`).
+- Detalhes e fontes: skill `acervo-salvar`.

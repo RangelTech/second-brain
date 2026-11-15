@@ -95,3 +95,9 @@ Depois dos cortes, ofereça juntar os melhores (5 a 15 cortes, na ordem da live)
 - Transcrição do YouTube traz "[ __ ]" (palavrão censurado) e "[música]": o script tira.
 - Live muito recente pode não ter chat gravado nem mapa de "mais assistidos"; use a fala.
 - O yt-dlp para de funcionar quando o YouTube muda: o script atualiza sozinho a cada 3 dias. Erro de "Sign in to confirm" = o YouTube pediu login para aquele IP; tente de novo mais tarde ou use outro vídeo.
+
+## Do acervo Salvar
+- **Copiar a estrutura de um vídeo que viralizou**: quebre o vídeo plano a plano (como o rea-video faz): duração de cada plano, se foi
+  filmado/gerado/código, como é a legenda, onde estão os cortes e o áudio; depois refaça a mesma estrutura com o conteúdo do cliente.
+- **Trend-jacking**: lançamentos culturais (ex.: um jogo muito esperado) rendem cortes "onde você estava em 2013 x hoje"; a janela é de dias.
+- Fontes: skill `acervo-salvar`.

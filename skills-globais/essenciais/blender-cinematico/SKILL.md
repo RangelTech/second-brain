@@ -36,3 +36,8 @@ Referência que inspirou: um curta de 36 s feito pelo Claude Code comandando o B
 - Formas feitas de primitivas: ótimo para produto estilizado, cena abstrata, peças, logo 3D; NÃO é fotorrealista como foto de estúdio.
 - Para realismo de foto/vídeo (carro real, pessoa, imóvel real): IA de vídeo no Estúdio (créditos) a partir de uma foto, com prompt de câmera ("Arc Right", "Dolly In").
 - Casa/imóvel real navegável a partir de vídeo do corretor: técnica de Gaussian Splatting (precisa GPU NVIDIA; ver skill de tour 3D quando existir).
+
+## Blender como referência para vídeo de IA (acervo Salvar)
+Monte a cena com formas simples (cubos, cilindros, câmera e luz), renderize um vídeo curto de referência e mande ao modelo de vídeo junto
+com as imagens de referência dos personagens, dizendo modelo, duração, resolução e proporção. Isso dá controle de câmera e de movimento que
+só texto não dá. Usar vídeo de referência costuma encarecer a geração (ordem de +15 a 20%); vale quando o plano precisa de precisão.

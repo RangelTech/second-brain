@@ -44,3 +44,7 @@ O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primei
 - Um destaque de cor só (o laranja/âmbar do modelo ou a cor da marca). Nada de arco-íris.
 - Vídeo de fundo sempre `muted autoplay loop playsinline` e com `poster` (imagem enquanto carrega).
 - Acessível: contraste alto, botão grande, funciona sem animação (`prefers-reduced-motion`).
+
+## Web moderna (acervo Salvar)
+Antes de escrever o site, carregue as orientações do repositório **modern-web-guidance** do time do Chrome (feito para agentes de código
+usarem padrões atuais de HTML/CSS/JS em vez de código antigo). Junte com este estilo cinematográfico e com a skill `frontend-premium`.
