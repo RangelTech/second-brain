@@ -171,6 +171,27 @@ const ponteLLM = require('./ponte-llm').criar({
   portaArq: path.join(app.getPath('userData'), 'ponte-porta.txt'),
   chaveRoteador: () => chaveLocal(),
   modeloPorChat: (chat) => (motorGateway() ? sessoes.get(chat)?.modelo : null), // motor gateway: o Hermes pede 'principal' e a ponte troca pelo modelo da conversa
+  // planejador (spec 40): o combo rt-planejar do servidor escreve o plano da tarefa; o modelo da casa executa. cfg.planejador=false desliga.
+  planejador: async (pedido) => {
+    if (cfg.planejador === false || process.env.SB_SEM_PLANEJADOR === '1') return null
+    const m = midiaDoApp()
+    if (!m) return null
+    const r = await fetch(m.base + '/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + m.chave, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'rt-planejar', max_tokens: 900, temperature: 0.3,
+        messages: [
+          { role: 'system', content: 'Você planeja tarefas para um agente de IA que trabalha no computador do usuário (arquivos, terminal, navegador, mídia, skills). Escreva um plano de execução em português, em passos numerados (no máximo 10), concretos e na ordem certa: o que verificar primeiro, quais ferramentas ou skills usar, onde salvar o resultado e como conferir antes de entregar. Não execute nada, não converse com o usuário e não faça perguntas: se faltar informação, escolha um padrão sensato e diga qual no plano. Responda só com o plano.' },
+          { role: 'user', content: pedido },
+        ],
+      }),
+      signal: AbortSignal.timeout(24000),
+    })
+    if (!r.ok) return null
+    const j = await r.json()
+    return j?.choices?.[0]?.message?.content || null
+  },
 })
 let navInfo = null // { url, token } do servidor local do navegador integrado
 let nav = null
