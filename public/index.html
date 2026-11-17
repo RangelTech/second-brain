@@ -27,7 +27,7 @@
   </section>
 
   <section id="escolha" hidden>
-    <p class="sub">Olá, <b id="quem"></b>. Qual computador você quer controlar?</p>
+    <p class="sub">Olá, <b id="quem"></b>. <span id="titulo-escolha">Qual computador você quer controlar?</span></p>
     <div id="grupos"></div>
     <p id="vazio" class="vazio" hidden>Nenhum computador conectado agora. No Cérebro Pro instalado, abra Configurações e ligue <b>Permitir acesso pela web</b>. Se for uma máquina virtual, confira se ela está ligada.</p>
     <a id="contratar" class="contratar" href="https://brain.rangeltech.net/#maquina-virtual" target="_blank" rel="noopener"><b>Quer uma máquina virtual só sua?</b><span>Seu Cérebro Pro rodando 24 horas, sem instalar nada. Saiba mais</span></a>
@@ -37,6 +37,8 @@
       <ul id="ext-lista"></ul>
       <a id="ext-baixar" href="https://brain.rangeltech.net/extensao/" target="_blank" rel="noopener">Baixar a extensão do Chrome</a>
     </section>
+    <a id="ir-remoto" class="contratar" href="/?remoto=1" hidden><b>Acessar meus computadores</b><span>Controle os computadores onde o Cérebro Pro está instalado.</span></a>
+    <a id="ir-vm" class="contratar" href="/" hidden><b>Voltar para a minha máquina virtual</b><span>O seu Cérebro Pro que roda 24 horas.</span></a>
     <div class="acoes"><button id="atualizar" class="sec" type="button">Atualizar</button><button id="sair" class="sec" type="button">Sair</button></div>
   </section>
 </main>

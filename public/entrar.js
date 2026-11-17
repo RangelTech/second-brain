@@ -1,5 +1,6 @@
 (function () {
   var $ = function (id) { return document.getElementById(id) }
+  var REMOTO = /[?&]remoto=1/.test(location.search) // entrada "Acessar meus computadores": só os computadores, nunca a VM
   var tela = function (qual) { $('login').hidden = qual !== 'login'; $('escolha').hidden = qual !== 'escolha' }
   var erro = function (t) { $('erro').textContent = t || ''; $('erro').hidden = !t }
 
@@ -11,11 +12,14 @@
   function mostrarMaquinas(auto) {
     return api('GET', '/api/maquinas').then(function (r) {
       if (r.status === 401) return tela('login')
-      var lista = r.json.lista || []
-      // uma máquina só (caso da VM dedicada): entra direto
-      if (auto && lista.length === 1) { location.replace('/m/' + encodeURIComponent(lista[0].id) + '/'); return }
+      var todas = r.json.lista || []
+      var vm = todas.filter(function (m) { return m.tipo === 'vm' })[0]
+      // spec 45 §C: o login entra direto na máquina virtual do cliente (uma por conta); "Meus computadores" é outra entrada
+      if (auto && !REMOTO && vm) { location.replace('/m/' + encodeURIComponent(vm.id) + '/'); return }
+      var lista = REMOTO ? todas.filter(function (m) { return m.tipo !== 'vm' }) : todas
+      if (auto && !REMOTO && lista.length === 1) { location.replace('/m/' + encodeURIComponent(lista[0].id) + '/'); return }
       var grupos = $('grupos'); grupos.textContent = ''
-      var secoes = [['desktop', 'Meus computadores'], ['vm', 'Minha máquina virtual']]
+      var secoes = REMOTO ? [['desktop', 'Meus computadores']] : [['vm', 'Minha máquina virtual'], ['desktop', 'Meus computadores']]
       secoes.forEach(function (s) {
         var itens = lista.filter(function (m) { return m.tipo === s[0] })
         if (!itens.length) return
@@ -33,8 +37,12 @@
         grupos.appendChild(ul)
       })
       // quem já tem uma máquina virtual não precisa do convite
-      $('contratar').hidden = lista.some(function (m) { return m.tipo === 'vm' })
+      $('contratar').hidden = REMOTO || todas.some(function (m) { return m.tipo === 'vm' })
       $('vazio').hidden = lista.length > 0
+      $('ir-remoto').hidden = REMOTO
+      $('ir-vm').hidden = !REMOTO || !vm
+      if (vm) $('ir-vm').href = '/m/' + encodeURIComponent(vm.id) + '/'
+      $('titulo-escolha').textContent = REMOTO ? 'Escolha o computador que você quer controlar.' : 'Qual computador você quer controlar?'
       tela('escolha')
       mostrarExtensao()
     })
