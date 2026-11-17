@@ -551,6 +551,10 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     async captura() {
       garantir()
       const wc = vista.webContents
+      // web/VM: a web mostra a página por captura e o painel do computador ficava fechado; painel fechado não desenha a página
+      // nova (ex.: WhatsApp) e a captura voltava vazia: a web ficava presa na última imagem (Google) com a barra já no endereço
+      // novo (17/11/2026). Igual às ferramentas do agente: garante o painel visível antes de capturar (na VM não há tela).
+      if (!aberto || !limites) await garantirVisivel()
       let img = await wc.capturePage()
       if (img.isEmpty()) return null
       const real = img.getSize()
