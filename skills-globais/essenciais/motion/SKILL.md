@@ -8,6 +8,21 @@ description: |
 
 Tudo roda com o FFmpeg que vem com o Cérebro Pro. **Não instale nada** (nem Pillow, nem Node): use os comandos abaixo.
 
+## Direção primeiro (regra nova, 17/11)
+A animação ficava fraca porque ninguém dirigia. Antes de escrever qualquer HTML:
+1. **Escreva a direção completa numa mensagem só** (ela vai ao modelo forte de planejamento automaticamente): objetivo do vídeo,
+   público, duração, formato, **estilo** (escolha um da lista abaixo), paleta, tipografia, e **cena a cena** com tempo de início e fim,
+   o que aparece, como entra (mola, máscara, digitação, zoom), o que sai, texto exato e câmera.
+2. Só depois escreva o código de cada cena seguindo a direção à risca. Não invente cenas novas no meio.
+3. **Portões de qualidade antes de renderizar:** prévia de cada cena olhada pela visão (texto legível no celular, nada fora da tela,
+   contraste, nada sobreposto, ritmo: nenhuma cena parada mais de 2 s sem movimento). Reprovou, corrige e olha de novo.
+
+Estilos prontos (peça ao usuário um, ou escolha pelo tema): tipografia cinética · editorial minimal (preto/branco + 1 cor) ·
+neon cyberpunk · pôster suíço (grid, Helvetica, blocos de cor) · papel e colagem · giz em quadro-negro · pixel art ·
+quadrinho (balões e onomatopeias) · vetor plano · infográfico de dados (números subindo, barras, gráficos) · luxo dourado ·
+retrô anos 80 (sol, grid, cromado) · documentário (foto com zoom lento + legenda) · glassmorphism tech · brutalista.
+Cada estilo define fonte, paleta, tipo de transição e ritmo; mantenha o mesmo estilo do começo ao fim.
+
 ## 0. Animação desenhada (o jeito bonito, padrão para "faça uma animação")
 Ferramentas do servidor `motion`: `motion_previa` (tira quadros PNG para você olhar) e `motion_animar` (gera o MP4). Rodam no computador do usuário com o navegador embutido do app: **nada para instalar, sem custo**.
 
