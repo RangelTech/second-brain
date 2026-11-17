@@ -1121,7 +1121,8 @@
           } else quieto += dt
           const dur = agora - fr.ini
           // frase pronta: falou algo e fez pausa de 0,7 s; ou passou de 25 s (corta na próxima pausa curta)
-          if (!g.encerrando && fr.falou >= 400 && ((quieto >= 700 && dur >= 1500) || (dur >= 25000 && quieto >= 150))) cortarFrase(g)
+          // spec 45 §B: o texto entra quase em tempo real (pausa curta de 0,45 s, ou a cada ~6 s de fala contínua numa micro pausa)
+          if (!g.encerrando && fr.falou >= 400 && ((quieto >= 450 && dur >= 1200) || (dur >= 6000 && quieto >= 120) || dur >= 12000)) cortarFrase(g)
           const n = Math.min(1, rms * 4)
           barras().forEach((i, k) => (i.style.height = 4 + Math.round(n * f[k] * 16) + 'px'))
           g.raf = requestAnimationFrame(medir)
@@ -1350,6 +1351,33 @@
     $('texto').value = ''
     $('texto').style.height = 'auto'
     enviarMensagem(c, t || 'Veja o(s) arquivo(s) anexado(s).', anexos)
+  }
+
+  // ponte para a conversa por voz (voz-conversa.js, spec 45 §F): usa o mesmo envio e a mesma conversa do chat
+  window.__sbVoz = {
+    enviarTexto(t) {
+      if (!cfg.ativo) return null
+      if (!chatAtual()) criarChat()
+      const c = chatAtual()
+      if (respostas.has(c.id)) {
+        if (!fila.has(c.id)) fila.set(c.id, [])
+        fila.get(c.id).push({ texto: t, anexos: [] })
+        desenharFila()
+        return c.id
+      }
+      enviarMensagem(c, t, [])
+      return c.id
+    },
+    ocupado: (id) => respostas.has(id) || (fila.get(id) || []).length > 0,
+    ultimaResposta(id) {
+      const c = chats.find((x) => x.id === id)
+      const m = c && [...c.msgs].reverse().find((x) => x.role === 'assistant')
+      return m ? String(m.content || '') : ''
+    },
+    mostrarCerebro(sim) {
+      const el = $('cerebro-vivo'), bt = $('abrir-cerebro')
+      if (el && bt && el.hidden === !!sim) bt.click()
+    },
   }
 
   function desenharFila() {
