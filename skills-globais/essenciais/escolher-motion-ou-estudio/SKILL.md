@@ -10,6 +10,9 @@ description: |
 
 Responda às 3 perguntas, nesta ordem:
 
+0. **É um DESENHO ANIMADO?** (bonequinho/boneco palito vivendo uma história, animação de terror, comédia ou curiosidade com
+   personagens desenhados, "animação de verdade", canal dark de animação) → skill **`desenho-animado`** (desenhado em código, sem custo).
+   Não é Estúdio: personagem desenhado não precisa de IA de vídeo.
 1. **O resultado precisa de algo que NÃO existe nos arquivos do usuário?** (uma pessoa, um carro, uma roupa, um rosto, uma cena, uma voz que fala um texto novo) → **Estúdio**.
 2. **É só mexer no que já existe?** (cortar, juntar, acelerar, legendar, pôr título, trilha, logo, texto animado, transição, formato 9:16, tirar silêncio) → **Motion**.
 3. **Ficou em dúvida?** Pergunte com 2 opções curtas:
@@ -18,6 +21,8 @@ Responda às 3 perguntas, nesta ordem:
 
 ## Motion (edição, sem custo)
 - Título, legenda palavra por palavra, vinheta, reel com texto: skill `motion` (script `titulo.py`, pronto em segundos).
+- Desenho animado com personagens contando uma história (narração + cenas desenhadas): skill `desenho-animado`.
+- Cortes de live/podcast: skill `cortes-de-video` (legenda sempre em português, título em caixa, barra de progresso).
 - Cortar, juntar, vertical 9:16, música, logo, acelerar: receitas da skill `motion`; ajuste fino visual: Editor (`editor_abrir_janela`), quando estiver ligado.
 - Entregue o arquivo e ofereça "Abrir no Editor" para ajustes.
 
@@ -29,6 +34,7 @@ Responda às 3 perguntas, nesta ordem:
 ## Exemplos
 | Pedido | Caminho |
 |---|---|
+| "faz uma animação de terror com um bonequinho" | desenho-animado |
 | "faça um vídeo com meu nome aparecendo" | Motion (título animado) |
 | "legenda esse vídeo" | Motion |
 | "corta os silêncios e deixa em 9:16" | Motion (Editor) |

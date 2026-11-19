@@ -6,6 +6,9 @@ description: |
 
 # Animação narrada (canal dark)
 
+> Quer PERSONAGENS vivendo a história (bonequinho andando, se assustando, cenário de quarto/rua/cemitério)? Use a skill `desenho-animado`:
+> é animação de verdade, desenhada em código. Esta skill aqui faz objetos/ícones com narrador.
+
 Formato visto na biblioteca do usuário (grupo Salvar, nov/2026): objetos 3D simples sobre fundo escuro, cor de destaque, título grande em cima, legenda embaixo e um narrador; e "o mesmo reel em 10 estilos". Vendem isso como curso/skill por R$ 37 a 97. Aqui sai de graça, no computador do usuário.
 
 ## O que você entrega
