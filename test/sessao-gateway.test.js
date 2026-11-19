@@ -211,3 +211,19 @@ test('aprovação de arquivo mostra o caminho em português e o modo "editar" li
   assert.match(p.titulo, /^Gravar o arquivo /)
   s.encerrar()
 })
+
+// 19/11/2026 (regressão da 0.6.79): o Hermes responde status 'queued' mesmo sem outro turno rodando (ex.: aquecimento, 1ª pergunta).
+// Ignorar o 1º fim nesse caso deixava o pedido esperando para sempre. Com um único fim, o pedido TEM que fechar.
+test('SessaoGateway: submit queued com um único fim de turno não trava', async () => {
+  const gw = gwFalso()
+  const original = gw.rpc
+  gw.rpc = async (m, p) => {
+    const r = await original(m, p)
+    return m === 'prompt.submit' ? { ...r, status: 'queued' } : r
+  }
+  const { s, emitidos } = montar(gw)
+  const r = await Promise.race([s.perguntar('oi').then(() => 'fechou'), new Promise((ok) => setTimeout(() => ok('travou'), 3000))])
+  assert.equal(r, 'fechou')
+  assert.match(emitidos.filter((e) => e.texto).map((e) => e.texto).join(''), /olá mundo/)
+  s.encerrar()
+})
