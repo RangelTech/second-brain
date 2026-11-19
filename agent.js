@@ -699,6 +699,50 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     .join('\n')
 }
 
+// ---------- continuidade (spec 50) ----------
+// Histórico que uma sessão NOVA do agente recebe (app reaberto, modelo trocado, gateway caído). Antes: só as últimas 10 mensagens com 700
+// caracteres cada, e o agente "não enxergava o chat todo". Agora, dentro de um orçamento: todas as mensagens do usuário (até 4 mil caracteres
+// cada), as 6 respostas mais recentes do agente com até 2 mil e as antigas com 300. Se passar do orçamento, as mais antigas saem primeiro.
+function historicoParaAgente(msgs, orcamento = 60000) {
+  const lista = (msgs || []).filter((m) => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim())
+  const idxAssist = lista.map((m, i) => (m.role === 'assistant' ? i : -1)).filter((i) => i >= 0)
+  const recentes = new Set(idxAssist.slice(-6))
+  const corta = (s, n) => (s.length > n ? s.slice(0, n) + '…' : s)
+  let linhas = lista.map((m, i) => {
+    const t = String(m.content).replace(/\s+\n/g, '\n').trim()
+    return m.role === 'user' ? 'Usuário: ' + corta(t, 4000) : 'Assistente: ' + corta(t, recentes.has(i) ? 2000 : 300)
+  })
+  let total = linhas.reduce((s, l) => s + l.length + 1, 0)
+  // passou do orçamento: primeiro saem as respostas ANTIGAS do agente (o pedido do usuário vale mais), depois as mensagens mais antigas
+  if (total > orcamento) {
+    linhas = linhas.filter((l, i) => lista[i].role === 'user' || recentes.has(i))
+    total = linhas.reduce((s, l) => s + l.length + 1, 0)
+  }
+  let ini = 0
+  while (total > orcamento && ini < linhas.length - 1) total -= linhas[ini++].length + 1
+  return (ini ? '[mensagens mais antigas omitidas]\n' : '') + linhas.slice(ini).join('\n')
+}
+
+// Plano (ferramenta todo) com itens ainda abertos quando o turno acabou: o agente parou no meio da meta. Não continua se ele terminou
+// fazendo uma pergunta ao usuário (aí é o usuário que tem que responder).
+function itensAbertosDoPlano(plano, textoFinal) {
+  const itens = (plano && Array.isArray(plano.itens) ? plano.itens : []).filter((i) => i && i.texto)
+  const abertos = itens.filter((i) => i.estado === 'pendente' || i.estado === 'fazendo')
+  if (!abertos.length) return []
+  if (/\?\s*$/.test(String(textoFinal || '').trim())) return []
+  return abertos
+}
+function textoContinuarPlano(abertos) {
+  return '[Continuação automática da meta] O plano ainda tem passos abertos: ' + abertos.map((i) => '"' + String(i.texto).slice(0, 120) + '"').join('; ') +
+    '. Continue do próximo passo aberto (consulte o arquivo de progresso se houver), sem refazer o que já foi feito, até entregar. Se faltar algo que só o usuário sabe, pergunte em uma frase.'
+}
+// Turno que morreu e não conseguiu se retomar: a próxima mensagem do usuário leva a meta junto, para o agente seguir de onde parou.
+function textoMetaPendente(meta, mensagemNova) {
+  return '[Tarefa anterior não terminou (o processo caiu): "' + String(meta.pedido || '').slice(0, 1500) + '"' +
+    (meta.feitos && meta.feitos.length ? '. Já tinha sido feito: ' + meta.feitos.slice(-8).join('; ') : '') +
+    '. Leia o arquivo de progresso se existir e continue dela de onde parou, sem refazer o que já foi entregue. Depois (ou junto, se for sobre ela) atenda a mensagem nova abaixo.]\n\n' + mensagemNova
+}
+
 // Mensagem que a pessoa manda enquanto o agente trabalha (entra no turno em andamento). Sem o embrulho, "terminou?" virava pedido novo: o modelo
 // respondia "ainda não, vou retomar" e ENCERRAVA o turno, largando a tarefa no meio (visto em 18/11/2026, 23:05-23:14).
 function embrulharDirecionamento(texto) {
@@ -1439,4 +1483,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, embrulharDirecionamento, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
+module.exports = { prepararHome, contextoDeSistema, embrulharDirecionamento, historicoParaAgente, itensAbertosDoPlano, textoContinuarPlano, textoMetaPendente, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }

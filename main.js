@@ -707,21 +707,82 @@ async function responder(alvo, msgs, ctx) {
   }
   // o Hermes não vem no instalador: na primeira conversa o app o instala (uma vez) e mostra o andamento
   await garantirAgente((aviso) => ctx.onDelta?.({ aviso }))
-  // se o agente precisar recomeçar (raciocínio ou modelo mudou), o novo recebe um resumo das últimas mensagens
+  // se o agente precisar recomeçar (app reaberto, raciocínio ou modelo mudou, gateway caiu), o novo recebe o chat com orçamento (spec 50)
   const ultimo = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
-  const anteriores = msgs.slice(0, -1).slice(-10)
-  const linhaHist = (m) => (m.role === 'user' ? 'Usuário' : 'Assistente') + ': ' + String(m.content).slice(0, 700)
-  const historico = anteriores.map(linhaHist).join(String.fromCharCode(10))
+  const historico = agenteMod.historicoParaAgente(msgs.slice(0, -1))
   if (PEDE_EDITOR.test(ultimo)) chatsComEditor.add(ctx.chat)
   const sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
-  if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o resumo do que já foi dito
-  sessao.emitir = ctx.onDelta // cada mensagem tem o seu canal de resposta e de permissão
+  if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o que já foi dito
+  // o que acontece no turno (plano, texto, ferramentas feitas) é lido aqui para decidir se a meta terminou
+  let plano = null
+  let textoTurno = ''
+  const feitos = []
+  const canal = ctx.onDelta || (() => {})
+  sessao.emitir = (d) => {
+    if (d && d.plano) plano = d.plano
+    if (d && d.texto) textoTurno += d.texto
+    if (d && d.novoCard) textoTurno = ''
+    if (d && d.ferramenta && d.ferramenta.status === 'completed' && d.ferramenta.titulo) feitos.push(String(d.ferramenta.titulo).slice(0, 80))
+    canal(d)
+  }
   sessao.pedirPermissao = ctx.pedirPermissao
   ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
-  const r = await sessao.perguntar(ultimo, ctx.anexos || [])
+  // meta de um turno que morreu: vai junto com esta mensagem, para o agente continuar de onde parou
+  const pendente = metasPendentes.ler(ctx.chat)
+  const pergunta = pendente ? agenteMod.textoMetaPendente(pendente, ultimo) : ultimo
+  if (pendente) registrarAgente(app, 'meta pendente retomada na mensagem nova')
+  let r
+  try {
+    r = await sessao.perguntar(pergunta, ctx.anexos || [])
+    // turno acabou com passos do plano abertos e sem pergunta ao usuário: continua sozinho (no máximo 2 voltas, só enquanto houver progresso)
+    for (let volta = 0; volta < 2 && !ctx.sinal?.aborted && cfg.continuarPlano !== false; volta++) {
+      const abertos = agenteMod.itensAbertosDoPlano(plano, textoTurno)
+      if (!abertos.length) break
+      const feitosAntes = (plano.itens || []).filter((i) => i.estado === 'feito').length
+      registrarAgente(app, `meta: ${abertos.length} passo(s) aberto(s) no fim do turno, continuando (volta ${volta + 1})`)
+      canal({ novoCard: true })
+      textoTurno = ''
+      r = await sessao.perguntar(agenteMod.textoContinuarPlano(abertos), [])
+      if ((plano.itens || []).filter((i) => i.estado === 'feito').length <= feitosAntes) break // sem progresso: para (não gasta cota em laço)
+    }
+    metasPendentes.limpar(ctx.chat)
+  } catch (e) {
+    // o turno morreu e a retomada automática não salvou: a meta fica guardada para a próxima mensagem (o usuário pode parar de propósito)
+    if (!ctx.sinal?.aborted) metasPendentes.guardar(ctx.chat, { pedido: pendente ? pendente.pedido : ultimo, feitos: [...(pendente?.feitos || []), ...feitos].slice(-20) })
+    throw e
+  }
   ctx.uso = r?.usage || null
   return ''
 }
+
+// Metas que morreram no meio (spec 50): uma por chat, em disco, para sobreviver a fechar o app.
+const agenteMod = require('./agent')
+const metasPendentes = (() => {
+  const arq = () => path.join(app.getPath('userData'), 'metas-pendentes.json')
+  const todas = () => {
+    try {
+      return JSON.parse(fs.readFileSync(arq(), 'utf8')) || {}
+    } catch {
+      return {}
+    }
+  }
+  const gravar = (o) => {
+    try {
+      fs.writeFileSync(arq(), JSON.stringify(o))
+    } catch {}
+  }
+  return {
+    ler: (chat) => {
+      const m = todas()[chat]
+      return m && Date.now() - (m.quando || 0) < 7 * 864e5 ? m : null // meta de mais de 7 dias não volta
+    },
+    guardar: (chat, m) => gravar({ ...todas(), [chat]: { ...m, quando: Date.now() } }),
+    limpar: (chat) => {
+      const o = todas()
+      if (o[chat]) delete o[chat], gravar(o)
+    },
+  }
+})()
 
 // ---------- modelos para o seletor do chat ----------
 async function listarModelos() {
