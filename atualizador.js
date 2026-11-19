@@ -3,6 +3,22 @@
 const PAGINA = 'https://github.com/RangelTech/second-brain/releases/latest'
 const INTERVALO = 6 * 3600 * 1000
 
+// "a" é mais nova que "b"? (semver simples: 0.6.81 > 0.6.81-teste.3 > 0.6.80). Só versão MAIOR conta: quem está numa versão de teste mais
+// nova que a publicada nunca é "atualizado" para trás.
+function maisNova(a, b) {
+  const p = (v) => {
+    const [nucleo, pre] = String(v || '').replace(/^v/, '').split('-')
+    return { n: nucleo.split('.').map((x) => parseInt(x, 10) || 0), pre: pre || '' }
+  }
+  const x = p(a)
+  const y = p(b)
+  for (let i = 0; i < 3; i++) if ((x.n[i] || 0) !== (y.n[i] || 0)) return (x.n[i] || 0) > (y.n[i] || 0)
+  if (x.pre === y.pre) return false
+  if (!x.pre) return true // 0.6.81 > 0.6.81-teste.3
+  if (!y.pre) return false
+  return x.pre.localeCompare(y.pre, undefined, { numeric: true }) > 0
+}
+
 // A troca no próprio lugar só funciona no instalador NSIS, no AppImage e no macOS assinado.
 function trocaAutomatica(processo = process) {
   if (processo.platform === 'win32') return !processo.env.PORTABLE_EXECUTABLE_FILE
@@ -25,14 +41,18 @@ function criar({ app, cfgGet, enviar, updater }) {
     } catch {}
   }
 
-  async function conferir() {
+  // forcar=true na abertura do app (pedido do Lucas, 19/11/2026): havendo versão nova e troca automática possível, baixa e instala NA HORA,
+  // sem esperar o clique. Com o app aberto (a cada 6 h) só baixa sozinho e instala ao fechar ou na próxima abertura: nunca no meio de uma tarefa.
+  async function conferir(forcar = false) {
     if (!au || ['baixando', 'pronta'].includes(est.fase)) return est
     try {
       const r = await au.checkForUpdates()
       const nova = r?.updateInfo?.version
-      if (nova && nova !== app.getVersion() && r.isUpdateAvailable !== false) {
-        emitir({ fase: 'disponivel', versao: nova, erro: '' })
-        if (cfgGet().atualizarAuto && est.automatica) baixar(false)
+      if (nova && maisNova(nova, app.getVersion()) && r.isUpdateAvailable !== false) {
+        const forcada = forcar && est.automatica && cfgGet().forcarAtualizacao !== false && !process.env.SB_SEM_FORCAR
+        emitir({ fase: 'disponivel', versao: nova, erro: '', forcada })
+        if (forcada) baixar(true, true)
+        else if (est.automatica && (cfgGet().atualizarAuto || cfgGet().forcarAtualizacao !== false)) baixar(false)
       } else emitir({ fase: 'nenhuma', erro: '' })
     } catch (e) {
       emitir({ fase: est.fase === 'disponivel' ? 'disponivel' : 'nenhuma', erro: String(e.message || e).slice(0, 160) })
@@ -40,27 +60,31 @@ function criar({ app, cfgGet, enviar, updater }) {
     return est
   }
 
-  async function baixar(instalarJa = true) {
+  async function baixar(instalarJa = true, silencioso = false) {
     if (!est.automatica) {
       require('electron').shell.openExternal(PAGINA)
       return est
     }
-    if (est.fase === 'baixando' || est.fase === 'pronta') return est
+    if (est.fase === 'pronta') { // já baixou sozinha (download automático): o clique em Atualizar instala na hora
+      if (instalarJa) instalar(silencioso)
+      return est
+    }
+    if (est.fase === 'baixando') return est
     emitir({ fase: 'baixando', erro: '' })
     try {
       await au.downloadUpdate()
       emitir({ fase: 'pronta' })
-      if (instalarJa) instalar()
+      if (instalarJa) instalar(silencioso)
     } catch (e) {
       emitir({ fase: 'disponivel', erro: 'Não consegui baixar agora. Tente de novo em instantes.' })
     }
     return est
   }
 
-  function instalar() {
+  function instalar(silencioso = false) {
     if (est.fase !== 'pronta') return false
-    // false, true: instalador normal (mostra o progresso) e reabre o app depois
-    setImmediate(() => au.quitAndInstall(false, true))
+    // (silencioso, reabrir): na atualização forçada da abertura o instalador roda sem janelas e o app reabre sozinho
+    setImmediate(() => au.quitAndInstall(!!silencioso, true))
     return true
   }
 
@@ -70,11 +94,11 @@ function criar({ app, cfgGet, enviar, updater }) {
     au.autoDownload = false
     au.autoInstallOnAppQuit = true // se baixou e o usuário só fechou o app, a troca acontece ao sair
     au.allowPrerelease = false
-    setTimeout(() => conferir(), 15000).unref?.()
+    setTimeout(() => conferir(true), 3000).unref?.() // abertura: confere logo e força a atualização (ver conferir)
     setInterval(() => conferir(), INTERVALO).unref?.()
   }
 
   return { iniciar, conferir, baixar, instalar, estado: () => ({ ...est }), trocaAutomatica }
 }
 
-module.exports = { criar, trocaAutomatica, PAGINA }
+module.exports = { criar, trocaAutomatica, maisNova, PAGINA }

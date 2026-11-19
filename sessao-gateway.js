@@ -184,19 +184,34 @@ class SessaoGateway {
 
   async direcionar(texto) {
     if (!this.sid || !this.turno) return false
-    // o Hermes responde {status:'queued'} (entra no próximo resultado de ferramenta) ou {status:'rejected'} (agente parado: o app põe na fila).
-    // Antes qualquer resposta valia como entregue e um 'rejected' sumia; e a demora não aparecia em log nenhum.
+    // Esta API do gateway não tem session.steer (respondia invalid_params): a mensagem vai por prompt.submit e, com busy_input_mode "steer"
+    // no config, entra no turno em andamento (status 'steered'). Se mesmo assim voltar 'queued', cancela no Hermes e devolve false para a
+    // tela enfileirar do jeito dela: nunca duas cópias, nem uma resposta de turno sem ninguém escutando.
     const t0 = Date.now()
+    const inputId = id()
     try {
-      const r = await this.gw.rpc('session.steer', { session_id: this.sid, text: String(texto) }, 11000)
-      const st = (r && (r.status || r.result?.status)) || ''
+      const r = await this.gw.rpc('prompt.submit', { session_id: this.sid, input_id: inputId, text: String(texto) }, 11000)
+      const st = (r && r.status) || ''
       agente.registrar(this.app, `direcionar: ${st || 'sem status'} em ${Date.now() - t0} ms`)
-      return st === 'queued' || st === 'redirected' || (!st && !!r)
+      if (st === 'steered' || st === 'redirected') return true
+      if (st === 'queued' && r.admission_id) {
+        // conversa local sempre enfileira: prompt.steer_queued TRANSFERE o pedido da fila para o turno em andamento (vira direcionamento)
+        try {
+          await this.gw.rpc('prompt.steer_queued', { session_id: this.sid, admission_id: r.admission_id }, 8000)
+          agente.registrar(this.app, `direcionar: transferido da fila para o turno em ${Date.now() - t0} ms`)
+          return true
+        } catch (e) {
+          agente.registrar(this.app, `direcionar: transferência recusada (${String(e.message || e).slice(0, 80)}), cancelando na fila do Hermes`)
+          await this.gw.rpc('prompt.cancel', { session_id: this.sid, admission_id: r.admission_id }, 8000).catch(() => {})
+        }
+      }
+      return false
     } catch (e) {
       agente.registrar(this.app, `direcionar falhou em ${Date.now() - t0} ms: ${String(e.message || e).slice(0, 120)}`)
       return false
     }
   }
+
 
   cancelar() {
     this.pedidoParar = true

@@ -230,6 +230,90 @@ function ambienteMontado(home, bin) {
     return false
   }
 }
+// Componentes que o agente precisa e que o Hermes só instala "na hora" (pela internet, na primeira vez que alguém usa). Se essa instalação
+// falha na máquina do cliente, o agente fica sem o recurso e gira tentando (19/11/2026: o Emerson pediu para ler um PDF e o agente não
+// conseguiu; o read_file só extrai PDF/Word/Excel com o extra doc-extract = firecrawl-anydoc). A instalação só vale com todos presentes.
+const COMPONENTES = [{ extra: 'doc-extract', modulo: 'anydoc', pacote: 'firecrawl-anydoc==0.2.4', nome: 'leitor de documentos (PDF, Word, Excel)' }]
+function temPacote(venv, nome) {
+  if (fs.existsSync(path.join(venv, 'Lib', 'site-packages', nome))) return true // Windows
+  try {
+    return fs.readdirSync(path.join(venv, 'lib')).some((d) => fs.existsSync(path.join(venv, 'lib', d, 'site-packages', nome)))
+  } catch {
+    return false
+  }
+}
+function ambientesDoAgente(home) {
+  const out = []
+  try {
+    for (const inst of fs.readdirSync(path.join(home, 'installs'))) {
+      const envs = path.join(home, 'installs', inst, 'environments')
+      if (!fs.existsSync(envs)) continue
+      for (const e of fs.readdirSync(envs)) {
+        const base = path.join(envs, e)
+        const py = path.join(base, 'venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
+        // só instalação COMPLETA (com o núcleo do Hermes, pacote acp): 19/11/2026 instalações sem ele derrubaram todas as conversas
+        if (fs.existsSync(py) && fs.existsSync(path.join(base, 'workspace', 'pm')) && temPacote(path.join(base, 'venv'), 'acp')) out.push({ py, venv: path.join(base, 'venv'), workspace: path.join(base, 'workspace'), em: fs.statSync(base).mtimeMs })
+      }
+    }
+  } catch {}
+  // só a instalação ATIVA conta (a mais recente): versões antigas do Hermes ficam na pasta depois de uma atualização (medido 19/11/2026: 2 instalações)
+  return out.sort((a, b) => b.em - a.em).slice(0, 1)
+}
+function rodarPy(py, codigo, env, prazoMs) {
+  return new Promise((ok) => {
+    let saida = ''
+    const p = spawn(py, ['-c', codigo], { env: { ...process.env, ...env, PYTHONUTF8: '1' }, windowsHide: true })
+    const t = setTimeout(() => { try { p.kill() } catch {} }, prazoMs)
+    p.stdout?.on('data', (d) => (saida += d))
+    p.stderr?.on('data', (d) => (saida += d))
+    p.on('error', (e) => (clearTimeout(t), ok({ codigo: -1, saida: String(e.message) })))
+    p.on('close', (c) => (clearTimeout(t), ok({ codigo: c, saida: saida.slice(-600) })))
+  })
+}
+// Instala o componente DENTRO do ambiente ativo, com o uv que vem com o app. NUNCA pelo `ensure_import` do Hermes chamado de fora: ele cria
+// uma instalação nova do ambiente sem o núcleo (acp), o Hermes passa a usá-la por ser a mais nova e TODAS as conversas falham com
+// request_failed (aconteceu no PC do Lucas em 19/11/2026, nos testes desta função).
+function uvDoApp(home) {
+  try {
+    const tools = path.join(home, 'tools')
+    const d = fs.readdirSync(tools).sort().reverse().find((x) => x.startsWith('uv-'))
+    const exe = d && path.join(tools, d, process.platform === 'win32' ? 'uv.exe' : 'uv')
+    if (exe && fs.existsSync(exe)) return exe
+  } catch {}
+  return process.env.SB_UV && fs.existsSync(process.env.SB_UV) ? process.env.SB_UV : null
+}
+function rodar(exe, args, env, prazoMs) {
+  return new Promise((ok) => {
+    let saida = ''
+    const p = spawn(exe, args, { env: { ...process.env, ...env }, windowsHide: true })
+    const t = setTimeout(() => { try { p.kill() } catch {} }, prazoMs)
+    p.stdout?.on('data', (d) => (saida += d))
+    p.stderr?.on('data', (d) => (saida += d))
+    p.on('error', (e) => (clearTimeout(t), ok({ codigo: -1, saida: String(e.message) })))
+    p.on('close', (c) => (clearTimeout(t), ok({ codigo: c, saida: saida.slice(-600) })))
+  })
+}
+async function garantirComponentes(home, anotar = () => {}) {
+  const amb = ambientesDoAgente(home)[0]
+  if (!amb) return { ok: false, faltando: ['ambiente do agente'], instalou: false }
+  const faltando = []
+  let instalou = false
+  for (const c of COMPONENTES) {
+    const testa = async () => (await rodarPy(amb.py, `import ${c.modulo}`, { HERMES_HOME: home }, 60000)).codigo === 0
+    if (await testa()) continue
+    anotar(`instalando ${c.nome}…`)
+    const uv = uvDoApp(home)
+    const r = uv ? await rodar(uv, ['pip', 'install', '--python', amb.py, c.pacote], { UV_CACHE_DIR: path.join(home, 'cache', 'uv') }, 10 * 60000) : { saida: 'uv do app não encontrado' }
+    if (await testa()) {
+      instalou = true
+      anotar(`${c.nome} instalado`)
+    } else {
+      anotar(`${c.nome} NÃO instalou: ${String(r.saida).replace(/\s+/g, ' ').slice(-200)}`)
+      faltando.push(c.nome)
+    }
+  }
+  return { ok: !faltando.length, faltando, instalou }
+}
 function marcarMontado(home, bin) {
   try {
     fs.writeFileSync(path.join(home, 'pronto.ok'), new Date().toISOString() + ' ' + assinaturaBin(bin))
@@ -469,7 +553,10 @@ function blocoEstilo() {
     'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente, nem a frase curta antes de usar uma ferramenta (ex.: "Vou abrir a Wikipédia e ler o primeiro parágrafo.").',
     'Nunca cite detalhes internos: nome de ferramenta (navegador_abrir, navegador_*, midia_gerar_imagem, terminal...), identificador de sessão ou de conversa (ex.: [@session:...], local-abc123...), tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Para falar de uma conversa antiga, use a data e o assunto ("na conversa de hoje às 19h sobre a Wikipédia"). Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
     'Não narre cada passo nem cada conferência. Faça o trabalho e entregue uma resposta curta: o que foi feito e onde está o arquivo.',
-    'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure entre as suas skills a ferramenta que serve (liste e leia as skills), e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
+    'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure no índice de skills a que serve e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
+    // spec 48 rodada 3: a regra de fábrica do Hermes manda "na dúvida, carregue" e há skills de 46 KB; com o Qwen (janela de 131 mil) isso enchia
+    // o contexto e levava à compressão em ciclo. Esta regra vem antes e manda o contrário.
+    'SKILLS COM ECONOMIA: carregue (skill_view) só a skill que claramente serve à tarefa, no máximo 2 por pedido; não carregue "por garantia", mesmo que outra instrução mande errar para o lado de carregar, porque cada skill aberta ocupa a sua memória de trabalho. Skill grande: leia o começo (o índice) e depois só a seção que precisa. Não releia uma skill que já leu nesta tarefa.',
   ]
   return MARCA_EST[0] + '\n## Como falar com o cliente (vale sempre)\n\n' + regras.join('\n\n') + '\n' + MARCA_EST[1]
 }
@@ -539,8 +626,19 @@ function yamlGateway(filhos = 3, globais = null) {
     '  provider: edge',
     'skills:',
     '  write_approval: false',
+    `  disabled: ${JSON.stringify(SKILLS_FORA)}`,
   ]
 }
+// skills de fábrica do Hermes fora do índice (spec 48 rodada 3): só Mac, dependem de CLI/conta que o cliente não tem, nichos que só fazem
+// ruído (uma tinha texto em chinês) ou concorrem com as nossas ferramentas (computer-use x navegador integrado). Cada uma pesa no prompt de
+// TODA chamada e confunde a escolha do Qwen. As úteis ficam (pdf, office, maps, dogfood, github, depuração, TDD, humanizer, design).
+const SKILLS_FORA = [
+  'apple-notes', 'apple-reminders', 'findmy', 'imessage',
+  'claude-code', 'codex', 'computer-use',
+  'ascii-video', 'baoyu-infographic', 'manim-video', 'p5js', 'songwriting-and-ai-music',
+  'himalaya', 'email-inbox-triage', 'google-workspace', 'obsidian', 'xurl', 'teams-meeting-pipeline',
+  'arxiv', 'competitor-news-monitor', 'codebase-inspection', 'simplify-code', 'sdlc-review',
+]
 // uv e Python que vêm com o agente (pasta tools do HERMES_HOME): as skills usam para montar ambientes próprios
 // (voz local, etc.) mesmo num computador sem Python. Vão no FIM do PATH: um Python do sistema continua tendo a vez.
 function ferramentasPython(home, env) {
@@ -622,7 +720,22 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     // resposta "o processo terminou normalmente" aparecia para o cliente (visto em 19/11/2026). Só falha avisa.
     'display:',
     '  background_process_notifications: "error"',
-    ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : []),
+    // mensagem mandada com o agente ocupado ENTRA no turno em andamento (padrão do Hermes é "interrupt"; o app usava session.steer, que esta
+    // API do gateway nem tem: invalid_params, e a dica sempre ia para a fila — medido 19/11/2026)
+    '  busy_input_mode: "steer"',
+    ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : ["skills:", `  disabled: ${JSON.stringify(SKILLS_FORA)}`]),
+    // LEITURA ENXUTA (spec 48 rodada 3, medido 19/11/2026 com Qwen puro): o agente lia main.py e painel.html INTEIROS (45 mil caracteres cada)
+    // e o contexto foi de 41 mil para ~70 mil tokens em 2 passos; cada passo seguinte levava 20-80 s e a compressão vinha logo. Acima do teto o
+    // Hermes recusa a leitura e manda ler por partes (offset+limit): força o comportamento certo mesmo num modelo que não segue a regra.
+    'file_read_max_chars: 16000',
+    'tool_output:',
+    '  max_bytes: 16000',
+    '  max_lines: 400',
+    '  max_line_length: 1000',
+    // o app reescreve o config.yaml a cada sessão; com o recarregar automático cada sessão recarregava os MCP e INVALIDAVA o cache de prompt do
+    // servidor (o modelo relia o prefixo inteiro do zero)
+    'mcp:',
+    '  auto_reload_on_config_change: false',
     'terminal:',
     '  backend: "local"',
     `  cwd: ${JSON.stringify(pasta.replace(/\\/g, '/'))}`,
@@ -682,12 +795,19 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     'AMBIENTE PRONTO: as ferramentas que as skills usam já vêm com o app: Python em SB_PYTHON e uv em SB_UV (também no PATH). Use os scripts das skills (voz_local.py, ambiente_docs.py e outros), que montam o ambiente certo do pacote nosso. Não instale Python nem pacotes pip por fora e não troque versões travadas nos scripts. Se um script de skill falhar, mostre o erro e siga a skill; não invente outra instalação.',
     'PLANO: se você criar uma lista de tarefas (ferramenta todo), ela aparece para o usuário. Atualize-a SEMPRE: marque o item como em andamento ao começar e como concluído assim que terminar, antes de ir para o próximo. Plano parado no primeiro item parece travamento.',
     process.env.SB_SEM_DICA_PASTAS ? '' : 'PASTAS GRANDES: para LISTAR, CONTAR ou PROCURAR arquivos use a ferramenta terminal com comandos diretos e limite de profundidade (ls, dir, find -maxdepth 2). NUNCA use search_files com o padrão * nem varreduras recursivas completas: elas leem a pasta inteira (inclusive node_modules, .git e venv) e podem levar minutos. Só varra tudo se o usuário pedir.',
-    'MEMÓRIA DE TRABALHO (tarefa com muitos passos, como mexer num projeto): quando a conversa fica longa ela é resumida sozinha e detalhes se perdem. Por isso, logo depois de mapear, grave o que descobriu em um arquivo de progresso na pasta .progresso dentro da pasta de trabalho (ex.: .progresso/protocolo-no-banco.md): o pedido do usuário com as palavras dele, os arquivos e linhas que importam, as decisões, o que já foi feito e o que falta. Só fatos curtos, sem colar código. Atualize-o a cada etapa concluída. Depois de um resumo do contexto (aviso CONTEXT COMPACTION) ou quando a tarefa for retomada, LEIA esse arquivo primeiro e siga do próximo item pendente: não refaça o mapeamento nem releia arquivos que ele já descreve, a não ser para pegar a linha exata que vai editar.',
+    'MEMÓRIA DE TRABALHO (tarefa com muitos passos, como mexer num projeto): quando a conversa fica longa ela é resumida sozinha e detalhes se perdem. Por isso, logo depois de mapear, grave o que descobriu no arquivo de progresso desta conversa: .progresso/<código>.md dentro da pasta de trabalho, onde <código> é o que aparece no fim da mensagem do usuário como <!--sb:código-->. Conteúdo: o pedido do usuário com as palavras dele, os arquivos e linhas que importam, as decisões, o que já foi feito e o que falta. Só fatos curtos (até ~40 linhas), sem colar código. Atualize-o a cada etapa concluída. O app mostra esse arquivo de volta para você no fim das mensagens como MEMÓRIA DA TAREFA: depois de um resumo do contexto ou numa retomada, siga dele a partir do próximo item pendente; não refaça o mapeamento nem releia arquivos que ele já descreve, a não ser para pegar a linha exata que vai editar.',
+    // spec 48 rodada 3 (ECC: planejar/executar/revisar em contextos separados): subagente começa com a memória limpa e erra menos
+    'ETAPAS GRANDES: se a tarefa tiver etapas grandes e independentes (ex.: banco, telas, testes), entregue cada uma a um ajudante (delegate_task) com o objetivo da etapa, os arquivos que importam e o caminho do arquivo de progresso; ele começa com a memória limpa e erra menos. Depois confira você mesmo o resultado de cada etapa e atualize o progresso. Etapa pequena, ou que depende muito do que já está na conversa: faça você.',
+    // ticket do Emerson (19/11/2026): pediu para ler um PDF e o agente ficou tentando abordagens até desistir
+    // spec 48 rodada 3: ler arquivo grande inteiro enchia o contexto e levava ao ciclo estudar -> comprimir -> esquecer -> estudar
+    'ARQUIVO GRANDE (mais de ~300 linhas): nunca leia inteiro. Primeiro ache as linhas que importam com o terminal (grep -n "termo" arquivo, ou wc -l para saber o tamanho) e leia só aquele trecho com read_file usando offset e limit (até ~150 linhas por vez). Não releia o que já leu nesta tarefa: anote no arquivo de progresso o que achou (arquivo, linhas, o que tem lá). Comece a FAZER cedo: depois de ler o essencial, edite; não estude o projeto inteiro antes.',
+    'LER PDF, WORD, EXCEL OU POWERPOINT: use read_file direto no arquivo; ele já extrai o texto (com páginas). Se o PDF vier sem texto (escaneado, só imagem), transforme as páginas em imagem e use a visão (vision_analyze). Não tente instalar bibliotecas nem inventar outro caminho: se em DUAS tentativas não der, diga em uma frase que não conseguiu ler e peça o arquivo em outro formato.',
     'MENSAGEM NO MEIO DO TRABALHO: se o usuário mandar algo enquanto você trabalha e for só pergunta de andamento ("terminou?", "e aí?", "travou?", "continua"), responda em UMA linha o que já foi feito e o que falta e CONTINUE a tarefa na mesma resposta, sem encerrar. Se for correção ou pedido novo, aplique e continue. A resposta só termina com a entrega.',
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR, mas de forma PROPORCIONAL e rápida: faça no máximo DUAS rodadas de verificação por entrega (uma conferência de sintaxe e uma olhada no resultado) e só corrija o que estiver realmente quebrado; não fique refinando detalhes visuais em loop. Para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console ou tire UMA captura e olhe. Capturas, extrações e outros arquivos de teste vão para uma pasta temporária fora da pasta entregue (ou apague ao terminar): a pasta final tem só o que o usuário pediu. Se houver erro, corrija e confira de novo UMA vez. Só então responda, dizendo o que verificou.',
     navegador ? 'Você tem um NAVEGADOR INTEGRADO que o usuário vê na tela ao lado do chat. Para abrir sites, clicar, preencher formulários, ler páginas e tirar capturas de tela, use as ferramentas do servidor "navegador" (navegador_abrir, navegador_ler, navegador_clicar, navegador_digitar, navegador_rolar, navegador_print, navegador_voltar, navegador_esperar, navegador_js). Comece com navegador_abrir, depois navegador_ler para ver a página e os elementos clicáveis (cada um tem um id), e use navegador_print para VER a página de verdade (depois olhe a imagem com vision_analyze no caminho devolvido). Prefira essas ferramentas ao navegador próprio do Hermes. O usuário também pode ter a extensão "Cérebro Pro no Chrome": com ela as mesmas ferramentas rodam no Chrome DELE, com as contas dele abertas (parâmetro onde="chrome"; no aplicativo o padrão é o navegador integrado e na versão web é sempre o Chrome dele). Antes, rode navegador_chrome_estado; sem Chrome conectado, mande o link https://brain.rangeltech.net/extensao/ (skill navegador-do-usuario).' : '',
-    midia ? 'VELOCIDADE EM MÍDIA: para imagem ou vídeo, chame PRIMEIRO midia_detalhar_prompt (5 a 15 s; ele escreve o briefing profissional com o pedido do usuário) e em seguida midia_gerar_imagem / midia_gerar_video com o prompt devolvido, sem encurtar; ao falar com o usuário diga só "Estou gerando a sua imagem, fica pronta em aproximadamente X segundos" (ou "o seu vídeo, em aproximadamente X minutos") e NUNCA mencione GPU, fila, servidor ou posição; NÃO liste skills, NÃO procure ferramentas e NÃO rode comandos antes, e depois de gerar apenas informe o caminho (sem reconferir). Se a ferramenta de mídia falhar por conexão perdida ("lost its stdio subprocess", "closed its transport") ou por "Não consegui gerar", chame de novo NA HORA, até 2 vezes, sem perguntar nada ao usuário. Você pode GERAR IMAGENS de verdade com a ferramenta midia_gerar_imagem (roda numa GPU do servidor, leva de 10 a 30 segundos e salva um PNG na pasta Imagens da pasta de trabalho). Quando o usuário pedir uma imagem, ilustração, capa, avatar, propaganda ou caricatura, USE a ferramenta em vez de dizer que não consegue: escreva o prompt em inglês, bem detalhado (assunto, estilo, luz, enquadramento, cores), escolha o formato (quadrado, retrato, paisagem, story ou banner) e depois diga o caminho completo do arquivo. Título curto dentro da imagem (1 a 3 palavras, em caixa alta, entre aspas no prompt) sai legível; frase longa e letra acentuada saem erradas, e nesses casos gere a imagem sem texto e aplique o título depois. Peça a contagem exata de pessoas no prompt (por exemplo exactly two people) e confira o resultado olhando a imagem. Você também pode GERAR VÍDEOS (1 a 60 s, sem áudio) com midia_gerar_video: a qualidade ALTA é o padrão (modelo de 14 bilhões de parâmetros em 720p; leva de 5 a 20 minutos por clipe de 5 s; a ferramenta volta na hora com a previsão e o aplicativo avisa no chat quando o arquivo ficar pronto: não espere nem consulte) e a rapida (cerca de 1 minuto, qualidade bem menor) só quando o usuário pedir um teste rápido. Na qualidade alta SEMPRE gere antes a imagem com midia_gerar_imagem, confira que ela está correta (carro com 4 rodas, pessoa com anatomia normal, rosto e mãos bons) e só então anime-a passando o caminho em imagem: um vídeo errado custa até 20 minutos do cliente, então acerte na primeira. Ao falar com o usuário use a previsão que a ferramenta devolveu. Salva um MP4 na pasta Videos. VOZ: para CLONAR uma voz (ler um texto com a voz de uma amostra) use midia_clonar_voz; para TROCAR a voz de um áudio ou vídeo use midia_trocar_voz; para REDUBLAR um vídeo em outro idioma com a voz do próprio locutor use midia_redublar_video. Todas voltam na hora com a previsão e o aplicativo avisa quando o arquivo ficar pronto (não espere nem consulte); a amostra de voz precisa de 3 a 25 segundos de fala limpa. Para TROCAR a pessoa de um vídeo pela de uma foto (troca de personagem ou de rosto) use midia_trocar_personagem, que leva vários minutos. ANTES de chamar, chame midia_conferir_troca (confere formato, tamanho, duração e áudio) e CONFIRA as entradas: olhe a foto (vision_analyze) e UM quadro do vídeo (extraia com ffmpeg para uma pasta temporária) e veja se há uma pessoa principal em primeiro plano com o rosto grande e nítido, se a foto é de frente, bem iluminada e sem óculos escuros, mão ou cabelo cobrindo o rosto, e se o vídeo tem espelho ou reflexo (esses falham); se algo estiver ruim, diga o que trocar. Se faltar informação (480p é mais rápido e 736p mais nítido; as pessoas cantam ou falam junto com o áudio? então ligue a sincronia labial), faça UMA mensagem curta com até 3 perguntas, cada uma com uma sugestão sua, e aceite "pode seguir" para você decidir. Só então chame a ferramenta, uma vez, caprichada. REGRA DE ROTEAMENTO: quando o usuário pedir "um vídeo de" alguma coisa que tem imagem real (um balão, um animal, uma pessoa, uma paisagem, um produto, uma comida, uma cena), USE SEMPRE midia_gerar_video, com o prompt em inglês descrevendo a cena, o movimento e a câmera. NUNCA improvise esse pedido com video-motion, Remotion, HyperFrames, terminal ou código: eles só servem para animação gráfica com texto (títulos, legendas, gráficos, vinhetas, reels com texto) e só quando o usuário pedir isso de forma explícita. Se midia_gerar_video falhar ou estiver indisponível, NÃO faça outra coisa no lugar: diga em português simples que o vídeo não pôde ser gerado agora e ofereça tentar de novo em instantes; não fale de servidor, GPU, fila nem erro técnico. A tela já mostra a fila, o percentual e o resultado, então não repita isso no texto. DIREÇÃO DE MÍDIA: antes de chamar midia_gerar_imagem ou midia_gerar_video, SEMPRE chame midia_detalhar_prompt (tipo, pedido do usuário com as palavras dele, respostas às suas perguntas, formato, segundos e tem_imagem_inicial) e use EXATAMENTE o prompt, o negative_prompt, o formato e os segundos que ele devolver; ele transforma o pedido curto em um briefing detalhado em inglês (sujeito, cena, ação e movimento, enquadramento e câmera, iluminação, estilo, cores, o que evitar em negative_prompt; texto dentro da imagem só se o usuário pediu) e preencha os parâmetros (formato, segundos, qualidade, seed). Siga a skill direcao-de-midia. DETALHE SEMPRE: o prompt enviado à ferramenta precisa ser RICO (imagem: 60 a 120 palavras em inglês; vídeo: 80 a 150) com sujeito, cenário, ação e movimento, câmera e lente, iluminação, paleta, atmosfera, estilo e qualidade, mais negative_prompt; prompt curto é recusado pela ferramenta. Se o pedido do usuário for curto e vago (só o assunto), faça UMA mensagem curta com até 5 perguntas numeradas (estilo, cenário, ação, cores e clima, formato e duração), cada uma com uma sugestão sua entre parênteses, e diga que ele pode responder "pode seguir" para você decidir tudo. Se ele responder "pode seguir" ou "tanto faz", ignorar as perguntas ou já tiver dado detalhes suficientes, NÃO pergunte de novo: invente você mesmo os detalhes que faltam, de forma coerente e caprichada (sem inventar textos, marcas nem rostos de pessoas reais), e gere. Antes de chamar a ferramenta, mostre em 1 ou 2 linhas em português o que vai gerar. ENCADEAMENTO: "este vídeo" ou "esta imagem" no pedido seguinte é o ÚLTIMO arquivo de mídia que você gerou nesta conversa (o caminho está no resultado da ferramenta). Para pôr texto, legenda, zoom ou animação num clipe de IA, use a skill video-motion SOBRE esse arquivo (clipes de IA têm 2 a 6 s: estenda com loop, câmera lenta ou concatenando vários clipes, sem dizer que gerou 20 s de uma vez) e entregue o arquivo final. Siga a skill orquestrador-de-midia. Depois de uma falha de mídia a tela já mostra um cartão com "Tentar de novo": responda com UMA frase curta (por exemplo "Não consegui gerar agora.") e nunca fale de instabilidade, primeira tentativa, servidor, nem tente de novo sozinho em sequência.' : '',
+    // spec 48 rodada 3: o bloco antigo tinha ~6 mil caracteres e ia em TODO pedido (até de código); o essencial cabe em ~1,4 mil
+    midia ? 'MÍDIA (imagem, vídeo, voz): 1) chame midia_detalhar_prompt com o pedido do usuário (palavras dele) e use EXATAMENTE o prompt, negative_prompt, formato e segundos que ele devolver; 2) gere com midia_gerar_imagem ou midia_gerar_video. Vídeo em qualidade alta: gere antes a imagem, confira com vision_analyze (anatomia, rodas, mãos) e anime-a passando o caminho em imagem; leva 5 a 20 min, a ferramenta volta na hora e o app avisa quando ficar pronto (não espere nem consulte). 3) Ao usuário diga só "Estou gerando a sua imagem/o seu vídeo, fica pronto em aproximadamente X" e depois o caminho do arquivo. "Um vídeo de" algo real (pessoa, animal, produto, paisagem) é SEMPRE midia_gerar_video; video-motion/código só para animação com texto quando pedirem. Pedido vago: UMA mensagem com até 5 perguntas numeradas, cada uma com sugestão; "pode seguir" = você decide e gera. Texto dentro da imagem: 1 a 3 palavras em caixa alta entre aspas; frase longa ou acento, gere sem texto. Voz: midia_clonar_voz (amostra de 3 a 25 s), midia_trocar_voz, midia_redublar_video; troca de rosto: midia_conferir_troca e depois midia_trocar_personagem. Falha por conexão: tente de novo na hora, até 2 vezes; depois, uma frase curta ("Não consegui gerar agora."), sem falar de servidor, GPU ou fila. Detalhes: skill direcao-de-midia, se existir.' : '',
     memoria ? 'Você tem MEMÓRIA das conversas antigas com este usuário: a ferramenta memoria_buscar procura nelas pelos assuntos. Quando ele perguntar "você lembra de...", "aquilo que conversamos", "o que ficou combinado" ou citar algo que não está nesta conversa, USE memoria_buscar (com palavras-chave do assunto) antes de responder; se precisar de mais contexto de um trecho, memoria_ler_conversa. Nunca diga que não lembra sem ter buscado. Diga de qual conversa e data veio a informação.' : '',
     ferramentas ? `Skills e ferramentas: ${ferramentas}` : '',
     // --- parte VARIÁVEL por usuário e por sessão, sempre no FIM: o prefixo fixo acima fica igual para todos e o cache do servidor o reaproveita
@@ -697,6 +817,50 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+// ---------- continuidade (spec 50) ----------
+// Histórico que uma sessão NOVA do agente recebe (app reaberto, modelo trocado, gateway caído). Antes: só as últimas 10 mensagens com 700
+// caracteres cada, e o agente "não enxergava o chat todo". Agora, dentro de um orçamento: todas as mensagens do usuário (até 4 mil caracteres
+// cada), as 6 respostas mais recentes do agente com até 2 mil e as antigas com 300. Se passar do orçamento, as mais antigas saem primeiro.
+function historicoParaAgente(msgs, orcamento = 60000) {
+  const lista = (msgs || []).filter((m) => m && (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim())
+  const idxAssist = lista.map((m, i) => (m.role === 'assistant' ? i : -1)).filter((i) => i >= 0)
+  const recentes = new Set(idxAssist.slice(-6))
+  const corta = (s, n) => (s.length > n ? s.slice(0, n) + '…' : s)
+  let linhas = lista.map((m, i) => {
+    const t = String(m.content).replace(/\s+\n/g, '\n').trim()
+    return m.role === 'user' ? 'Usuário: ' + corta(t, 4000) : 'Assistente: ' + corta(t, recentes.has(i) ? 2000 : 300)
+  })
+  let total = linhas.reduce((s, l) => s + l.length + 1, 0)
+  // passou do orçamento: primeiro saem as respostas ANTIGAS do agente (o pedido do usuário vale mais), depois as mensagens mais antigas
+  if (total > orcamento) {
+    linhas = linhas.filter((l, i) => lista[i].role === 'user' || recentes.has(i))
+    total = linhas.reduce((s, l) => s + l.length + 1, 0)
+  }
+  let ini = 0
+  while (total > orcamento && ini < linhas.length - 1) total -= linhas[ini++].length + 1
+  return (ini ? '[mensagens mais antigas omitidas]\n' : '') + linhas.slice(ini).join('\n')
+}
+
+// Plano (ferramenta todo) com itens ainda abertos quando o turno acabou: o agente parou no meio da meta. Não continua se ele terminou
+// fazendo uma pergunta ao usuário (aí é o usuário que tem que responder).
+function itensAbertosDoPlano(plano, textoFinal) {
+  const itens = (plano && Array.isArray(plano.itens) ? plano.itens : []).filter((i) => i && i.texto)
+  const abertos = itens.filter((i) => i.estado === 'pendente' || i.estado === 'fazendo')
+  if (!abertos.length) return []
+  if (/\?\s*$/.test(String(textoFinal || '').trim())) return []
+  return abertos
+}
+function textoContinuarPlano(abertos) {
+  return '[Continuação automática da meta] O plano ainda tem passos abertos: ' + abertos.map((i) => '"' + String(i.texto).slice(0, 120) + '"').join('; ') +
+    '. Continue do próximo passo aberto (consulte o arquivo de progresso se houver), sem refazer o que já foi feito, até entregar. Se faltar algo que só o usuário sabe, pergunte em uma frase.'
+}
+// Turno que morreu e não conseguiu se retomar: a próxima mensagem do usuário leva a meta junto, para o agente seguir de onde parou.
+function textoMetaPendente(meta, mensagemNova) {
+  return '[Tarefa anterior não terminou (o processo caiu): "' + String(meta.pedido || '').slice(0, 1500) + '"' +
+    (meta.feitos && meta.feitos.length ? '. Já tinha sido feito: ' + meta.feitos.slice(-8).join('; ') : '') +
+    '. Leia o arquivo de progresso se existir e continue dela de onde parou, sem refazer o que já foi entregue. Depois (ou junto, se for sobre ela) atenda a mensagem nova abaixo.]\n\n' + mensagemNova
 }
 
 // Mensagem que a pessoa manda enquanto o agente trabalha (entra no turno em andamento). Sem o embrulho, "terminou?" virava pedido novo: o modelo
@@ -1439,4 +1603,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, embrulharDirecionamento, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
+module.exports = { prepararHome, contextoDeSistema, garantirComponentes, ambientesDoAgente, embrulharDirecionamento, historicoParaAgente, itensAbertosDoPlano, textoContinuarPlano, textoMetaPendente, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }

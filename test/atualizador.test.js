@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { criar, trocaAutomatica } = require('../atualizador')
+const { criar, trocaAutomatica, maisNova } = require('../atualizador')
 
 function falso({ versao = '9.9.9', falha = false } = {}) {
   const au = { chamadas: [], autoDownload: true }
@@ -11,9 +11,9 @@ function falso({ versao = '9.9.9', falha = false } = {}) {
 }
 const montar = (au, cfg = {}, eventos = []) => criar({ app: { getVersion: () => '0.6.15', isPackaged: true }, cfgGet: () => cfg, enviar: (c, d) => eventos.push([c, d.fase]), updater: au })
 
-test('nova versão avisa a tela; sem auto não baixa sozinho', async () => {
+test('nova versão avisa a tela; com a atualização forçada desligada e sem auto, não baixa sozinho', async () => {
   const au = falso(), ev = []
-  const a = montar(au, {}, ev)
+  const a = montar(au, { forcarAtualizacao: false }, ev)
   a.trocaAutomatica = () => true
   await a.conferir()
   assert.equal(a.estado().fase, 'disponivel')
@@ -57,4 +57,36 @@ test('onde não dá para trocar no lugar', () => {
   assert.equal(trocaAutomatica({ platform: 'win32', env: {} }), true)
   assert.equal(trocaAutomatica({ platform: 'linux', env: { APPIMAGE: '/x' } }), true)
   assert.equal(trocaAutomatica({ platform: 'linux', env: {} }), false)
+})
+
+
+test('abertura do app: versão nova é baixada e instalada NA HORA, em silêncio, e o app reabre', async () => {
+  const au = falso()
+  const a = montar(au)
+  if (!a.estado().automatica) return // só Windows instalado e AppImage trocam sozinhos
+  await a.conferir(true)
+  await new Promise((r) => setTimeout(r, 10))
+  assert.deepEqual(au.chamadas, ['baixar', ['instalar', true, true]])
+})
+
+test('com o app aberto (sem forçar) só baixa; instala ao fechar', async () => {
+  const au = falso()
+  const a = montar(au)
+  if (!a.estado().automatica) return
+  await a.conferir(false)
+  await new Promise((r) => setTimeout(r, 10))
+  assert.deepEqual(au.chamadas, ['baixar'])
+})
+
+test('nunca rebaixa: versão de teste mais nova que a publicada não é "atualizada" para trás', async () => {
+  const au = falso({ versao: '0.6.80' })
+  const a = criar({ app: { getVersion: () => '0.6.81-teste.3', isPackaged: true }, cfgGet: () => ({}), enviar: () => {}, updater: au })
+  await a.conferir(true)
+  assert.equal(a.estado().fase, 'nenhuma')
+  assert.deepEqual(au.chamadas, [])
+  assert.equal(maisNova('0.6.81', '0.6.81-teste.3'), true)
+  assert.equal(maisNova('0.6.81-teste.3', '0.6.81-teste.2'), true)
+  assert.equal(maisNova('0.6.80', '0.6.81-teste.3'), false)
+  assert.equal(maisNova('0.6.81-teste.10', '0.6.81-teste.9'), true)
+  assert.equal(maisNova('0.6.80', '0.6.80'), false)
 })

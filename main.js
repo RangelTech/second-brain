@@ -171,6 +171,19 @@ const ponteLLM = require('./ponte-llm').criar({
   portaArq: path.join(app.getPath('userData'), 'ponte-porta.txt'),
   chaveRoteador: () => chaveLocal(),
   modeloPorChat: (chat) => (motorGateway() ? sessoes.get(chat)?.modelo : null), // motor gateway: o Hermes pede 'principal' e a ponte troca pelo modelo da conversa
+  // memória da tarefa (spec 48 rodada 3): o arquivo de progresso da conversa vai, curto, no fim de toda chamada do agente. Só arquivo das últimas 12 h.
+  memoriaTarefa: (chat) => {
+    if (cfg.memoriaTarefa === false || !cfg.pasta || !/^[A-Za-z0-9_-]{4,80}$/.test(chat)) return null
+    try {
+      const arq = path.join(cfg.pasta, '.progresso', chat + '.md')
+      const st = fs.statSync(arq)
+      if (Date.now() - st.mtimeMs > 12 * 3600 * 1000) return null
+      const t = fs.readFileSync(arq, 'utf8').trim()
+      return t ? (t.length > 2500 ? t.slice(0, 2500) + '\n[…cortado: mantenha este arquivo curto]' : t) : null
+    } catch {
+      return null
+    }
+  },
   // planejador (spec 40): o combo rt-planejar do servidor escreve o plano da tarefa; o modelo da casa executa. cfg.planejador=false desliga.
   planejador: async (pedido) => {
     if (cfg.planejador === false || process.env.SB_SEM_PLANEJADOR === '1') return null
@@ -214,8 +227,29 @@ function limparAgenteQuebrado(anotar = () => {}) {
     }
   }
 }
+// Componentes que o Hermes só instalaria "na hora" (ex.: leitor de PDF/Word/Excel): a instalação só vale com todos presentes. Se algum foi
+// instalado agora, o gateway reinicia para passar a usar a instalação nova do ambiente (spec 48 rodada 3, ticket do Emerson 19/11/2026).
+async function componentesDoAgente(anotar) {
+  const home = caminhosHermes.homeAgente(app)
+  const r = await require('./agent').garantirComponentes(home, anotar)
+  if (r.instalou) {
+    try { require('./sessao-gateway').encerrarGateway() } catch {}
+    const bin = localizarBinario(app)
+    const hermes = bin && path.join(path.dirname(bin), process.platform === 'win32' ? 'hermes.exe' : 'hermes')
+    if (hermes && fs.existsSync(hermes)) {
+      await new Promise((ok) => require('child_process').execFile(hermes, ['gateway', 'stop', '--yes'], { env: { ...process.env, HERMES_HOME: home }, windowsHide: true, timeout: 60000 }, () => ok()))
+      anotar('gateway reiniciado para usar os componentes novos')
+    }
+  }
+  return r
+}
 async function verificarAgente(anotar = () => {}) {
-  if (fs.existsSync(marcaTeste())) return { ok: true, jaFeito: true }
+  if (fs.existsSync(marcaTeste())) {
+    // instalação antiga já testada: confere os componentes também (quem ficou sem o leitor de documentos recebe agora)
+    const c = await componentesDoAgente(anotar)
+    if (c.ok) return { ok: true, jaFeito: true }
+    return { ok: false, motivo: 'faltou instalar: ' + c.faltando.join(', ') }
+  }
   const pasta = pastaTrabalhoPadrao()
   fs.mkdirSync(pasta, { recursive: true })
   let r
@@ -243,6 +277,11 @@ async function verificarAgente(anotar = () => {}) {
         anotar('reinstalar o agente falhou: ' + e.message)
       }
     }
+  }
+  // a instalação só vale com a conversa de teste E todos os componentes (o CI e o instalador falham sem eles)
+  if (r.ok) {
+    const c = await componentesDoAgente(anotar)
+    if (!c.ok) r = { ok: false, motivo: 'faltou instalar: ' + c.faltando.join(', ') }
   }
   if (r.ok) {
     try {
@@ -707,21 +746,108 @@ async function responder(alvo, msgs, ctx) {
   }
   // o Hermes não vem no instalador: na primeira conversa o app o instala (uma vez) e mostra o andamento
   await garantirAgente((aviso) => ctx.onDelta?.({ aviso }))
-  // se o agente precisar recomeçar (raciocínio ou modelo mudou), o novo recebe um resumo das últimas mensagens
+  // se o agente precisar recomeçar (app reaberto, raciocínio ou modelo mudou, gateway caiu), o novo recebe o chat com orçamento (spec 50)
   const ultimo = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
-  const anteriores = msgs.slice(0, -1).slice(-10)
-  const linhaHist = (m) => (m.role === 'user' ? 'Usuário' : 'Assistente') + ': ' + String(m.content).slice(0, 700)
-  const historico = anteriores.map(linhaHist).join(String.fromCharCode(10))
+  const historico = agenteMod.historicoParaAgente(msgs.slice(0, -1))
   if (PEDE_EDITOR.test(ultimo)) chatsComEditor.add(ctx.chat)
-  const sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
-  if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o resumo do que já foi dito
-  sessao.emitir = ctx.onDelta // cada mensagem tem o seu canal de resposta e de permissão
-  sessao.pedirPermissao = ctx.pedirPermissao
+  let sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
+  if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o que já foi dito
+  // o que acontece no turno (plano, texto, ferramentas feitas, uso do contexto) é lido aqui para decidir se a meta terminou
+  let plano = null
+  let textoTurno = ''
+  let textoTodo = ''
+  let uso = null
+  const feitos = []
+  const canal = ctx.onDelta || (() => {})
+  const ligar = (s) => {
+    s.emitir = (d) => {
+      if (d && d.plano) plano = d.plano
+      if (d && d.texto) (textoTurno += d.texto), (textoTodo += d.texto)
+      if (d && d.novoCard) textoTurno = ''
+      if (d && d.contexto && d.contexto.tamanho) uso = d.contexto
+      if (d && d.ferramenta && d.ferramenta.status === 'completed' && d.ferramenta.titulo) feitos.push(String(d.ferramenta.titulo).slice(0, 80))
+      canal(d)
+    }
+    s.pedirPermissao = ctx.pedirPermissao
+  }
+  ligar(sessao)
   ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
-  const r = await sessao.perguntar(ultimo, ctx.anexos || [])
+  // recomeço planejado (spec 48 rodada 3, ECC context-gate): contexto acima de 75% da janela no FIM de um turno = sessão nova e limpa
+  // (chat com orçamento + memória da tarefa que a ponte reinjeta), em vez de deixar o Hermes comprimir de novo no meio do próximo trabalho
+  const cheio = () => !!(uso && uso.usado >= 0.75 * uso.tamanho && cfg.recomecoPlanejado !== false)
+  const recomecar = async (motivo) => {
+    registrarAgente(app, `recomeço planejado (${motivo}): contexto em ${Math.round((100 * uso.usado) / uso.tamanho)}%`)
+    try { sessao.encerrar() } catch {}
+    sessoes.delete(ctx.chat)
+    const hist = agenteMod.historicoParaAgente([...msgs.slice(0, -1), { role: 'user', content: ultimo }, ...(textoTodo.trim() ? [{ role: 'assistant', content: textoTodo }] : [])])
+    sessao = await sessaoDoChat(ctx.chat, alvo, ctx, hist)
+    if (sessao.primeira) sessao.historico = hist
+    ligar(sessao)
+    uso = null
+  }
+  // meta de um turno que morreu: vai junto com esta mensagem, para o agente continuar de onde parou
+  const pendente = metasPendentes.ler(ctx.chat)
+  const pergunta = pendente ? agenteMod.textoMetaPendente(pendente, ultimo) : ultimo
+  if (pendente) registrarAgente(app, 'meta pendente retomada na mensagem nova')
+  let r
+  try {
+    r = await sessao.perguntar(pergunta, ctx.anexos || [])
+    // turno acabou com passos do plano abertos e sem pergunta ao usuário: continua sozinho (no máximo 2 voltas, só enquanto houver progresso)
+    for (let volta = 0; volta < 2 && !ctx.sinal?.aborted && cfg.continuarPlano !== false; volta++) {
+      const abertos = agenteMod.itensAbertosDoPlano(plano, textoTurno)
+      if (!abertos.length) break
+      const feitosAntes = (plano.itens || []).filter((i) => i.estado === 'feito').length
+      registrarAgente(app, `meta: ${abertos.length} passo(s) aberto(s) no fim do turno, continuando (volta ${volta + 1})`)
+      if (cheio()) await recomecar('antes de continuar a meta')
+      canal({ novoCard: true })
+      textoTurno = ''
+      r = await sessao.perguntar(agenteMod.textoContinuarPlano(abertos), [])
+      if ((plano.itens || []).filter((i) => i.estado === 'feito').length <= feitosAntes) break // sem progresso: para (não gasta cota em laço)
+    }
+    metasPendentes.limpar(ctx.chat)
+    // terminou cheio: a próxima mensagem já começa numa sessão limpa (com o chat todo dentro do orçamento)
+    if (cheio()) {
+      registrarAgente(app, `recomeço planejado (fim do pedido): contexto em ${Math.round((100 * uso.usado) / uso.tamanho)}%, próxima mensagem em sessão nova`)
+      try { sessao.encerrar() } catch {}
+      sessoes.delete(ctx.chat)
+    }
+  } catch (e) {
+    // o turno morreu e a retomada automática não salvou: a meta fica guardada para a próxima mensagem (o usuário pode parar de propósito)
+    if (!ctx.sinal?.aborted) metasPendentes.guardar(ctx.chat, { pedido: pendente ? pendente.pedido : ultimo, feitos: [...(pendente?.feitos || []), ...feitos].slice(-20) })
+    throw e
+  }
   ctx.uso = r?.usage || null
   return ''
 }
+
+// Metas que morreram no meio (spec 50): uma por chat, em disco, para sobreviver a fechar o app.
+const agenteMod = require('./agent')
+const metasPendentes = (() => {
+  const arq = () => path.join(app.getPath('userData'), 'metas-pendentes.json')
+  const todas = () => {
+    try {
+      return JSON.parse(fs.readFileSync(arq(), 'utf8')) || {}
+    } catch {
+      return {}
+    }
+  }
+  const gravar = (o) => {
+    try {
+      fs.writeFileSync(arq(), JSON.stringify(o))
+    } catch {}
+  }
+  return {
+    ler: (chat) => {
+      const m = todas()[chat]
+      return m && Date.now() - (m.quando || 0) < 7 * 864e5 ? m : null // meta de mais de 7 dias não volta
+    },
+    guardar: (chat, m) => gravar({ ...todas(), [chat]: { ...m, quando: Date.now() } }),
+    limpar: (chat) => {
+      const o = todas()
+      if (o[chat]) delete o[chat], gravar(o)
+    },
+  }
+})()
 
 // ---------- modelos para o seletor do chat ----------
 async function listarModelos() {

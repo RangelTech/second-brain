@@ -150,9 +150,10 @@ jobs:
 
   # Só com Windows, macOS e Linux publicados a versão passa a ser "a mais recente". Se um sistema falhar, a release fica como pré-lançamento
   # e ninguém recebe link quebrado (11/11/2026: a 0.6.59 virou "latest" sem o instalador do Windows e o download do site deu 404).
+  # Tag de teste (com hífen, ex.: v0.6.80-teste.1) fica como pré-lançamento: só quem tem o link instala; ninguém recebe atualização.
   promover:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     permissions:
       contents: write
