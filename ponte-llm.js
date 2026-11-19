@@ -122,7 +122,24 @@ function comPlano(j, plano) {
   return j
 }
 
-function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, chaveRoteador = null, modeloPorChat = null, planejador = null }) {
+// Memória da tarefa (spec 48 rodada 3, ideia do ECC "guarde fora da janela, reinjete pequeno"): o agente grava o progresso em
+// .progresso/<id da conversa>.md, mas o Qwen esquece de reler depois da compressão. A ponte põe um resumo curto no FIM da última mensagem
+// de toda chamada: sobrevive a qualquer compressão e não mexe no começo do pedido (o cache de prefixo do servidor continua valendo).
+const MEMORIA_MARCA = '[MEMÓRIA DA TAREFA'
+function comMemoria(j, txt) {
+  if (!j || !Array.isArray(j.messages) || !j.messages.length || !txt) return j
+  const u = j.messages[j.messages.length - 1]
+  if (!u || (u.role !== 'user' && u.role !== 'tool')) return j
+  const bloco = `\n\n${MEMORIA_MARCA} — o seu arquivo de progresso desta conversa; siga dele e atualize ao concluir cada etapa]\n${txt}\n[FIM DA MEMÓRIA DA TAREFA]`
+  if (typeof u.content === 'string') {
+    if (!u.content.includes(MEMORIA_MARCA)) u.content += bloco
+  } else if (Array.isArray(u.content) && !u.content.some((p) => p && typeof p.text === 'string' && p.text.includes(MEMORIA_MARCA))) {
+    u.content = [...u.content, { type: 'text', text: bloco }]
+  }
+  return j
+}
+
+function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, chaveRoteador = null, modeloPorChat = null, planejador = null, memoriaTarefa = null }) {
   const planos = new Map() // chat -> { plano, em }
   let servidor = null
   const alvo = () => new URL(typeof destino === 'function' ? destino() : destino)
@@ -287,6 +304,12 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, ch
         let texto = tirarFerramentas(semPensar(n.pares.size ? n.texto : corpo.toString('utf8')))
         // motor gateway: o Hermes sempre pede o modelo 'principal'; quem sabe o modelo escolhido na conversa e o app
         if (modeloPorChat && chat) { try { const m = modeloPorChat(chat); if (m) { const j = JSON.parse(texto); if (j && typeof j === 'object') { j.model = m; texto = JSON.stringify(j) } } } catch {} }
+        if (memoriaTarefa && chat) {
+          try {
+            const mem = memoriaTarefa(chat)
+            if (mem) { const j = JSON.parse(texto); if (j && Array.isArray(j.tools) && j.tools.length) texto = JSON.stringify(comMemoria(j, mem)) } // só em chamada de agente
+          } catch {}
+        }
         const enviar = () => {
           corpo = Buffer.from(texto, 'utf8')
           up.setHeader('content-length', corpo.length)
@@ -355,4 +378,4 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, ch
   }
 }
 
-module.exports = { semPensar, criar, SEP, normalizarEditor, restaurarEditor, tirarFerramentas, deveriaPlanejar, comPlano }
+module.exports = { semPensar, criar, SEP, normalizarEditor, restaurarEditor, tirarFerramentas, deveriaPlanejar, comPlano , comMemoria, MEMORIA_MARCA }

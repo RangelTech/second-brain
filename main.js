@@ -171,6 +171,19 @@ const ponteLLM = require('./ponte-llm').criar({
   portaArq: path.join(app.getPath('userData'), 'ponte-porta.txt'),
   chaveRoteador: () => chaveLocal(),
   modeloPorChat: (chat) => (motorGateway() ? sessoes.get(chat)?.modelo : null), // motor gateway: o Hermes pede 'principal' e a ponte troca pelo modelo da conversa
+  // memória da tarefa (spec 48 rodada 3): o arquivo de progresso da conversa vai, curto, no fim de toda chamada do agente. Só arquivo das últimas 12 h.
+  memoriaTarefa: (chat) => {
+    if (cfg.memoriaTarefa === false || !cfg.pasta || !/^[A-Za-z0-9_-]{4,80}$/.test(chat)) return null
+    try {
+      const arq = path.join(cfg.pasta, '.progresso', chat + '.md')
+      const st = fs.statSync(arq)
+      if (Date.now() - st.mtimeMs > 12 * 3600 * 1000) return null
+      const t = fs.readFileSync(arq, 'utf8').trim()
+      return t ? (t.length > 2500 ? t.slice(0, 2500) + '\n[…cortado: mantenha este arquivo curto]' : t) : null
+    } catch {
+      return null
+    }
+  },
   // planejador (spec 40): o combo rt-planejar do servidor escreve o plano da tarefa; o modelo da casa executa. cfg.planejador=false desliga.
   planejador: async (pedido) => {
     if (cfg.planejador === false || process.env.SB_SEM_PLANEJADOR === '1') return null

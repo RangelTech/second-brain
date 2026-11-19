@@ -33,7 +33,8 @@ test('o prompt manda gravar e ler o arquivo de progresso e não largar a tarefa 
   const p = contextoDeSistema({ pasta: 'C:/x' })
   assert.match(p, /MEMÓRIA DE TRABALHO/)
   assert.match(p, /\.progresso/)
-  assert.match(p, /CONTEXT COMPACTION/)
+  assert.match(p, /MEMÓRIA DA TAREFA/)
+  assert.match(p, /<!--sb:código-->/)
   assert.match(p, /MENSAGEM NO MEIO DO TRABALHO/)
   // as regras novas ficam no prefixo fixo (antes da parte variável), para o cache do servidor continuar valendo
   assert.ok(p.indexOf('MEMÓRIA DE TRABALHO') < p.indexOf('Pasta de trabalho: C:/x'))

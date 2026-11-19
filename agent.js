@@ -469,7 +469,10 @@ function blocoEstilo() {
     'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente, nem a frase curta antes de usar uma ferramenta (ex.: "Vou abrir a Wikipédia e ler o primeiro parágrafo.").',
     'Nunca cite detalhes internos: nome de ferramenta (navegador_abrir, navegador_*, midia_gerar_imagem, terminal...), identificador de sessão ou de conversa (ex.: [@session:...], local-abc123...), tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Para falar de uma conversa antiga, use a data e o assunto ("na conversa de hoje às 19h sobre a Wikipédia"). Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
     'Não narre cada passo nem cada conferência. Faça o trabalho e entregue uma resposta curta: o que foi feito e onde está o arquivo.',
-    'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure entre as suas skills a ferramenta que serve (liste e leia as skills), e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
+    'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure no índice de skills a que serve e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
+    // spec 48 rodada 3: a regra de fábrica do Hermes manda "na dúvida, carregue" e há skills de 46 KB; com o Qwen (janela de 131 mil) isso enchia
+    // o contexto e levava à compressão em ciclo. Esta regra vem antes e manda o contrário.
+    'SKILLS COM ECONOMIA: carregue (skill_view) só a skill que claramente serve à tarefa, no máximo 2 por pedido; não carregue "por garantia", mesmo que outra instrução mande errar para o lado de carregar, porque cada skill aberta ocupa a sua memória de trabalho. Skill grande: leia o começo (o índice) e depois só a seção que precisa. Não releia uma skill que já leu nesta tarefa.',
   ]
   return MARCA_EST[0] + '\n## Como falar com o cliente (vale sempre)\n\n' + regras.join('\n\n') + '\n' + MARCA_EST[1]
 }
@@ -539,8 +542,19 @@ function yamlGateway(filhos = 3, globais = null) {
     '  provider: edge',
     'skills:',
     '  write_approval: false',
+    `  disabled: ${JSON.stringify(SKILLS_FORA)}`,
   ]
 }
+// skills de fábrica do Hermes fora do índice (spec 48 rodada 3): só Mac, dependem de CLI/conta que o cliente não tem, nichos que só fazem
+// ruído (uma tinha texto em chinês) ou concorrem com as nossas ferramentas (computer-use x navegador integrado). Cada uma pesa no prompt de
+// TODA chamada e confunde a escolha do Qwen. As úteis ficam (pdf, office, maps, dogfood, github, depuração, TDD, humanizer, design).
+const SKILLS_FORA = [
+  'apple-notes', 'apple-reminders', 'findmy', 'imessage',
+  'claude-code', 'codex', 'computer-use',
+  'ascii-video', 'baoyu-infographic', 'manim-video', 'p5js', 'songwriting-and-ai-music',
+  'himalaya', 'email-inbox-triage', 'google-workspace', 'obsidian', 'xurl', 'teams-meeting-pipeline',
+  'arxiv', 'competitor-news-monitor', 'codebase-inspection', 'simplify-code', 'sdlc-review',
+]
 // uv e Python que vêm com o agente (pasta tools do HERMES_HOME): as skills usam para montar ambientes próprios
 // (voz local, etc.) mesmo num computador sem Python. Vão no FIM do PATH: um Python do sistema continua tendo a vez.
 function ferramentasPython(home, env) {
@@ -622,7 +636,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     // resposta "o processo terminou normalmente" aparecia para o cliente (visto em 19/11/2026). Só falha avisa.
     'display:',
     '  background_process_notifications: "error"',
-    ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : []),
+    ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : ["skills:", `  disabled: ${JSON.stringify(SKILLS_FORA)}`]),
     'terminal:',
     '  backend: "local"',
     `  cwd: ${JSON.stringify(pasta.replace(/\\/g, '/'))}`,
@@ -682,7 +696,7 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     'AMBIENTE PRONTO: as ferramentas que as skills usam já vêm com o app: Python em SB_PYTHON e uv em SB_UV (também no PATH). Use os scripts das skills (voz_local.py, ambiente_docs.py e outros), que montam o ambiente certo do pacote nosso. Não instale Python nem pacotes pip por fora e não troque versões travadas nos scripts. Se um script de skill falhar, mostre o erro e siga a skill; não invente outra instalação.',
     'PLANO: se você criar uma lista de tarefas (ferramenta todo), ela aparece para o usuário. Atualize-a SEMPRE: marque o item como em andamento ao começar e como concluído assim que terminar, antes de ir para o próximo. Plano parado no primeiro item parece travamento.',
     process.env.SB_SEM_DICA_PASTAS ? '' : 'PASTAS GRANDES: para LISTAR, CONTAR ou PROCURAR arquivos use a ferramenta terminal com comandos diretos e limite de profundidade (ls, dir, find -maxdepth 2). NUNCA use search_files com o padrão * nem varreduras recursivas completas: elas leem a pasta inteira (inclusive node_modules, .git e venv) e podem levar minutos. Só varra tudo se o usuário pedir.',
-    'MEMÓRIA DE TRABALHO (tarefa com muitos passos, como mexer num projeto): quando a conversa fica longa ela é resumida sozinha e detalhes se perdem. Por isso, logo depois de mapear, grave o que descobriu em um arquivo de progresso na pasta .progresso dentro da pasta de trabalho (ex.: .progresso/protocolo-no-banco.md): o pedido do usuário com as palavras dele, os arquivos e linhas que importam, as decisões, o que já foi feito e o que falta. Só fatos curtos, sem colar código. Atualize-o a cada etapa concluída. Depois de um resumo do contexto (aviso CONTEXT COMPACTION) ou quando a tarefa for retomada, LEIA esse arquivo primeiro e siga do próximo item pendente: não refaça o mapeamento nem releia arquivos que ele já descreve, a não ser para pegar a linha exata que vai editar.',
+    'MEMÓRIA DE TRABALHO (tarefa com muitos passos, como mexer num projeto): quando a conversa fica longa ela é resumida sozinha e detalhes se perdem. Por isso, logo depois de mapear, grave o que descobriu no arquivo de progresso desta conversa: .progresso/<código>.md dentro da pasta de trabalho, onde <código> é o que aparece no fim da mensagem do usuário como <!--sb:código-->. Conteúdo: o pedido do usuário com as palavras dele, os arquivos e linhas que importam, as decisões, o que já foi feito e o que falta. Só fatos curtos (até ~40 linhas), sem colar código. Atualize-o a cada etapa concluída. O app mostra esse arquivo de volta para você no fim das mensagens como MEMÓRIA DA TAREFA: depois de um resumo do contexto ou numa retomada, siga dele a partir do próximo item pendente; não refaça o mapeamento nem releia arquivos que ele já descreve, a não ser para pegar a linha exata que vai editar.',
     'MENSAGEM NO MEIO DO TRABALHO: se o usuário mandar algo enquanto você trabalha e for só pergunta de andamento ("terminou?", "e aí?", "travou?", "continua"), responda em UMA linha o que já foi feito e o que falta e CONTINUE a tarefa na mesma resposta, sem encerrar. Se for correção ou pedido novo, aplique e continue. A resposta só termina com a entrega.',
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR, mas de forma PROPORCIONAL e rápida: faça no máximo DUAS rodadas de verificação por entrega (uma conferência de sintaxe e uma olhada no resultado) e só corrija o que estiver realmente quebrado; não fique refinando detalhes visuais em loop. Para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console ou tire UMA captura e olhe. Capturas, extrações e outros arquivos de teste vão para uma pasta temporária fora da pasta entregue (ou apague ao terminar): a pasta final tem só o que o usuário pediu. Se houver erro, corrija e confira de novo UMA vez. Só então responda, dizendo o que verificou.',
