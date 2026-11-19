@@ -70,7 +70,13 @@ class SessaoGateway {
     const perm = pedidoDePermissao(ev)
     if (perm) { if (process.env.SB_DEBUG_PERM) agente.registrar(this.app, 'approval payload: ' + JSON.stringify(ev.payload).slice(0, 600)); return void this._permissao(perm, ev) }
     const fim = fimDeTurno(ev)
-    if (fim.fim && this._fim) return this._fim(fim)
+    if (fim.fim && this._fim) {
+      // fim que chega antes da resposta do prompt.submit: ainda não se sabe se é do nosso turno ou de um turno interno do Hermes que estava rodando
+      if (this._aguardandoSubmit) return void (this._fimAntecipado = fim)
+      // nosso pedido entrou na fila atrás de outro turno: o primeiro fim é do outro (a resposta dele não é a resposta do usuário)
+      if (this._pularFins > 0) return void (this._pularFins--, agente.registrar(this.app, 'gateway: fim de turno de outro pedido ignorado (o nosso estava na fila)'))
+      return this._fim(fim)
+    }
     for (const e of traducao(ev, this.estado)) {
       if (e.texto) {
         if (/^\s*gateway\.errors\./.test(e.texto)) continue
@@ -143,7 +149,24 @@ class SessaoGateway {
           const sid = this.sid || (await this._criarComTentativas())
           if (this.pedidoParar) throw new Error('Interrompido.')
           const fim = new Promise((ok) => { this._fim = ok })
-          const r = await this.gw.rpc('prompt.submit', { session_id: sid, input_id: id(), text: corpo + (this.chatMarca ? nl + '<!--sb:' + this.chatMarca + '-->' : '') }, 60000)
+          // Com o Hermes ocupado (ex.: turno interno de aviso de processo), o submit volta status 'queued' e o PRIMEIRO message.complete é do
+          // outro turno: antes o app fechava o pedido com a resposta errada e a resposta de verdade nunca aparecia (visto em 19/11/2026).
+          this._pularFins = 0
+          this._fimAntecipado = null
+          this._aguardandoSubmit = true
+          let r
+          try {
+            r = await this.gw.rpc('prompt.submit', { session_id: sid, input_id: id(), text: corpo + (this.chatMarca ? nl + '<!--sb:' + this.chatMarca + '-->' : '') }, 60000)
+          } finally {
+            this._aguardandoSubmit = false
+          }
+          const naFila = r && r.status === 'queued'
+          const antecipado = this._fimAntecipado
+          this._fimAntecipado = null
+          if (naFila) {
+            agente.registrar(this.app, 'gateway: pedido entrou na fila atrás de outro turno' + (antecipado ? ' (o outro já terminou)' : ''))
+            if (!antecipado) this._pularFins = 1
+          } else if (antecipado) this._fim(antecipado) // turno nosso que terminou antes da resposta do submit
           this.turno = fim
           const f = await fim
           this.turno = null
