@@ -74,8 +74,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "montar-ambiente falhou (codigo $LASTEXITCODE)" }
     "ambiente montado em $([int]((Get-Date) - $t1).TotalMinutes) min"
     # componentes que o Hermes so instalaria "na hora" (leitor de PDF/Word/Excel): vao JA no pacote, o cliente nao depende da internet para isso
+    # (com o uv do runner, se houver; sem ele so avisa: o app garante o componente no preparo do cliente e o teste de instalacao do CI confere)
+    $uvRunner = (Get-Command uv -ErrorAction SilentlyContinue).Source
+    if ($uvRunner) { $env:SB_UV = $uvRunner }
     & node -e "require('./agent').garantirComponentes(process.argv[1], console.log).then((r) => { console.log(JSON.stringify(r)); process.exit(r.ok ? 0 : 1) })" $casa
-    if ($LASTEXITCODE -ne 0) { throw "componentes do agente nao instalaram (codigo $LASTEXITCODE)" }
+    if ($LASTEXITCODE -ne 0) { Write-Warning "componentes do agente nao foram embutidos (codigo $LASTEXITCODE): o app instala no preparo" }
     foreach ($d in 'cache', 'logs', 'sessions', 'memories', 'backups', 'image_cache', 'audio_cache', 'telemetry', 'pairing', 'cron', 'kanban', 'state', 'runtime', 'platforms', 'plugins', 'hooks', 'gateway', 'skills', 'source-checks', 'pending_messages', 'plugin-update-checks', '.curator_backups') {
         Remove-Item -Recurse -Force (Join-Path $casa $d) -ErrorAction SilentlyContinue
     }
