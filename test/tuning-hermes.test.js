@@ -34,3 +34,22 @@ test('config e SOUL: skills de fábrica fora do índice e regra de economia de s
   assert.match(soul, /SKILLS COM ECONOMIA/)
   assert.match(soul, /no máximo 2 por pedido/)
 })
+
+test('componentes: só a instalação ativa (mais recente) do ambiente conta; prompt manda ler documento pelo read_file', () => {
+  const { ambientesDoAgente, contextoDeSistema } = require('../agent')
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), 'sbc-'))
+  const py = process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']
+  for (const [inst, idade] of [['velha', 5000], ['nova', 0]]) {
+    const base = path.join(h, 'installs', inst, 'environments', 'e1')
+    fs.mkdirSync(path.join(base, 'venv', py[0]), { recursive: true })
+    fs.mkdirSync(path.join(base, 'workspace', 'pm'), { recursive: true })
+    fs.writeFileSync(path.join(base, 'venv', ...py), '')
+    const t = new Date(Date.now() - idade * 1000)
+    fs.utimesSync(base, t, t)
+  }
+  const a = ambientesDoAgente(h)
+  assert.equal(a.length, 1)
+  assert.match(a[0].py, /nova/)
+  assert.equal(ambientesDoAgente(path.join(h, 'nada')).length, 0)
+  assert.match(contextoDeSistema({ pasta: 'C:/x' }), /LER PDF, WORD/)
+})

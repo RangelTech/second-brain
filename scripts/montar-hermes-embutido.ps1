@@ -73,6 +73,9 @@ try {
     & node (Join-Path (Get-Location) 'scripts\montar-ambiente.js') (Join-Path $raiz 'bin\hermes-acp.exe') $casa 40
     if ($LASTEXITCODE -ne 0) { throw "montar-ambiente falhou (codigo $LASTEXITCODE)" }
     "ambiente montado em $([int]((Get-Date) - $t1).TotalMinutes) min"
+    # componentes que o Hermes so instalaria "na hora" (leitor de PDF/Word/Excel): vao JA no pacote, o cliente nao depende da internet para isso
+    & node -e "require('./agent').garantirComponentes(process.argv[1], console.log).then((r) => { console.log(JSON.stringify(r)); process.exit(r.ok ? 0 : 1) })" $casa
+    if ($LASTEXITCODE -ne 0) { throw "componentes do agente nao instalaram (codigo $LASTEXITCODE)" }
     foreach ($d in 'cache', 'logs', 'sessions', 'memories', 'backups', 'image_cache', 'audio_cache', 'telemetry', 'pairing', 'cron', 'kanban', 'state', 'runtime', 'platforms', 'plugins', 'hooks', 'gateway', 'skills', 'source-checks', 'pending_messages', 'plugin-update-checks', '.curator_backups') {
         Remove-Item -Recurse -Force (Join-Path $casa $d) -ErrorAction SilentlyContinue
     }

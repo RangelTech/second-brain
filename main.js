@@ -227,8 +227,29 @@ function limparAgenteQuebrado(anotar = () => {}) {
     }
   }
 }
+// Componentes que o Hermes só instalaria "na hora" (ex.: leitor de PDF/Word/Excel): a instalação só vale com todos presentes. Se algum foi
+// instalado agora, o gateway reinicia para passar a usar a instalação nova do ambiente (spec 48 rodada 3, ticket do Emerson 19/11/2026).
+async function componentesDoAgente(anotar) {
+  const home = caminhosHermes.homeAgente(app)
+  const r = await require('./agent').garantirComponentes(home, anotar)
+  if (r.instalou) {
+    try { require('./sessao-gateway').encerrarGateway() } catch {}
+    const bin = localizarBinario(app)
+    const hermes = bin && path.join(path.dirname(bin), process.platform === 'win32' ? 'hermes.exe' : 'hermes')
+    if (hermes && fs.existsSync(hermes)) {
+      await new Promise((ok) => require('child_process').execFile(hermes, ['gateway', 'stop', '--yes'], { env: { ...process.env, HERMES_HOME: home }, windowsHide: true, timeout: 60000 }, () => ok()))
+      anotar('gateway reiniciado para usar os componentes novos')
+    }
+  }
+  return r
+}
 async function verificarAgente(anotar = () => {}) {
-  if (fs.existsSync(marcaTeste())) return { ok: true, jaFeito: true }
+  if (fs.existsSync(marcaTeste())) {
+    // instalação antiga já testada: confere os componentes também (quem ficou sem o leitor de documentos recebe agora)
+    const c = await componentesDoAgente(anotar)
+    if (c.ok) return { ok: true, jaFeito: true }
+    return { ok: false, motivo: 'faltou instalar: ' + c.faltando.join(', ') }
+  }
   const pasta = pastaTrabalhoPadrao()
   fs.mkdirSync(pasta, { recursive: true })
   let r
@@ -256,6 +277,11 @@ async function verificarAgente(anotar = () => {}) {
         anotar('reinstalar o agente falhou: ' + e.message)
       }
     }
+  }
+  // a instalação só vale com a conversa de teste E todos os componentes (o CI e o instalador falham sem eles)
+  if (r.ok) {
+    const c = await componentesDoAgente(anotar)
+    if (!c.ok) r = { ok: false, motivo: 'faltou instalar: ' + c.faltando.join(', ') }
   }
   if (r.ok) {
     try {

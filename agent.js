@@ -230,6 +230,62 @@ function ambienteMontado(home, bin) {
     return false
   }
 }
+// Componentes que o agente precisa e que o Hermes só instala "na hora" (pela internet, na primeira vez que alguém usa). Se essa instalação
+// falha na máquina do cliente, o agente fica sem o recurso e gira tentando (19/11/2026: o Emerson pediu para ler um PDF e o agente não
+// conseguiu; o read_file só extrai PDF/Word/Excel com o extra doc-extract = firecrawl-anydoc). A instalação só vale com todos presentes.
+const COMPONENTES = [{ extra: 'doc-extract', modulo: 'anydoc', nome: 'leitor de documentos (PDF, Word, Excel)' }]
+function ambientesDoAgente(home) {
+  const out = []
+  try {
+    for (const inst of fs.readdirSync(path.join(home, 'installs'))) {
+      const envs = path.join(home, 'installs', inst, 'environments')
+      if (!fs.existsSync(envs)) continue
+      for (const e of fs.readdirSync(envs)) {
+        const base = path.join(envs, e)
+        const py = path.join(base, 'venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
+        if (fs.existsSync(py) && fs.existsSync(path.join(base, 'workspace', 'pm'))) out.push({ py, workspace: path.join(base, 'workspace'), em: fs.statSync(base).mtimeMs })
+      }
+    }
+  } catch {}
+  // só a instalação ATIVA conta (a mais recente): versões antigas do Hermes ficam na pasta depois de uma atualização (medido 19/11/2026: 2 instalações)
+  return out.sort((a, b) => b.em - a.em).slice(0, 1)
+}
+function rodarPy(py, codigo, env, prazoMs) {
+  return new Promise((ok) => {
+    let saida = ''
+    const p = spawn(py, ['-c', codigo], { env: { ...process.env, ...env, PYTHONUTF8: '1' }, windowsHide: true })
+    const t = setTimeout(() => { try { p.kill() } catch {} }, prazoMs)
+    p.stdout?.on('data', (d) => (saida += d))
+    p.stderr?.on('data', (d) => (saida += d))
+    p.on('error', (e) => (clearTimeout(t), ok({ codigo: -1, saida: String(e.message) })))
+    p.on('close', (c) => (clearTimeout(t), ok({ codigo: c, saida: saida.slice(-600) })))
+  })
+}
+// O Hermes instala um extra criando uma instalação NOVA do ambiente (endereçada pelo conjunto de pacotes) e passa a usá-la quando reinicia:
+// depois de instalar, a conferência relê qual é a instalação mais recente; `instalou` avisa quem chamou para reiniciar o gateway.
+async function garantirComponentes(home, anotar = () => {}) {
+  const testa = (c) => {
+    const amb = ambientesDoAgente(home)[0]
+    return amb ? rodarPy(amb.py, `import ${c.modulo}`, { HERMES_HOME: home }, 60000).then((r) => r.codigo === 0) : Promise.resolve(false)
+  }
+  if (!ambientesDoAgente(home).length) return { ok: false, faltando: ['ambiente do agente'], instalou: false }
+  const faltando = []
+  let instalou = false
+  for (const c of COMPONENTES) {
+    if (await testa(c)) continue
+    anotar(`instalando ${c.nome}…`)
+    const { py, workspace } = ambientesDoAgente(home)[0]
+    const r = await rodarPy(py, `import sys; sys.path.insert(0, ${JSON.stringify(workspace)}); from pm import ensure_import; ensure_import(${JSON.stringify(c.extra)})`, { HERMES_HOME: home }, 10 * 60000)
+    if (await testa(c)) {
+      instalou = true
+      anotar(`${c.nome} instalado`)
+    } else {
+      anotar(`${c.nome} NÃO instalou: ${String(r.saida).replace(/\s+/g, ' ').slice(-200)}`)
+      faltando.push(c.nome)
+    }
+  }
+  return { ok: !faltando.length, faltando, instalou }
+}
 function marcarMontado(home, bin) {
   try {
     fs.writeFileSync(path.join(home, 'pronto.ok'), new Date().toISOString() + ' ' + assinaturaBin(bin))
@@ -699,6 +755,8 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     'MEMÓRIA DE TRABALHO (tarefa com muitos passos, como mexer num projeto): quando a conversa fica longa ela é resumida sozinha e detalhes se perdem. Por isso, logo depois de mapear, grave o que descobriu no arquivo de progresso desta conversa: .progresso/<código>.md dentro da pasta de trabalho, onde <código> é o que aparece no fim da mensagem do usuário como <!--sb:código-->. Conteúdo: o pedido do usuário com as palavras dele, os arquivos e linhas que importam, as decisões, o que já foi feito e o que falta. Só fatos curtos (até ~40 linhas), sem colar código. Atualize-o a cada etapa concluída. O app mostra esse arquivo de volta para você no fim das mensagens como MEMÓRIA DA TAREFA: depois de um resumo do contexto ou numa retomada, siga dele a partir do próximo item pendente; não refaça o mapeamento nem releia arquivos que ele já descreve, a não ser para pegar a linha exata que vai editar.',
     // spec 48 rodada 3 (ECC: planejar/executar/revisar em contextos separados): subagente começa com a memória limpa e erra menos
     'ETAPAS GRANDES: se a tarefa tiver etapas grandes e independentes (ex.: banco, telas, testes), entregue cada uma a um ajudante (delegate_task) com o objetivo da etapa, os arquivos que importam e o caminho do arquivo de progresso; ele começa com a memória limpa e erra menos. Depois confira você mesmo o resultado de cada etapa e atualize o progresso. Etapa pequena, ou que depende muito do que já está na conversa: faça você.',
+    // ticket do Emerson (19/11/2026): pediu para ler um PDF e o agente ficou tentando abordagens até desistir
+    'LER PDF, WORD, EXCEL OU POWERPOINT: use read_file direto no arquivo; ele já extrai o texto (com páginas). Se o PDF vier sem texto (escaneado, só imagem), transforme as páginas em imagem e use a visão (vision_analyze). Não tente instalar bibliotecas nem inventar outro caminho: se em DUAS tentativas não der, diga em uma frase que não conseguiu ler e peça o arquivo em outro formato.',
     'MENSAGEM NO MEIO DO TRABALHO: se o usuário mandar algo enquanto você trabalha e for só pergunta de andamento ("terminou?", "e aí?", "travou?", "continua"), responda em UMA linha o que já foi feito e o que falta e CONTINUE a tarefa na mesma resposta, sem encerrar. Se for correção ou pedido novo, aplique e continue. A resposta só termina com a entrega.',
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR, mas de forma PROPORCIONAL e rápida: faça no máximo DUAS rodadas de verificação por entrega (uma conferência de sintaxe e uma olhada no resultado) e só corrija o que estiver realmente quebrado; não fique refinando detalhes visuais em loop. Para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console ou tire UMA captura e olhe. Capturas, extrações e outros arquivos de teste vão para uma pasta temporária fora da pasta entregue (ou apague ao terminar): a pasta final tem só o que o usuário pediu. Se houver erro, corrija e confira de novo UMA vez. Só então responda, dizendo o que verificou.',
@@ -1499,4 +1557,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, embrulharDirecionamento, historicoParaAgente, itensAbertosDoPlano, textoContinuarPlano, textoMetaPendente, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
+module.exports = { prepararHome, contextoDeSistema, garantirComponentes, ambientesDoAgente, embrulharDirecionamento, historicoParaAgente, itensAbertosDoPlano, textoContinuarPlano, textoMetaPendente, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
