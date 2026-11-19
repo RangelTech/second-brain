@@ -16,6 +16,8 @@ test('config.yaml: revisão em segundo plano desligada, visão no mesmo bloco au
     assert.strictEqual(/^ {2}vision:/m.test(y), !!visao)
     assert.match(y, new RegExp(`proactive_prune_tokens: ${PODAR_EM}`))
     assert.match(y, new RegExp(`threshold_tokens: ${COMPRIMIR_EM}`))
+    assert.strictEqual((y.match(/^display:/gm) || []).length, 1)
+    assert.match(y, /^ {2}background_process_notifications: "error"$/m)
   }
 })
 

@@ -1521,8 +1521,10 @@ app.whenReady().then(() => {
     try {
       const s = sessoes.get(id)
       if (!s || s.morto || !s.turno || !String(texto || '').trim()) return { ok: false }
-      // se o turno estiver parado numa aprovação de permissão, o Hermes pode não responder ao 2º prompt: depois de 4 s a tela enfileira como antes
-      return { ok: await Promise.race([s.direcionar(require('./agent').embrulharDirecionamento(texto)), new Promise((r) => setTimeout(() => r(false), 4000))]) }
+      // se o turno estiver parado numa aprovação de permissão, o Hermes pode não responder: depois de 12 s a tela enfileira como antes.
+      // Eram 4 s: com o agente ocupado o Hermes demora mais que isso e a dica ia para a fila, chegando só depois do turno (visto em 19/11/2026).
+      // O RPC desiste em 11 s (sessao-gateway.js), antes deste prazo, para a mensagem nunca entrar duas vezes.
+      return { ok: await Promise.race([s.direcionar(require('./agent').embrulharDirecionamento(texto)), new Promise((r) => setTimeout(() => r(false), 12000))]) }
     } catch (e) {
       registrarAgente(app, 'direcionar: ' + (e.message || e))
       return { ok: false }

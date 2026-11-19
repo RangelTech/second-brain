@@ -184,7 +184,18 @@ class SessaoGateway {
 
   async direcionar(texto) {
     if (!this.sid || !this.turno) return false
-    try { await this.gw.rpc('session.steer', { session_id: this.sid, text: String(texto) }, 15000); return true } catch { return false }
+    // o Hermes responde {status:'queued'} (entra no próximo resultado de ferramenta) ou {status:'rejected'} (agente parado: o app põe na fila).
+    // Antes qualquer resposta valia como entregue e um 'rejected' sumia; e a demora não aparecia em log nenhum.
+    const t0 = Date.now()
+    try {
+      const r = await this.gw.rpc('session.steer', { session_id: this.sid, text: String(texto) }, 11000)
+      const st = (r && (r.status || r.result?.status)) || ''
+      agente.registrar(this.app, `direcionar: ${st || 'sem status'} em ${Date.now() - t0} ms`)
+      return st === 'queued' || st === 'redirected' || (!st && !!r)
+    } catch (e) {
+      agente.registrar(this.app, `direcionar falhou em ${Date.now() - t0} ms: ${String(e.message || e).slice(0, 120)}`)
+      return false
+    }
   }
 
   cancelar() {

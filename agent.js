@@ -618,6 +618,10 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     '  background_review:',
     `    enabled: ${process.env.SB_REVISAO_FUNDO ? 'true' : 'false'}`,
     ...(visao ? ['  vision:', '    provider: "custom"', `    model: ${JSON.stringify(visao.modelo)}`, `    base_url: ${JSON.stringify(visao.base)}`, '    api_key_env: "SB_VISAO_CHAVE"'] : []),
+    // aviso de processo em segundo plano (servidor, build) que terminou: com "concise" o fim de um servidor de teste virava um turno novo e a
+    // resposta "o processo terminou normalmente" aparecia para o cliente (visto em 19/11/2026). Só falha avisa.
+    'display:',
+    '  background_process_notifications: "error"',
     ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : []),
     'terminal:',
     '  backend: "local"',
