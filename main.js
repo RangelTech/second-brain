@@ -1522,7 +1522,7 @@ app.whenReady().then(() => {
       const s = sessoes.get(id)
       if (!s || s.morto || !s.turno || !String(texto || '').trim()) return { ok: false }
       // se o turno estiver parado numa aprovação de permissão, o Hermes pode não responder ao 2º prompt: depois de 4 s a tela enfileira como antes
-      return { ok: await Promise.race([s.direcionar(String(texto)), new Promise((r) => setTimeout(() => r(false), 4000))]) }
+      return { ok: await Promise.race([s.direcionar(require('./agent').embrulharDirecionamento(texto)), new Promise((r) => setTimeout(() => r(false), 4000))]) }
     } catch (e) {
       registrarAgente(app, 'direcionar: ' + (e.message || e))
       return { ok: false }

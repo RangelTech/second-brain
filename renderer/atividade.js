@@ -293,7 +293,7 @@
     }
 
     function quadro(t) {
-      const dt = Math.min(0.05, ult ? t - ult : 0.016)
+      const dt = Math.min(0.12, ult ? t - ult : 0.016) // até 10 quadros/s sem foco sem a animação andar em câmera lenta
       ult = t
       if (!W) tamanho()
       // geometria: o canvas é o FUNDO da tela do chat inteira; o cérebro fica grande no meio da área da conversa
@@ -636,10 +636,17 @@
       if (animando || semTela) return
       animando = true
       tamanho()
-      const laco = () => {
+      let ultimoQuadro = 0
+      const laco = (ts) => {
         if (!animando) return
+        // fundo de tela inteira a 60 quadros/s custava ~130-150% de CPU no processo de GPU e outro tanto no da tela (medido 18/11/2026):
+        // 30 quadros/s com a janela em foco e 10 sem foco; o movimento usa o relógio, então só fica menos fluido, não mais lento
+        const intervalo = document.hasFocus() ? 33 : 100
         // só desenha com a janela visível e o cartão na tela (vários chats trabalhando não pesam: só o da tela anima)
-        if (!document.hidden && canvas.isConnected) quadro(agora()) // sem offsetParent: ele forçava recalcular o layout a cada quadro (19% do tempo); quem esconde chama parar()
+        if (!document.hidden && canvas.isConnected && ts - ultimoQuadro >= intervalo - 2) { // sem offsetParent: ele forçava recalcular o layout a cada quadro (19% do tempo); quem esconde chama parar()
+          ultimoQuadro = ts
+          quadro(agora())
+        }
         raf = requestAnimationFrame(laco)
       }
       raf = requestAnimationFrame(laco)

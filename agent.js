@@ -253,8 +253,11 @@ async function contarArquivos(dirs) {
   return n
 }
 const CONTEXTO_REAL = 131072
-const COMPRIMIR_EM = 160000 // janela de 262 mil: comprimir cedo (72 mil) fazia o agente esquecer skills em tarefas longas
-const PODAR_EM = 110000 // a poda apaga resultados velhos de ferramenta, inclusive a skill lida no começo
+// Com janela de 131 mil o Hermes comprime em 75% dela (98.304): threshold_tokens é só um TETO (vale o menor). Os antigos 160 mil e 110 mil
+// eram da janela de 262 mil e, com 131 mil, a poda (barata, sem modelo) nunca rodava antes da compressão (cara: 30 a 110 s de modelo).
+// Medido em 18/11/2026: um pedido longo teve 35 compressões e zero podas. Agora a poda vem antes e adia a compressão.
+const COMPRIMIR_EM = 98304
+const PODAR_EM = 64000 // só resume resultados de ferramenta grandes (>8 mil caracteres) fora das últimas 30 mensagens; não chama o modelo
 
 const caminhosHermes = require('./caminhos-hermes')
 function localizarBinario(app) {
@@ -591,7 +594,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     '    tool_call: 3600',
     'compression:',
     '  enabled: true',
-    `  threshold_tokens: ${COMPRIMIR_EM}`, // comprime cedo: o resumo fica pequeno e rápido
+    `  threshold_tokens: ${COMPRIMIR_EM}`, // igual ao piso do Hermes para janela < 512 mil (75%)
     `  proactive_prune_tokens: ${PODAR_EM}`, // antes disso, só poda resultados velhos de ferramenta (não chama o modelo)
     '  target_ratio: 0.15',
     '  protect_last_n: 30',
@@ -669,6 +672,8 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
     'AMBIENTE PRONTO: as ferramentas que as skills usam já vêm com o app: Python em SB_PYTHON e uv em SB_UV (também no PATH). Use os scripts das skills (voz_local.py, ambiente_docs.py e outros), que montam o ambiente certo do pacote nosso. Não instale Python nem pacotes pip por fora e não troque versões travadas nos scripts. Se um script de skill falhar, mostre o erro e siga a skill; não invente outra instalação.',
     'PLANO: se você criar uma lista de tarefas (ferramenta todo), ela aparece para o usuário. Atualize-a SEMPRE: marque o item como em andamento ao começar e como concluído assim que terminar, antes de ir para o próximo. Plano parado no primeiro item parece travamento.',
     process.env.SB_SEM_DICA_PASTAS ? '' : 'PASTAS GRANDES: para LISTAR, CONTAR ou PROCURAR arquivos use a ferramenta terminal com comandos diretos e limite de profundidade (ls, dir, find -maxdepth 2). NUNCA use search_files com o padrão * nem varreduras recursivas completas: elas leem a pasta inteira (inclusive node_modules, .git e venv) e podem levar minutos. Só varra tudo se o usuário pedir.',
+    'MEMÓRIA DE TRABALHO (tarefa com muitos passos, como mexer num projeto): quando a conversa fica longa ela é resumida sozinha e detalhes se perdem. Por isso, logo depois de mapear, grave o que descobriu em um arquivo de progresso na pasta .progresso dentro da pasta de trabalho (ex.: .progresso/protocolo-no-banco.md): o pedido do usuário com as palavras dele, os arquivos e linhas que importam, as decisões, o que já foi feito e o que falta. Só fatos curtos, sem colar código. Atualize-o a cada etapa concluída. Depois de um resumo do contexto (aviso CONTEXT COMPACTION) ou quando a tarefa for retomada, LEIA esse arquivo primeiro e siga do próximo item pendente: não refaça o mapeamento nem releia arquivos que ele já descreve, a não ser para pegar a linha exata que vai editar.',
+    'MENSAGEM NO MEIO DO TRABALHO: se o usuário mandar algo enquanto você trabalha e for só pergunta de andamento ("terminou?", "e aí?", "travou?", "continua"), responda em UMA linha o que já foi feito e o que falta e CONTINUE a tarefa na mesma resposta, sem encerrar. Se for correção ou pedido novo, aplique e continue. A resposta só termina com a entrega.',
     'Ao criar arquivos grandes, NÃO escreva tudo numa só chamada: divida em partes de no máximo ~150 linhas (crie o esqueleto e depois acrescente ou edite por partes). Chamadas gigantes deixam o usuário minutos sem ver andamento e podem estourar o tempo.',
     'NUNCA diga que algo está pronto sem VERIFICAR, mas de forma PROPORCIONAL e rápida: faça no máximo DUAS rodadas de verificação por entrega (uma conferência de sintaxe e uma olhada no resultado) e só corrija o que estiver realmente quebrado; não fique refinando detalhes visuais em loop. Para JavaScript extraia o script e rode `node --check`; para HTML abra no Chrome ou Edge sem janela (headless) e leia os erros do console ou tire UMA captura e olhe. Capturas, extrações e outros arquivos de teste vão para uma pasta temporária fora da pasta entregue (ou apague ao terminar): a pasta final tem só o que o usuário pediu. Se houver erro, corrija e confira de novo UMA vez. Só então responda, dizendo o que verificou.',
     navegador ? 'Você tem um NAVEGADOR INTEGRADO que o usuário vê na tela ao lado do chat. Para abrir sites, clicar, preencher formulários, ler páginas e tirar capturas de tela, use as ferramentas do servidor "navegador" (navegador_abrir, navegador_ler, navegador_clicar, navegador_digitar, navegador_rolar, navegador_print, navegador_voltar, navegador_esperar, navegador_js). Comece com navegador_abrir, depois navegador_ler para ver a página e os elementos clicáveis (cada um tem um id), e use navegador_print para VER a página de verdade (depois olhe a imagem com vision_analyze no caminho devolvido). Prefira essas ferramentas ao navegador próprio do Hermes. O usuário também pode ter a extensão "Cérebro Pro no Chrome": com ela as mesmas ferramentas rodam no Chrome DELE, com as contas dele abertas (parâmetro onde="chrome"; no aplicativo o padrão é o navegador integrado e na versão web é sempre o Chrome dele). Antes, rode navegador_chrome_estado; sem Chrome conectado, mande o link https://brain.rangeltech.net/extensao/ (skill navegador-do-usuario).' : '',
@@ -682,6 +687,16 @@ function contextoDeSistema({ pasta, ferramentas, navegador, midia, memoria }) {
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+// Mensagem que a pessoa manda enquanto o agente trabalha (entra no turno em andamento). Sem o embrulho, "terminou?" virava pedido novo: o modelo
+// respondia "ainda não, vou retomar" e ENCERRAVA o turno, largando a tarefa no meio (visto em 18/11/2026, 23:05-23:14).
+function embrulharDirecionamento(texto) {
+  const t = String(texto || '').trim()
+  if (!t) return t
+  return '[Mensagem do usuário enviada enquanto você trabalhava]\n' + t + '\n\n' +
+    '(Se for só pergunta de andamento, responda em UMA linha o que já foi feito e o que falta e CONTINUE a tarefa sem encerrar a resposta. ' +
+    'Se for correção ou pedido novo, aplique e continue. A resposta só termina com a entrega.)'
 }
 
 function registrar(app, linha) {
@@ -1414,4 +1429,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
+module.exports = { prepararHome, contextoDeSistema, embrulharDirecionamento, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
