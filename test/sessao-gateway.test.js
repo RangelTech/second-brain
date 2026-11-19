@@ -227,3 +227,24 @@ test('SessaoGateway: submit queued com um único fim de turno não trava', async
   assert.match(emitidos.filter((e) => e.texto).map((e) => e.texto).join(''), /olá mundo/)
   s.encerrar()
 })
+
+// 19/11/2026: o gateway não tem session.steer (invalid_params); a dica vai por prompt.submit com busy_input_mode "steer"
+test('SessaoGateway: direcionar vai por prompt.submit; steered entra no turno, queued é cancelado no Hermes (sem cópia dupla)', async () => {
+  for (const [status, esperado] of [['steered', true], ['queued', false]]) {
+    const gw = gwFalso()
+    const { s } = montar(gw)
+    const vistos = []
+    const original = gw.rpc
+    gw.rpc = async (m, p) => {
+      vistos.push(m)
+      if (m === 'prompt.submit' && s.turno) return { status }
+      return original(m, p)
+    }
+    s.sid = 'S1'
+    s.turno = Promise.resolve()
+    assert.equal(await s.direcionar('terminou?'), esperado, status)
+    assert.ok(vistos.includes('prompt.submit') && !vistos.includes('session.steer'))
+    assert.equal(vistos.includes('prompt.cancel'), status === 'queued')
+    s.encerrar()
+  }
+})

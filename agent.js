@@ -720,6 +720,9 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     // resposta "o processo terminou normalmente" aparecia para o cliente (visto em 19/11/2026). Só falha avisa.
     'display:',
     '  background_process_notifications: "error"',
+    // mensagem mandada com o agente ocupado ENTRA no turno em andamento (padrão do Hermes é "interrupt"; o app usava session.steer, que esta
+    // API do gateway nem tem: invalid_params, e a dica sempre ia para a fila — medido 19/11/2026)
+    '  busy_input_mode: "steer"',
     ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : ["skills:", `  disabled: ${JSON.stringify(SKILLS_FORA)}`]),
     // LEITURA ENXUTA (spec 48 rodada 3, medido 19/11/2026 com Qwen puro): o agente lia main.py e painel.html INTEIROS (45 mil caracteres cada)
     // e o contexto foi de 41 mil para ~70 mil tokens em 2 passos; cada passo seguinte levava 20-80 s e a compressão vinha logo. Acima do teto o
