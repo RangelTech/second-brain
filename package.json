@@ -1,7 +1,7 @@
 {
   "name": "second-brain",
   "productName": "Segundo Cérebro",
-  "version": "0.6.81-teste.1",
+  "version": "0.6.81-teste.2",
   "description": "Cérebro Pro, da Rangel Tech: agente de IA para desktop com provedores e combos",
   "main": "main.js",
   "author": {
