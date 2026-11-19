@@ -724,22 +724,41 @@ async function responder(alvo, msgs, ctx) {
   const ultimo = [...msgs].reverse().find((m) => m.role === 'user')?.content ?? ''
   const historico = agenteMod.historicoParaAgente(msgs.slice(0, -1))
   if (PEDE_EDITOR.test(ultimo)) chatsComEditor.add(ctx.chat)
-  const sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
+  let sessao = await sessaoDoChat(ctx.chat, alvo, ctx, historico)
   if (sessao.primeira) sessao.historico = historico // sessão aquecida antes da 1ª pergunta do agente: entra o que já foi dito
-  // o que acontece no turno (plano, texto, ferramentas feitas) é lido aqui para decidir se a meta terminou
+  // o que acontece no turno (plano, texto, ferramentas feitas, uso do contexto) é lido aqui para decidir se a meta terminou
   let plano = null
   let textoTurno = ''
+  let textoTodo = ''
+  let uso = null
   const feitos = []
   const canal = ctx.onDelta || (() => {})
-  sessao.emitir = (d) => {
-    if (d && d.plano) plano = d.plano
-    if (d && d.texto) textoTurno += d.texto
-    if (d && d.novoCard) textoTurno = ''
-    if (d && d.ferramenta && d.ferramenta.status === 'completed' && d.ferramenta.titulo) feitos.push(String(d.ferramenta.titulo).slice(0, 80))
-    canal(d)
+  const ligar = (s) => {
+    s.emitir = (d) => {
+      if (d && d.plano) plano = d.plano
+      if (d && d.texto) (textoTurno += d.texto), (textoTodo += d.texto)
+      if (d && d.novoCard) textoTurno = ''
+      if (d && d.contexto && d.contexto.tamanho) uso = d.contexto
+      if (d && d.ferramenta && d.ferramenta.status === 'completed' && d.ferramenta.titulo) feitos.push(String(d.ferramenta.titulo).slice(0, 80))
+      canal(d)
+    }
+    s.pedirPermissao = ctx.pedirPermissao
   }
-  sessao.pedirPermissao = ctx.pedirPermissao
+  ligar(sessao)
   ctx.sinal?.addEventListener('abort', () => sessao.cancelar())
+  // recomeço planejado (spec 48 rodada 3, ECC context-gate): contexto acima de 75% da janela no FIM de um turno = sessão nova e limpa
+  // (chat com orçamento + memória da tarefa que a ponte reinjeta), em vez de deixar o Hermes comprimir de novo no meio do próximo trabalho
+  const cheio = () => !!(uso && uso.usado >= 0.75 * uso.tamanho && cfg.recomecoPlanejado !== false)
+  const recomecar = async (motivo) => {
+    registrarAgente(app, `recomeço planejado (${motivo}): contexto em ${Math.round((100 * uso.usado) / uso.tamanho)}%`)
+    try { sessao.encerrar() } catch {}
+    sessoes.delete(ctx.chat)
+    const hist = agenteMod.historicoParaAgente([...msgs.slice(0, -1), { role: 'user', content: ultimo }, ...(textoTodo.trim() ? [{ role: 'assistant', content: textoTodo }] : [])])
+    sessao = await sessaoDoChat(ctx.chat, alvo, ctx, hist)
+    if (sessao.primeira) sessao.historico = hist
+    ligar(sessao)
+    uso = null
+  }
   // meta de um turno que morreu: vai junto com esta mensagem, para o agente continuar de onde parou
   const pendente = metasPendentes.ler(ctx.chat)
   const pergunta = pendente ? agenteMod.textoMetaPendente(pendente, ultimo) : ultimo
@@ -753,12 +772,19 @@ async function responder(alvo, msgs, ctx) {
       if (!abertos.length) break
       const feitosAntes = (plano.itens || []).filter((i) => i.estado === 'feito').length
       registrarAgente(app, `meta: ${abertos.length} passo(s) aberto(s) no fim do turno, continuando (volta ${volta + 1})`)
+      if (cheio()) await recomecar('antes de continuar a meta')
       canal({ novoCard: true })
       textoTurno = ''
       r = await sessao.perguntar(agenteMod.textoContinuarPlano(abertos), [])
       if ((plano.itens || []).filter((i) => i.estado === 'feito').length <= feitosAntes) break // sem progresso: para (não gasta cota em laço)
     }
     metasPendentes.limpar(ctx.chat)
+    // terminou cheio: a próxima mensagem já começa numa sessão limpa (com o chat todo dentro do orçamento)
+    if (cheio()) {
+      registrarAgente(app, `recomeço planejado (fim do pedido): contexto em ${Math.round((100 * uso.usado) / uso.tamanho)}%, próxima mensagem em sessão nova`)
+      try { sessao.encerrar() } catch {}
+      sessoes.delete(ctx.chat)
+    }
   } catch (e) {
     // o turno morreu e a retomada automática não salvou: a meta fica guardada para a próxima mensagem (o usuário pode parar de propósito)
     if (!ctx.sinal?.aborted) metasPendentes.guardar(ctx.chat, { pedido: pendente ? pendente.pedido : ultimo, feitos: [...(pendente?.feitos || []), ...feitos].slice(-20) })
