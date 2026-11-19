@@ -230,21 +230,24 @@ test('SessaoGateway: submit queued com um único fim de turno não trava', async
 
 // 19/11/2026: o gateway não tem session.steer (invalid_params); a dica vai por prompt.submit com busy_input_mode "steer"
 test('SessaoGateway: direcionar vai por prompt.submit; steered entra no turno, queued é cancelado no Hermes (sem cópia dupla)', async () => {
-  for (const [status, esperado] of [['steered', true], ['queued', false]]) {
+  // queued + transferência aceita = entregue; queued + transferência recusada = cancela na fila do Hermes e a tela enfileira
+  for (const [status, esperado, recusa] of [['steered', true, false], ['queued', true, false], ['queued', false, true]]) {
     const gw = gwFalso()
     const { s } = montar(gw)
     const vistos = []
     const original = gw.rpc
     gw.rpc = async (m, p) => {
       vistos.push(m)
-      if (m === 'prompt.submit' && s.turno) return { status }
+      if (m === 'prompt.submit' && s.turno) return { status, admission_id: 'A9' }
+      if (m === 'prompt.steer_queued') { if (p.admission_id !== 'A9') throw new Error('admission errada'); if (recusa) throw new Error('steer_unavailable'); return {} }
       return original(m, p)
     }
     s.sid = 'S1'
     s.turno = Promise.resolve()
     assert.equal(await s.direcionar('terminou?'), esperado, status)
     assert.ok(vistos.includes('prompt.submit') && !vistos.includes('session.steer'))
-    assert.equal(vistos.includes('prompt.cancel'), status === 'queued')
+    assert.equal(vistos.includes('prompt.steer_queued'), status === 'queued')
+    assert.equal(vistos.includes('prompt.cancel'), status === 'queued' && recusa)
     s.encerrar()
   }
 })

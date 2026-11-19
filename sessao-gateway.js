@@ -194,7 +194,17 @@ class SessaoGateway {
       const st = (r && r.status) || ''
       agente.registrar(this.app, `direcionar: ${st || 'sem status'} em ${Date.now() - t0} ms`)
       if (st === 'steered' || st === 'redirected') return true
-      if (st === 'queued') await this.gw.rpc('prompt.cancel', { session_id: this.sid, input_id: inputId }, 8000).catch(() => {})
+      if (st === 'queued' && r.admission_id) {
+        // conversa local sempre enfileira: prompt.steer_queued TRANSFERE o pedido da fila para o turno em andamento (vira direcionamento)
+        try {
+          await this.gw.rpc('prompt.steer_queued', { session_id: this.sid, admission_id: r.admission_id }, 8000)
+          agente.registrar(this.app, `direcionar: transferido da fila para o turno em ${Date.now() - t0} ms`)
+          return true
+        } catch (e) {
+          agente.registrar(this.app, `direcionar: transferência recusada (${String(e.message || e).slice(0, 80)}), cancelando na fila do Hermes`)
+          await this.gw.rpc('prompt.cancel', { session_id: this.sid, admission_id: r.admission_id }, 8000).catch(() => {})
+        }
+      }
       return false
     } catch (e) {
       agente.registrar(this.app, `direcionar falhou em ${Date.now() - t0} ms: ${String(e.message || e).slice(0, 120)}`)
