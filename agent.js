@@ -611,7 +611,13 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     ...(process.env.SB_TOOLSETS_OFF ? [`  disabled_toolsets: ${JSON.stringify(process.env.SB_TOOLSETS_OFF.split(',').map((s) => s.trim()).filter(Boolean))}`] : []),
     // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
     // com a conta do Unlimited, a visão vai direto a ele. Sem a conta, o Hermes decide sozinho.
-    ...(visao ? ['auxiliary:', '  vision:', '    provider: "custom"', `    model: ${JSON.stringify(visao.modelo)}`, `    base_url: ${JSON.stringify(visao.base)}`, '    api_key_env: "SB_VISAO_CHAVE"'] : []),
+    'auxiliary:',
+    // revisão automática depois de cada turno (o Hermes relê a conversa inteira para salvar memória/ajustar skill): medido 11-19/11/2026 no PC
+    // do Lucas, 14 revisões, 1,62 milhão de tokens, ZERO resultado (result=none) e cache_read=0: era só GPU e cota do cliente queimando.
+    // /refine continua funcionando quando o usuário pedir. SB_REVISAO_FUNDO=1 religa só para medir.
+    '  background_review:',
+    `    enabled: ${process.env.SB_REVISAO_FUNDO ? 'true' : 'false'}`,
+    ...(visao ? ['  vision:', '    provider: "custom"', `    model: ${JSON.stringify(visao.modelo)}`, `    base_url: ${JSON.stringify(visao.base)}`, '    api_key_env: "SB_VISAO_CHAVE"'] : []),
     ...(gateway ? yamlGateway(filhos, process.env.SB_SEM_MCP_CRON ? null : mcpGlobais(app)) : []),
     'terminal:',
     '  backend: "local"',

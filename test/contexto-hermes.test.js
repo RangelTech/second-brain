@@ -1,7 +1,23 @@
 // Controle de contexto do Hermes e mensagem no meio do trabalho (spec 48)
 const test = require('node:test')
 const assert = require('node:assert')
-const { COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, contextoDeSistema, embrulharDirecionamento } = require('../agent')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const { COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, contextoDeSistema, embrulharDirecionamento, prepararHome } = require('../agent')
+
+test('config.yaml: revisão em segundo plano desligada, visão no mesmo bloco auxiliary, poda e compressão escritas', () => {
+  const t = fs.mkdtempSync(path.join(os.tmpdir(), 'sbh-'))
+  const app = { getPath: () => t, getAppPath: () => process.cwd(), isPackaged: false, getVersion: () => '0' }
+  for (const visao of [null, { base: 'http://x/v1', modelo: 'visao', chave: 'k' }]) {
+    const y = fs.readFileSync(path.join(prepararHome(app, { base: 'http://127.0.0.1:1/v1', pasta: t, visao }), 'config.yaml'), 'utf8')
+    assert.strictEqual((y.match(/^auxiliary:/gm) || []).length, 1, 'um bloco auxiliary só (chave repetida no YAML some com a primeira)')
+    assert.match(y, /^ {2}background_review:\n {4}enabled: false$/m)
+    assert.strictEqual(/^ {2}vision:/m.test(y), !!visao)
+    assert.match(y, new RegExp(`proactive_prune_tokens: ${PODAR_EM}`))
+    assert.match(y, new RegExp(`threshold_tokens: ${COMPRIMIR_EM}`))
+  }
+})
 
 test('a poda barata acontece antes da compressão e tudo cabe na janela real', () => {
   // o Hermes comprime em 75% de janelas < 512 mil; threshold_tokens só baixa esse ponto
