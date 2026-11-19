@@ -1111,6 +1111,40 @@ app.whenReady().then(() => {
     setTimeout(() => wkPend.has(id) && (wkPend.delete(id), res({ ok: false, erro: 'prazo' })), 60000)
     whisperWorker().postMessage({ ...m, id }, transfer || [])
   })
+  // Ditado ao vivo (spec 49): a tela manda PCM 16 kHz em pedaços; o conector (conector-ditado.js) fala com o servidor e o texto volta
+  // parcial enquanto a pessoa fala. Falhou ao abrir ou caiu: a tela volta sozinha ao ditado por frases (canal ditado:servidor abaixo).
+  const conectorDitado = require('./conector-ditado')
+  const ditadosVivos = new Map()
+  ipcMain.handle('ditado:vivo:abrir', (e, id) => {
+    const m = midiaDoApp()
+    if (!m || !id) return { ok: false }
+    ditadosVivos.get(id)?.fechar()
+    const wc = e.sender
+    const manda = (tipo, data) => {
+      try {
+        if (!wc.isDestroyed()) wc.send('ditado:vivo:evento', { id, tipo, data })
+      } catch {}
+    }
+    const c = conectorDitado.abrirStream({ base: m.base, chave: m.chave, idioma: 'pt' }, {
+      aoParcial: (t) => manda('parcial', t),
+      aoFinal: (t) => manda('final', t),
+      aoFimDeFala: () => manda('fimDeFala'),
+      aoErro: (msg) => (registrarAgente(app, 'ditado ao vivo: ' + String(msg).slice(0, 160)), manda('erro', msg)),
+      aoFechar: () => (ditadosVivos.get(id) === c && ditadosVivos.delete(id), manda('fechou')),
+    })
+    ditadosVivos.set(id, c)
+    return { ok: true }
+  })
+  ipcMain.handle('ditado:vivo:audio', (_e, id, pcm) => {
+    const c = ditadosVivos.get(id)
+    if (!c || !pcm) return false
+    c.enviar(Buffer.from(pcm))
+    return true
+  })
+  ipcMain.handle('ditado:vivo:fechar', (_e, id) => {
+    ditadosVivos.get(id)?.fechar()
+    return true
+  })
   // Ditado por voz: o áudio da gravação inteira vai ao servidor de transcrição (Whisper na GPU) com a chave da conta e o texto volta.
   // Vale para o app e para a web (a web chama este mesmo canal pela ponte, e quem fala com o servidor é a máquina do cliente).
   ipcMain.handle('ditado:servidor', async (_e, dados, mime) => {

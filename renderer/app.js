@@ -1058,6 +1058,94 @@
     novaFrase(g)
     try { velho.stop() } catch {}
   }
+  // ---- ditado ao vivo (spec 49): PCM 16 kHz vai em pedaços de ~160 ms pelo conector; o texto parcial aparece na caixa enquanto a pessoa
+  // fala e vira definitivo no fim da frase. Não abriu, ou caiu antes do primeiro texto: a gravação segue pelo ditado por frases.
+  let vivoAtual = null // { id, g, base, finais, parcial, recebeu, fim }
+  function pintarVivo(v) {
+    const t = $('texto')
+    t.value = [v.base, v.finais, v.parcial].map((s) => (s || '').trim()).filter(Boolean).join(' ')
+    t.dispatchEvent(new Event('input'))
+    t.scrollTop = t.scrollHeight
+  }
+  function encerrarVivo(v) {
+    if (vivoAtual !== v) return
+    vivoAtual = null
+    clearTimeout(v.fim)
+    v.parcial = ''
+    pintarVivo(v)
+    try { v.proc && v.proc.disconnect() } catch {}
+    if (v.g.encerrando) {
+      try { v.g.fluxo.getTracks().forEach((tr) => tr.stop()) } catch {}
+      try { v.g.ctx && v.g.ctx.close() } catch {}
+      transcrevendo = false
+      pintarMic(null)
+      if (!$('texto').value.trim()) aviso('Não entendi nenhuma fala. Tente de novo, mais perto do microfone.')
+      $('texto').focus()
+    }
+  }
+  window.sb.ditadoVivo?.aoEvento((ev) => {
+    const v = vivoAtual
+    if (!v || !ev || ev.id !== v.id) return
+    if (ev.tipo === 'parcial') (v.recebeu = true), (v.parcial = ev.data || ''), pintarVivo(v)
+    else if (ev.tipo === 'final') (v.recebeu = true), (v.finais = [v.finais, ev.data].filter(Boolean).join(' ')), (v.parcial = ''), pintarVivo(v)
+    else if (ev.tipo === 'fimDeFala') (v.parcial = ''), pintarVivo(v)
+    else if (ev.tipo === 'erro' || ev.tipo === 'fechou') {
+      if (!v.g.encerrando && !v.recebeu && gravandoVoz === v.g) {
+        // caiu antes de qualquer texto: segue gravando pelo caminho antigo, sem a pessoa perceber
+        try { v.proc && v.proc.disconnect() } catch {}
+        vivoAtual = null
+        v.g.vivo = null
+        v.g.frase = { falou: 0, ini: performance.now() }
+        novaFrase(v.g)
+      } else encerrarVivo(v)
+    }
+  })
+  async function iniciarVivo(g) {
+    if (!window.sb.ditadoVivo || !g.ctx || !g.ctx.createScriptProcessor) return false
+    const id = 'd' + Date.now() + Math.random().toString(36).slice(2, 6)
+    let r
+    try {
+      r = await window.sb.ditadoVivo.abrir(id)
+    } catch {
+      r = null
+    }
+    if (!r || !r.ok) return false
+    const v = { id, g, base: $('texto').value, finais: '', parcial: '', recebeu: false, fim: 0 }
+    const fonte = g.ctx.createMediaStreamSource(g.fluxo)
+    const proc = g.ctx.createScriptProcessor(4096, 1, 1)
+    const razao = g.ctx.sampleRate / 16000
+    let acum = new Int16Array(0)
+    proc.onaudioprocess = (e) => {
+      if (vivoAtual !== v) return
+      const x = e.inputBuffer.getChannelData(0)
+      const n = Math.floor(x.length / razao)
+      const out = new Int16Array(acum.length + n)
+      out.set(acum)
+      for (let i = 0; i < n; i++) {
+        const s = Math.max(-1, Math.min(1, x[Math.floor(i * razao)]))
+        out[acum.length + i] = s < 0 ? s * 0x8000 : s * 0x7fff
+      }
+      acum = out
+      if (acum.length >= 2560) {
+        window.sb.ditadoVivo.audio(id, new Uint8Array(acum.buffer.slice(0))).catch(() => {})
+        acum = new Int16Array(0)
+      }
+    }
+    fonte.connect(proc)
+    proc.connect(g.ctx.destination) // o ScriptProcessor só roda ligado à saída (sai mudo: o buffer de saída fica zerado)
+    v.proc = proc
+    g.vivo = v
+    vivoAtual = v
+    return true
+  }
+  function pararVivo(g) {
+    const v = g.vivo
+    transcrevendo = true
+    pintarMic('transcrevendo')
+    try { v.proc && v.proc.disconnect() } catch {}
+    window.sb.ditadoVivo.fechar(v.id).catch(() => {})
+    v.fim = setTimeout(() => encerrarVivo(v), 8000) // o último texto não veio: fecha assim mesmo
+  }
   function pararGravacao() {
     const g = gravandoVoz
     if (!g) return
@@ -1065,6 +1153,7 @@
     g.encerrando = true
     clearTimeout(g.limite)
     cancelAnimationFrame(g.raf)
+    if (g.vivo) return pararVivo(g)
     transcrevendo = true
     pintarMic('transcrevendo')
     try {
@@ -1090,7 +1179,8 @@
     const ctx = AC ? new AC() : null
     const g = { fluxo, ctx, mime, raf: 0, limite: 0, encerrando: false }
     aviso('')
-    novaFrase(g)
+    // ao vivo primeiro (spec 49); sem conexão, o ditado por frases de sempre
+    if (!(cfg?.ditadoVivo !== false && (await iniciarVivo(g)))) novaFrase(g)
     if (ctx) {
       try {
         const an = ctx.createAnalyser()
@@ -1115,6 +1205,13 @@
           // piso de ruído adaptativo: fala = bem acima do ruído do ambiente
           piso = rms < piso ? rms * 0.2 + piso * 0.8 : piso * 0.999 + rms * 0.001
           const fala = rms > Math.max(0.012, piso * 2.5)
+          if (g.vivo) {
+            // ao vivo: quem corta as frases é o servidor; aqui só as barras do microfone
+            const nv = Math.min(1, rms * 4)
+            barras().forEach((i, k) => (i.style.height = 4 + Math.round(nv * f[k] * 16) + 'px'))
+            g.raf = requestAnimationFrame(medir)
+            return
+          }
           const fr = g.frase
           if (fala) {
             fr.falou += dt
