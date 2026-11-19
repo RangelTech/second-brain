@@ -269,6 +269,7 @@
   const nomeArq = (p) => String(p || '').split(/[\\/]/).pop()
   // nome de ferramenta -> rótulo de gente; etapas internas do agente não aparecem
   const INTERNA = /^\s*(Reading tool details|Searching tools|Unnamed call)/i
+  const ACESO_MIN = 2500 // ms que cada ferramenta fica acesa no cérebro, mesmo quando termina antes (a animação acompanha o trabalho real)
   const ehMidia = (f) => /midia_(gerar_(imagem|video)|redublar_video|trocar_voz|clonar_voz|estudio|orcar|trocar_personagem)/.test((f && f.titulo) || '')
   const ROTULOS = [
     [/ias_perguntar/, 'Consultando outra IA'], [/delegate|subagent|spawn|agente_/i, 'Chamando um agente auxiliar'], [/midia_detalhar_prompt/, 'Detalhando o pedido'], [/midia_orcar/, 'Calculando o preço'], [/midia_estudio/, 'Criando no Estúdio'], [/midia_redublar_video/, 'Redublando o vídeo'], [/midia_trocar_voz/, 'Trocando a voz'], [/midia_clonar_voz/, 'Clonando a voz'], [/midia_conferir_troca/, 'Conferindo a foto e o vídeo'], [/midia_gerar_video/, 'Gerando vídeo'], [/midia_gerar_imagem/, 'Gerando imagem'], [/memoria_/, 'Relembrando nas conversas'],
@@ -1565,9 +1566,12 @@
         r.esperaDesde = r.esperaDesde || Date.now() - p.seg * 1000
         sinal(r, p.seg < 12 ? `Aguardando o modelo… ${p.seg} s` : `O modelo está escrevendo uma ação longa (um arquivo, por exemplo) · ${fmtTempo(p.seg * 1000)} · a tela só mostra quando ela termina`)
         definirFrase(r, p.seg < 12 ? 'Pensando…' : 'Montando uma ação longa, como um arquivo…')
+        // ação longa sendo escrita pelo modelo: acende Arquivos em vez de deixar o cérebro em "Raciocínio" o tempo todo
+        if (p.seg >= 12 && r.base !== 'arquivos' && !r.cats?.size) (r.base = 'arquivos'), cardDe(r)?.base('arquivos')
         return
       }
       r.esperaDesde = 0
+      if (p.tipo === 'ferramenta' && r.base !== 'arquivos' && !r.cats?.size) (r.base = 'arquivos'), cardDe(r)?.base('arquivos')
       const oque = p.tipo === 'ferramenta' ? 'uma ação longa (provavelmente um arquivo)' : p.tipo === 'raciocinio' ? 'o raciocínio' : 'a resposta'
       definirFrase(r, p.tipo === 'ferramenta' ? 'Escrevendo um arquivo…' : p.tipo === 'resposta' ? 'Escrevendo a resposta…' : '')
       if (!r.compactando) sinal(r, `Escrevendo ${oque} · ${nTokens(p.tokens)} tokens${p.tps ? ' · ' + p.tps + ' tok/s' : ''}`)
@@ -1634,16 +1638,24 @@
         r.cats ||= new Map()
         const cat = SA.categoriaDe(f)
         const fim = f.status === 'completed' || f.status === 'failed'
+        r.catsDesde ||= new Map()
         if (!r.cats.has(f.id)) {
           r.cats.set(f.id, cat)
+          r.catsDesde.set(f.id, Date.now())
           cardDe(r)?.evento(cat, 'inicio')
           definirFrase(r, SA.fraseDaFerramenta(f, rotuloFerr, tituloLimpo), true)
         }
-        if (fim) {
+        if (fim && r.cats.has(f.id)) {
           const c = r.cats.get(f.id)
           r.cats.delete(f.id)
-          cardDe(r)?.evento(c, f.status === 'failed' ? 'erro' : 'ok')
-          if (!r.cats.size) (r.base = 'pensar'), cardDe(r)?.base('pensar'), definirFrase(r, f.status === 'failed' ? 'Tentando de outro jeito…' : 'Analisando o resultado…')
+          // ferramenta rápida (ler um arquivo leva ~2 s) só piscava e o cérebro voltava a "Raciocínio": fica acesa pelo menos ACESO_MIN
+          const resta = Math.max(0, ACESO_MIN - (Date.now() - (r.catsDesde.get(f.id) || 0)))
+          r.catsDesde.delete(f.id)
+          const falhou = f.status === 'failed'
+          setTimeout(() => {
+            cardDe(r)?.evento(c, falhou ? 'erro' : 'ok')
+            if (!r.cats.size && r.base !== 'escrever') (r.base = 'pensar'), cardDe(r)?.base('pensar'), definirFrase(r, falhou ? 'Tentando de outro jeito…' : 'Analisando o resultado…')
+          }, resta)
         }
       }
       const existente = r.partes.find((p) => p.t === 'ferr' && p.f.id === f.id)
