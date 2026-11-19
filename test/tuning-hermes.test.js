@@ -39,17 +39,20 @@ test('componentes: só a instalação ativa (mais recente) do ambiente conta; pr
   const { ambientesDoAgente, contextoDeSistema } = require('../agent')
   const h = fs.mkdtempSync(path.join(os.tmpdir(), 'sbc-'))
   const py = process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']
-  for (const [inst, idade] of [['velha', 5000], ['nova', 0]]) {
+  // 'velha' e 'nova' completas; 'quebrada' é a mais nova mas SEM o núcleo do Hermes (acp): nunca pode ser escolhida (19/11/2026)
+  for (const [inst, idade, completa] of [['velha', 5000, true], ['nova', 100, true], ['quebrada', 0, false]]) {
     const base = path.join(h, 'installs', inst, 'environments', 'e1')
     fs.mkdirSync(path.join(base, 'venv', py[0]), { recursive: true })
     fs.mkdirSync(path.join(base, 'workspace', 'pm'), { recursive: true })
     fs.writeFileSync(path.join(base, 'venv', ...py), '')
+    if (completa) fs.mkdirSync(process.platform === 'win32' ? path.join(base, 'venv', 'Lib', 'site-packages', 'acp') : path.join(base, 'venv', 'lib', 'python3.12', 'site-packages', 'acp'), { recursive: true })
     const t = new Date(Date.now() - idade * 1000)
     fs.utimesSync(base, t, t)
   }
   const a = ambientesDoAgente(h)
   assert.equal(a.length, 1)
   assert.match(a[0].py, /nova/)
+  assert.doesNotMatch(a[0].py, /quebrada/)
   assert.equal(ambientesDoAgente(path.join(h, 'nada')).length, 0)
   assert.match(contextoDeSistema({ pasta: 'C:/x' }), /LER PDF, WORD/)
 })

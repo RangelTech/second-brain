@@ -1838,6 +1838,23 @@
   // atualização do app: aviso discreto com botão; só no app instalado (a versão web não troca o programa)
   if (window.__sbRaw && window.sb.atualizacao) {
     const desenharAtualizacao = (e) => {
+      // atualização FORÇADA na abertura: tela cheia, sem "Depois"; o app fecha, instala em silêncio e reabre sozinho.
+      // Se o download falhar, a tela some e volta o aviso normal (com o erro e o botão de tentar).
+      let f = document.getElementById('sb-atualizacao-forcada')
+      if (e && e.forcada && ['baixando', 'pronta', 'disponivel'].includes(e.fase) && !e.erro) {
+        if (!f) {
+          f = document.createElement('div')
+          f.id = 'sb-atualizacao-forcada'
+          f.setAttribute('role', 'alertdialog')
+          f.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(14,10,7,.94);color:#f3ece4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font:15px system-ui,sans-serif;text-align:center;padding:24px'
+          f.innerHTML = '<div style="font-size:20px;font-weight:600"></div><div style="opacity:.8;max-width:420px"></div>'
+          document.body.appendChild(f)
+        }
+        f.firstChild.textContent = 'Atualizando o Cérebro Pro' + (e.versao ? ' para a versão ' + e.versao : '') + '…'
+        f.lastChild.textContent = e.fase === 'pronta' ? 'Instalando. O aplicativo reabre sozinho em instantes.' : 'Baixando a versão nova. Leva poucos minutos e o aplicativo reabre sozinho.'
+        return document.getElementById('sb-atualizacao')?.remove()
+      }
+      f?.remove()
       let b = document.getElementById('sb-atualizacao')
       if (!e || !['disponivel', 'baixando', 'pronta'].includes(e.fase) || window.__sbAtualizacaoAdiada === e.versao) return b?.remove()
       if (!b) {

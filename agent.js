@@ -233,7 +233,15 @@ function ambienteMontado(home, bin) {
 // Componentes que o agente precisa e que o Hermes só instala "na hora" (pela internet, na primeira vez que alguém usa). Se essa instalação
 // falha na máquina do cliente, o agente fica sem o recurso e gira tentando (19/11/2026: o Emerson pediu para ler um PDF e o agente não
 // conseguiu; o read_file só extrai PDF/Word/Excel com o extra doc-extract = firecrawl-anydoc). A instalação só vale com todos presentes.
-const COMPONENTES = [{ extra: 'doc-extract', modulo: 'anydoc', nome: 'leitor de documentos (PDF, Word, Excel)' }]
+const COMPONENTES = [{ extra: 'doc-extract', modulo: 'anydoc', pacote: 'firecrawl-anydoc==0.2.4', nome: 'leitor de documentos (PDF, Word, Excel)' }]
+function temPacote(venv, nome) {
+  if (fs.existsSync(path.join(venv, 'Lib', 'site-packages', nome))) return true // Windows
+  try {
+    return fs.readdirSync(path.join(venv, 'lib')).some((d) => fs.existsSync(path.join(venv, 'lib', d, 'site-packages', nome)))
+  } catch {
+    return false
+  }
+}
 function ambientesDoAgente(home) {
   const out = []
   try {
@@ -243,7 +251,8 @@ function ambientesDoAgente(home) {
       for (const e of fs.readdirSync(envs)) {
         const base = path.join(envs, e)
         const py = path.join(base, 'venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python')
-        if (fs.existsSync(py) && fs.existsSync(path.join(base, 'workspace', 'pm'))) out.push({ py, workspace: path.join(base, 'workspace'), em: fs.statSync(base).mtimeMs })
+        // só instalação COMPLETA (com o núcleo do Hermes, pacote acp): 19/11/2026 instalações sem ele derrubaram todas as conversas
+        if (fs.existsSync(py) && fs.existsSync(path.join(base, 'workspace', 'pm')) && temPacote(path.join(base, 'venv'), 'acp')) out.push({ py, venv: path.join(base, 'venv'), workspace: path.join(base, 'workspace'), em: fs.statSync(base).mtimeMs })
       }
     }
   } catch {}
@@ -261,22 +270,41 @@ function rodarPy(py, codigo, env, prazoMs) {
     p.on('close', (c) => (clearTimeout(t), ok({ codigo: c, saida: saida.slice(-600) })))
   })
 }
-// O Hermes instala um extra criando uma instalação NOVA do ambiente (endereçada pelo conjunto de pacotes) e passa a usá-la quando reinicia:
-// depois de instalar, a conferência relê qual é a instalação mais recente; `instalou` avisa quem chamou para reiniciar o gateway.
+// Instala o componente DENTRO do ambiente ativo, com o uv que vem com o app. NUNCA pelo `ensure_import` do Hermes chamado de fora: ele cria
+// uma instalação nova do ambiente sem o núcleo (acp), o Hermes passa a usá-la por ser a mais nova e TODAS as conversas falham com
+// request_failed (aconteceu no PC do Lucas em 19/11/2026, nos testes desta função).
+function uvDoApp(home) {
+  try {
+    const tools = path.join(home, 'tools')
+    const d = fs.readdirSync(tools).sort().reverse().find((x) => x.startsWith('uv-'))
+    const exe = d && path.join(tools, d, process.platform === 'win32' ? 'uv.exe' : 'uv')
+    if (exe && fs.existsSync(exe)) return exe
+  } catch {}
+  return process.env.SB_UV && fs.existsSync(process.env.SB_UV) ? process.env.SB_UV : null
+}
+function rodar(exe, args, env, prazoMs) {
+  return new Promise((ok) => {
+    let saida = ''
+    const p = spawn(exe, args, { env: { ...process.env, ...env }, windowsHide: true })
+    const t = setTimeout(() => { try { p.kill() } catch {} }, prazoMs)
+    p.stdout?.on('data', (d) => (saida += d))
+    p.stderr?.on('data', (d) => (saida += d))
+    p.on('error', (e) => (clearTimeout(t), ok({ codigo: -1, saida: String(e.message) })))
+    p.on('close', (c) => (clearTimeout(t), ok({ codigo: c, saida: saida.slice(-600) })))
+  })
+}
 async function garantirComponentes(home, anotar = () => {}) {
-  const testa = (c) => {
-    const amb = ambientesDoAgente(home)[0]
-    return amb ? rodarPy(amb.py, `import ${c.modulo}`, { HERMES_HOME: home }, 60000).then((r) => r.codigo === 0) : Promise.resolve(false)
-  }
-  if (!ambientesDoAgente(home).length) return { ok: false, faltando: ['ambiente do agente'], instalou: false }
+  const amb = ambientesDoAgente(home)[0]
+  if (!amb) return { ok: false, faltando: ['ambiente do agente'], instalou: false }
   const faltando = []
   let instalou = false
   for (const c of COMPONENTES) {
-    if (await testa(c)) continue
+    const testa = async () => (await rodarPy(amb.py, `import ${c.modulo}`, { HERMES_HOME: home }, 60000)).codigo === 0
+    if (await testa()) continue
     anotar(`instalando ${c.nome}…`)
-    const { py, workspace } = ambientesDoAgente(home)[0]
-    const r = await rodarPy(py, `import sys; sys.path.insert(0, ${JSON.stringify(workspace)}); from pm import ensure_import; ensure_import(${JSON.stringify(c.extra)})`, { HERMES_HOME: home }, 10 * 60000)
-    if (await testa(c)) {
+    const uv = uvDoApp(home)
+    const r = uv ? await rodar(uv, ['pip', 'install', '--python', amb.py, c.pacote], { UV_CACHE_DIR: path.join(home, 'cache', 'uv') }, 10 * 60000) : { saida: 'uv do app não encontrado' }
+    if (await testa()) {
       instalou = true
       anotar(`${c.nome} instalado`)
     } else {
