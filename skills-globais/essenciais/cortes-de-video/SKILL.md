@@ -101,3 +101,15 @@ Depois dos cortes, ofereça juntar os melhores (5 a 15 cortes, na ordem da live)
   filmado/gerado/código, como é a legenda, onde estão os cortes e o áudio; depois refaça a mesma estrutura com o conteúdo do cliente.
 - **Trend-jacking**: lançamentos culturais (ex.: um jogo muito esperado) rendem cortes "onde você estava em 2013 x hoje"; a janela é de dias.
 - Fontes: skill `acervo-salvar`.
+
+## Pós-produção padrão (o que o Viralizaí faz em todo corte, 19/11/2026)
+- **Legenda sempre em português**, palavra por palavra (karaokê: 2-3 palavras por vez, a palavra falada em amarelo e 12% maior).
+  Corte de vídeo gringo é bem-vindo: traduza **frase a frase** (pausa > 0,6 s ou pontuação quebra a frase), lotes de até 15 frases,
+  e distribua as palavras traduzidas no tempo da frase original, proporcional ao tamanho de cada palavra. Se a IA devolver número
+  errado de frases, traduza frase a frase. (Viralizaí: `app/motor/traduz.py`.)
+- **Título-gancho grande em caixa** (cor de destaque, fonte grossa, maiúsculas) **o vídeo todo**, no topo, com entrada em "pulo"
+  (escala 72% → 107% → 100% em 0,3 s).
+- **Barra de progresso** fina no topo, na cor de destaque, enchendo até o fim (segura a pessoa até o final).
+- **@ do canal**: só na versão de quem vai postar. Corte que será reaproveitado por várias pessoas (vitrine, banco de cortes) sai SEM @.
+- Margens seguras por rede: TikTok cobre mais embaixo e à direita (legenda a ~430 px do fundo em 1280 de altura; título a ~175 px do topo).
+- Tudo num passe só de ffmpeg com legenda ASS (`subtitles=...:fontsdir=...`), Montserrat ExtraBold.
