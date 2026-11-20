@@ -550,3 +550,12 @@ body.modo-voz .nav .nav-barra,body.modo-voz .nav-fav-menu{display:none}
 @keyframes brilhoBorda{0%,100%{background-position:120% 0}50%{background-position:-20% 0}}
 @media (prefers-reduced-motion:reduce){.voz-cartao,.voz-cartao.chega,.voz-cartao::after,.voz-cartao::before{animation:none}}
 body.modo-voz .nav-divisoria,body.modo-voz .nav-progresso{display:none}
+
+/* spec 54: cartão de vídeo do YouTube (maior, 16:9, com fechar) */
+.voz-cartao.voz-yt{width:min(34vw,460px);cursor:default}
+.voz-cartao.voz-yt iframe{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}
+.voz-cartao.voz-yt figcaption{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.voz-cartao.voz-yt::after{display:none}
+.yt-fechar{border:0;background:rgba(255,255,255,.08);color:#cfeaff;border-radius:999px;width:24px;height:24px;cursor:pointer;flex-shrink:0}
+/* spec 54: a conversa por voz não depende do agente; a tela de carregamento não cobre o palco (o aquecimento continua por trás) */
+body.modo-voz #sb-carregando{display:none !important}

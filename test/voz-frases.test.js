@@ -83,3 +83,9 @@ test('saudação: período pela hora, primeiro nome do e-mail ou do nome, pergun
   assert.match(F.saudacao(9, 'ana@x.com', s), /^Bom dia, Ana! /)
   assert.match(F.saudacao(20, '', s), /^Boa noite! /)
 })
+
+test('comandos de voz: fechar e silenciar, sem confundir com pedido', () => {
+  for (const t of ['Fecha o modo de voz', 'pode encerrar a conversa', 'sair do modo voz', 'Desliga a voz', 'tchau', 'Até mais, cérebro']) assert.equal(F.comandoDeVoz(t), 'fechar', t)
+  for (const t of ['Silencia o microfone', 'mutar o mic', 'desliga o microfone', 'fecha o microfone']) assert.equal(F.comandoDeVoz(t), 'mudo', t)
+  for (const t of ['fecha a janela do navegador', 'me conta sobre a conversa de ontem', 'qual a cotação do dólar', 'desliga o computador às 22h']) assert.equal(F.comandoDeVoz(t), null, t)
+})

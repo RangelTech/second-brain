@@ -985,6 +985,11 @@ app.whenReady().then(() => {
     salvarCfg()
   }
   session.defaultSession.setPermissionRequestHandler((_wc, permissao, cb) => cb(['media', 'clipboard-read'].includes(permissao)))
+  // spec 54: vídeo do YouTube embutido no cartão da voz. Página local (file://) não manda origem e o YouTube recusa tocar (erro 153):
+  // só nos pedidos do player embutido, a origem vai como o site do produto.
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube.com/embed/*', 'https://www.youtube-nocookie.com/embed/*'] }, (det, cb) => {
+    cb({ requestHeaders: { ...det.requestHeaders, Referer: 'https://segundocerebro.pro/' } })
+  })
   criarJanela()
   if (!MODO_SERVIDOR) {
     try {
@@ -1238,6 +1243,27 @@ app.whenReady().then(() => {
   ipcMain.handle('ditado:vivo:fechar', (_e, id) => {
     vozesVivas.get(id)?.fechar()
     return true
+  })
+  // Cérebro de voz (spec 54): modelo rápido na frente do Hermes, só na conversa por voz (cerebro-voz.js). Eventos por 'voz:cerebro:evento'.
+  const cerebroVoz = require('./cerebro-voz')
+  ipcMain.handle('voz:cerebro', (e, id, p = {}) => {
+    const m = midiaDoApp()
+    if (!m || !id) return { ok: false }
+    const wc = e.sender
+    const emitir = (ev) => { try { if (!wc.isDestroyed()) wc.send('voz:cerebro:evento', { id, ...ev }) } catch {} }
+    // medido 20/11: rt-auto 1a palavra ~1,8 s e escolhe bem as ferramentas; o Qwen da casa (~1,6 s) é a reserva se o primeiro falhar
+    const modelo = p.modelo || process.env.SB_VOZ_MODELO || cfg.vozModelo || 'rt-auto'
+    let falou = false
+    const emitirVigiando = (ev) => { if (ev.tipo === 'delta' || ev.tipo === 'agente' || ev.tipo === 'youtube') falou = true; emitir(ev) }
+    const args = (mod) => ({ base: m.base, chave: m.chave, modelo: mod, nome: p.nome || '', historico: Array.isArray(p.historico) ? p.historico : [], texto: p.texto, modo: p.modo })
+    cerebroVoz.conversar(args(modelo), emitirVigiando)
+      .catch((err) => {
+        registrarAgente(app, 'cerebro de voz (' + modelo + '): ' + String((err && err.message) || err).slice(0, 160))
+        if (falou || modelo === 'qwen-abliterated') throw err
+        return cerebroVoz.conversar(args('qwen-abliterated'), emitir)
+      })
+      .catch((err) => emitir({ tipo: 'erro', data: String((err && err.message) || err) }))
+    return { ok: true, modelo }
   })
   // Voz de saída em stream (spec 52): os pedaços de MP3 vão para a tela conforme chegam do servidor, e ela toca enquanto recebe
   // (a conversa por voz começa a falar no 1º pedaço, não no fim da síntese). 'fim' leva o tempo do 1º pedaço e o total (medição).

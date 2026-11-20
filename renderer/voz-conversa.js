@@ -21,7 +21,7 @@
   const ABAIXAR_MS = 250 // voz forte por cima por esse tempo abaixa a IA
   const CONFIRMAR_MS = 1600 // prazo para o stream confirmar que era fala (senão o volume volta)
   const ESPERA_MS = 1200 // sem resposta nesse tempo: "Deixa eu pensar"
-  const ETAPA_MIN_MS = 7000 // fala de etapa no máximo a cada 7 s
+  const ETAPA_MIN_MS = 5000 // fala de etapa no máximo a cada 5 s
 
   function cor(nome, reserva) {
     const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim()
@@ -228,7 +228,7 @@
     st.ouvido = ''
     st.base = ''
     if (!texto || F.soParar(texto)) return fase('ouvindo', '')
-    enviarAoAgente(texto)
+    responder(texto)
   }
 
   // ---------- ouvir sem stream (gravação por frase, caminho antigo) ----------
@@ -314,6 +314,173 @@
     st.medidor = requestAnimationFrame(medir)
   }
 
+  // ---------- cérebro de voz (spec 54): modelo rápido na frente; o Hermes só entra para TAREFA ----------
+  let cerebroLigado = false
+  function ligarCerebro() {
+    if (cerebroLigado || !window.sb.vozCerebro) return
+    cerebroLigado = true
+    window.sb.vozCerebro.aoEvento((e) => st && st.cerebroOuvinte && st.cerebroOuvinte(e))
+  }
+  // fala frase por frase enquanto o texto chega (a 1ª frase já sai em ~1-2 s); a síntese de cada frase é pedida assim que ela fecha
+  function criarFala(sessao, turno) {
+    let buf = '', total = '', comecou = false, laco = null
+    const fila = []
+    const valido = () => st === sessao && st.turno === turno
+    async function tocarFila() {
+      while (fila.length && valido()) {
+        const it = fila.shift()
+        if (!comecou) (comecou = true), clearTimeout(st.timerEspera), fase('falando', '')
+        let foi = false
+        if (it.h) foi = await tocarTTS(it.h, it.frase)
+        if (!foi && valido()) {
+          const r = await sintetizar(it.frase)
+          if (r && r.ok && valido()) await tocar(r, it.frase)
+          else if (valido()) await falarSistema(it.frase)
+        }
+      }
+      laco = null
+    }
+    function empurrar(frase) {
+      frase = paraFala(frase)
+      if (!frase || !valido()) return
+      registrar('fala: ' + frase)
+      fila.push({ frase, h: temStreamTTS() ? pedirTTS(frase) : null })
+      if (!laco) laco = tocarFila()
+    }
+    return {
+      add(d) {
+        buf += d
+        total += d
+        let m
+        while ((m = /^([\s\S]*?[.!?…])(\s+)/.exec(buf)) && m[1].trim().length >= 12) (empurrar(m[1]), (buf = buf.slice(m[0].length)))
+      },
+      falar(frase) { total += (total ? ' ' : '') + frase; empurrar(frase) },
+      async fim() {
+        if (buf.trim()) empurrar(buf)
+        buf = ''
+        while (laco) await laco
+      },
+      get comecou() { return comecou },
+      get texto() { return total },
+    }
+  }
+  function lembrar(papel, texto) {
+    if (!st || !texto) return
+    st.historico.push({ role: papel, content: String(texto).slice(0, 2000) })
+    if (st.historico.length > 16) st.historico.splice(0, st.historico.length - 16)
+  }
+  async function responder(texto) {
+    if (!st) return
+    const cmd = F.comandoDeVoz(texto)
+    if (cmd === 'mudo') return silenciarPorVoz()
+    if (cmd === 'fechar') {
+      const fala = criarFala(st, st.turno)
+      fala.falar(st.sortear(['Até mais! Quando quiser, é só me chamar.', 'Fechado. Tô por aqui quando precisar.', 'Beleza, até daqui a pouco!']))
+      await fala.fim()
+      return encerrar()
+    }
+    if (!window.sb.vozCerebro) return enviarAoAgente(texto)
+    ligarCerebro()
+    const sessao = st
+    const turno = ++st.turno
+    st.enviado = texto
+    st.cima = 0
+    st.cartoesVistos = new Set()
+    fase('pensando', '“' + texto + '”')
+    const fala = criarFala(sessao, turno)
+    const vivo = () => st === sessao && st.turno === turno
+    // a resposta direta costuma começar em ~2 s; se demorar mais, uma frase de espera para não deixar no vácuo
+    st.timerEspera = setTimeout(() => vivo() && !st.tocando && !fala.comecou && falarCurta(st.sortear(F.ESPERA)), 2200)
+    const id = 'c' + Date.now() + Math.random().toString(36).slice(2, 6)
+    let agente = null, erro = false
+    await new Promise((ok) => {
+      st.cerebroOuvinte = (e) => {
+        if (e.id !== id || !vivo()) return
+        if (e.tipo === 'delta') fala.add(e.data)
+        else if (e.tipo === 'youtube') mostrarYoutube(e.video, e.titulo)
+        else if (e.tipo === 'limpar') recolherCartoes()
+        else if (e.tipo === 'agente') agente = { tarefa: e.tarefa, aviso: e.aviso }
+        else if (e.tipo === 'erro') (erro = true), ok()
+        else if (e.tipo === 'fim') ok()
+      }
+      window.sb.vozCerebro.perguntar(id, { texto, historico: st.historico, nome: st.nome }).then((r) => { if (!r || !r.ok) (erro = true), ok() }).catch(() => ((erro = true), ok()))
+    })
+    if (!vivo()) return
+    st.cerebroOuvinte = null
+    if (erro && !fala.comecou && !agente) return enviarAoAgente(texto) // sem o cérebro rápido: o caminho de antes, pelo Hermes
+    lembrar('user', texto)
+    if (agente) {
+      // TAREFA: o aviso sai já (sem repetir se o modelo já falou algo parecido) e o Hermes completo trabalha narrando
+      if (!fala.texto.trim()) fala.falar(agente.aviso)
+      await fala.fim()
+      if (!vivo()) return
+      lembrar('assistant', fala.texto)
+      return executarComAgente(agente.tarefa, texto, sessao, turno)
+    }
+    await fala.fim()
+    if (!vivo()) return
+    lembrar('assistant', fala.texto)
+    try { P().registrarVoz(texto, fala.texto) } catch {}
+    fase('ouvindo', '')
+  }
+  // "silenciar o microfone" por voz: silencia e avisa que para voltar é no botão (sem escutar não dá para ouvir o "volta")
+  function silenciarPorVoz() {
+    const b = $('voz-palco').querySelector('.voz-mudo')
+    const fala = criarFala(st, st.turno)
+    fala.falar('Microfone silenciado. Quando quiser falar de novo, é só tocar no botão.')
+    fala.fim().then(() => { if (st && !st.mudo && b) b.click() })
+  }
+  // tarefa de verdade: vai para o Hermes completo (a mesma conversa do chat) e a voz narra o caminho até o resultado
+  async function executarComAgente(tarefa, original, sessao, turno) {
+    const vivo = () => st === sessao && st.turno === turno
+    fase('pensando', '“' + original + '”')
+    const id = P().enviarTexto('🎙️ ' + tarefa)
+    if (!id) return fase('ouvindo', 'Escolha um modelo antes de conversar.')
+    st.chat = id
+    st.ultimaEtapa = Date.now()
+    st.ultimoProgresso = Date.now()
+    st.ultimaCat = null
+    st.etapaPendente = null
+    const t0 = Date.now()
+    while (vivo() && P().ocupado(id)) {
+      await new Promise((ok) => setTimeout(ok, 400))
+      mostrarCartoes(imagensNaTela())
+      narrarPendente()
+      // a cada ~20 s sem nada falado, conta em que etapa está ("Ainda tô nisso: estou lendo os arquivos")
+      if (vivo() && !st.tocando && Date.now() - Math.max(st.ultimaEtapa, st.ultimoProgresso) > 20000) {
+        st.ultimoProgresso = Date.now()
+        const etapa = st.ultimaCat ? F.fraseDaEtapa(st.ultimaCat, st.sortear) : ''
+        falarCurta(etapa ? st.sortear(['Ainda tô nisso: ', 'Seguindo aqui: ', 'Continuo trabalhando: ']) + etapa.charAt(0).toLowerCase() + etapa.slice(1) : st.sortear(F.ESPERA_LONGA), true)
+      }
+      if (Date.now() - t0 > 60 * 60 * 1000) break
+    }
+    if (!vivo()) return
+    const resp = P().ultimaResposta(id)
+    if (/\[\[tela:limpar\]\]/i.test(resp)) recolherCartoes()
+    mostrarCartoes([...imagensNaTela(), ...imagensDoTexto(resp)])
+    // o resultado do Hermes vem formatado para ler; o cérebro de voz conta em texto corrido
+    const fala = criarFala(sessao, turno)
+    let ok = false
+    if (window.sb.vozCerebro) {
+      const rid = 'r' + Date.now()
+      ok = await new Promise((fim) => {
+        st.cerebroOuvinte = (e) => {
+          if (e.id !== rid || !vivo()) return
+          if (e.tipo === 'delta') fala.add(e.data)
+          else if (e.tipo === 'fim') fim(true)
+          else if (e.tipo === 'erro') fim(false)
+        }
+        window.sb.vozCerebro.perguntar(rid, { modo: 'resumir', nome: st.nome, historico: st.historico, texto: 'Pedido: ' + original + '\n\nResultado do agente:\n' + String(resp || '').slice(0, 6000) }).then((r) => { if (!r || !r.ok) fim(false) }).catch(() => fim(false))
+      })
+    }
+    if (!vivo()) return
+    if (!ok && !fala.comecou) return (await falarResposta(resp, turno)), vivo() && fase('ouvindo', '')
+    await fala.fim()
+    if (!vivo()) return
+    lembrar('assistant', fala.texto)
+    fase('ouvindo', '')
+  }
+
   // ---------- pensar: agente, frases de espera, etapas ----------
   async function enviarAoAgente(texto) {
     if (!st) return
@@ -358,12 +525,23 @@
     if (!st.mudo && !st.vivo) novaFrase()
   }
   // ferramenta nova no turno da voz: fala a etapa (no máx. 1 a cada 7 s, nunca por cima de outra fala)
-  function aoFerramenta({ chat, cat }) {
-    if (!st || st.chat !== chat || st.fase !== 'pensando' || st.tocando) return
-    if (Date.now() - st.ultimaEtapa < ETAPA_MIN_MS) return
+  function aoFerramenta({ chat, cat, fim, falhou }) {
+    if (!st || st.chat !== chat || st.fase !== 'pensando') return
+    if (fim && !falhou) return // sucesso: a próxima etapa já conta o andamento
+    if (!fim) st.ultimaCat = cat
+    // falando agora ou cedo demais: a etapa fica guardada e sai assim que der (o laço da tarefa confere)
+    st.etapaPendente = falhou ? 'falha' : cat
+    narrarPendente()
+  }
+  function narrarPendente() {
+    if (!st || !st.etapaPendente || st.tocando || st.fase !== 'pensando') return
+    const falha = st.etapaPendente === 'falha'
+    if (Date.now() - st.ultimaEtapa < (falha ? 2500 : ETAPA_MIN_MS)) return
+    const cat = st.etapaPendente
+    st.etapaPendente = null
     st.ultimaEtapa = Date.now()
     clearTimeout(st.timerEspera)
-    falarCurta(F.fraseDaEtapa(cat, st.sortear))
+    falarCurta(falha ? st.sortear(['Não deu certo dessa vez, vou tentar de outro jeito.', 'Opa, travou aqui. Vou tentar de novo.', 'Não consegui por esse caminho, tentando outro.']) : F.fraseDaEtapa(cat, st.sortear), true)
   }
 
   // ---------- cartões holográficos (spec 53): o que a IA quer MOSTRAR sai do centro do cérebro e para na lateral ----------
@@ -401,6 +579,40 @@
     if (!ult) return []
     return [...ult.querySelectorAll('img.img-final, video.img-final')].map((el) => ({ src: el.currentSrc || el.src, alt: el.alt || 'Mídia', video: el.tagName === 'VIDEO' }))
   }
+  // música/vídeo do YouTube num cartão maior, tocando. Enquanto toca, o microfone fica em pausa (senão ele "ouve" a letra da música)
+  function mostrarYoutube(idVideo, titulo) {
+    if (!st || !idVideo) return
+    recolherCartoes()
+    const caixa = $('voz-palco').querySelector('.voz-cartoes')
+    const c = document.createElement('figure')
+    c.className = 'voz-cartao voz-yt'
+    const f = document.createElement('iframe')
+    f.src = 'https://www.youtube.com/embed/' + encodeURIComponent(idVideo) + '?autoplay=1&rel=0&modestbranding=1'
+    f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'
+    f.referrerPolicy = 'strict-origin-when-cross-origin'
+    f.title = titulo || 'Vídeo'
+    c.appendChild(f)
+    const leg = document.createElement('figcaption')
+    leg.innerHTML = '<span></span><button type="button" class="yt-fechar" aria-label="Fechar o vídeo">✕</button>'
+    leg.querySelector('span').textContent = titulo || 'YouTube'
+    c.appendChild(leg)
+    leg.querySelector('.yt-fechar').onclick = (ev) => { ev.stopPropagation(); fecharYoutube(c) }
+    caixa.prepend(c)
+    const centro = P().centroCerebro && P().centroCerebro()
+    const r = c.getBoundingClientRect()
+    if (centro && r.width) (c.style.setProperty('--dx', Math.round(centro.x - (r.left + r.width / 2)) + 'px'), c.style.setProperty('--dy', Math.round(centro.y - (r.top + r.height / 2)) + 'px'))
+    c.classList.add('chega')
+    st.ytAtivo = c
+    if (!st.mudo) (st.mudoPeloVideo = true), $('voz-palco').querySelector('.voz-mudo').click()
+    $('voz-palco').querySelector('.voz-legenda').textContent = 'Tocando: ' + (titulo || 'vídeo') + '. Para falar comigo, feche o vídeo ou toque no microfone.'
+  }
+  function fecharYoutube(c) {
+    if (c) c.remove()
+    if (!st) return
+    st.ytAtivo = null
+    if (st.mudoPeloVideo && st.mudo) $('voz-palco').querySelector('.voz-mudo').click()
+    st.mudoPeloVideo = false
+  }
   // recolhe os cartões de volta para o centro do cérebro (assunto novo ou o agente mandou limpar a tela)
   function recolherCartoes() {
     const caixa = $('voz-palco') && $('voz-palco').querySelector('.voz-cartoes')
@@ -414,7 +626,7 @@
         c.style.setProperty('--dy', Math.round(centro.y - (r.top + r.height / 2)) + 'px')
       }
       c.classList.add('sai')
-      setTimeout(() => c.remove(), 650)
+      setTimeout(() => (c.classList.contains('voz-yt') ? fecharYoutube(c) : c.remove()), 650)
     }
   }
   function mostrarCartoes(lista) {
@@ -612,8 +824,9 @@
       a.play().catch(fim)
     })
   }
-  async function falarCurta(frase) {
+  async function falarCurta(frase, narrar) {
     if (!st || !frase) return
+    registrar('fala curta: ' + frase)
     let r = st.cache.get(frase)
     if (!r) {
       r = await sintetizar(frase)
@@ -689,6 +902,7 @@
     try {
       const c = await window.sb.cfg()
       nome = c.unlimitedNome || c.unlimitedEmail || ''
+      if (st === sessao) st.nome = F.primeiroNome(nome) // o cérebro de voz chama a pessoa pelo nome
     } catch {}
     if (st !== sessao) return
     const frase = F.saudacao(new Date().getHours(), nome, st.sortear)
@@ -741,7 +955,7 @@
       freq: new Uint8Array(anMic.frequencyBinCount), alt: new Float32Array(N_BARRAS), amostra: new Uint8Array(512),
       antes: performance.now(), piso: 0.01, quieto: 0, cima: 0, abaixou: 0, mudo: false, fase: 'ouvindo', frase: null, raf: 0, medidor: 0,
       vivo: null, ouvido: '', base: '', prefixo: '', ultimoTexto: '', textoEm: 0, ultimaVoz: -1e9, enviado: '', chat: null, turno: 0,
-      tocando: null, falandoTexto: '', falados: [], cartoesVistos: new Set(), cache: new Map(), sortear: F.sorteador(), ultimaEtapa: 0, timerEspera: 0,
+      tocando: null, falandoTexto: '', falados: [], cartoesVistos: new Set(), historico: [], nome: '', cerebroOuvinte: null, cache: new Map(), sortear: F.sorteador(), ultimaEtapa: 0, timerEspera: 0,
     }
     const sessao = st
     st.tirarFerr = P().aoFerramenta(aoFerramenta)

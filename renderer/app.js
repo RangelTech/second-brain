@@ -1464,6 +1464,17 @@
       CV && CV.card && CV.card.foco && CV.card.foco(alvo)
     },
     centroCerebro: () => (CV && CV.card && CV.card.centro ? CV.card.centro() : null),
+    // spec 54: a conversa rápida da voz (sem Hermes) também fica escrita na conversa do chat
+    registrarVoz(usuario, resposta) {
+      if (!chatAtual()) criarChat()
+      const c = chatAtual()
+      c.msgs.push({ role: 'user', em: Date.now(), content: '🎙️ ' + usuario, anexos: [] }, { role: 'assistant', em: Date.now(), content: resposta })
+      if (c.titulo === 'Nova conversa' || c.titulo === 'Novo chat') c.titulo = usuario.slice(0, 42)
+      c.em = Date.now()
+      salvar()
+      if (c.id === atual) desenhar()
+    },
+    fraseAtual: (id) => (respostas.get(id) || {}).frase || '',
   }
 
   function desenharFila() {
@@ -1739,6 +1750,7 @@
           const resta = Math.max(0, ACESO_MIN - (Date.now() - (r.catsDesde.get(f.id) || 0)))
           r.catsDesde.delete(f.id)
           const falhou = f.status === 'failed'
+          for (const fn of vozFerrOuvintes || []) try { fn({ chat: r.id, cat: c, fim: true, falhou }) } catch {}
           setTimeout(() => {
             cardDe(r)?.evento(c, falhou ? 'erro' : 'ok')
             if (!r.cats.size && r.base !== 'escrever') (r.base = 'pensar'), cardDe(r)?.base('pensar'), definirFrase(r, falhou ? 'Tentando de outro jeito…' : 'Analisando o resultado…')

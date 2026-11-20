@@ -36,6 +36,7 @@
       "mcp-ias.js",
       "gateway-cliente.js",
       "conector-ditado.js",
+      "cerebro-voz.js",
       "dublagem.js",
       "rotinas.js",
       "atendimento.js",

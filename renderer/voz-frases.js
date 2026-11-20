@@ -72,6 +72,14 @@
     const nome = primeiroNome(nomeOuEmail)
     return `${periodo(hora)}${nome ? ', ' + nome : ''}! ${sortear(PERGUNTAS)}`
   }
+  // comandos rápidos da conversa por voz (spec 54), sem modelo: "fechar o modo de voz", "silenciar o microfone"
+  function comandoDeVoz(texto) {
+    const t = ' ' + palavras(texto).join(' ') + ' '
+    if (/ (silencia|silenciar|muta|mutar|desliga|desligar|fecha|fechar|cala|corta|cortar) (o |a )?(meu )?(microfone|mic) /.test(t)) return 'mudo'
+    if (/ (fecha|fechar|encerra|encerrar|sai|sair|desliga|desligar|termina|terminar|finaliza|finalizar)( o| a| da| do)? (modo (de )?voz|conversa( por voz)?|voz|chamada) /.test(t)) return 'fechar'
+    if (/^ (tchau|ate mais|ate logo|falou|valeu tchau)( cerebro)? $/.test(t)) return 'fechar'
+    return null
+  }
   const PARAR = new Set(['para', 'pare', 'parar', 'parou', 'chega', 'espera', 'espere', 'perai', 'peraí', 'ei', 'ow', 'calma', 'cala', 'silencio', 'nao', 'stop', 'ok', 'tá', 'ta', 'beleza', 'quero', 'eu', 'não', 'aí', 'ai', 'pera'])
 
   function todas() {
@@ -117,5 +125,5 @@
     return w.length > 0 && w.length <= 4 && w.every((x) => PARAR.has(x))
   }
 
-  return { ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
+  return { comandoDeVoz, ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
 })
