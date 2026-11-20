@@ -1272,7 +1272,7 @@ app.whenReady().then(() => {
         if (falou || modelo === 'qwen-abliterated') throw err
         return cerebroVoz.conversar(args('qwen-abliterated'), emitir)
       })
-      .catch((err) => emitir({ tipo: 'erro', data: String((err && err.message) || err) }))
+      .catch((err) => (registrarAgente(app, 'cerebro de voz (reserva): ' + String((err && err.message) || err).slice(0, 160)), emitir({ tipo: 'erro', data: String((err && err.message) || err) })))
     return { ok: true, modelo }
   })
   // Voz de saída em stream (spec 52): os pedaços de MP3 vão para a tela conforme chegam do servidor, e ela toca enquanto recebe

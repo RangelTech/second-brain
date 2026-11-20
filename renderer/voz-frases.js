@@ -80,10 +80,21 @@
     if (/^ (tchau|ate mais|ate logo|falou|valeu tchau)( cerebro)? $/.test(t)) return 'fechar'
     return null
   }
+  // andamento de uma etapa que continua (2ª vez em diante): nunca repete a frase de anúncio (Lucas: "virou ladainha")
+  const ANDAMENTO = {
+    web: ['Achei umas fontes, tô conferindo.', 'Tô cruzando as informações pra te passar certinho.', 'Ainda pesquisando, mas já tô chegando lá.'],
+    pesquisa: ['Ainda procurando, já já acho.', 'Tô conferindo o que achei.'],
+    arquivos: ['Tô juntando o que li nos arquivos.', 'Já estou com o conteúdo, organizando.'],
+    navegador: ['A página abriu, tô olhando.', 'Navegando mais um pouco aqui.'],
+    codigo: ['O código está andando.', 'Tô testando o que escrevi.'],
+    terminal: ['O comando está rodando.', 'Esperando o computador terminar aqui.'],
+  }
+  const ANDAMENTO_GERAL = ['Seguindo aqui, falta pouco.', 'Tá andando, só mais um pouquinho.', 'Ainda trabalhando nisso.']
+  const fraseDeAndamento = (cat, sortear) => sortear(ANDAMENTO[cat] || ANDAMENTO_GERAL)
   const PARAR = new Set(['para', 'pare', 'parar', 'parou', 'chega', 'espera', 'espere', 'perai', 'peraí', 'ei', 'ow', 'calma', 'cala', 'silencio', 'nao', 'stop', 'ok', 'tá', 'ta', 'beleza', 'quero', 'eu', 'não', 'aí', 'ai', 'pera'])
 
   function todas() {
-    return [...new Set([...INTENCOES.flatMap((i) => i.frases), ...ESPERA, ...ESPERA_LONGA, ...Object.values(ETAPA).flat()])]
+    return [...new Set([...INTENCOES.flatMap((i) => i.frases), ...ESPERA, ...ESPERA_LONGA, ...Object.values(ETAPA).flat(), ...Object.values(ANDAMENTO).flat(), ...ANDAMENTO_GERAL])]
   }
   // sorteia da lista sem repetir a última frase dita (de qualquer lista)
   function sorteador(rnd = Math.random) {
@@ -125,5 +136,5 @@
     return w.length > 0 && w.length <= 4 && w.every((x) => PARAR.has(x))
   }
 
-  return { comandoDeVoz, ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
+  return { comandoDeVoz, fraseDeAndamento, ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
 })

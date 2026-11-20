@@ -21,7 +21,8 @@
   const ABAIXAR_MS = 250 // voz forte por cima por esse tempo abaixa a IA
   const CONFIRMAR_MS = 1600 // prazo para o stream confirmar que era fala (senão o volume volta)
   const ESPERA_MS = 1200 // sem resposta nesse tempo: "Deixa eu pensar"
-  const ETAPA_MIN_MS = 5000 // fala de etapa no máximo a cada 5 s
+  const ETAPA_MIN_MS = 12000 // fala de etapa no máximo a cada 12 s (5 s virou ladainha nas buscas seguidas)
+  const MESMA_ETAPA_MS = 35000 // a mesma etapa só volta a ser comentada depois disso, e com frase de andamento
 
   function cor(nome, reserva) {
     const v = getComputedStyle(document.documentElement).getPropertyValue(nome).trim()
@@ -390,7 +391,8 @@
     const fala = criarFala(sessao, turno)
     const vivo = () => st === sessao && st.turno === turno
     // a resposta direta costuma começar em ~2 s; se demorar mais, uma frase de espera para não deixar no vácuo
-    st.timerEspera = setTimeout(() => vivo() && !st.tocando && !fala.comecou && falarCurta(st.sortear(F.ESPERA)), 2200)
+    // com intenção clara ("pesquisa", "cria um arquivo", "abre o site") a frase de espera já diz o que vai fazer
+    st.timerEspera = setTimeout(() => vivo() && !st.tocando && !fala.comecou && falarCurta(F.fraseDeAbertura(texto, st.sortear) || st.sortear(F.ESPERA)), 1800)
     const id = 'c' + Date.now() + Math.random().toString(36).slice(2, 6)
     let agente = null, erro = false
     await new Promise((ok) => {
@@ -441,16 +443,16 @@
     st.ultimoProgresso = Date.now()
     st.ultimaCat = null
     st.etapaPendente = null
+    st.etapasDitas = {}
     const t0 = Date.now()
     while (vivo() && P().ocupado(id)) {
       await new Promise((ok) => setTimeout(ok, 400))
       mostrarCartoes(imagensNaTela())
       narrarPendente()
       // a cada ~20 s sem nada falado, conta em que etapa está ("Ainda tô nisso: estou lendo os arquivos")
-      if (vivo() && !st.tocando && Date.now() - Math.max(st.ultimaEtapa, st.ultimoProgresso) > 20000) {
+      if (vivo() && !st.tocando && Date.now() - Math.max(st.ultimaEtapa, st.ultimoProgresso) > 30000) {
         st.ultimoProgresso = Date.now()
-        const etapa = st.ultimaCat ? F.fraseDaEtapa(st.ultimaCat, st.sortear) : ''
-        falarCurta(etapa ? st.sortear(['Ainda tô nisso: ', 'Seguindo aqui: ', 'Continuo trabalhando: ']) + etapa.charAt(0).toLowerCase() + etapa.slice(1) : st.sortear(F.ESPERA_LONGA), true)
+        falarCurta(st.ultimaCat ? F.fraseDeAndamento(st.ultimaCat, st.sortear) : st.sortear(F.ESPERA_LONGA), true)
       }
       if (Date.now() - t0 > 60 * 60 * 1000) break
     }
@@ -494,6 +496,7 @@
     if (!id) { fase('ouvindo', 'Escolha um modelo antes de conversar.'); if (!st.vivo) novaFrase(); return }
     st.chat = id
     st.ultimaEtapa = 0
+    st.etapasDitas = {}
     // não deixar no vácuo: sem resposta em ~1 s, uma frase de espera; trabalho longo, outra de vez em quando
     let esperas = 0
     const t0 = Date.now()
@@ -539,9 +542,13 @@
     if (Date.now() - st.ultimaEtapa < (falha ? 2500 : ETAPA_MIN_MS)) return
     const cat = st.etapaPendente
     st.etapaPendente = null
+    // cada etapa é anunciada UMA vez; repetida, só depois de MESMA_ETAPA_MS e com frase de andamento (nunca o mesmo anúncio)
+    const ja = st.etapasDitas[cat]
+    if (!falha && ja && Date.now() - ja < MESMA_ETAPA_MS) return
+    st.etapasDitas[cat] = Date.now()
     st.ultimaEtapa = Date.now()
     clearTimeout(st.timerEspera)
-    falarCurta(falha ? st.sortear(['Não deu certo dessa vez, vou tentar de outro jeito.', 'Opa, travou aqui. Vou tentar de novo.', 'Não consegui por esse caminho, tentando outro.']) : F.fraseDaEtapa(cat, st.sortear), true)
+    falarCurta(falha ? st.sortear(['Não deu certo dessa vez, vou tentar de outro jeito.', 'Opa, travou aqui. Vou tentar de novo.', 'Não consegui por esse caminho, tentando outro.']) : ja ? F.fraseDeAndamento(cat, st.sortear) : F.fraseDaEtapa(cat, st.sortear), true)
   }
 
   // ---------- cartões holográficos (spec 53): o que a IA quer MOSTRAR sai do centro do cérebro e para na lateral ----------
@@ -955,7 +962,7 @@
       freq: new Uint8Array(anMic.frequencyBinCount), alt: new Float32Array(N_BARRAS), amostra: new Uint8Array(512),
       antes: performance.now(), piso: 0.01, quieto: 0, cima: 0, abaixou: 0, mudo: false, fase: 'ouvindo', frase: null, raf: 0, medidor: 0,
       vivo: null, ouvido: '', base: '', prefixo: '', ultimoTexto: '', textoEm: 0, ultimaVoz: -1e9, enviado: '', chat: null, turno: 0,
-      tocando: null, falandoTexto: '', falados: [], cartoesVistos: new Set(), historico: [], nome: '', cerebroOuvinte: null, cache: new Map(), sortear: F.sorteador(), ultimaEtapa: 0, timerEspera: 0,
+      tocando: null, falandoTexto: '', falados: [], cartoesVistos: new Set(), historico: [], nome: '', cerebroOuvinte: null, etapasDitas: {}, cache: new Map(), sortear: F.sorteador(), ultimaEtapa: 0, timerEspera: 0,
     }
     const sessao = st
     st.tirarFerr = P().aoFerramenta(aoFerramenta)

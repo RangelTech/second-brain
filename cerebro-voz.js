@@ -62,18 +62,33 @@ function instrucao({ nome, modo }) {
   return base.join('\n')
 }
 
+// voz não pode ficar muda: sem o 1º pedaço em PRIMEIRO_MS a chamada cai (e o app passa para o modelo reserva na hora).
+// Medido 20/11: o rt-auto travou uma vez 60 s sem responder; com este prazo a troca leva ~8 s em vez de 60.
+const PRIMEIRO_MS = 11000 // 8 s derrubou os dois modelos juntos num momento de servidor cheio
 async function chamar({ base, chave, modelo, mensagens, comFerramentas }, aoDelta) {
-  const r = await fetch(base + '/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + chave, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: modelo, stream: true, temperature: 0.6, max_tokens: 700, messages: mensagens, ...(comFerramentas ? { tools: FERRAMENTAS, tool_choice: 'auto' } : {}), chat_template_kwargs: { enable_thinking: false } }),
-    signal: AbortSignal.timeout(60000),
-  })
+  const ac = new AbortController()
+  const prazo = setTimeout(() => ac.abort(new Error('sem resposta em ' + PRIMEIRO_MS / 1000 + ' s')), PRIMEIRO_MS)
+  const teto = setTimeout(() => ac.abort(new Error('resposta longa demais')), 60000)
+  let r
+  try {
+    r = await fetch(base + '/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + chave, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelo, stream: true, temperature: 0.6, max_tokens: 700, messages: mensagens, ...(comFerramentas ? { tools: FERRAMENTAS, tool_choice: 'auto' } : {}), chat_template_kwargs: { enable_thinking: false } }),
+      signal: ac.signal,
+    })
+  } catch (e) {
+    clearTimeout(prazo); clearTimeout(teto)
+    throw ac.signal.reason || e
+  }
+  if (!r.ok || !r.body) (clearTimeout(prazo), clearTimeout(teto))
   if (!r.ok || !r.body) throw new Error('modelo respondeu ' + r.status)
   let texto = ''
   const chamadas = []
   let resto = ''
+  try {
   for await (const pedaco of r.body) {
+    clearTimeout(prazo) // chegou o 1º pedaço: daqui para frente só o teto de 60 s
     resto += Buffer.from(pedaco).toString('utf8')
     let i
     while ((i = resto.indexOf('\n')) >= 0) {
@@ -94,6 +109,12 @@ async function chamar({ base, chave, modelo, mensagens, comFerramentas }, aoDelt
         if (tc.function?.arguments) chamadas[k].args += tc.function.arguments
       }
     }
+  }
+  } catch (e) {
+    throw ac.signal.aborted ? ac.signal.reason || e : e
+  } finally {
+    clearTimeout(prazo)
+    clearTimeout(teto)
   }
   return { texto, chamadas: chamadas.filter(Boolean) }
 }
@@ -117,6 +138,7 @@ async function conversar({ base, chave, modelo, nome, historico = [], texto, mod
       let a = {}
       try { a = JSON.parse(c.args || '{}') } catch {}
       let saida = ''
+      c.nome = /busc|pesquis|search/i.test(c.nome) ? 'buscar_na_web' : /youtube|tocar|musica/i.test(c.nome) ? 'tocar_youtube' : /agente|tarefa/i.test(c.nome) ? 'usar_agente' : /limpar|tela/i.test(c.nome) ? 'limpar_tela' : c.nome
       emitir({ tipo: 'ferramenta', nome: c.nome, args: a })
       try {
         if (c.nome === 'buscar_na_web') saida = await buscarNaWeb(a.consulta || texto)
