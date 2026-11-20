@@ -2216,6 +2216,7 @@
     navAberto = !!sim
     $('nav').hidden = !sim
     $('app').classList.toggle('nav-aberto', !!sim)
+    document.body.classList.toggle('nav-leve', !!sim) // cérebro do fundo a 15 quadros/s enquanto o navegador está aberto
     $('abrir-nav').classList.toggle('on', !!sim)
     await NAV.mostrar(!!sim)
     navUltimo = ''
@@ -2355,9 +2356,38 @@
     $('nav-voltar').disabled = !e.podeVoltar
     $('nav-avancar').disabled = !e.podeAvancar
     $('nav-ctl').hidden = !e.controlando
+    $('nav-ctl').lastChild.textContent = e.controlando ? e.acao || 'Agente' : 'Agente'
+    $('nav').classList.toggle('agente', !!e.controlando)
     $('nav').classList.toggle('carregando', !!e.carregando)
     $('nav-vazio').hidden = !!e.url
   })
+  // divisória arrastável entre o chat e o navegador (spec 53): a largura fica guardada neste computador
+  ;(() => {
+    const div = $('nav-divisoria')
+    if (!div) return
+    try { const l = localStorage.getItem('navLargura'); if (l) document.documentElement.style.setProperty('--nav-larg', l) } catch {}
+    div.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault()
+      div.setPointerCapture(ev.pointerId)
+      div.classList.add('arrastando')
+      NAV.esconderTemp(true) // a vista nativa por cima engoliria o arraste
+      const app = $('app').getBoundingClientRect()
+      const mover = (e) => {
+        const pct = Math.max(28, Math.min(70, ((app.right - e.clientX) / app.width) * 100))
+        document.documentElement.style.setProperty('--nav-larg', pct.toFixed(1) + '%')
+      }
+      const soltar = () => {
+        div.classList.remove('arrastando')
+        div.removeEventListener('pointermove', mover)
+        NAV.esconderTemp(false)
+        try { localStorage.setItem('navLargura', getComputedStyle(document.documentElement).getPropertyValue('--nav-larg').trim()) } catch {}
+        navPos(true)
+      }
+      div.addEventListener('pointermove', mover)
+      div.addEventListener('pointerup', soltar, { once: true })
+      div.addEventListener('pointercancel', soltar, { once: true })
+    })
+  })()
   NAV.aoAbrirPainel(() => navAbrir(true))
   NAV.aoReposicionar(() => navPos(true))
   new ResizeObserver(() => navPos(true)).observe($('nav-host'))

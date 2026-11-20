@@ -52,6 +52,13 @@
     if (cat === 'terminal') return 'Rodando um comando…'
     if (cat === 'codigo') return 'Rodando um código…'
     if (cat === 'redes') return alvo ? `Abrindo a rede social: ${alvo}` : 'Abrindo a rede social…'
+    // spec 53: nunca mostrar o nome interno (navegador_abrir...): cada ação do navegador em português
+    if (cat === 'navegador') {
+      const acao = (/navegador_(\w+)/.exec(f.titulo || '') || [])[1] || ''
+      const FR = { abrir: 'Abrindo o site', ler: 'Lendo a página', clicar: 'Clicando na página', digitar: 'Digitando na página', rolar: 'Rolando a página',
+        voltar: 'Voltando à página anterior', esperar: 'Esperando a página carregar', print: 'Olhando a página', js: 'Mexendo na página' }
+      return FR[acao] || 'Usando o navegador'
+    }
     return alvo && cat !== 'terminal' ? `${base}: ${alvo}` : base
   }
 
@@ -668,7 +675,8 @@
         if (!animando) return
         // fundo de tela inteira a 60 quadros/s custava ~130-150% de CPU no processo de GPU e outro tanto no da tela (medido 18/11/2026):
         // 30 quadros/s com a janela em foco e 10 sem foco; o movimento usa o relógio, então só fica menos fluido, não mais lento
-        const intervalo = document.hasFocus() ? 33 : 100
+        // spec 53: com o navegador integrado aberto a página dele também pinta; o cérebro cai para 15 quadros/s e libera a máquina
+        const intervalo = !document.hasFocus() ? 100 : document.body.classList.contains('nav-leve') ? 66 : 33
         // só desenha com a janela visível e o cartão na tela (vários chats trabalhando não pesam: só o da tela anima)
         if (!document.hidden && canvas.isConnected && ts - ultimoQuadro >= intervalo - 2) { // sem offsetParent: ele forçava recalcular o layout a cada quadro (19% do tempo); quem esconde chama parar()
           ultimoQuadro = ts

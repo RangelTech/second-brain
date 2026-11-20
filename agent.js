@@ -705,13 +705,16 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     'agent:',
     `  reasoning_effort: ${JSON.stringify(raciocinio || 'none')}`,
     '  environment_probe: false', // sondagem do toolchain da maquina a cada partida: nao entra no nosso prompt
+    // spec 53: o toolset `browser` do Hermes (browser_exec) abre um Chromium proprio, invisivel para o cliente, 7 a 11 s por chamada, e
+    // concorria com o NOSSO navegador integrado (que o cliente ve). Fica desligado; SB_TOOLSETS_OFF soma outros (ex.: connections).
+    // Antes esta chave ia parar debaixo de `plugins:` e nao valia: o Hermes le `agent.disabled_toolsets`.
+    `  disabled_toolsets: ${JSON.stringify([...new Set(['browser', ...String(process.env.SB_TOOLSETS_OFF || '').split(',').map((x) => x.trim()).filter(Boolean)])])}`,
     // PARTIDA: o Hermes descobre e carrega 59 plugins (provedores de imagem, video, busca, navegador externo, Discord, Feishu...) e nenhum serve ao
     // Segundo Cerebro: imagem, video, navegador e memoria sao os NOSSOS servidores MCP. Cada plugin e um import e um check_fn na partida e no 1o turno.
     ...(process.env.SB_SEM_PLUGINS_FORA ? [] : ['plugins:', `  disabled: ${JSON.stringify(gateway ? PLUGINS_FORA.filter((x) => x !== 'web-ddgs') : PLUGINS_FORA)}`]), // SB_SEM_PLUGINS_FORA=1 so para medir/comparar
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     // toolsets desligados (cada ferramenta pesa tokens em TODO passo): lista separada por vírgula em SB_TOOLSETS_OFF, ex.: connections,browser
     // (so aceita nome de TOOLSET; `search_files` sozinha e tirada pela ponte-llm.js, porque o toolset `file` levaria read/write junto)
-    ...(process.env.SB_TOOLSETS_OFF ? [`  disabled_toolsets: ${JSON.stringify(process.env.SB_TOOLSETS_OFF.split(',').map((s) => s.trim()).filter(Boolean))}`] : []),
     // olhar imagens (vision_analyze, prints do navegador): o Qwen do Unlimited enxerga, mas o Hermes não sabe disso pelo combo local;
     // com a conta do Unlimited, a visão vai direto a ele. Sem a conta, o Hermes decide sozinho.
     'auxiliary:',

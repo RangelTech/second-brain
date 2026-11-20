@@ -219,8 +219,21 @@
 .chip-topo:hover{background:var(--card2);color:var(--fg)}
 .chip-topo.on{color:var(--ac2);border-color:#6a5548}
 .chip-topo .ic{width:15px;height:15px}
-.app.nav-aberto{grid-template-columns:272px minmax(0,1fr) minmax(380px,46%)}
-.app.nav-aberto.recolhido{grid-template-columns:minmax(0,1fr) minmax(380px,46%)}
+.app.nav-aberto{grid-template-columns:272px minmax(360px,1fr) minmax(380px,var(--nav-larg,44%))}
+.app.nav-aberto.recolhido{grid-template-columns:minmax(360px,1fr) minmax(380px,var(--nav-larg,44%))}
+/* spec 53: navegador repaginado. Divisória arrastável (a largura fica guardada), barra fina de carregamento e, quando o AGENTE está
+   mexendo na página, uma borda viva e o que ele está fazendo escrito ("Clicando em Entrar") */
+body.nav-leve:not(.modo-voz) .cerebro-fundo{opacity:.55;transition:opacity .4s}
+.nav-divisoria{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:25}
+.nav-divisoria:hover,.nav-divisoria.arrastando{background:linear-gradient(90deg,transparent 3px,var(--ac) 3px,var(--ac) 5px,transparent 5px)}
+.nav-progresso{position:absolute;left:0;right:0;top:48px;height:2px;z-index:22;pointer-events:none;opacity:0;background:linear-gradient(90deg,transparent,var(--ac),#7fd8ff,transparent);background-size:40% 100%;background-repeat:no-repeat}
+.nav.carregando .nav-progresso{opacity:1;animation:navCarrega 1.1s ease-in-out infinite}
+@keyframes navCarrega{from{background-position:-40% 0}to{background-position:140% 0}}
+.nav.agente .nav-host{box-shadow:inset 0 0 0 2px rgba(110,200,255,.55),inset 0 0 28px rgba(80,170,255,.18);transition:box-shadow .3s}
+.nav-ctl{max-width:34%;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}.nav-url{min-width:160px}
+.nav.agente .nav-ctl{border-color:rgba(110,200,255,.6);color:#bfe6ff;background:rgba(40,90,140,.25)}
+.nav.agente .ponto-ctl{animation:pontoCtl 1s ease-in-out infinite}
+@keyframes pontoCtl{50%{opacity:.25}}
 .nav{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--bd);background:var(--lat)}
 .nav[hidden]{display:none}
 .nav-barra{display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--bd)}
@@ -534,3 +547,4 @@ body.modo-voz .nav .nav-barra,body.modo-voz .nav-fav-menu{display:none}
 @keyframes varre{from{background-position:0 0}to{background-position:0 40px}}
 @keyframes brilhoBorda{0%,100%{background-position:120% 0}50%{background-position:-20% 0}}
 @media (prefers-reduced-motion:reduce){.voz-cartao,.voz-cartao.chega,.voz-cartao::after,.voz-cartao::before{animation:none}}
+body.modo-voz .nav-divisoria,body.modo-voz .nav-progresso{display:none}

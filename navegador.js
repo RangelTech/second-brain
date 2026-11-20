@@ -84,6 +84,23 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   let servidor = null
   let porta = 0
   let controlando = false
+  let acaoAtual = '' // spec 53: o que o agente está fazendo na página agora, em português ("Clicando em Entrar")
+  const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, '') } catch { return '' } }
+  function descreverAcao(nome, a) {
+    const alvo = String(a.texto || a.rotulo || a.seletor || '').trim().slice(0, 40)
+    switch (nome) {
+      case 'abrir': return 'Abrindo ' + (host(a.url) || 'a página')
+      case 'ler': return 'Lendo a página'
+      case 'clicar': return alvo ? `Clicando em "${alvo}"` : 'Clicando'
+      case 'digitar': return 'Digitando'
+      case 'rolar': return 'Rolando a página'
+      case 'voltar': return 'Voltando'
+      case 'esperar': return 'Esperando carregar'
+      case 'print': return 'Olhando a tela'
+      case 'js': return 'Mexendo na página'
+      default: return 'Usando o navegador'
+    }
+  }
   let timerControle = null
 
   // janela destacada (Spec 25): o navegador sai do painel e ganha uma janela própria, grande, com a barra de endereço no topo. A vista nativa é a MESMA
@@ -142,6 +159,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
       podeVoltar: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoBack(),
       podeAvancar: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoForward(),
       controlando,
+      acao: controlando ? acaoAtual : '',
       destacado: estaDestacado(),
     }
   }
@@ -509,6 +527,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     }
     const f = ferramentas[nome]
     if (!f) throw new Error('Ferramenta desconhecida: ' + nome)
+    acaoAtual = descreverAcao(nome, args)
     marcarControle()
     try {
       return await f(args)

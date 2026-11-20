@@ -46,7 +46,7 @@
     ouvintes.set(id, o)
     // o microfone já começa a ser guardado AGORA: quem fala logo ao clicar não perde as primeiras palavras enquanto a conexão abre
     const fonte = ctx.createMediaStreamSource(fluxo)
-    const proc = ctx.createScriptProcessor(4096, 1, 1)
+    const proc = ctx.createScriptProcessor(2048, 1, 1) // ~43 ms por bloco a 48 kHz: a fala chega ao servidor mais cedo
     let acum = new Int16Array(0)
     let pausado = false
     let fechado = false
@@ -65,7 +65,7 @@
       out.set(acum)
       out.set(pcm, acum.length)
       acum = out
-      if (acum.length >= 2560) {
+      if (acum.length >= 1280) { // pedaços de ~80 ms (antes 160 ms): menos atraso no texto ao vivo
         mandar(new Uint8Array(acum.buffer.slice(0)))
         acum = new Int16Array(0)
       }
