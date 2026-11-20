@@ -94,7 +94,10 @@ const MARCA_AQUECER = '<!--sb:aquecer-->'
 
 // Planejador (spec 40 §3): na PRIMEIRA chamada de uma tarefa do agente (tem ferramentas e ainda não há resposta do assistente), com a IA
 // Unlimited escolhida e um pedido de verdade (não um "oi"), a ponte pede um plano detalhado ao combo rt-planejar (Claude Code/ChatGPT) e o
-// entrega ao modelo da casa como instrução. Um plano por conversa (cache 15 min); falhou ou demorou mais de 25 s, segue sem plano.
+// entrega ao modelo da casa como instrução. Um plano por conversa (cache 15 min).
+// Spec 54 (20/11/2026): o pedido NÃO espera mais o plano (eram 8–10 s parados no começo de toda tarefa, medidos no log). O 1º passo sai na
+// hora e o plano, feito em paralelo, entra nos passos seguintes no FIM da última mensagem (como a memória da tarefa): o começo do pedido
+// não muda e o cache de prefixo do servidor continua valendo.
 const PLANO_MARCA = 'PLANO DE EXECUÇÃO'
 function ultimoPedido(j) {
   const u = [...(j.messages || [])].reverse().find((m) => m && m.role === 'user')
@@ -107,18 +110,25 @@ function deveriaPlanejar(j) {
   if (!j || !Array.isArray(j.messages) || !j.messages.length || !Array.isArray(j.tools) || !j.tools.length) return null
   if (!/abliterated|unlimited|rt-geral/i.test(String(j.model || ''))) return null
   if ((j.messages[j.messages.length - 1] || {}).role !== 'user') return null
-  if (j.messages.some((m) => m && m.role === 'system' && String(m.content || '').includes(PLANO_MARCA))) return null
+  if (j.messages.some((m) => m && JSON.stringify(m.content || '').includes(PLANO_MARCA))) return null
   const txt = ultimoPedido(j)
   if (txt.length < 40 || /^(oi|olá|ola|bom dia|boa tarde|boa noite|obrigad|valeu|ok)\b/i.test(txt)) return null
   return txt
 }
 function comPlano(j, plano) {
-  const bloco = `${PLANO_MARCA} (feito pelo planejador; siga a ordem, adapte se algo não bater com o que você encontrar e não mostre este plano ao usuário):\n${plano}`
-  // anexa à mensagem de sistema que já existe: o template do modelo da casa não aceita um 2º "system" no meio da conversa
+  const bloco = `\n\n[${PLANO_MARCA} (feito pelo planejador; siga a ordem, adapte se algo não bater com o que você encontrar e não mostre este plano ao usuário)]\n${plano}\n[FIM DO PLANO]`
+  // no FIM da última mensagem (do usuário ou resultado de ferramenta): o começo do pedido fica igual e o cache de prefixo vale
+  const u = j.messages[j.messages.length - 1]
+  if (u && (u.role === 'user' || u.role === 'tool')) {
+    if (typeof u.content === 'string') { if (!u.content.includes(PLANO_MARCA)) u.content += bloco }
+    else if (Array.isArray(u.content) && !u.content.some((p) => p && typeof p.text === 'string' && p.text.includes(PLANO_MARCA))) u.content = [...u.content, { type: 'text', text: bloco }]
+    return j
+  }
+  // sem mensagem do usuário/ferramenta no fim (raro): anexa ao system que já existe (o template não aceita 2º system no meio)
   const s = j.messages[0]
-  if (s && s.role === 'system' && typeof s.content === 'string') s.content = s.content + '\n\n' + bloco
-  else if (s && s.role === 'system' && Array.isArray(s.content)) s.content = [...s.content, { type: 'text', text: '\n\n' + bloco }]
-  else j.messages.unshift({ role: 'system', content: bloco })
+  if (s && s.role === 'system' && typeof s.content === 'string') s.content = s.content + bloco
+  else if (s && s.role === 'system' && Array.isArray(s.content)) s.content = [...s.content, { type: 'text', text: bloco }]
+  else j.messages.unshift({ role: 'system', content: bloco.trim() })
   return j
 }
 
@@ -321,7 +331,7 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, ch
         // o Hermes reenvia a conversa a cada passo SEM o plano (ele só existe aqui): reinsere o plano guardado em todas as chamadas da conversa
         const guardadoChat = chat && planos.get(chat)
         if (j && Array.isArray(j.messages) && guardadoChat && guardadoChat.plano && guardadoChat.pedido === ultimoPedido(j) &&
-            Date.now() - guardadoChat.em < 3 * 3600 * 1000 && !j.messages.some((m) => m && m.role === 'system' && String(m.content || '').includes(PLANO_MARCA))) {
+            Date.now() - guardadoChat.em < 3 * 3600 * 1000 && !j.messages.some((m) => m && JSON.stringify(m.content || '').includes(PLANO_MARCA))) {
           texto = JSON.stringify(comPlano(j, guardadoChat.plano))
           return enviar()
         }
@@ -333,18 +343,18 @@ function criar({ destino, aoProgresso, registrar = () => {}, portaArq = null, ch
           if (guardado.plano) texto = JSON.stringify(comPlano(j, guardado.plano))
           return enviar()
         }
-        if (chat) aoProgresso(chat, { tipo: 'espera', seg: 0, fase: 'Planejando a tarefa' })
+        // plano em paralelo: este passo sai JÁ; o plano entra nos próximos passos do mesmo pedido quando ficar pronto
         const tp = Date.now()
+        planos.set(chave, { plano: '', pedido, em: Date.now(), pendente: true })
         Promise.race([planejador(pedido), new Promise((ok) => setTimeout(() => ok(null), 25000))])
           .catch(() => null)
           .then((plano) => {
             plano = typeof plano === 'string' ? plano.trim().slice(0, 4000) : ''
             planos.set(chave, { plano, pedido, em: Date.now() })
             if (planos.size > 200) planos.delete(planos.keys().next().value)
-            registrar(`ponte: plano ${plano ? 'pronto' : 'indisponível'} em ${((Date.now() - tp) / 1000).toFixed(1)} s (${String(chat || '').slice(0, 8)})`)
-            if (plano) texto = JSON.stringify(comPlano(j, plano))
-            enviar()
+            registrar(`ponte: plano ${plano ? 'pronto' : 'indisponível'} em ${((Date.now() - tp) / 1000).toFixed(1)} s, sem segurar o pedido (${String(chat || '').slice(0, 8)})`)
           })
+        enviar()
       })
     } else req.pipe(up)
   }
