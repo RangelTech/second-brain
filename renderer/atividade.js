@@ -268,7 +268,7 @@
     const estouros = []
     const cx = semTela ? null : canvas.getContext('2d')
     let W = 0, H = 0, dpr = 1, clarao = 0, ult = 0, acum = 0, raf = 0, animando = false, fraseAtual = '', relogio = 0
-    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar'
+    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar', foco = null
     const mix = (a, b, k) => { const x = rgb(a), y = rgb(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join('') }
     const agora = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000
 
@@ -356,25 +356,42 @@
         f.px += (tx - f.px) * seg
         f.py += (ty - f.py) * seg
       }
+      // FOCO (spec 52, conversa por voz): a orb da etapa (ferramenta em uso, ou a base: Raciocínio) corre até o ponto pedido (centro da
+      // auréola) e cresce; as outras abrem espaço. Sem foco, ela volta ao passeio e ao tamanho normal.
+      const ativaAgora = ferr.filter((f) => f.ativo > 0).pop()
+      const fFoco = foco ? ativaAgora || porId[base] || porId.pensar : null
+      for (const f of ferr) {
+        // com raio pedido, a orb (raio R0 + 4 acesa) cresce até ele; senão usa a escala
+        const alvoZoom = f === fFoco ? (foco.fr ? Math.max(1, (foco.fr * W) / (R0 + 4)) : foco.escala) : 1
+        f.zoom = lerp(f.zoom || 1, alvoZoom, 1 - Math.pow(f === fFoco ? 0.004 : 0.02, dt))
+        if (f === fFoco) {
+          const seg = Math.min(1, dt * 7) // rápido: ela anda até lá, não aparece
+          f.px += (foco.fx * W - f.px) * seg
+          f.py += (foco.fy * H - f.py) * seg
+        }
+      }
       // REGRA: orbes nunca se sobrepõem. Qualquer par mais perto que os dois raios + folga é afastado ao longo da linha entre eles
-      // (3 passadas por quadro dão conta de grupos de 3 ou mais); depois volta para dentro da tela.
-      const minimo = (R0 + 5) * 2 + 16
+      // (3 passadas por quadro dão conta de grupos de 3 ou mais); depois volta para dentro da tela. A orb em foco não é empurrada.
       for (let it = 0; it < 3; it++) {
         for (let i = 0; i < ferr.length; i++) {
           for (let j = i + 1; j < ferr.length; j++) {
             const A = ferr[i], B = ferr[j]
+            const minimo = (R0 + 5) * ((A.zoom || 1) + (B.zoom || 1)) + 16
             let dx = B.px - A.px, dy = B.py - A.py
             let d = Math.hypot(dx, dy)
             if (d >= minimo) continue
             if (d < 0.01) (dx = Math.cos(i + j)), (dy = Math.sin(i + j)), (d = 1)
-            const empurra = (minimo - d) / 2
-            A.px -= (dx / d) * empurra
-            A.py -= (dy / d) * empurra
-            B.px += (dx / d) * empurra
-            B.py += (dy / d) * empurra
+            const kA = A === fFoco ? 0 : B === fFoco ? 1 : 0.5
+            const kB = 1 - kA
+            const falta = minimo - d
+            A.px -= (dx / d) * falta * kA
+            A.py -= (dy / d) * falta * kA
+            B.px += (dx / d) * falta * kB
+            B.py += (dy / d) * falta * kB
           }
         }
         for (const f of ferr) {
+          if (f === fFoco) continue
           f.px = Math.max(R0 + 18, Math.min(W - R0 - 18, f.px))
           f.py = Math.max(R0 + 18, Math.min(H - R0 - 18, f.py))
         }
@@ -543,7 +560,8 @@
 
       cx.globalCompositeOperation = 'source-over'
       for (const f of ferr) {
-        const on = f.liga, R = R0 + on * 4
+        const z = f.zoom || 1
+        const on = f.liga, R = (R0 + on * 4) * z
         cx.globalAlpha = 1
         cx.beginPath(); cx.arc(f.ix, f.iy, R, 0, TAU)
         cx.fillStyle = on > 0.05 ? rgba(f.cor, 0.1 + on * 0.1) : 'rgba(150,160,190,0.04)'
@@ -563,7 +581,7 @@
           }
           cx.globalCompositeOperation = 'source-over'
         }
-        icone(cx, f.id, f.ix, f.iy, R0 * 0.8 + on * 4, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
+        icone(cx, f.id, f.ix, f.iy, (R0 * 0.8 + on * 4) * z, on > 0.05 ? '#ffffff' : mix('#c9b48a', '#93a6c8', kAtivo), 0.38 + 0.12 * kAtivo + on * 0.5)
         if (on > 0.3) {
           cx.globalAlpha = Math.min(1, (on - 0.3) * 2)
           cx.fillStyle = f.cor
@@ -673,8 +691,19 @@
       for (const f of ferr) f.ativo = 0
       chip()
     }
+    // alvo = { x, y } em coordenadas da janela (clientX/clientY) e `escala` (tamanho da orb); null solta a orb
+    function definirFoco(alvo) {
+      if (!alvo) return void (foco = null)
+      let fx = 0.5, fy = 0.5
+      if (!semTela) {
+        const r = canvas.getBoundingClientRect()
+        if (r.width && r.height) (fx = (alvo.x - r.left) / r.width), (fy = (alvo.y - r.top) / r.height)
+      }
+      // raio em pixels da janela -> fração da largura do canvas (o canvas pode estar escalado por CSS no modo voz)
+      foco = { fx, fy, escala: alvo.escala || 3, fr: alvo.raio && !semTela ? alvo.raio / (canvas.getBoundingClientRect().width || 1) : 0 }
+    }
     return {
-      evento, pensar, iniciar, parar, tamanho, passo, modo, base: definirBase, limpar, estado: () => ({ ativo: alvoAtivo, base }),
+      evento, pensar, iniciar, parar, tamanho, passo, modo, base: definirBase, limpar, foco: definirFoco, estado: () => ({ ativo: alvoAtivo, base, foco: !!foco }),
       orbes: () => ferr.map((f) => ({ id: f.id, x: f.ix, y: f.iy })), // diagnóstico (teste de não sobrepor)
       ativas: () => new Map(ferr.filter((f) => f.ativo).map((f) => [f.id, f.ativo]).concat(ferr.filter((f) => !f.ativo && f.liga >= 0).map((f) => [f.id, f.ativo]))),
       particulas: () => pacotes.length + estouros.length + (ferr.some((f) => f.ativo) ? 1 : 0),

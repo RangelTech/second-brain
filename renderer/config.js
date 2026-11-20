@@ -665,6 +665,19 @@
   // =====================================================================
   // AGENTE e SOBRE (não dependem do motor)
   // =====================================================================
+  // vozes neurais (spec 52): todas testadas falando português (a fala gerada foi transcrita sem erro em 20/11/2026). As multilíngues
+  // detectam o idioma sozinhas e às vezes leem frase curta em outra língua ("Um segundinho" saiu em alemão): ficam marcadas.
+  const VOZES = [
+    ['pt-BR-FranciscaNeural', 'Francisca (feminina, padrão)'],
+    ['pt-BR-AntonioNeural', 'Antônio (masculina)'],
+    ['pt-BR-ThalitaMultilingualNeural', 'Thalita (feminina, multilíngue: pode trocar de idioma)'],
+    ['en-US-AvaMultilingualNeural', 'Ava (feminina, multilíngue: sotaque e pode trocar de idioma)'],
+    ['en-US-EmmaMultilingualNeural', 'Emma (feminina, multilíngue: sotaque e pode trocar de idioma)'],
+    ['fr-FR-VivienneMultilingualNeural', 'Vivienne (feminina, multilíngue: sotaque e pode trocar de idioma)'],
+    ['en-US-AndrewMultilingualNeural', 'Andrew (masculina, multilíngue: sotaque e pode trocar de idioma)'],
+    ['en-US-BrianMultilingualNeural', 'Brian (masculina, multilíngue: sotaque e pode trocar de idioma)'],
+    ['it-IT-GiuseppeMultilingualNeural', 'Giuseppe (masculina, multilíngue: sotaque e pode trocar de idioma)'],
+  ]
   async function telaAgente() {
     const c = await window.sb.cfg()
     $('.cfg-corpo').innerHTML = `
@@ -677,8 +690,27 @@
       <h2>Raciocínio</h2>
       <div class="cfg-acoes"><select id="ag-rac">${[['none', 'Desligado (mais rápido, recomendado)'], ['low', 'Baixo'], ['medium', 'Médio'], ['high', 'Alto (pode demorar muito)']].map(([v, n]) => `<option value="${v}" ${(c.raciocinio || 'none') === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       <p class="mut">Quanto o modelo "pensa" antes de responder. Desligado é bem mais rápido e basta para a maioria das tarefas; níveis altos podem levar muitos minutos.</p>
+      <h2>Voz</h2>
+      <div class="cfg-acoes"><select id="ag-voz">${VOZES.map(([v, n]) => `<option value="${v}" ${(c.voz || VOZES[0][0]) === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><button id="ag-voz-ouvir">Ouvir exemplo</button></div>
+      <p class="mut">A voz que responde na conversa por voz e no botão "Ouvir" das respostas.</p>
       <h2>Permissões</h2>
       <p class="mut">O agente sempre pergunta antes de rodar comandos, escrever fora da pasta de trabalho ou apagar arquivos. Em cada pergunta você pode escolher "Permitir sempre nesta conversa".</p>`
+    $('#ag-voz').onchange = (e) => window.sb.salvarCfg({ voz: e.target.value })
+    $('#ag-voz-ouvir').onclick = async (e) => {
+      const bt = e.currentTarget
+      bt.disabled = true
+      bt.textContent = 'Carregando…'
+      try {
+        const r = await window.sb.vozFalar('Oi! Esta é a minha voz. Quando você conversar comigo por voz, é assim que eu vou te responder.', $('#ag-voz').value)
+        if (r && r.ok) {
+          const a = new Audio(URL.createObjectURL(new Blob([r.bytes], { type: r.mime || 'audio/mpeg' })))
+          bt.textContent = 'Tocando…'
+          await new Promise((ok) => ((a.onended = a.onerror = ok), a.play().catch(ok)))
+        }
+      } catch {}
+      bt.disabled = false
+      bt.textContent = 'Ouvir exemplo'
+    }
     $('#ag-escolher').onclick = async () => {
       const p = await window.sb.escolherPasta()
       if (p) {

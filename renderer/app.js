@@ -588,7 +588,9 @@
     const estado = { botao, audio: null, parado: false }
     falando = estado
     botao.classList.add('on')
-    const pedir = (t) => (window.sb.vozFalar ? window.sb.vozFalar(t, (window.SB_CFG && window.SB_CFG.voz) || 'feminina').catch(() => ({ ok: false })) : Promise.resolve({ ok: false }))
+    let vozEscolhida = 'pt-BR-FranciscaNeural'
+    try { vozEscolhida = (await window.sb.cfg()).voz || vozEscolhida } catch {} // escolhida em Configurações > Agente > Voz
+    const pedir = (t) => (window.sb.vozFalar ? window.sb.vozFalar(t, vozEscolhida).catch(() => ({ ok: false })) : Promise.resolve({ ok: false }))
     let prox = pedir(blocos[0])
     for (let i = 0; i < blocos.length; i++) {
       const r = await prox
@@ -1058,6 +1060,53 @@
     novaFrase(g)
     try { velho.stop() } catch {}
   }
+  // ---- ditado ao vivo (spec 52): o texto aparece na caixa enquanto a pessoa fala (cada evento traz a fala atual inteira e substitui o
+  // anterior); no fim de cada fala ele fica fixo. Não abriu, ou caiu antes do primeiro texto: segue pelo ditado por frases, sem aviso.
+  function pintarVivo(v) {
+    const t = $('texto')
+    t.value = [v.base, v.finais, v.atual].map((s) => (s || '').trim()).filter(Boolean).join(' ')
+    t.dispatchEvent(new Event('input'))
+    t.scrollTop = t.scrollHeight
+  }
+  function encerrarVivo(g) {
+    const v = g.vivoTexto
+    if (!v || v.fim) return
+    v.fim = true
+    clearTimeout(v.prazo)
+    if (v.atual) (v.finais = [v.finais, v.atual].filter(Boolean).join(' ')), (v.atual = '')
+    pintarVivo(v)
+    try { g.fluxo.getTracks().forEach((tr) => tr.stop()) } catch {}
+    try { g.ctx && g.ctx.close() } catch {}
+    transcrevendo = false
+    pintarMic(null)
+    if (!$('texto').value.trim()) aviso('Não entendi nenhuma fala. Tente de novo, mais perto do microfone.')
+    else aviso('')
+    $('texto').focus()
+  }
+  async function iniciarVivo(g) {
+    if (!window.SBVozStream || !g.ctx) return false
+    const v = { base: $('texto').value, finais: '', atual: '', fim: false, prazo: 0 }
+    const s = await window.SBVozStream.abrir(g.ctx, g.fluxo, {
+      aoTexto: (t) => ((v.atual = t), pintarVivo(v)),
+      aoFimDeFala: () => {
+        if (v.atual) (v.finais = [v.finais, v.atual].filter(Boolean).join(' ')), (v.atual = '')
+        pintarVivo(v)
+      },
+      aoErro: (_m, recebeu) => {
+        if (!recebeu && gravandoVoz === g && !g.encerrando) {
+          // caiu antes de qualquer texto: segue gravando pelo caminho antigo
+          g.vivo = null
+          g.vivoTexto = null
+          novaFrase(g)
+        }
+      },
+      aoFechou: () => g.encerrando && encerrarVivo(g),
+    })
+    if (!s) return false
+    g.vivo = s
+    g.vivoTexto = v
+    return true
+  }
   function pararGravacao() {
     const g = gravandoVoz
     if (!g) return
@@ -1065,6 +1114,13 @@
     g.encerrando = true
     clearTimeout(g.limite)
     cancelAnimationFrame(g.raf)
+    if (g.vivo) {
+      transcrevendo = true
+      pintarMic('transcrevendo')
+      g.vivo.fechar()
+      g.vivoTexto.prazo = setTimeout(() => encerrarVivo(g), 8000) // o último texto não veio: fecha assim mesmo
+      return
+    }
     transcrevendo = true
     pintarMic('transcrevendo')
     try {
@@ -1090,7 +1146,8 @@
     const ctx = AC ? new AC() : null
     const g = { fluxo, ctx, mime, raf: 0, limite: 0, encerrando: false }
     aviso('')
-    novaFrase(g)
+    // ao vivo primeiro (spec 52); sem conexão, o ditado por frases de sempre
+    if (!(cfg?.ditadoVivo !== false && (await iniciarVivo(g)))) novaFrase(g)
     if (ctx) {
       try {
         const an = ctx.createAnalyser()
@@ -1115,6 +1172,13 @@
           // piso de ruído adaptativo: fala = bem acima do ruído do ambiente
           piso = rms < piso ? rms * 0.2 + piso * 0.8 : piso * 0.999 + rms * 0.001
           const fala = rms > Math.max(0.012, piso * 2.5)
+          if (g.vivo) {
+            // ao vivo: quem fecha as frases é o servidor; aqui só as barras do microfone
+            const nv = Math.min(1, rms * 4)
+            barras().forEach((i, k) => (i.style.height = 4 + Math.round(nv * f[k] * 16) + 'px'))
+            g.raf = requestAnimationFrame(medir)
+            return
+          }
           const fr = g.frase
           if (fala) {
             fr.falou += dt
@@ -1355,6 +1419,7 @@
   }
 
   // ponte para a conversa por voz (voz-conversa.js, spec 45 §F): usa o mesmo envio e a mesma conversa do chat
+  var vozFerrOuvintes = new Set() // var: o evento de ferramenta pode chegar antes desta linha no arranque
   window.__sbVoz = {
     enviarTexto(t) {
       if (!cfg.ativo) return null
@@ -1378,6 +1443,24 @@
     mostrarCerebro(sim) {
       const el = $('cerebro-vivo'), bt = $('abrir-cerebro')
       if (el && bt && el.hidden === !!sim) bt.click()
+    },
+    // spec 52: a pessoa falou por cima enquanto ele pensava ("ei, não quero"): para o turno, como o botão Parar
+    cancelar(id) {
+      const rr = respostas.get(id)
+      if (!rr) return false
+      rr.paradoManual = true
+      fila.delete(id)
+      desenharFila()
+      window.sb.parar(id)
+      return true
+    },
+    aoFerramenta(fn) {
+      vozFerrOuvintes.add(fn)
+      return () => vozFerrOuvintes.delete(fn)
+    },
+    // puxa a orb da etapa para um ponto da tela (centro da auréola) e a aumenta; null devolve ao passeio
+    focoOrb(alvo) {
+      CV && CV.card && CV.card.foco && CV.card.foco(alvo)
     },
   }
 
@@ -1644,6 +1727,8 @@
           r.catsDesde.set(f.id, Date.now())
           cardDe(r)?.evento(cat, 'inicio')
           definirFrase(r, SA.fraseDaFerramenta(f, rotuloFerr, tituloLimpo), true)
+          // conversa por voz (spec 52): fala a etapa ("Estou lendo os arquivos")
+          for (const fn of vozFerrOuvintes || []) try { fn({ chat: r.id, cat }) } catch {}
         }
         if (fim && r.cats.has(f.id)) {
           const c = r.cats.get(f.id)

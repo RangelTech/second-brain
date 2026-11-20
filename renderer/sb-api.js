@@ -120,7 +120,20 @@
       unlimitedSair: () => invoke('unlimited:sair'),
       aoUnlimited: (fn) => on('unlimited:estado', fn),
       ditadoServidor: (dados, mime) => invoke('ditado:servidor', dados, mime),
+      // voz ao vivo (spec 52): abre o stream, manda PCM 16 kHz em pedaços e recebe texto (acumulado da fala) / fimDeFala / erro / fechou
+      ditadoVivo: {
+        abrir: (id) => invoke('ditado:vivo:abrir', id),
+        audio: (id, pcm) => invoke('ditado:vivo:audio', id, pcm),
+        fechar: (id) => invoke('ditado:vivo:fechar', id),
+        aoEvento: (fn) => on('ditado:vivo:evento', fn),
+      },
       vozFalar: (texto, voz) => invoke('voz:falar', texto, voz),
+      // voz de saída em stream (spec 52): pedaços de MP3 chegam por evento { id, tipo: 'dados'|'fim'|'erro', data }
+      vozStream: {
+        abrir: (id, texto, voz) => invoke('voz:stream', id, texto, voz),
+        parar: (id) => invoke('voz:stream:parar', id),
+        aoPedaco: (fn) => on('voz:pedaco', fn),
+      },
       ditadoWhisperPronto: () => invoke('ditado:whisper-pronto'),
       ditadoWhisperAquecer: () => invoke('ditado:whisper-aquecer'),
       ditadoWhisper: (pcm) => invoke('ditado:whisper', pcm),

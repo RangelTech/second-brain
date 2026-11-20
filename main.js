@@ -1200,6 +1200,87 @@ app.whenReady().then(() => {
       return { ok: false, erro: 'Não consegui transcrever agora. Confira a internet e tente de novo.' }
     }
   })
+  // Voz ao vivo (spec 52): a tela manda PCM 16 kHz em pedaços; o conector fala com o servidor de transcrição em streaming (troca de
+  // conexão a cada 2 min) e o texto ACUMULADO da fala volta por evento. Usado pelo ditado e pela conversa por voz. Falhou ao abrir ou
+  // caiu antes do primeiro texto: a tela volta sozinha ao caminho antigo (ditado:servidor). SB_VOZ_STREAM_URL/CHAVE: só teste local.
+  const conectorVoz = require('./conector-ditado')
+  const vozesVivas = new Map()
+  ipcMain.handle('ditado:vivo:abrir', (e, id) => {
+    if (!id) return { ok: false }
+    let url, auth
+    if (process.env.SB_VOZ_STREAM_URL) {
+      url = process.env.SB_VOZ_STREAM_URL
+      auth = 'Bearer ' + (process.env.SB_VOZ_STREAM_CHAVE || '')
+    } else {
+      const m = midiaDoApp()
+      if (!m) return { ok: false }
+      url = conectorVoz.urlDoServidor(m.base)
+      auth = 'Bearer ' + m.chave
+    }
+    vozesVivas.get(id)?.fechar()
+    const wc = e.sender
+    const manda = (tipo, data) => {
+      try {
+        if (!wc.isDestroyed()) wc.send('ditado:vivo:evento', { id, tipo, data })
+      } catch {}
+    }
+    const c = conectorVoz.abrirStream({ url, auth, idioma: 'pt' }, {
+      aoTexto: (t) => manda('texto', t),
+      aoFimDeFala: () => manda('fimDeFala'),
+      aoErro: (msg) => (registrarAgente(app, 'voz ao vivo: ' + String(msg).slice(0, 160)), manda('erro', msg)),
+      aoFechar: () => (vozesVivas.get(id) === c && vozesVivas.delete(id), manda('fechou')),
+    })
+    vozesVivas.set(id, c)
+    return { ok: true }
+  })
+  ipcMain.handle('ditado:vivo:audio', (_e, id, pcm) => {
+    const c = vozesVivas.get(id)
+    if (!c || !pcm) return false
+    c.enviar(Buffer.from(pcm))
+    return true
+  })
+  ipcMain.handle('ditado:vivo:fechar', (_e, id) => {
+    vozesVivas.get(id)?.fechar()
+    return true
+  })
+  // Voz de saída em stream (spec 52): os pedaços de MP3 vão para a tela conforme chegam do servidor, e ela toca enquanto recebe
+  // (a conversa por voz começa a falar no 1º pedaço, não no fim da síntese). 'fim' leva o tempo do 1º pedaço e o total (medição).
+  const vozFluxos = new Map()
+  ipcMain.handle('voz:stream', (e, id, texto, voz) => {
+    const m = midiaDoApp()
+    if (!m || !id) return { ok: false }
+    const wc = e.sender
+    const manda = (tipo, data) => {
+      try {
+        if (!wc.isDestroyed()) wc.send('voz:pedaco', { id, tipo, data })
+      } catch {}
+    }
+    const ac = new AbortController()
+    vozFluxos.set(id, ac)
+    const t0 = Date.now()
+    ;(async () => {
+      try {
+        const r = await fetch(m.base + '/audio/speech', { method: 'POST', headers: { Authorization: 'Bearer ' + m.chave, 'Content-Type': 'application/json' }, body: JSON.stringify({ input: String(texto || '').slice(0, 6000), voice: voz || 'feminina' }), signal: AbortSignal.any([ac.signal, AbortSignal.timeout(60000)]) })
+        if (!r.ok || !r.body) return manda('erro', 'status ' + r.status)
+        let primeiro = 0
+        for await (const pedaco of r.body) {
+          if (!primeiro) primeiro = Date.now() - t0
+          manda('dados', new Uint8Array(pedaco))
+        }
+        manda('fim', { primeiro, total: Date.now() - t0 })
+      } catch (err) {
+        if (!ac.signal.aborted) registrarAgente(app, 'voz stream: ' + String((err && err.message) || err).slice(0, 160))
+        manda('erro', String((err && err.message) || err))
+      } finally {
+        vozFluxos.delete(id)
+      }
+    })()
+    return { ok: true }
+  })
+  ipcMain.handle('voz:stream:parar', (_e, id) => {
+    vozFluxos.get(id)?.abort()
+    return true
+  })
   // Voz de saída (spec 38 E): texto -> fala neural (vozes da Microsoft) pelo servidor; o renderer pede frase a frase e toca
   // enquanto a próxima carrega. Falhou => o renderer usa a voz do sistema.
   ipcMain.handle('voz:falar', async (_e, texto, voz) => {
@@ -1452,7 +1533,7 @@ app.whenReady().then(() => {
   }
   ipcMain.handle('cfg:get', () => publica())
   ipcMain.handle('cfg:set', (_e, parcial) => {
-    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto', 'acessoWebPerguntado']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
+    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto', 'acessoWebPerguntado', 'voz']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
     salvarCfg()
     return publica()
   })
