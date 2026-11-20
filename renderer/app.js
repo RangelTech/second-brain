@@ -127,16 +127,35 @@
           .replace(CAMINHO_ARQ, (m) => `<a class="arq-link" href="#" data-arq="${m}">${m.split(/[\\/]/).pop()}</a>${!ehWeb && EXT_ESCRITORIO.test(m) && window.sb.escritorio ? `<button class="arq-editar" data-escritorio="${m}" title="Abrir no editor de documentos do Cérebro Pro">Abrir no editor</button>` : ''}`)
           .replace(/`([^`\n]+)`/g, '<code>$1</code>')
           .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
-          .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)]+)/g, (m, rotulo, urlMd, urlSolta) => {
-            if (urlMd) return `<a href="${urlMd}" rel="noreferrer">${rotulo}</a>`
-            const pontuacao = /[.,;:!?]+$/.exec(urlSolta)
-            const url = pontuacao ? urlSolta.slice(0, -pontuacao[0].length) : urlSolta
-            return `<a href="${url}" rel="noreferrer">${url}</a>${pontuacao ? pontuacao[0] : ''}`
+          // spec 54: foto da internet que o agente achou (![alt](https://...)) aparece dentro da mensagem
+          .replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g, (m, alt, u) => `<img class="img-chat" src="${u}" alt="${alt}" loading="lazy" referrerpolicy="no-referrer">`)
+          .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<)"]+)/g, (m, rotulo, urlMd, urlSolta, pos, todo) => {
+            if (urlSolta && /(src|href)="$/.test(todo.slice(Math.max(0, pos - 6), pos))) return m // endereço que já está dentro de uma imagem/link
+            const url0 = urlMd || urlSolta
+            const pontuacao = urlSolta ? /[.,;:!?]+$/.exec(urlSolta) : null
+            const url = pontuacao ? url0.slice(0, -pontuacao[0].length) : url0
+            // vídeo do YouTube: o link e, embaixo, o player (miniatura; o vídeo só carrega ao clicar)
+            const yt = (/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([\w-]{11})/.exec(url) || [])[1]
+            const player = yt ? `<span class="yt-chat" data-yt="${yt}" role="button" tabindex="0" aria-label="Tocar o vídeo"><img src="https://i.ytimg.com/vi/${yt}/hqdefault.jpg" alt="" loading="lazy"><i class="yt-play"></i></span>` : ''
+            return `<a href="${url}" rel="noreferrer">${urlMd ? rotulo : url}</a>${pontuacao ? pontuacao[0] : ''}${player}`
           })
       })
       .join('')
   }
   window.SBmd = md
+  // foto que não carrega (site bloqueia) some em vez de deixar um ícone quebrado; o player do YouTube nasce ao clicar na miniatura
+  document.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('img-chat')) e.target.remove() }, true)
+  document.addEventListener('click', (e) => {
+    const p = e.target.closest && e.target.closest('.yt-chat')
+    if (!p || p.querySelector('iframe')) return
+    const f = document.createElement('iframe')
+    f.src = 'https://www.youtube.com/embed/' + encodeURIComponent(p.dataset.yt) + '?autoplay=1&rel=0&modestbranding=1'
+    f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'
+    f.allowFullscreen = true
+    f.referrerPolicy = 'strict-origin-when-cross-origin'
+    p.replaceChildren(f)
+    p.classList.add('tocando')
+  })
 
   const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   // Conversas compartilhadas (app + web, ou várias pessoas no mesmo login): cada alteração leva o carimbo `mod`, as apagadas

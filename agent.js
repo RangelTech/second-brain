@@ -293,7 +293,48 @@ function rodar(exe, args, env, prazoMs) {
     p.on('close', (c) => (clearTimeout(t), ok({ codigo: c, saida: saida.slice(-600) })))
   })
 }
+// AUTOCONSERTO (spec 54, 20/11/2026, 2ª vez no PC do Lucas): uma ferramenta do Hermes que pede um pacote "na hora" (ex.: a voz edge-tts)
+// faz ele criar uma instalação NOVA só com aquele pacote, sem o núcleo (acp). Por ser a mais nova, o Hermes passa a usá-la e TODA conversa
+// falha com request_failed. Se a instalação mais nova estiver sem o núcleo e existir outra completa, a quebrada sai de installs/ (vai para
+// installs-quebradas/, nada é apagado) e o Hermes volta à completa.
+function isolarInstalacoesQuebradas(home, anotar = () => {}) {
+  const dir = path.join(home, 'installs')
+  let lista = []
+  try {
+    lista = fs.readdirSync(dir).map((nome) => {
+      const base = path.join(dir, nome)
+      let completa = false
+      try {
+        for (const e of fs.readdirSync(path.join(base, 'environments'))) {
+          const env = path.join(base, 'environments', e)
+          if (fs.existsSync(path.join(env, 'workspace', 'pm')) && temPacote(path.join(env, 'venv'), 'acp')) completa = true
+        }
+      } catch {}
+      return { nome, base, completa, em: fs.statSync(base).mtimeMs }
+    })
+  } catch {
+    return false
+  }
+  if (!lista.some((x) => x.completa)) return false // nenhuma completa: deixa o Hermes montar do zero, não mexe
+  const maisNovaCompleta = Math.max(...lista.filter((x) => x.completa).map((x) => x.em))
+  const quebradas = lista.filter((x) => !x.completa && x.em >= maisNovaCompleta)
+  if (!quebradas.length) return false
+  const destino = path.join(home, 'installs-quebradas')
+  try { fs.mkdirSync(destino, { recursive: true }) } catch {}
+  let moveu = false
+  for (const q of quebradas) {
+    try {
+      fs.renameSync(q.base, path.join(destino, q.nome + '-' + Date.now()))
+      anotar(`instalação do agente sem o núcleo posta de lado (${q.nome}); voltando à completa`)
+      moveu = true
+    } catch (e) {
+      anotar('não consegui pôr de lado a instalação quebrada ' + q.nome + ': ' + e.message)
+    }
+  }
+  return moveu
+}
 async function garantirComponentes(home, anotar = () => {}) {
+  const isolou = isolarInstalacoesQuebradas(home, anotar)
   const amb = ambientesDoAgente(home)[0]
   if (!amb) return { ok: false, faltando: ['ambiente do agente'], instalou: false }
   const faltando = []
@@ -312,7 +353,7 @@ async function garantirComponentes(home, anotar = () => {}) {
       faltando.push(c.nome)
     }
   }
-  return { ok: !faltando.length, faltando, instalou }
+  return { ok: !faltando.length, faltando, instalou: instalou || isolou }
 }
 function marcarMontado(home, bin) {
   try {
@@ -553,6 +594,8 @@ function blocoEstilo() {
     'Responda sempre em português do Brasil, em tom simples e gentil. Nunca escreva em inglês para o cliente, nem a frase curta antes de usar uma ferramenta (ex.: "Vou abrir a Wikipédia e ler o primeiro parágrafo.").',
     'Nunca cite detalhes internos: nome de ferramenta (navegador_abrir, navegador_*, midia_gerar_imagem, terminal...), identificador de sessão ou de conversa (ex.: [@session:...], local-abc123...), tool_call, JSON, wrapper, erro técnico, servidor, GPU ou fila. Para falar de uma conversa antiga, use a data e o assunto ("na conversa de hoje às 19h sobre a Wikipédia"). Se algo falhar, tente de novo em silêncio; se continuar falhando, diga só que não conseguiu agora e ofereça tentar de novo.',
     // spec 54: navegador aberto no automático fez site barrar como robô ("acesso temporariamente restrito")
+    // spec 54: foto e YouTube no chat na hora
+    'FOTO E VÍDEO NA HORA: pediram para ver/mostrar uma foto de algo real, use midia_buscar_fotos e coloque as linhas de imagem na resposta. Pediram um vídeo do YouTube (música, clipe, trailer), use midia_buscar_youtube e coloque o link na resposta; se depois pedirem um corte ou edição "disso", use esse link. Não abra o navegador para isso.',
     'NAVEGADOR INTEGRADO SÓ QUANDO PRECISA: abra o navegador apenas quando o usuário pedir para abrir/entrar num site, ou quando a tarefa exigir AGIR dentro de uma página (entrar numa conta, clicar, preencher, comprar, postar). Para pesquisar, ler notícia, ver preço, cotação ou achar imagem, use a busca na web (web_search / web_extract), que é rápida e não aparece na tela. Dentro de um site, vá com calma: espere a página carregar entre as ações.',
     'Não narre cada passo nem cada conferência. Faça o trabalho e entregue uma resposta curta: o que foi feito e onde está o arquivo.',
     'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure no índice de skills a que serve e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
@@ -710,7 +753,7 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     // spec 53: o toolset `browser` do Hermes (browser_exec) abre um Chromium proprio, invisivel para o cliente, 7 a 11 s por chamada, e
     // concorria com o NOSSO navegador integrado (que o cliente ve). Fica desligado; SB_TOOLSETS_OFF soma outros (ex.: connections).
     // Antes esta chave ia parar debaixo de `plugins:` e nao valia: o Hermes le `agent.disabled_toolsets`.
-    `  disabled_toolsets: ${JSON.stringify([...new Set(['browser', ...String(process.env.SB_TOOLSETS_OFF || '').split(',').map((x) => x.trim()).filter(Boolean)])])}`,
+    `  disabled_toolsets: ${JSON.stringify([...new Set(['browser', 'tts', ...String(process.env.SB_TOOLSETS_OFF || '').split(',').map((x) => x.trim()).filter(Boolean)])])}`, // tts: a voz é do app; a do Hermes pedia edge-tts e criava instalação quebrada
     // PARTIDA: o Hermes descobre e carrega 59 plugins (provedores de imagem, video, busca, navegador externo, Discord, Feishu...) e nenhum serve ao
     // Segundo Cerebro: imagem, video, navegador e memoria sao os NOSSOS servidores MCP. Cada plugin e um import e um check_fn na partida e no 1o turno.
     ...(process.env.SB_SEM_PLUGINS_FORA ? [] : ['plugins:', `  disabled: ${JSON.stringify(gateway ? PLUGINS_FORA.filter((x) => x !== 'web-ddgs') : PLUGINS_FORA)}`]), // SB_SEM_PLUGINS_FORA=1 so para medir/comparar
@@ -1613,4 +1656,4 @@ class Sessao {
   }
 }
 
-module.exports = { prepararHome, contextoDeSistema, garantirComponentes, ambientesDoAgente, embrulharDirecionamento, historicoParaAgente, itensAbertosDoPlano, textoContinuarPlano, textoMetaPendente, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }
+module.exports = { isolarInstalacoesQuebradas, prepararHome, contextoDeSistema, garantirComponentes, ambientesDoAgente, embrulharDirecionamento, historicoParaAgente, itensAbertosDoPlano, textoContinuarPlano, textoMetaPendente, COMPRIMIR_EM, PODAR_EM, CONTEXTO_REAL, decidirPermissao, vigiarGitPreso, caminhosHermes, MORTE_DO_AGENTE, kindDeCotaDeMidia, Sessao,ambienteMontado, limparGitPreso, localizarBinario, atalhoValido, prepararBase, definirPacote, mcpsExternos, registrar, matarArvore, matarArvorePoupandoGateway, descendentes, limparHermesPreso, matarGatewayOrfao, sessoesVivas, sincronizarSkillsGlobais, ajustarHermes, ferramentasPython, yamlGateway, mcpGlobais }

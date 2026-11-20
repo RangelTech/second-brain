@@ -43,6 +43,9 @@ const obj = (props, req = []) => ({ type: 'object', properties: props, required:
 const FORMATOS = { quadrado: '1024x1024', retrato: '832x1216', paisagem: '1216x832', story: '720x1280', banner: '1344x768' }
 const FORMATOS_VIDEO = ['paisagem', 'retrato', 'quadrado']
 const FERRAMENTAS = [
+  // spec 54: fotos e YouTube na hora (sem navegador), as mesmas buscas da conversa por voz
+  { nome: 'buscar_fotos', desc: 'Acha FOTOS da internet de algo real (pessoa, lugar, animal, objeto, produto) em ~1 s, sem abrir navegador. Use quando o usuário pedir para VER/MOSTRAR uma foto ou imagem de algo que existe. Coloque as linhas de imagem que esta ferramenta devolver na sua resposta: o chat mostra as fotos.', schema: obj({ busca: { type: 'string', description: 'o que procurar, como numa busca de imagens' }, quantidade: { type: 'integer', description: '1 a 4 (padrão 3)' } }, ['busca']) },
+  { nome: 'buscar_youtube', desc: 'Acha um vídeo do YouTube (música, clipe, trailer, aula, vídeo de um assunto) em ~1 s, sem abrir navegador. Coloque o link devolvido na sua resposta: o chat mostra o player. O link também serve para cortar ou baixar o vídeo depois.', schema: obj({ busca: { type: 'string', description: 'artista e música, ou o vídeo procurado' } }, ['busca']) },
   {
     nome: 'dublar_video',
     desc: 'REDUBLA um vídeo com a VOZ DO USUÁRIO (clonada de uma amostra) e, se pedido, em outro idioma: o vídeo fica igual, só a fala passa a ser dita com a voz dele. Duas etapas: 1) sem confirmado, ouve a fala do vídeo, traduz se preciso e devolve o PREÇO em créditos e um trecho do texto: mostre ao usuário e espere o SIM; 2) com confirmado=true, gera a voz e remonta o vídeo (de 1 a 6 minutos). Amostra: áudio ou vídeo com 30 s a 5 min de fala limpa da pessoa (quanto mais, melhor). A música de fundo não é mantida. A dublagem não sincroniza os lábios.',
@@ -534,6 +537,19 @@ async function tratar(msg) {
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^midia_/, '')
     try {
+      if (nome === 'buscar_fotos' || nome === 'buscar_youtube') {
+        const cv = require('./cerebro-voz')
+        const a = params?.arguments || {}
+        let texto
+        if (nome === 'buscar_fotos') {
+          const l = await cv.acharImagens(a.busca, a.quantidade || 3)
+          texto = l.length ? 'Coloque estas linhas na resposta, do jeito que estão (o chat mostra as fotos):\n' + l.map((x) => `![${String(a.busca).replace(/[\[\]]/g, '')}](${x.src})`).join('\n') : 'Não achei fotos disso.'
+        } else {
+          const v = await cv.acharYoutube(a.busca)
+          texto = v ? `Coloque este link na resposta (o chat mostra o player): [${v.titulo.replace(/[\[\]]/g, '')}](https://www.youtube.com/watch?v=${v.id})` : 'Não achei esse vídeo no YouTube.'
+        }
+        return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: texto }] } })
+      }
       if (nome === 'detalhar_prompt') {
         if (!CHAVE && !process.env.SB_MIDIA_MOCK) throw new Error('O Cérebro Pro ainda não tem a chave do servidor. Entre na sua conta.')
         const ctx = { base: BASE, chave: CHAVE, fetchFn: process.env.SB_MIDIA_MOCK ? async () => { throw new Error('mock') } : undefined }
