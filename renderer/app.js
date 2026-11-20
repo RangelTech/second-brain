@@ -83,6 +83,7 @@
   // markdown mínimo: blocos de código, código em linha, negrito, títulos, listas, links http(s)
   function md(t) {
     return String(t)
+      .replace(/\[\[tela:[a-z]+\]\]/gi, '') // comando de tela da conversa por voz (spec 53): age na tela, não aparece no chat
       .replace(/^\s+|\s+$/g, '')
       .split(/```/)
       .map((p, i) => {

@@ -350,6 +350,7 @@
     clearTimeout(st && st.timerEspera)
     if (st !== sessao || st.turno !== turno) return // interrompido: quem interrompeu já cuidou da fase
     const resp = P().ultimaResposta(id)
+    if (/\[\[tela:limpar\]\]/i.test(resp)) recolherCartoes() // o agente decidiu tirar o que estava na tela
     mostrarCartoes([...imagensNaTela(), ...imagensDoTexto(resp)])
     await falarResposta(resp, turno)
     if (st !== sessao || st.turno !== turno) return
@@ -382,9 +383,30 @@
     if (!ult) return []
     return [...ult.querySelectorAll('img.img-final, video.img-final')].map((el) => ({ src: el.currentSrc || el.src, alt: el.alt || 'Mídia', video: el.tagName === 'VIDEO' }))
   }
+  // recolhe os cartões de volta para o centro do cérebro (assunto novo ou o agente mandou limpar a tela)
+  function recolherCartoes() {
+    const caixa = $('voz-palco') && $('voz-palco').querySelector('.voz-cartoes')
+    if (!caixa) return
+    const centro = P().centroCerebro && P().centroCerebro()
+    for (const c of [...caixa.children]) {
+      if (c.classList.contains('sai')) continue
+      const r = c.getBoundingClientRect()
+      if (centro && r.width) {
+        c.style.setProperty('--dx', Math.round(centro.x - (r.left + r.width / 2)) + 'px')
+        c.style.setProperty('--dy', Math.round(centro.y - (r.top + r.height / 2)) + 'px')
+      }
+      c.classList.add('sai')
+      setTimeout(() => c.remove(), 650)
+    }
+  }
   function mostrarCartoes(lista) {
     if (!st || !lista.length) return
     const caixa = $('voz-palco').querySelector('.voz-cartoes')
+    // primeira imagem de um pedido novo: as do assunto anterior voltam para o cérebro antes
+    if (lista.some((it) => it.src && !st.cartoesVistos.has(it.src)) && st.cartoesDoTurno !== st.turno) {
+      st.cartoesDoTurno = st.turno
+      recolherCartoes()
+    }
     for (const it of lista) {
       if (!it.src || st.cartoesVistos.has(it.src)) continue
       st.cartoesVistos.add(it.src)
@@ -418,6 +440,7 @@
   // ---------- falar ----------
   function paraFala(texto) {
     let t = String(texto || '')
+      .replace(/\[\[tela:[a-z]+\]\]/gi, ' ') // comando de tela: não é falado
       .replace(/```[\s\S]*?```/g, ' ')
       .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
       .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
@@ -744,7 +767,7 @@
     if (b) b.classList.remove('on')
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && st) encerrar() })
-  window.SBVozConversa = { iniciar, encerrar, mostrarCartoes: (l) => mostrarCartoes(l || []), ativo: () => !!st, estado: () => st && { fase: st.fase, ouvido: st.ouvido, vivo: !!st.vivo, tocando: !!st.tocando, abaixou: !!st.abaixou, cache: st.cache.size, turno: st.turno, enviado: st.enviado } }
+  window.SBVozConversa = { iniciar, encerrar, mostrarCartoes: (l) => mostrarCartoes(l || []), recolherCartoes, ativo: () => !!st, estado: () => st && { fase: st.fase, ouvido: st.ouvido, vivo: !!st.vivo, tocando: !!st.tocando, abaixou: !!st.abaixou, cache: st.cache.size, turno: st.turno, enviado: st.enviado } }
   const b = $('voz-conversa')
   if (b) b.onclick = iniciar
 })()

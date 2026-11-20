@@ -542,6 +542,8 @@ body.modo-voz .nav .nav-barra,body.modo-voz .nav-fav-menu{display:none}
 .voz-cartao::before{content:"";position:absolute;inset:-1px;border-radius:16px;pointer-events:none;background:linear-gradient(120deg,transparent 30%,rgba(160,230,255,.35) 50%,transparent 70%);background-size:250% 100%;animation:brilhoBorda 4.5s ease-in-out infinite;mix-blend-mode:screen}
 .voz-cartao.grande{width:min(46vw,620px);cursor:zoom-out;z-index:5}
 .voz-cartao.grande img,.voz-cartao.grande video{max-height:70vh;object-fit:contain;background:#050a14}
+.voz-cartao.sai{animation:cartaoVolta .6s cubic-bezier(.5,0,.75,0) forwards}
+@keyframes cartaoVolta{to{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(.05);filter:blur(6px) brightness(3)}}
 @keyframes cartaoNasce{0%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(.06);filter:blur(8px) brightness(3)}55%{opacity:1;filter:blur(1px) brightness(1.6)}100%{opacity:1;transform:none;filter:none}}
 @keyframes cartaoFlutua{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes varre{from{background-position:0 0}to{background-position:0 40px}}
