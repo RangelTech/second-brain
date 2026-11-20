@@ -641,6 +641,25 @@
     if (st.chat && P().ocupado(st.chat)) P().cancelar(st.chat)
   }
 
+  // "Boa tarde, Lucas! Em que posso te ajudar?" ao abrir: hora local, primeiro nome da conta, pergunta sorteada. Sem LLM, sai na hora.
+  async function saudar(sessao) {
+    let nome = ''
+    try {
+      const c = await window.sb.cfg()
+      nome = c.unlimitedNome || c.unlimitedEmail || ''
+    } catch {}
+    if (st !== sessao) return
+    const frase = F.saudacao(new Date().getHours(), nome, st.sortear)
+    $('voz-palco').querySelector('.voz-legenda').textContent = frase
+    try {
+      if (temStreamTTS()) await tocarTTS(pedirTTS(frase), frase)
+      else {
+        const r = await sintetizar(frase)
+        if (r && r.ok && st === sessao) await tocar(r, frase)
+      }
+    } catch {}
+  }
+
   // frases de espera e de etapa já sintetizadas na voz escolhida: saem na hora, sem esperar o servidor
   // Só com a conversa parada (ouvindo): durante pensar/falar a síntese da resposta tem a vez.
   async function aquecerFrases(sessao) {
@@ -699,7 +718,7 @@
     else return encerrar()
     st.aoRedimensionar = () => focar()
     window.addEventListener('resize', st.aoRedimensionar)
-    aquecerFrases(sessao)
+    saudar(sessao).finally(() => aquecerFrases(sessao))
   }
   function encerrar() {
     const s = st

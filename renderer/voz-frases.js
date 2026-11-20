@@ -57,6 +57,21 @@
     const i = id && INTENCOES.find((x) => x.id === id)
     return i ? sortear(i.frases) : null
   }
+  // saudação ao abrir a conversa por voz (pedido do Lucas 20/11): pela hora local + primeiro nome + uma pergunta sorteada. Sem LLM: sai na hora.
+  const PERGUNTAS = ['Em que posso te ajudar?', 'O que vamos fazer hoje?', 'Em que posso ser útil agora?', 'Sobre o que você quer conversar?',
+    'Tô por aqui. O que você precisa?', 'Pode mandar, o que manda hoje?', 'Bora resolver o quê agora?']
+  function periodo(hora) {
+    return hora >= 5 && hora < 12 ? 'Bom dia' : hora >= 12 && hora < 18 ? 'Boa tarde' : 'Boa noite'
+  }
+  // "lucas.rangel+light@outlook.com" ou "Lucas Rangel" -> "Lucas"
+  function primeiroNome(nomeOuEmail) {
+    const base = String(nomeOuEmail || '').split('@')[0].split(/[.+_\-\s\d]/)[0]
+    return base.length >= 2 ? base[0].toUpperCase() + base.slice(1).toLowerCase() : ''
+  }
+  function saudacao(hora, nomeOuEmail, sortear) {
+    const nome = primeiroNome(nomeOuEmail)
+    return `${periodo(hora)}${nome ? ', ' + nome : ''}! ${sortear(PERGUNTAS)}`
+  }
   const PARAR = new Set(['para', 'pare', 'parar', 'parou', 'chega', 'espera', 'espere', 'perai', 'peraí', 'ei', 'ow', 'calma', 'cala', 'silencio', 'nao', 'stop', 'ok', 'tá', 'ta', 'beleza', 'quero', 'eu', 'não', 'aí', 'ai', 'pera'])
 
   function todas() {
@@ -102,5 +117,5 @@
     return w.length > 0 && w.length <= 4 && w.every((x) => PARAR.has(x))
   }
 
-  return { ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
+  return { ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
 })
