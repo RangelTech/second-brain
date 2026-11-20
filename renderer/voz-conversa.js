@@ -75,8 +75,8 @@
     if (!st) return
     if (st.fase !== 'pensando') return P().focoOrb(null)
     const r = st.canvas.getBoundingClientRect()
-    // mesmo centro e raio do anel desenhado em desenhar(): a orb encaixa por dentro do anel
-    P().focoOrb({ x: r.left + r.width / 2, y: r.top + r.height * 0.44, raio: Math.min(r.width, r.height) * 0.2 * 0.78 })
+    // a orb vai ao centro do cérebro (onde o anel está) com o tamanho de dentro do anel
+    P().focoOrb({ raio: Math.min(r.width, r.height) * 0.2 * 0.78 })
   }
 
   // ---------- auréola ----------
@@ -90,7 +90,14 @@
     const g = cv.getContext('2d')
     g.setTransform(dpr, 0, 0, dpr, 0, 0)
     g.clearRect(0, 0, w, h)
-    const cx = w / 2, cy = h * 0.44
+    // o anel fica em volta do CENTRO DO CÉREBRO do fundo (o mesmo ponto para onde a orb da etapa vai): tudo concêntrico
+    let cx = w / 2, cy = h * 0.44
+    const c = P().centroCerebro && P().centroCerebro()
+    if (c) {
+      const r = cv.getBoundingClientRect()
+      cx = c.x - r.left
+      cy = c.y - r.top
+    }
     const raio = Math.min(w, h) * 0.2
     // fonte do som: a voz da IA quando ela fala (resposta ou frase de espera), o microfone nos outros momentos
     const an = st.tocando && st.anSaida ? st.anSaida : st.anMic

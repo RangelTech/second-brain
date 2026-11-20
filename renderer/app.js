@@ -1462,6 +1462,7 @@
     focoOrb(alvo) {
       CV && CV.card && CV.card.foco && CV.card.foco(alvo)
     },
+    centroCerebro: () => (CV && CV.card && CV.card.centro ? CV.card.centro() : null),
   }
 
   function desenharFila() {

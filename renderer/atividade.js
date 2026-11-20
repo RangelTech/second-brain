@@ -268,7 +268,7 @@
     const estouros = []
     const cx = semTela ? null : canvas.getContext('2d')
     let W = 0, H = 0, dpr = 1, clarao = 0, ult = 0, acum = 0, raf = 0, animando = false, fraseAtual = '', relogio = 0
-    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar', foco = null
+    let alvoAtivo = 0, kAtivo = 0, yaw = 0.6, base = 'pensar', foco = null, ultCX = 0, ultCY = 0
     const mix = (a, b, k) => { const x = rgb(a), y = rgb(b); return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * k).toString(16).padStart(2, '0')).join('') }
     const agora = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000
 
@@ -301,6 +301,8 @@
       const R0 = W < 640 ? 20 : 32 // celular: orbes menores (no telefone as de 32 px se amontoavam)
       const topo = Math.min(70, H * 0.1), baixo = H - Math.min(180, H * 0.24)
       const CX = W / 2, CY = (topo + baixo) / 2
+      ultCX = CX
+      ultCY = CY
       const ativas = ferr.filter((f) => f.aceso)
       const energia = (ativas.length ? 1 : 0.35) * (0.35 + 0.65 * kAtivo)
 
@@ -362,12 +364,19 @@
       const fFoco = foco ? ativaAgora || porId[base] || porId.pensar : null
       for (const f of ferr) {
         // com raio pedido, a orb (raio R0 + 4 acesa) cresce até ele; senão usa a escala
-        const alvoZoom = f === fFoco ? (foco.fr ? Math.max(1, (foco.fr * W) / (R0 + 4)) : foco.escala) : 1
+        // raio pedido vem em pixels da janela; o canvas pode estar escalado por CSS (modo voz): converte pela largura real dele
+        const alvoZoom = f === fFoco ? (foco.raio ? Math.max(1, foco.raio / (kTela() || 1) / (R0 + 4)) : foco.escala) : 1
         f.zoom = lerp(f.zoom || 1, alvoZoom, 1 - Math.pow(f === fFoco ? 0.004 : 0.02, dt))
         if (f === fFoco) {
           const seg = Math.min(1, dt * 7) // rápido: ela anda até lá, não aparece
-          f.px += (foco.fx * W - f.px) * seg
-          f.py += (foco.fy * H - f.py) * seg
+          // posição própria do foco (o passeio acima também mexe em px/py; se as duas puxassem, ela pararia fora do centro)
+          if (f.fx === undefined) (f.fx = f.px), (f.fy = f.py)
+          f.fx += (CX - f.fx) * seg // centro do cérebro: o anel da voz é desenhado no mesmo ponto (centro())
+          f.fy += (CY - f.fy) * seg
+          f.px = f.fx
+          f.py = f.fy
+        } else if (f.fx !== undefined) {
+          f.fx = f.fy = undefined // saiu do foco: volta a passear de onde está
         }
       }
       // REGRA: orbes nunca se sobrepõem. Qualquer par mais perto que os dois raios + folga é afastado ao longo da linha entre eles
@@ -692,18 +701,24 @@
       chip()
     }
     // alvo = { x, y } em coordenadas da janela (clientX/clientY) e `escala` (tamanho da orb); null solta a orb
+    // alvo = { raio } (pixels da janela) ou { escala }: a orb da etapa vai ao CENTRO DO CÉREBRO e cresce; null solta a orb
     function definirFoco(alvo) {
-      if (!alvo) return void (foco = null)
-      let fx = 0.5, fy = 0.5
-      if (!semTela) {
-        const r = canvas.getBoundingClientRect()
-        if (r.width && r.height) (fx = (alvo.x - r.left) / r.width), (fy = (alvo.y - r.top) / r.height)
-      }
-      // raio em pixels da janela -> fração da largura do canvas (o canvas pode estar escalado por CSS no modo voz)
-      foco = { fx, fy, escala: alvo.escala || 3, fr: alvo.raio && !semTela ? alvo.raio / (canvas.getBoundingClientRect().width || 1) : 0 }
+      foco = alvo ? { raio: alvo.raio || 0, escala: alvo.escala || 3 } : null
+    }
+    // pixels da janela por unidade do canvas (o modo voz amplia o fundo por CSS)
+    function kTela() {
+      if (semTela || !W) return 1
+      return (canvas.getBoundingClientRect().width || W) / W
+    }
+    // centro do cérebro em coordenadas da janela, para a auréola da voz desenhar o anel em volta dele
+    function centro() {
+      if (semTela || !W) return null
+      const r = canvas.getBoundingClientRect()
+      if (!r.width || !r.height) return null
+      return { x: r.left + (ultCX / W) * r.width, y: r.top + (ultCY / H) * r.height }
     }
     return {
-      evento, pensar, iniciar, parar, tamanho, passo, modo, base: definirBase, limpar, foco: definirFoco, estado: () => ({ ativo: alvoAtivo, base, foco: !!foco }),
+      evento, pensar, iniciar, parar, tamanho, passo, modo, base: definirBase, limpar, foco: definirFoco, centro, estado: () => ({ ativo: alvoAtivo, base, foco: !!foco }),
       orbes: () => ferr.map((f) => ({ id: f.id, x: f.ix, y: f.iy })), // diagnóstico (teste de não sobrepor)
       ativas: () => new Map(ferr.filter((f) => f.ativo).map((f) => [f.id, f.ativo]).concat(ferr.filter((f) => !f.ativo && f.liga >= 0).map((f) => [f.id, f.ativo]))),
       particulas: () => pacotes.length + estouros.length + (ferr.some((f) => f.ativo) ? 1 : 0),
