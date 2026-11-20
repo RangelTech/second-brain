@@ -21,7 +21,7 @@ Uma frase para o usuário, sempre que trocar de navegador: "Vou usar o seu Chrom
 3. **Não conectado ou pausado:** não invente nem tente de novo em loop. Diga em português simples e mande o link.
 
 ## Como pedir a instalação (mande exatamente isto, adaptando o tom)
-> Para eu usar o seu Chrome, com as suas contas já abertas, instale a extensão do Cérebro Pro (3 minutos): **https://brain.rangeltech.net/extensao/**
+> Para eu usar o seu Chrome, com as suas contas já abertas, instale a extensão do Cérebro Pro (3 minutos): **https://segundocerebro.pro/extensao/**
 > Baixe e extraia o arquivo, abra `chrome://extensions`, ligue o **Modo do desenvolvedor**, clique em **Carregar sem compactação** e escolha a pasta. Depois clique no ícone da extensão: se o aplicativo estiver aberto ela se conecta sozinha; se não, clique em **Entrar** e use o seu e-mail e senha uma vez.
 
 Se o usuário estiver no aplicativo e a extensão já estiver instalada mas desconectada, diga para abrir **Configurações** e tocar em **Conectar o Chrome**. Na web, diga para tocar no ícone da extensão e em **Entrar**.

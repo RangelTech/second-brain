@@ -7,7 +7,7 @@ const path = require('path')
 const crypto = require('crypto')
 const WebSocket = require('ws')
 
-const URL_PADRAO = process.env.SB_REMOTO_URL || 'https://remoto.rangeltech.net'
+const URL_PADRAO = process.env.SB_REMOTO_URL || 'https://app.segundocerebro.pro'
 const RENDERER = path.join(__dirname, 'renderer')
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' }
 // o que a tela web NÃO pode pedir ao app (abre janela, pasta ou programa no computador, ou mexe no próprio acesso web)

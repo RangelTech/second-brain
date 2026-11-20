@@ -13,7 +13,7 @@ const chatAtual = () => {
 const path = require('path')
 const { detalhar, formatarSaida, conferirTroca, formatarConferencia } = require('./midia-detalhar')
 
-let BASE = (process.env.SB_MIDIA_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+let BASE = (process.env.SB_MIDIA_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '')
 let CHAVE = process.env.SB_MIDIA_CHAVE || ''
 let PASTA = process.env.SB_MIDIA_PASTA || process.cwd()
 // o aplicativo (processo principal) reaproveita este módulo para concluir os jobs pesados em segundo plano: aponta para a conta e a pasta dele

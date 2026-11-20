@@ -47,7 +47,7 @@ test('print da extensão salva o PNG e devolve o caminho para o vision_analyze',
 test('sem Chrome conectado a mensagem manda o link da extensão (e não troca de navegador sozinha)', async () => {
   for (const codigo of ['sem_extensao', 'pausado', 'timeout', 'desconectada']) {
     const { nav } = montar({ modoServidor: true, resposta: { ok: false, codigo, erro: 'x' } })
-    await assert.rejects(nav.atender('abrir', { url: 'https://a.com' }), /brain\.rangeltech\.net\/extensao.*onde="integrado"/s)
+    await assert.rejects(nav.atender('abrir', { url: 'https://a.com' }), /segundocerebro.pro\/extensao.*onde="integrado"/s)
   }
 })
 
@@ -61,7 +61,7 @@ test('esperar é sempre local e chrome_estado informa o estado', async () => {
   assert.match((await nav.atender('esperar', { ms: 10 })).texto, /Esperei/)
   const e = JSON.parse((await nav.atender('chrome_estado', {})).texto)
   assert.deepStrictEqual([e.chrome_conectado, e.pausado, e.onde_padrao, e.acesso_web_ligado], [true, false, 'chrome', true])
-  assert.match(e.link_extensao, /brain\.rangeltech\.net\/extensao/)
+  assert.match(e.link_extensao, /segundocerebro.pro\/extensao/)
   assert.strictEqual(chamadas.length, 0)
 })
 

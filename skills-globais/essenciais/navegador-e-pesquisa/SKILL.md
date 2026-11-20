@@ -27,4 +27,4 @@ Subdomínios e caminhos que você acha que existem muitas vezes não existem. Ex
 - Role a página para carregar mais publicações antes de concluir que não há mais.
 
 ## Chrome do usuário (extensão)
-Por padrão o aplicativo usa o navegador integrado; na versão web, o Chrome do usuário. Quando o usuário pedir o Chrome dele, ou o site exigir as contas dele (WhatsApp Web, Instagram, Gmail), use `onde: "chrome"` nas ferramentas `navegador_*`. Sem a extensão conectada, mande o link **https://brain.rangeltech.net/extensao/**. Detalhes e cuidados na skill `navegador-do-usuario`.
+Por padrão o aplicativo usa o navegador integrado; na versão web, o Chrome do usuário. Quando o usuário pedir o Chrome dele, ou o site exigir as contas dele (WhatsApp Web, Instagram, Gmail), use `onde: "chrome"` nas ferramentas `navegador_*`. Sem a extensão conectada, mande o link **https://segundocerebro.pro/extensao/**. Detalhes e cuidados na skill `navegador-do-usuario`.

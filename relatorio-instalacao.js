@@ -5,7 +5,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const BASE = () => (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+const BASE = () => (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '')
 const LINHAS = 100
 
 // tira o nome de usuario do Windows dos caminhos e do texto, para o relatorio nao identificar a pessoa

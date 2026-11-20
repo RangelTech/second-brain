@@ -3,7 +3,7 @@
 // liberado, liga o provedor e cria o combo "principal" sozinho. Instalações antigas, que já têm chave, seguem como estavam.
 const os = require('os')
 
-const BASE = () => (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+const BASE = () => (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '')
 const INTERVALO_MS = 30000
 
 function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {

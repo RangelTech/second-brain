@@ -9,7 +9,7 @@ const { execFile } = require('child_process')
 
 const HOST = 'net.rangeltech.segundocerebro'
 const ID_EXTENSAO = 'cdhhngjakiihefobehjmpdhlpedlkanp' // fixado pela chave pública do manifesto da extensão
-const LINK_EXTENSAO = 'https://brain.rangeltech.net/extensao/'
+const LINK_EXTENSAO = 'https://segundocerebro.pro/extensao/'
 
 // servidor só local: só o host nativo (que lê o token do arquivo na pasta do usuário) consegue pedir o pareamento
 function iniciarServidor({ pasta, pareamento }) {

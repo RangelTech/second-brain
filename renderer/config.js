@@ -4,7 +4,7 @@
   const CAT = (window.SB_CATALOGO && window.SB_CATALOGO.provedores) || []
   // id da conexão (claude) e apelido do roteador (cc) levam ao mesmo provedor: os modelos vêm marcados pelo apelido
   const POR_ID = Object.fromEntries([...CAT.filter((p) => p.alias).map((p) => [p.alias, p]), ...CAT.map((p) => [p.id, p])])
-  const UNLIMITED = { prefixo: 'unl', base: 'https://qwen.rangeltech.net/v1', modelo: 'qwen-abliterated', nome: 'Unlimited' }
+  const UNLIMITED = { prefixo: 'unl', base: 'https://api.segundocerebro.pro/v1', modelo: 'qwen-abliterated', nome: 'Unlimited' }
   // Provedores com entrada por conta (assinatura) que o app sabe completar sozinho.
   const OAUTH_CODIGO = ['codex', 'claude', 'gemini-cli']
   const OAUTH_DISPOSITIVO = ['github']
@@ -306,7 +306,7 @@
           <div class="passo mut" style="font-size:12px">Para não precisar copiar e colar nunca mais, instale a extensão do Chrome: <a href="#" id="m-ext-link">baixar a extensão</a>.</div>
           <div class="campo" style="margin-top:8px"><label for="m-url">Endereço de retorno</label><input type="text" id="m-url" placeholder="http://localhost:8080/callback?code=…"></div>`
         const el = j.q('#m-ext-link')
-        if (el) el.onclick = (e) => (e.preventDefault(), window.sb.abrirExterno('https://brain.rangeltech.net/extensao/'))
+        if (el) el.onclick = (e) => (e.preventDefault(), window.sb.abrirExterno('https://segundocerebro.pro/extensao/'))
         btn.textContent = 'Concluir'
         btn.disabled = false
         btn.onclick = async () => {
@@ -812,7 +812,7 @@
         </div>
         <p class="mut" id="ch-msg" style="margin:10px 0 0;font-size:13px" hidden></p>
       </div>`
-    $('#ch-baixar').onclick = () => window.sb.abrirExterno(e.link || 'https://brain.rangeltech.net/extensao/')
+    $('#ch-baixar').onclick = () => window.sb.abrirExterno(e.link || 'https://segundocerebro.pro/extensao/')
     const c = $('#ch-conectar')
     if (c) c.onclick = async () => {
       c.disabled = true

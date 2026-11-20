@@ -1,7 +1,7 @@
 ---
 name: open-webui
 description: |
-  Interface de chat estilo ChatGPT para modelos compatíveis com a API OpenAI. Use como chat de demonstração apontando para a nossa API (qwen.rangeltech.net/v1) ou para o cliente testar modelos na máquina virtual.
+  Interface de chat estilo ChatGPT para modelos compatíveis com a API OpenAI. Use como chat de demonstração apontando para a nossa API (api.segundocerebro.pro/v1) ou para o cliente testar modelos na máquina virtual.
   Use quando o cliente disser: "quero um chat estilo ChatGPT na minha máquina"; "tela de chat para a nossa API"; "interface web para meus modelos".
 ---
 
@@ -22,7 +22,7 @@ Como produto principal: já temos o Cérebro Pro.
 ```bash
 python3.12 -m venv v && v/bin/pip install open-webui      # 5 min 15 s, grande (muitos pacotes)
 DATA_DIR=$HOME/owui WEBUI_AUTH=False OFFLINE_MODE=True PORT=3941 HOST=127.0.0.1 v/bin/open-webui serve --port 3941
-# apontar para a nossa API:  OPENAI_API_BASE_URL=https://qwen.rangeltech.net/v1  OPENAI_API_KEY=<chave do cliente>
+# apontar para a nossa API:  OPENAI_API_BASE_URL=https://api.segundocerebro.pro/v1  OPENAI_API_KEY=<chave do cliente>
 ```
 Teste: `GET /` HTTP 200 e `GET /health` devolveu `{"status":true}` em menos de 60 s. Exige Python 3.11 ou 3.12 (o 3.10 não serve).
 

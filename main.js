@@ -310,9 +310,9 @@ function garantirAgente(aviso) {
 function midiaDoApp() {
   try {
     const c = cfg.unlimitedChave
-    if (process.env.SB_MIDIA_CHAVE) return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: process.env.SB_MIDIA_CHAVE } // so para teste
+    if (process.env.SB_MIDIA_CHAVE) return { base: (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, ''), chave: process.env.SB_MIDIA_CHAVE } // so para teste
     if (!c || !cfg.unlimitedLigado) return null
-    return { base: (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, ''), chave: decifrar(c), prefs: cfg.midia || {} }
+    return { base: (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, ''), chave: decifrar(c), prefs: cfg.midia || {} }
   } catch {
     return null
   }
@@ -324,7 +324,7 @@ async function nivelDeSeguranca() {
   if (!cfg.unlimitedChave) return 1
   if (nivelSeg.valor && Date.now() - nivelSeg.em < 60000) return nivelSeg.valor
   try {
-    const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+    const base = (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '')
     const r = await fetch(base + '/auth/whoami', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(5000) })
     const j = await r.json()
     if (r.ok && [1, 2, 3].includes(j.safety_level)) nivelSeg = { valor: j.safety_level, em: Date.now() }
@@ -1098,7 +1098,7 @@ app.whenReady().then(() => {
       // que nem carregava (achado em 14/11/2026 no login do Instagram pelo Facebook).
       if (!MODO_SERVIDOR && cfg.proxyNavegador !== 'sempre') return { proxy: null }
       if (!cfg.unlimitedChave) return { proxy: null }
-      const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+      const base = (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '')
       const r = await fetch(base + '/app/proxy-navegador', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
       return r.ok ? await r.json() : null // servidor antigo (sem a rota) ou fora do ar: mantém como está
     },
@@ -1292,7 +1292,7 @@ app.whenReady().then(() => {
   // painel da conta (spec 37): créditos do Estúdio, limites da sessão e da semana, plano e nível de segurança, numa chamada só (barra do chat e aba Cota)
   ipcMain.handle('conta:painel', async () => {
     if (!cfg.unlimitedEmail || !cfg.unlimitedChave) return { ok: false, erro: 'Entre na sua conta.' }
-    const base = (process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '')
+    const base = (process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '')
     const h = { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }
     const pegar = async (rota) => { try { const r = await fetch(base + rota, { headers: h, signal: AbortSignal.timeout(15000) }); return r.ok ? await r.json() : null } catch { return null } }
     const [uso, eu, cred] = await Promise.all([pegar('/usage'), pegar('/auth/whoami'), pegar('/credits')])
@@ -1308,7 +1308,7 @@ app.whenReady().then(() => {
   ipcMain.handle('conta:uso', async () => {
     try {
       if (!cfg.unlimitedEmail || !cfg.unlimitedChave) return { ok: false, erro: 'Entre na sua conta.' }
-      const r = await fetch((process.env.SB_UNLIMITED_BASE || 'https://qwen.rangeltech.net/v1').replace(/\/+$/, '') + '/usage', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
+      const r = await fetch((process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '') + '/usage', { headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
       if (!r.ok) return { ok: false, erro: `O servidor respondeu ${r.status}.` }
       return { ok: true, email: cfg.unlimitedEmail, plano: cfg.unlimitedPlano || '', ...(await r.json()) }
     } catch (e) {

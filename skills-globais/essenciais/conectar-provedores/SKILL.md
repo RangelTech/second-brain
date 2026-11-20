@@ -13,7 +13,7 @@ O usuário pode usar a própria assinatura do Claude, do ChatGPT e do Gemini den
 
 ## O que a pessoa vê (sem copiar e colar)
 - **No aplicativo instalado:** abre uma janela do próprio Cérebro Pro com o login da empresa. A pessoa entra, a janela fecha sozinha e a conta aparece conectada.
-- **Na versão web:** se o Chrome dela estiver conectado pela extensão, o login abre numa aba do Chrome (onde ela costuma já estar logada), fecha sozinha e conecta. Sem a extensão, o app pede para colar o endereço de retorno; para nunca mais precisar disso, mande o link da extensão: **https://brain.rangeltech.net/extensao/** (veja a skill `navegador-do-usuario`).
+- **Na versão web:** se o Chrome dela estiver conectado pela extensão, o login abre numa aba do Chrome (onde ela costuma já estar logada), fecha sozinha e conecta. Sem a extensão, o app pede para colar o endereço de retorno; para nunca mais precisar disso, mande o link da extensão: **https://segundocerebro.pro/extensao/** (veja a skill `navegador-do-usuario`).
 - Se a janela ou aba for fechada antes de terminar, é só tocar de novo em **Entrar com a conta**.
 - Aparecer uma página de erro em `localhost:8080` no fim do login é normal. O Cérebro Pro pega o endereço sozinho.
 

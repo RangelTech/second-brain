@@ -2316,7 +2316,7 @@
       perguntarAcessoWeb()
     } else loginMsg(r.erro, false)
   }
-  // Depois do primeiro login neste computador: pergunta UMA vez se a pessoa quer acessá-lo pelo celular ou por outro navegador (remoto.rangeltech.net).
+  // Depois do primeiro login neste computador: pergunta UMA vez se a pessoa quer acessá-lo pelo celular ou por outro navegador (app.segundocerebro.pro).
   // Não liga sozinho: o acesso remoto dá controle de arquivos e comandos deste computador. Na tela web (remoto) a chamada é bloqueada e nada acontece.
   async function perguntarAcessoWeb() {
     try {
@@ -2324,7 +2324,7 @@
       const est = await window.sb.acessoWeb?.estado?.()
       if (!est || est.ok === false || est.ativo !== false) return
       await window.sb.salvarCfg({ acessoWebPerguntado: true })
-      if (await window.sbConfirmar('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em remoto.rangeltech.net, com este computador ligado. Você pode desligar quando quiser em Configurações.', { sim: 'Quero', nao: 'Agora não' })) await window.sb.acessoWeb.ativar(true)
+      if (await window.sbConfirmar('Quer acessar este computador pelo celular ou por outro navegador?\n\nÉ só entrar com a sua conta em app.segundocerebro.pro, com este computador ligado. Você pode desligar quando quiser em Configurações.', { sim: 'Quero', nao: 'Agora não' })) await window.sb.acessoWeb.ativar(true)
     } catch {}
   }
   $('login-esqueci').onclick = async () => {
@@ -2351,7 +2351,7 @@
     $('login').hidden = false
     setTimeout(() => $('login-email').focus(), 50)
   }
-  $('login-assinar').onclick = () => window.sb.abrirExterno('https://brain.rangeltech.net')
+  $('login-assinar').onclick = () => window.sb.abrirExterno('https://segundocerebro.pro')
   function pintarAcesso(e) {
     if (e) {
       const mostrarLogin = e.fase === 'login'

@@ -27,14 +27,14 @@ function conversarComHost(pasta, msg) {
 
 test('o servidor local só atende o host (token certo, sem Origin) e entrega o pareamento da conta', async () => {
   const pasta = tmp()
-  const h = await A.iniciarServidor({ pasta, pareamento: async () => ({ token: 'sbp.abc.def', base: 'https://remoto.rangeltech.net' }) })
+  const h = await A.iniciarServidor({ pasta, pareamento: async () => ({ token: 'sbp.abc.def', base: 'https://app.segundocerebro.pro' }) })
   const c = JSON.parse(fs.readFileSync(path.join(pasta, 'extensao-host.json'), 'utf8'))
   assert.strictEqual(c.porta, h.porta)
   assert.strictEqual((await post(h.porta, '/extensao/parear')).s, 401) // sem token
   assert.strictEqual((await post(h.porta, '/extensao/parear', { Authorization: 'Bearer errado' })).s, 401)
   assert.strictEqual((await post(h.porta, '/extensao/parear', { Authorization: 'Bearer ' + c.token, Origin: 'https://site-malicioso.com' })).s, 403) // página web não pode pedir
   const r = await post(h.porta, '/extensao/parear', { Authorization: 'Bearer ' + c.token })
-  assert.deepStrictEqual([r.s, r.j.token, r.j.base], [200, 'sbp.abc.def', 'https://remoto.rangeltech.net'])
+  assert.deepStrictEqual([r.s, r.j.token, r.j.base], [200, 'sbp.abc.def', 'https://app.segundocerebro.pro'])
   h.fechar()
   assert.ok(!fs.existsSync(path.join(pasta, 'extensao-host.json')))
 })

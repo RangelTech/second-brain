@@ -70,7 +70,7 @@ const path = require('path')
 const MAX_TEXTO = 14000
 const TEMPO_CARGA_MS = 35000
 
-const LINK_EXTENSAO = 'https://brain.rangeltech.net/extensao/'
+const LINK_EXTENSAO = 'https://segundocerebro.pro/extensao/'
 // falhas de TRANSPORTE da extensão (nada chegou a rodar no Chrome); erro da própria ferramenta (elemento sumiu) não entra aqui
 const FALHAS_TRANSPORTE = new Set(['sem_extensao', 'pausado', 'desconectada', 'timeout'])
 
