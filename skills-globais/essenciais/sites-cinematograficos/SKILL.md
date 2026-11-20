@@ -48,3 +48,18 @@ O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primei
 ## Web moderna (acervo Salvar)
 Antes de escrever o site, carregue as orientações do repositório **modern-web-guidance** do time do Chrome (feito para agentes de código
 usarem padrões atuais de HTML/CSS/JS em vez de código antigo). Junte com este estilo cinematográfico e com a skill `frontend-premium`.
+
+## Tema "cidade neon de jogo" (Miami à noite) sem copiar marca
+Pedido tipo "quero no tema do GTA": faça o CLIMA, nunca a marca. Não use logo, fonte, nome, personagem nem arte oficial de jogo
+(direito autoral e marca registrada); diga isso numa frase e entregue a versão original. Receita testada numa landing real (19/11):
+- **Fotos de fundo**: edite as fotos do próprio cliente com `midia_gerar_imagem` mandando a foto e pedindo "keep the same person
+  identical (face, clothes, pose), change only the environment into a Miami night: hot pink and violet sunset, palm trees, art-deco
+  hotels with pink and cyan neon (no readable words), wet asphalt reflecting neon; no logos, no text". Deixe espaço vazio do lado do título.
+- **Cores**: fundo roxo quase preto (#0b0614), rosa-choque (#ff2d95), ciano (#19e3ff) e laranja-pôr-do-sol (#ff8a3d); título com
+  degradê rosa→laranja→ciano (`background-clip:text`), botões rosa→laranja, faixa correndo rosa→roxo→ciano.
+- **Palmeiras ao fundo**: silhueta de palmeira em SVG embutido (`data:image/svg+xml`) como `background` das seções e num
+  `::before` do topo, em rosa/ciano com 15–30% de opacidade, nos cantos de baixo; no celular, menores e só duas.
+- **Vídeo de exemplo dentro do celular**: `<video autoplay muted loop playsinline poster>` na moldura de celular, com botão
+  "toque p/ ouvir" que liga o som e volta ao começo. Comprima antes: `ffmpeg -i in.mp4 -c:v libx264 -crf 26 -vf scale=540:-2 -c:a aac
+  -b:a 96k -movflags +faststart out.mp4` (8 s ficam ~1,3 MB).
+- Conferir no celular: o Edge/Chrome sem janela não abre menos que ~500 px de largura; print "cortado" em 390 px pode ser só isso.

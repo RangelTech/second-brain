@@ -35,7 +35,7 @@ Se o usuário pedir imagem **adulta/explícita** ou o `midia_gerar_imagem` avisa
 | `video-rapido` | vídeo curto de teste, 5 a 15 s | `prompt` (+ `fotos[0]` para animar uma foto) |
 | `video-ponta` | vídeo bonito de 4 a 15 s | `prompt` (+ foto) |
 | `video-premium` | cinema, comercial | `prompt` (+ fotos/vídeos de referência) |
-| `video-google` | vídeo com som ambiente e fala | `prompt` |
+| `video-google` | vídeo com som, fala e **canto** (bicho cantando, música) — 4, 6 ou 8 s | `prompt` (+ `largura`/`altura`, ex. 720x1280 vertical) |
 | `imagem-livre` | imagem sem restrição de conteúdo (5 créditos) | `prompt` |
 | `imagem-ponta` | imagem com qualidade máxima (o comum é `midia_gerar_imagem`) | `prompt` |
 
@@ -49,8 +49,15 @@ Custa créditos pelo tamanho da fala (5 minutos de fala ficam por volta de 40 cr
 ## Prompt (para editar-video e vídeos novos)
 Em inglês, 40 a 120 palavras: o que trocar e por quê, o que manter ("same camera angle, same motion, same lighting, keep the background"), aparência do novo elemento (marca, cor, ano, material), estilo. Para roupa: "the man now wears a tailored navy blue suit with white shirt and silk tie, keep his face, hair and gestures".
 
+## Receita testada: bicho cantando (vídeo viral)
+Use `video-google` com qualidade `720p-audio`, 8 s, vertical (`largura` 720, `altura` 1280). Prompt em inglês descrevendo o bicho, o
+lugar e a ação, com a letra **entre aspas e o idioma dito**: "...sings in a sweet, cartoonish high voice, in Brazilian Portuguese, the
+children's lullaby: 'Brilha, brilha, estrelinha, quero ver você brilhar'. Soft music box melody accompanies the song." Testado em 19/11:
+gato laranja dançando numa laje à noite, letra saiu certinha, ficou pronto em ~95 s. Músicas de domínio público (cantigas) evitam
+problema de direito autoral. Para mais de 8 s, gere partes e junte no Editor.
+
 ## Vídeo longo
-- Modelos que **criam** vídeo fazem até 15 s por vez: para mais, gere partes e junte no Editor.
+- Modelos que **criam** vídeo fazem até 15 s por vez (o com som faz até 8 s; o rápido começa em 5 s): para mais, gere partes e junte no Editor.
 - `trocar-personagem` e `sincronia-labial` aceitam o vídeo inteiro (o preço cresce com a duração).
 - `editar-video` trabalha em partes de até 15 s: orce com a duração total (o orçamento já diz quantas partes), corte o vídeo com FFmpeg em partes iguais de até 15 s (`ffmpeg -i in.mp4 -c copy -f segment -segment_time 15 -reset_timestamps 1 parte-%02d.mp4`), crie cada parte com o mesmo prompt e junte na ordem (`ffmpeg -f concat`) ou no Editor.
 - Se o orçamento vier "acima do valor normal", diga isso com clareza e ofereça uma versão menor (480p ou trecho mais curto).
