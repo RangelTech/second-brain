@@ -130,6 +130,7 @@
         aoEvento: (fn) => on('ditado:vivo:evento', fn),
       },
       vozFalar: (texto, voz) => invoke('voz:falar', texto, voz),
+      janelaMostrar: () => invoke('janela:mostrar'),
       // cérebro de voz (spec 54): { texto, historico, nome, modo } -> eventos delta/ferramenta/youtube/agente/limpar/fim/erro
       vozCerebro: { perguntar: (id, p) => invoke('voz:cerebro', id, p), aoEvento: (fn) => on('voz:cerebro:evento', fn) },
       // voz de saída em stream (spec 52): pedaços de MP3 chegam por evento { id, tipo: 'dados'|'fim'|'erro', data }

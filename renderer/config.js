@@ -693,9 +693,21 @@
       <h2>Voz</h2>
       <div class="cfg-acoes"><select id="ag-voz">${VOZES.map(([v, n]) => `<option value="${v}" ${(c.voz || VOZES[0][0]) === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><button id="ag-voz-ouvir">Ouvir exemplo</button></div>
       <p class="mut">A voz que responde na conversa por voz e no botão "Ouvir" das respostas.</p>
+      <h2>Chamar por voz</h2>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ag-ativ" ${c.ativacaoLigada ? 'checked' : ''}> Abrir a conversa por voz quando eu falar a frase abaixo</label>
+      <div class="cfg-acoes" style="margin-top:8px"><input type="text" id="ag-ativ-frase" value="${esc(c.palavraAtivacao || 'Olá cérebro')}" placeholder="Olá cérebro" style="flex:1;min-width:220px"><button id="ag-ativ-salvar">Salvar frase</button></div>
+      <p class="mut">Funciona com o app aberto ou minimizado na bandeja. A frase é reconhecida aqui no seu computador, sem enviar áudio para a internet; o microfone só vai para a nuvem depois que a conversa começa. Prefira 2 ou 3 palavras fáceis, como "Olá cérebro" ou "Bora começar".</p>
       <h2>Permissões</h2>
       <p class="mut">O agente sempre pergunta antes de rodar comandos, escrever fora da pasta de trabalho ou apagar arquivos. Em cada pergunta você pode escolher "Permitir sempre nesta conversa".</p>`
     $('#ag-voz').onchange = (e) => window.sb.salvarCfg({ voz: e.target.value })
+    const reconfig = () => window.SBAtivacao && window.SBAtivacao.reconfigurar()
+    $('#ag-ativ').onchange = async (e) => { await window.sb.salvarCfg({ ativacaoLigada: e.target.checked }); reconfig() }
+    $('#ag-ativ-salvar').onclick = async () => {
+      const f = $('#ag-ativ-frase').value.trim()
+      if (f.split(/\s+/).length < 2) return alert('Use pelo menos 2 palavras (uma palavra só dispara à toa).')
+      await window.sb.salvarCfg({ palavraAtivacao: f })
+      reconfig()
+    }
     $('#ag-voz-ouvir').onclick = async (e) => {
       const bt = e.currentTarget
       bt.disabled = true

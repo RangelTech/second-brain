@@ -999,6 +999,16 @@ app.whenReady().then(() => {
     }
   }
   ipcMain.handle('sistema:estado', () => bandeja?.estado() || { inicio: false, bandeja: false, instalado: app.isPackaged, indisponivel: true })
+  // palavra de ativação (spec 54): a frase ouvida traz a janela (mesmo escondida na bandeja) para a frente
+  ipcMain.handle('janela:mostrar', () => {
+    try {
+      if (bandeja?.mostrar) bandeja.mostrar()
+      else if (janela) (janela.isMinimized() && janela.restore(), janela.show(), janela.focus())
+      return true
+    } catch {
+      return false
+    }
+  })
   ipcMain.handle('sistema:definir', (_e, m) => bandeja?.definir({ ...(m && 'inicio' in m ? { iniciarComSistema: !!m.inicio } : {}), ...(m && 'bandeja' in m ? { fecharParaBandeja: !!m.bandeja } : {}) }))
   nav = navegadorMod.criar({
     app,
@@ -1568,7 +1578,7 @@ app.whenReady().then(() => {
   }
   ipcMain.handle('cfg:get', () => publica())
   ipcMain.handle('cfg:set', (_e, parcial) => {
-    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto', 'acessoWebPerguntado', 'voz']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
+    for (const k of ['ativo', 'soConversa', 'pasta', 'raciocinio', 'modoPermissao', 'atualizarAuto', 'acessoWebPerguntado', 'voz', 'ativacaoLigada', 'palavraAtivacao']) if (parcial[k] !== undefined) cfg[k] = parcial[k]
     salvarCfg()
     return publica()
   })
