@@ -1,7 +1,7 @@
 ---
 name: edicao-profissional
 description: |
-  Editar como profissional um vídeo GRAVADO (pessoa falando para a câmera, aula, depoimento, podcast) para Reels, TikTok (inclusive monetizável, mais de 1 min), Shorts e VSL de 3 a 15 min, SEM IA de vídeo: tira silêncios e respiros (jump cut), zoom alternado no rosto, legenda palavra por palavra no rodapé, título-gancho em cima, palavras que saltam, listas, números, imagens (geradas de graça), chamada final, efeitos sonoros e trilha que abaixa na fala; tudo desenhado com React no Motion. Também faz o ACABAMENTO leve de um vídeo pronto (moldura fina, @ do perfil, "digita IA nos comentários"). Use quando pedirem "edita meu vídeo", "deixa profissional", "faz uma VSL", "tira os silêncios", "legenda meu vídeo", "transforma em reels/tiktok", "coloca animação no meu vídeo".
+  Editar como profissional um vídeo GRAVADO (pessoa falando para a câmera, aula, depoimento, podcast) para Reels, TikTok (inclusive monetizável, mais de 1 min), Shorts e VSL de 3 a 15 min, SEM IA de vídeo: tira silêncios e respiros (jump cut), zoom alternado no rosto, legenda palavra por palavra no rodapé, título-gancho em cima, palavras que saltam, listas, números, imagens (geradas de graça), chamada final, efeitos sonoros e trilha que abaixa na fala; tudo desenhado com React no Motion. Também faz o ACABAMENTO leve de um vídeo pronto (moldura fina, @ do perfil, "digita IA nos comentários"). Também TAMPA ou ESCONDE algo no vídeo (nome, @, marca d'água, legenda antiga, placa) de um jeito bonito, nunca com retângulo preto. Use quando pedirem "edita meu vídeo", "deixa profissional", "faz uma VSL", "tira os silêncios", "legenda meu vídeo", "transforma em reels/tiktok", "coloca animação no meu vídeo", "tampa/esconde/tira esse nome/logo/marca d'água", "coloca uma barra em cima".
 ---
 
 # Edição profissional (gravação → Reels, TikTok, VSL)
@@ -60,6 +60,48 @@ Pedido de "narrador contando o que acontece" (estilo narrador de série de comé
 ## Acabamento leve (vídeo já pronto: reel redublado, corte, vídeo do cliente)
 `python editar.py acabamento --video V.mp4 --pasta P --arroba "@perfil" --cta "Se quiser saber mais|digita *IA* nos comentários"` → moldura fina, @ no topo e chamada final pulsando nos últimos 4,5 s. Depois `motion_animar` com o html/audio impressos.
 **Pergunte ao usuário** antes de entregar um vídeo de outra pessoa ou um reel refeito: "Quer que eu coloque o @ dele, uma moldura fina e uma chamada no fim (tipo 'digita IA nos comentários')?". Não é obrigatório, é opção.
+
+## Tampar ou esconder algo no vídeo (nome, @, marca d'água, legenda velha) — COM CARINHO
+Reclamação real de cliente: pediu para tampar um nome no topo e recebeu um quadrado preto chapado. Isso nunca. Escolha, nesta ordem:
+1. **Cortar fora** (o melhor quando o que incomoda está na borda): `crop` tirando a faixa + `scale`/`pad` de volta ao formato (9:16 ou
+   16:9). O assunto continua inteiro? Então some de vez, sem marca.
+2. **Desfoque só na área** (natural, parece edição): recorte a área, `boxblur=20:2` nela e sobreponha de volta com borda suave
+   (máscara com degradê de ~12 px). Bom para nome/@ em cima de imagem movimentada.
+3. **Faixa de design** (quando pediram "uma barra" ou a área é grande): gere um PNG com Python (Pillow):
+   - **colada na borda** e **100% opaca** sobre o que precisa sumir (semitransparente deixa o nome aparecendo por trás: testado),
+     com folga de ~20 px além da área; cantos arredondados só do lado de dentro (raio ~34 px);
+   - fundo em **degradê da cor dominante da própria faixa** (média dos pixels dessa região num quadro do vídeo), escurecida ~35%;
+   - linha fina da cor de destaque (3–4 px) perto da borda de dentro;
+   - **um texto útil**, nunca vazio: o gancho/tema do vídeo, o @ do cliente ou um título curto, fonte forte, centralizado;
+   - sobreponha com `overlay` e entrada animada (fade 0,35 s) no vídeo inteiro.
+4. **Logo pequeno**: `delogo=x:y:w:h` (interpola a área) e confira.
+Sempre: tire um print de 2 ou 3 momentos, OLHE, e só entregue se o que devia sumir sumiu de verdade e ficou bonito (alinhado, texto
+legível, nada tampando rosto). Diga em uma frase qual caminho usou ("cortei a faixa de cima", "coloquei uma faixa com o título").
+
+Receita testada (vídeo 1080x1920, nome no topo em 0–150 px):
+```python
+import subprocess
+from PIL import Image, ImageDraw, ImageFont
+# cor dominante da faixa num quadro do meio do vídeo
+subprocess.run(['ffmpeg','-y','-ss','1','-i','video.mp4','-vf','crop=1080:150:0:0,scale=1:1','-frames:v','1','px.png'], check=True)
+r, g, b = Image.open('px.png').convert('RGB').getpixel((0, 0)); cor = (int(r*.65), int(g*.65), int(b*.65))
+W, H = 1080, 175  # largura do vídeo; altura = área a esconder + folga
+img = Image.new('RGBA', (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
+for y in range(H):
+    k = y / H; d.line([(0, y), (W, y)], fill=(int(cor[0]*(1-k*.35)), int(cor[1]*(1-k*.35)), int(cor[2]*(1-k*.35)), 255))
+m = Image.new('L', (W, H), 0); ImageDraw.Draw(m).rounded_rectangle([0, 0, W-1, H-1], 34, fill=255, corners=(False, False, True, True))
+img.putalpha(m); d = ImageDraw.Draw(img)
+d.line([(90, H-9), (W-90, H-9)], fill=(255, 204, 0, 235), width=4)
+f = None
+for nome in ['arialbd.ttf', 'Montserrat-Bold.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf']:
+    try: f = ImageFont.truetype(nome, 54); break
+    except OSError: pass
+f = f or ImageFont.load_default(size=54)
+t = 'TÍTULO CURTO DO VÍDEO'; w = d.textlength(t, font=f); d.text(((W-w)/2, (H-70)/2), t, font=f, fill='white')
+img.save('faixa.png')
+```
+`ffmpeg -i video.mp4 -loop 1 -i faixa.png -filter_complex "[1]format=rgba,fade=in:st=0:d=0.35:alpha=1[f];[0][f]overlay=0:0:shortest=1" -c:a copy saida.mp4`
+(faixa embaixo: `overlay=0:H-h` e cantos arredondados em cima).
 
 ## Problemas conhecidos (já resolvidos)
 - FFmpeg 9 não aceita `-filter_complex_script` (use `-/filter_complex arquivo`); o script já usa.
