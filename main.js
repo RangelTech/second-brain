@@ -1840,6 +1840,19 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('arquivo:abrir', (_e, p) => (fs.existsSync(p) ? shell.openPath(p) : 'Arquivo não encontrado'))
   ipcMain.handle('arquivo:mostrar', (_e, p) => (shell.showItemInFolder(p), true))
+  // spec 53: o agente mostra na tela da voz um arquivo que gerou ("grafico.png"): acha o caminho de verdade (absoluto, pasta de trabalho
+  // ou a pasta de rascunho do Hermes, onde o terminal dele grava)
+  ipcMain.handle('arquivo:achar', (_e, nome) => {
+    try {
+      const n = String(nome || '').replace(/^file:\/\/\/?/i, '')
+      // a pasta que o agente usa é userData/hermes-home (cfg.hermesHome é a instalação piloto de onde ela veio)
+      const homes = [path.join(app.getPath('userData'), 'hermes-home'), cfg.hermesHome].filter(Boolean)
+      const opcoes = path.isAbsolute(n) ? [n] : [cfg.pasta && path.join(cfg.pasta, n), ...homes.flatMap((h) => [path.join(h, 'cache', 'scratch', n), path.join(h, n)])].filter(Boolean)
+      return opcoes.find((p) => { try { return fs.statSync(p).isFile() } catch { return false } }) || null
+    } catch {
+      return null
+    }
+  })
   ipcMain.handle('arquivo:ler', (_e, p) => {
     try {
       const b = fs.readFileSync(p)

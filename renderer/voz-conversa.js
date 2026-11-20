@@ -370,12 +370,30 @@
   function imagensDoTexto(texto) {
     const out = []
     // endereço da internet ou ARQUIVO do computador (gráfico que o agente gerou: C:\...\grafico.png, /home/.../x.png, file:///...)
-    for (const m of String(texto || '').matchAll(/!\[([^\]]*)\]\(<?((?:https?|file):\/\/[^)>\s]+|[A-Za-z]:[\\/][^)>]+|\/[^)>\s]+)>?\)/g)) {
-      let src = m[2].trim()
-      if (!/^(https?|file):/i.test(src)) src = 'file:///' + src.replace(/\\/g, '/').replace(/^\/+/, '')
-      out.push({ src: encodeURI(decodeURI(src)), alt: m[1] || 'Imagem', video: /\.(mp4|webm|mov)$/i.test(src) })
+    // internet: usa o endereço; arquivo (caminho completo OU só o nome, ex.: "grafico.png"): o app acha e entrega os bytes (vale também na web)
+    for (const m of String(texto || '').matchAll(/!\[([^\]]*)\]\(<?([^)>]+?)>?\)/g)) {
+      const src = m[2].trim()
+      const video = /\.(mp4|webm|mov)$/i.test(src)
+      if (/^https?:\/\//i.test(src)) out.push({ src, alt: m[1] || 'Imagem', video })
+      else if (/\.(png|jpe?g|gif|webp|svg|mp4|webm|mov)$/i.test(src)) out.push({ arquivo: src, src: 'arquivo:' + src, alt: m[1] || 'Imagem', video })
     }
     return out
+  }
+  const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime' }
+  async function carregarArquivo(nome, video) {
+    try {
+      const p = window.sb.acharArquivo ? await window.sb.acharArquivo(nome) : nome
+      if (!p) return null
+      const r = await window.sb.lerArquivo(p)
+      if (!r || !r.ok) return null
+      const bin = atob(r.base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const ext = (/\.(\w+)$/.exec(p) || [])[1] || ''
+      return URL.createObjectURL(new Blob([bytes], { type: MIME[ext.toLowerCase()] || (video ? 'video/mp4' : 'image/png') }))
+    } catch {
+      return null
+    }
   }
   function imagensNaTela() {
     const msgs = document.querySelectorAll('.conversa .msg.assistant')
@@ -413,7 +431,8 @@
       const c = document.createElement('figure')
       c.className = 'voz-cartao'
       const midia = document.createElement(it.video ? 'video' : 'img')
-      midia.src = it.src
+      if (it.arquivo) carregarArquivo(it.arquivo, it.video).then((u) => (u ? (midia.src = u) : c.remove()))
+      else midia.src = it.src
       if (it.video) Object.assign(midia, { autoplay: true, muted: true, loop: true, playsInline: true })
       else midia.alt = it.alt
       midia.onerror = () => c.remove() // link quebrado não fica na tela

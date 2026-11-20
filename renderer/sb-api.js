@@ -44,6 +44,7 @@
       abrirArquivo: (p) => invoke('arquivo:abrir', p),
       mostrarArquivo: (p) => invoke('arquivo:mostrar', p),
       lerArquivo: (p) => invoke('arquivo:ler', p),
+      acharArquivo: (nome) => invoke('arquivo:achar', nome),
       abrirLogs: () => invoke('logs:abrir'),
       info: () => invoke('app:info'),
       atualizacao: {
