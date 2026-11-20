@@ -1,12 +1,22 @@
 ---
 name: navegador-e-pesquisa
 description: |
-  Como abrir sites e redes sociais (Instagram, Facebook, YouTube, TikTok, X, LinkedIn, qualquer página) com o navegador integrado sem errar o endereço. Use sempre que o usuário pedir para entrar, abrir, ver, pesquisar ou pegar algo de um site ou rede social, ou quando uma página não carregar ("não abre", "deu erro", "não achou o site").
+  Pesquisar na internet e abrir sites. Pergunta simples (cotação, clima, notícia, "quanto custa") usa a busca na web sem abrir navegador; o navegador é para agir em sites. Como abrir sites e redes sociais (Instagram, Facebook, YouTube, TikTok, X, LinkedIn, qualquer página) com o navegador integrado sem errar o endereço. Use sempre que o usuário pedir para entrar, abrir, ver, pesquisar ou pegar algo de um site ou rede social, ou quando uma página não carregar ("não abre", "deu erro", "não achou o site").
 ---
 
 # Navegador e pesquisa
 
 O seu papel é desenrolar a vida do usuário. Tente de verdade, adapte e vá até o fim do que foi pedido. O navegador integrado é do cliente: ele guarda a sessão (cookies e logins), então o que o usuário já deixou aberto continua aberto para você.
+
+## Regra: pergunta simples NÃO abre o navegador
+Cotação (dólar, euro, bitcoin), clima, resultado de jogo, notícia do dia, horário, endereço, definição, "quanto custa", "quem é": use a
+ferramenta **`web_search`** e responda com o que veio nos resultados (título e resumo já costumam trazer o número). É rápido e o usuário
+não vê nada piscando na tela.
+- Os resultados não trouxeram o dado? Faça **outra** `web_search` com palavras diferentes (ex.: "USD BRL hoje", "dólar comercial agora").
+- Só então abra o navegador, e use **`navegador_ler`** (texto da página). `navegador_print` + olhar a imagem é o caminho mais lento: só
+  quando o que importa é visual (layout, foto, gráfico).
+- Abra o navegador direto quando precisar **agir** na página: entrar numa conta, clicar, preencher, comprar, postar, ou quando o
+  usuário pedir para ver/abrir um site.
 
 ## Regra: nunca invente endereço
 Subdomínios e caminhos que você acha que existem muitas vezes não existem. Exemplo real: `pt-br.instagram.com` não existe e o navegador devolve erro de nome. Escrever o endereço de cabeça é o erro mais comum.

@@ -50,3 +50,22 @@ test('paraPcm16k: 48 kHz vira 16 kHz em Int16 com o volume certo', () => {
   assert.equal(z.length, 160)
   assert.equal(z[0], -0x8000)
 })
+
+test('abertura por intenção: palavra inteira, com acento, na ordem certa', () => {
+  const casos = {
+    'Pesquisa na internet qual é a cotação do dólar hoje': 'internet',
+    'Olha nos meus arquivos o contrato': 'arquivos',
+    'O que tem na minha área de trabalho?': 'arquivos',
+    'Abre o Instagram da padaria': 'site',
+    'Cria uma imagem de um gato': 'midia',
+    'Faz um script que renomeia fotos': 'codigo',
+    'Me explica como funciona a fotossíntese': 'pensar',
+    'Quanto é dois mais dois?': null,
+    'oi tudo bem': null,
+  }
+  for (const [t, esperado] of Object.entries(casos)) assert.equal(F.intencao(t), esperado, t)
+  const s = F.sorteador(() => 0)
+  assert.match(F.fraseDeAbertura('pesquisa o clima amanhã', s), /internet/)
+  assert.equal(F.fraseDeAbertura('oi', s), null)
+  for (const i of F.INTENCOES) for (const f of i.frases) assert.ok(F.todas().includes(f), f)
+})

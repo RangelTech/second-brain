@@ -329,7 +329,11 @@
     // não deixar no vácuo: sem resposta em ~1 s, uma frase de espera; trabalho longo, outra de vez em quando
     let esperas = 0
     const t0 = Date.now()
-    st.timerEspera = setTimeout(() => vivo() && !st.tocando && falarCurta(st.sortear(F.ESPERA)), ESPERA_MS)
+    // com intenção clara ("pesquisa", "meus arquivos", "abre o site"...) ele já diz na hora o que vai fazer, como quem entendeu;
+    // sem intenção, o "deixa eu pensar" só entra se a resposta demorar
+    const abertura = F.fraseDeAbertura(texto, st.sortear)
+    if (abertura) (st.ultimaEtapa = Date.now()), falarCurta(abertura)
+    else st.timerEspera = setTimeout(() => vivo() && !st.tocando && falarCurta(st.sortear(F.ESPERA)), ESPERA_MS)
     function vivo() { return st === sessao && st.turno === turno && st.fase === 'pensando' }
     while (st === sessao && st.turno === turno && P().ocupado(id)) {
       await new Promise((ok) => setTimeout(ok, 300))

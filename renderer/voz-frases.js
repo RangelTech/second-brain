@@ -28,10 +28,39 @@
     agentes: ['Vou pedir uma ajuda aqui.', 'Chamei um ajudante para isso.'],
     escrever: ['Estou escrevendo a resposta.'],
   }
+  // abertura por INTENÇÃO (pedido do Lucas 20/11): no instante em que o pedido sai, ele já diz o que vai fazer, como alguém que entendeu.
+  // A ordem importa: a primeira que casar vale. Sem intenção clara: nada aqui (a frase de espera entra depois de ~1 s, se precisar).
+  // palavra inteira mesmo com acento ("foto" não casa em "fotossíntese"): o \b do JavaScript não entende letra acentuada
+  const palavra = (alts) => new RegExp('(?<!\\p{L})(' + alts + ')(?!\\p{L})', 'iu')
+  const INTENCOES = [
+    { id: 'internet', re: palavra('pesquis\\p{L}*|internet|google|cota[çc][ãa]o|not[íi]cias?|previs[ãa]o do tempo|clima|quanto (est[áa]|t[áa]) o'),
+      frases: ['Vou dar uma procurada na internet, um momentinho.', 'Deixa comigo, vou buscar isso na internet.', 'Já vou pesquisar isso pra você.'] },
+    { id: 'arquivos', re: palavra('arquivos?|pastas?|documentos?|planilhas?|pdf|computador|meu pc|no pc|[áa]rea de trabalho|desktop|downloads'),
+      frases: ['Vou dar uma olhada aqui no seu computador, um momentinho.', 'Deixa eu procurar nos seus arquivos.', 'Já vou olhar isso no seu computador.'] },
+    { id: 'codigo', re: palavra('c[óo]digo|programa\\p{L}*|script|sistema|aplicativo|app|landing|p[áa]gina de vendas'),
+      frases: ['Beleza, vou colocar a mão na massa.', 'Deixa comigo, vou começar a construir.'] },
+    { id: 'site', re: palavra('abr[ea]\\p{L}*|entr[ae] n[oa]|site|instagram|youtube|whatsapp|facebook|tiktok|linkedin'),
+      frases: ['Vou abrir isso pra você.', 'Deixa comigo, já estou abrindo.'] },
+    { id: 'midia', re: palavra('imagem|imagens|fotos?|v[íi]deos?|logo|desenh\\p{L}*|arte|anima[çc][ãa]o'),
+      frases: ['Vou preparar isso pra você, já te mostro.', 'Deixa comigo, vou criar isso agora.'] },
+    { id: 'pensar', re: palavra('explica\\p{L}*|analis\\p{L}*|compar\\p{L}*|planej\\p{L}*|estrat[ée]gia|por que|porque|como (eu )?(fa[çc]o|funciona)|me ajuda a'),
+      frases: ['Hum, deixa eu pensar com calma.', 'Boa pergunta. Deixa eu pensar.', 'Deixa eu organizar as ideias.'] },
+  ]
+  // pergunta longa sem intenção reconhecida também ganha "deixa eu pensar"
+  function intencao(texto) {
+    const t = String(texto || '')
+    for (const i of INTENCOES) if (i.frases.length && i.re.test(t)) return i.id
+    return palavras(t).length >= 18 ? 'pensar' : null
+  }
+  function fraseDeAbertura(texto, sortear) {
+    const id = intencao(texto)
+    const i = id && INTENCOES.find((x) => x.id === id)
+    return i ? sortear(i.frases) : null
+  }
   const PARAR = new Set(['para', 'pare', 'parar', 'parou', 'chega', 'espera', 'espere', 'perai', 'peraí', 'ei', 'ow', 'calma', 'cala', 'silencio', 'nao', 'stop', 'ok', 'tá', 'ta', 'beleza', 'quero', 'eu', 'não', 'aí', 'ai', 'pera'])
 
   function todas() {
-    return [...new Set([...ESPERA, ...ESPERA_LONGA, ...Object.values(ETAPA).flat()])]
+    return [...new Set([...INTENCOES.flatMap((i) => i.frases), ...ESPERA, ...ESPERA_LONGA, ...Object.values(ETAPA).flat()])]
   }
   // sorteia da lista sem repetir a última frase dita (de qualquer lista)
   function sorteador(rnd = Math.random) {
@@ -73,5 +102,5 @@
     return w.length > 0 && w.length <= 4 && w.every((x) => PARAR.has(x))
   }
 
-  return { ESPERA, ESPERA_LONGA, ETAPA, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
+  return { ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
 })

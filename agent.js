@@ -581,7 +581,10 @@ function aplicarSeguranca(home, nivel) {
 // tirava junto o que manda os passos das ferramentas para a tela (o cerebro ficava sem saber o que o agente fazia). Medido em 10/11/2026.
 const PLUGINS_FORA = [
   'browser-browser-use', 'browser-browserbase', 'browser-firecrawl', 'deepinfra', 'fal', 'krea', 'meta-ai-image-gen', 'openai', 'openai-codex', 'openrouter', 'xai',
-  'web-brave-free', 'web-ddgs', 'web-exa', 'web-firecrawl', 'web-keenable', 'web-openai-native', 'web-parallel', 'web-perplexity', 'web-searxng', 'web-tavily', 'web-xai',
+  // busca na web (spec 53): exa, parallel, firecrawl e keenable FICAM LIGADOS: o modo "sem chave" do Hermes (keyless_mcp: endpoints públicos
+  // gratuitos de busca e leitura de página) depende deles. Com os 4 desligados o web_search falhava ("No web search provider configured")
+  // e toda pergunta simples (cotação do dólar) virava navegador + print + visão. Medido 20/11/2026: busca sem chave em ~5 s com o valor.
+  'web-brave-free', 'web-ddgs', 'web-openai-native', 'web-perplexity', 'web-searxng', 'web-tavily', 'web-xai',
   'hermes-achievements', 'google_meet', 'teams_pipeline', 'disk-cleanup',
 ]
 // motor gateway (spec 34 fase 2): o agente ganha TODAS as ferramentas do Hermes (plano da tarefa, perguntas, memoria, busca em conversas, voz, rotinas, subagentes,
