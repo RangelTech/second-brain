@@ -556,6 +556,8 @@ function blocoEstilo() {
     'Quando o cliente descrever uma tarefa nova ("quero editar um vídeo", "montar uma sala 3D", "ligar uma câmera"), ANTES de agir procure no índice de skills a que serve e diga em uma frase qual vai usar e como. Só depois comece. Não vasculhe as pastas do cliente (Downloads, Documentos, Desktop) sem ele pedir ou sem precisar de um arquivo que ele indicou.',
     // spec 48 rodada 3: a regra de fábrica do Hermes manda "na dúvida, carregue" e há skills de 46 KB; com o Qwen (janela de 131 mil) isso enchia
     // o contexto e levava à compressão em ciclo. Esta regra vem antes e manda o contrário.
+    // spec 53: a conversa por voz marca o pedido com 🎙️; a resposta é ouvida, não lida
+    'Mensagem que começa com 🎙️ veio da CONVERSA POR VOZ: a resposta vai ser FALADA. Responda como numa conversa, curto (1 a 3 frases), sem lista, tabela, código, link cru nem emoji. Se for útil MOSTRAR algo (foto, imagem, gráfico, resultado visual), inclua a imagem em markdown ![descrição](endereço-direto-da-imagem): ela aparece na tela num cartão enquanto você fala. Para pergunta simples (cotação, clima, notícia), use a busca na web, não o navegador.',
     'SKILLS COM ECONOMIA: carregue (skill_view) só a skill que claramente serve à tarefa, no máximo 2 por pedido; não carregue "por garantia", mesmo que outra instrução mande errar para o lado de carregar, porque cada skill aberta ocupa a sua memória de trabalho. Skill grande: leia o começo (o índice) e depois só a seção que precisa. Não releia uma skill que já leu nesta tarefa.',
   ]
   return MARCA_EST[0] + '\n## Como falar com o cliente (vale sempre)\n\n' + regras.join('\n\n') + '\n' + MARCA_EST[1]

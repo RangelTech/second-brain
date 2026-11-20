@@ -510,3 +510,19 @@ body.modo-voz .app.nav-aberto{grid-template-columns:272px minmax(0,1fr)}
 body.modo-voz .app.nav-aberto.recolhido{grid-template-columns:minmax(0,1fr)}
 body.modo-voz .nav:not([hidden]){position:fixed;right:18px;top:62px;width:min(30vw,400px);height:min(30vh,260px);z-index:45;border:1px solid rgba(255,255,255,.14);border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.55);animation:vozEntra .3s ease-out}
 body.modo-voz .nav .nav-barra,body.modo-voz .nav-fav-menu{display:none}
+/* spec 53: cartões holográficos da conversa por voz. O que a IA quer mostrar nasce no centro do cérebro, voa até a lateral e fica
+   flutuando como projeção: vidro escuro, borda ciano viva, linhas de varredura correndo. Clique amplia. */
+.voz-cartoes{position:absolute;left:28px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;pointer-events:auto;z-index:2;max-height:84%}
+.voz-cartao{position:relative;margin:0;width:min(19vw,250px);border-radius:16px;overflow:hidden;cursor:zoom-in;background:rgba(8,16,30,.55);border:1px solid rgba(110,210,255,.45);box-shadow:0 0 0 1px rgba(110,210,255,.08),0 0 34px rgba(70,170,255,.28),inset 0 0 26px rgba(70,170,255,.10);backdrop-filter:blur(10px) saturate(1.3);transition:width .45s cubic-bezier(.2,.8,.2,1),transform .45s cubic-bezier(.2,.8,.2,1);animation:cartaoFlutua 6s ease-in-out infinite}
+.voz-cartao.chega{animation:cartaoNasce .8s cubic-bezier(.16,.9,.24,1) both,cartaoFlutua 6s ease-in-out .8s infinite}
+.voz-cartao img,.voz-cartao video{display:block;width:100%;max-height:34vh;object-fit:cover}
+.voz-cartao figcaption{padding:8px 12px;font-size:12.5px;color:#cfeaff;letter-spacing:.02em;background:linear-gradient(180deg,rgba(8,16,30,0),rgba(8,16,30,.85))}
+.voz-cartao::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(180deg,rgba(140,220,255,.07) 0 1px,transparent 1px 4px);mix-blend-mode:screen;animation:varre 3.2s linear infinite}
+.voz-cartao::before{content:"";position:absolute;inset:-1px;border-radius:16px;pointer-events:none;background:linear-gradient(120deg,transparent 30%,rgba(160,230,255,.35) 50%,transparent 70%);background-size:250% 100%;animation:brilhoBorda 4.5s ease-in-out infinite;mix-blend-mode:screen}
+.voz-cartao.grande{width:min(46vw,620px);cursor:zoom-out;z-index:5}
+.voz-cartao.grande img,.voz-cartao.grande video{max-height:70vh;object-fit:contain;background:#050a14}
+@keyframes cartaoNasce{0%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(.06);filter:blur(8px) brightness(3)}55%{opacity:1;filter:blur(1px) brightness(1.6)}100%{opacity:1;transform:none;filter:none}}
+@keyframes cartaoFlutua{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes varre{from{background-position:0 0}to{background-position:0 40px}}
+@keyframes brilhoBorda{0%,100%{background-position:120% 0}50%{background-position:-20% 0}}
+@media (prefers-reduced-motion:reduce){.voz-cartao,.voz-cartao.chega,.voz-cartao::after,.voz-cartao::before{animation:none}}

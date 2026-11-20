@@ -37,7 +37,7 @@
     p.className = 'voz-palco'
     p.setAttribute('role', 'dialog')
     p.setAttribute('aria-label', 'Conversa por voz')
-    p.innerHTML = '<canvas class="voz-aureola" aria-hidden="true"></canvas>' +
+    p.innerHTML = '<canvas class="voz-aureola" aria-hidden="true"></canvas><div class="voz-cartoes" aria-live="polite"></div>' +
       '<div class="voz-rodape"><p class="voz-estado" role="status" aria-live="polite"></p><p class="voz-legenda" aria-live="polite"></p>' +
       '<div class="voz-acoes"><button type="button" class="voz-mudo" aria-pressed="false">Silenciar microfone</button>' +
       '<button type="button" class="voz-sair">Encerrar conversa</button></div></div>'
@@ -322,7 +322,8 @@
     st.enviado = texto
     st.cima = 0
     fase('pensando', '“' + texto + '”')
-    const id = P().enviarTexto(texto)
+    st.cartoesVistos = new Set()
+    const id = P().enviarTexto('🎙️ ' + texto) // o SOUL sabe: pedido falado = resposta curta, de conversa, com imagem em cartão
     if (!id) { fase('ouvindo', 'Escolha um modelo antes de conversar.'); if (!st.vivo) novaFrase(); return }
     st.chat = id
     st.ultimaEtapa = 0
@@ -337,6 +338,7 @@
     function vivo() { return st === sessao && st.turno === turno && st.fase === 'pensando' }
     while (st === sessao && st.turno === turno && P().ocupado(id)) {
       await new Promise((ok) => setTimeout(ok, 300))
+      mostrarCartoes(imagensNaTela())
       const quieto = Date.now() - Math.max(st.ultimaEtapa, t0)
       if (vivo() && !st.tocando && esperas < 3 && quieto > 11000) {
         esperas++
@@ -348,6 +350,7 @@
     clearTimeout(st && st.timerEspera)
     if (st !== sessao || st.turno !== turno) return // interrompido: quem interrompeu já cuidou da fase
     const resp = P().ultimaResposta(id)
+    mostrarCartoes([...imagensNaTela(), ...imagensDoTexto(resp)])
     await falarResposta(resp, turno)
     if (st !== sessao || st.turno !== turno) return
     fase('ouvindo', '')
@@ -360,6 +363,51 @@
     st.ultimaEtapa = Date.now()
     clearTimeout(st.timerEspera)
     falarCurta(F.fraseDaEtapa(cat, st.sortear))
+  }
+
+  // ---------- cartões holográficos (spec 53): o que a IA quer MOSTRAR sai do centro do cérebro e para na lateral ----------
+  function imagensDoTexto(texto) {
+    const out = []
+    for (const m of String(texto || '').matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) out.push({ src: m[2], alt: m[1] || 'Imagem' })
+    return out
+  }
+  function imagensNaTela() {
+    const msgs = document.querySelectorAll('.conversa .msg.assistant')
+    const ult = msgs[msgs.length - 1]
+    if (!ult) return []
+    return [...ult.querySelectorAll('img.img-final, video.img-final')].map((el) => ({ src: el.currentSrc || el.src, alt: el.alt || 'Mídia', video: el.tagName === 'VIDEO' }))
+  }
+  function mostrarCartoes(lista) {
+    if (!st || !lista.length) return
+    const caixa = $('voz-palco').querySelector('.voz-cartoes')
+    for (const it of lista) {
+      if (!it.src || st.cartoesVistos.has(it.src)) continue
+      st.cartoesVistos.add(it.src)
+      const c = document.createElement('figure')
+      c.className = 'voz-cartao'
+      const midia = document.createElement(it.video ? 'video' : 'img')
+      midia.src = it.src
+      if (it.video) Object.assign(midia, { autoplay: true, muted: true, loop: true, playsInline: true })
+      else midia.alt = it.alt
+      midia.onerror = () => c.remove() // link quebrado não fica na tela
+      c.appendChild(midia)
+      if (it.alt && !it.video) {
+        const leg = document.createElement('figcaption')
+        leg.textContent = it.alt
+        c.appendChild(leg)
+      }
+      c.onclick = () => c.classList.toggle('grande')
+      caixa.prepend(c)
+      while (caixa.children.length > 3) caixa.lastChild.remove()
+      // nasce no centro do cérebro e voa até o lugar dele
+      const centro = P().centroCerebro && P().centroCerebro()
+      const r = c.getBoundingClientRect()
+      if (centro && r.width) {
+        c.style.setProperty('--dx', Math.round(centro.x - (r.left + r.width / 2)) + 'px')
+        c.style.setProperty('--dy', Math.round(centro.y - (r.top + r.height / 2)) + 'px')
+      }
+      c.classList.add('chega')
+    }
   }
 
   // ---------- falar ----------
@@ -627,7 +675,7 @@
       freq: new Uint8Array(anMic.frequencyBinCount), alt: new Float32Array(N_BARRAS), amostra: new Uint8Array(512),
       antes: performance.now(), piso: 0.01, quieto: 0, cima: 0, abaixou: 0, mudo: false, fase: 'ouvindo', frase: null, raf: 0, medidor: 0,
       vivo: null, ouvido: '', base: '', prefixo: '', ultimoTexto: '', textoEm: 0, ultimaVoz: -1e9, enviado: '', chat: null, turno: 0,
-      tocando: null, falandoTexto: '', falados: [], cache: new Map(), sortear: F.sorteador(), ultimaEtapa: 0, timerEspera: 0,
+      tocando: null, falandoTexto: '', falados: [], cartoesVistos: new Set(), cache: new Map(), sortear: F.sorteador(), ultimaEtapa: 0, timerEspera: 0,
     }
     const sessao = st
     st.tirarFerr = P().aoFerramenta(aoFerramenta)
@@ -667,12 +715,12 @@
     document.body.classList.remove('modo-voz')
     try { window.sb.navegador && window.sb.navegador.miniatura && window.sb.navegador.miniatura(false) } catch {}
     const p = $('voz-palco')
-    if (p) p.hidden = true
+    if (p) (p.hidden = true), p.querySelector('.voz-cartoes') && (p.querySelector('.voz-cartoes').innerHTML = '')
     const b = $('voz-conversa')
     if (b) b.classList.remove('on')
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && st) encerrar() })
-  window.SBVozConversa = { iniciar, encerrar, ativo: () => !!st, estado: () => st && { fase: st.fase, ouvido: st.ouvido, vivo: !!st.vivo, tocando: !!st.tocando, abaixou: !!st.abaixou, cache: st.cache.size, turno: st.turno, enviado: st.enviado } }
+  window.SBVozConversa = { iniciar, encerrar, mostrarCartoes: (l) => mostrarCartoes(l || []), ativo: () => !!st, estado: () => st && { fase: st.fase, ouvido: st.ouvido, vivo: !!st.vivo, tocando: !!st.tocando, abaixou: !!st.abaixou, cache: st.cache.size, turno: st.turno, enviado: st.enviado } }
   const b = $('voz-conversa')
   if (b) b.onclick = iniciar
 })()
