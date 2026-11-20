@@ -194,7 +194,8 @@ function comandoParaExtensao(conta, maquinaWs, msg) {
 // ---------- HTTP ----------
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' }
 const CABECALHOS = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' }
-const CSP_APP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; worker-src blob: 'self'; connect-src 'self' wss: ws: blob: data:; frame-ancestors 'none'"
+// spec 54: player do YouTube no cartão da voz (frame-src) e mídia de endereço https nos cartões
+const CSP_APP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; script-src 'self' 'wasm-unsafe-eval'; worker-src blob: 'self'; connect-src 'self' wss: ws: blob: data:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; frame-ancestors 'none'"
 const CSP_LOGIN = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'"
 
 function json(res, status, corpo, extra = {}) {
