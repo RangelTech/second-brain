@@ -400,6 +400,7 @@
         if (e.id !== id || !vivo()) return
         if (e.tipo === 'delta') fala.add(e.data)
         else if (e.tipo === 'youtube') mostrarYoutube(e.video, e.titulo)
+        else if (e.tipo === 'imagens') mostrarCartoes((e.lista || []).map((x) => ({ src: x.src, reserva: x.reserva, alt: x.titulo })))
         else if (e.tipo === 'limpar') recolherCartoes()
         else if (e.tipo === 'agente') agente = { tarefa: e.tarefa, aviso: e.aviso }
         else if (e.tipo === 'erro') (erro = true), ok()
@@ -436,7 +437,9 @@
   async function executarComAgente(tarefa, original, sessao, turno) {
     const vivo = () => st === sessao && st.turno === turno
     fase('pensando', '“' + original + '”')
-    const id = P().enviarTexto('🎙️ ' + tarefa)
+    // navegador só quando a pessoa pediu ou quando é preciso agir num site (abrir no automático fez site barrar como robô, 20/11)
+    const pediuSite = /navegador|site|p[áa]gina|abr[ea]|entr[ae]|login|logar|whatsapp|instagram|facebook|tiktok|youtube|linkedin|gmail|e-?mail/i.test(original)
+    const id = P().enviarTexto('🎙️ ' + tarefa + (pediuSite ? '' : '\n\n(Pesquise pela busca na web; não abra o navegador integrado, a não ser que precise agir dentro de um site.)'))
     if (!id) return fase('ouvindo', 'Escolha um modelo antes de conversar.')
     st.chat = id
     st.ultimaEtapa = Date.now()
@@ -654,7 +657,8 @@
       else midia.src = it.src
       if (it.video) Object.assign(midia, { autoplay: true, muted: true, loop: true, playsInline: true })
       else midia.alt = it.alt
-      midia.onerror = () => c.remove() // link quebrado não fica na tela
+      // site que bloqueia foto "de fora": tenta a miniatura do buscador antes de desistir do cartão
+      midia.onerror = () => (it.reserva && midia.src !== it.reserva ? (midia.src = it.reserva) : c.remove())
       c.appendChild(midia)
       if (it.alt && !it.video) {
         const leg = document.createElement('figcaption')
@@ -1007,7 +1011,7 @@
     if (b) b.classList.remove('on')
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && st) encerrar() })
-  window.SBVozConversa = { iniciar, encerrar, mostrarCartoes: (l) => mostrarCartoes(l || []), recolherCartoes, ativo: () => !!st, estado: () => st && { fase: st.fase, ouvido: st.ouvido, vivo: !!st.vivo, tocando: !!st.tocando, abaixou: !!st.abaixou, cache: st.cache.size, turno: st.turno, enviado: st.enviado } }
+  window.SBVozConversa = { iniciar, encerrar, responder: (t) => st && responder(t), mostrarCartoes: (l) => mostrarCartoes(l || []), recolherCartoes, ativo: () => !!st, estado: () => st && { fase: st.fase, ouvido: st.ouvido, vivo: !!st.vivo, tocando: !!st.tocando, abaixou: !!st.abaixou, cache: st.cache.size, turno: st.turno, enviado: st.enviado } }
   const b = $('voz-conversa')
   if (b) b.onclick = iniciar
 })()

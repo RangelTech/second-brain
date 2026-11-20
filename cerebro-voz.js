@@ -39,9 +39,25 @@ async function acharYoutube(busca) {
   return v ? { id: idYoutube(v.url), titulo: v.titulo.replace(/\s*-\s*YouTube\s*$/i, '') } : null
 }
 
+// ---------------------------------------------------------------- fotos da internet (~0,9 s, sem navegador): busca de imagens do DuckDuckGo
+const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' }
+async function acharImagens(busca, n = 3) {
+  const q = encodeURIComponent(String(busca || '').slice(0, 200))
+  const h = await (await fetch('https://duckduckgo.com/?q=' + q + '&iax=images&ia=images', { headers: UA, signal: AbortSignal.timeout(8000) })).text()
+  const vqd = (/vqd=["']?([\d-]+)/.exec(h) || [])[1]
+  if (!vqd) throw new Error('busca de imagens indisponível')
+  const r = await fetch(`https://duckduckgo.com/i.js?l=br-pt&o=json&q=${q}&vqd=${vqd}&f=,,,,,&p=1`, { headers: { ...UA, Referer: 'https://duckduckgo.com/' }, signal: AbortSignal.timeout(8000) })
+  const j = await r.json()
+  // fotos grandes e em paisagem/quadradas primeiro (ficam bonitas no cartão); a miniatura do buscador é a reserva se o site bloquear
+  return (j.results || []).filter((x) => x.image && x.width >= 500).slice(0, 12)
+    .sort((a, b) => (b.width / b.height >= 0.75 ? 1 : 0) - (a.width / a.height >= 0.75 ? 1 : 0))
+    .slice(0, Math.max(1, Math.min(4, n))).map((x) => ({ src: x.image, reserva: x.thumbnail, titulo: String(x.title || '').slice(0, 80) }))
+}
+
 // ---------------------------------------------------------------- o modelo
 const FERRAMENTAS = [
   { type: 'function', function: { name: 'buscar_na_web', description: 'Busca rápida na internet. Use para QUALQUER coisa atual ou que muda: preço, cotação, clima, notícia, placar, lançamento, horário, quem é hoje, ou quando não tiver certeza do fato.', parameters: { type: 'object', properties: { consulta: { type: 'string', description: 'o que buscar, em poucas palavras' } }, required: ['consulta'] } } },
+  { type: 'function', function: { name: 'mostrar_imagens', description: 'Mostra na tela, na hora, fotos da internet de algo real: pessoa, lugar, animal, objeto, produto, obra. Rápido (1 s), sem abrir navegador.', parameters: { type: 'object', properties: { busca: { type: 'string', description: 'o que procurar, como numa busca de imagens' }, quantidade: { type: 'integer', description: '1 a 4 (padrão 3)' } }, required: ['busca'] } } },
   { type: 'function', function: { name: 'tocar_youtube', description: 'Acha e toca na tela um vídeo ou música do YouTube (clipe, música, trailer, vídeo de um assunto).', parameters: { type: 'object', properties: { busca: { type: 'string', description: 'artista e música, ou o vídeo procurado' } }, required: ['busca'] } } },
   { type: 'function', function: { name: 'usar_agente', description: 'Passa uma TAREFA para o agente completo, que mexe no computador do usuário: arquivos e pastas, WhatsApp, Instagram e outras redes, navegador (entrar em sites, logar, clicar, preencher), criar ou editar site, documento, planilha, imagem ou vídeo, programar, rodar comandos, ou qualquer coisa de várias etapas. Leva de segundos a vários minutos.', parameters: { type: 'object', properties: { tarefa: { type: 'string', description: 'a tarefa completa e clara, com todos os detalhes que o usuário deu' }, aviso: { type: 'string', description: 'uma frase curta e simpática para falar agora, avisando que vai fazer (e que pode demorar, se for longo)' } }, required: ['tarefa', 'aviso'] } } },
   { type: 'function', function: { name: 'limpar_tela', description: 'Tira da tela as imagens, gráficos ou vídeos que estão sendo mostrados (o usuário pediu para fechar/tirar, ou o assunto mudou).', parameters: { type: 'object', properties: {} } } },
@@ -54,7 +70,7 @@ function instrucao({ nome, modo }) {
     'NUNCA use lista, tabela, tópicos, negrito, títulos, emoji, link ou código. No máximo 3 ou 4 frases, a não ser que peçam detalhe. Se houver opções, ofereça no FINAL, numa frase só.',
     'Tenha personalidade: caloroso, esperto, um toque de humor quando cabe. Se a pessoa estiver desabafando, escute de verdade, acolha, pergunte com cuidado, sem sermão.',
     'NUNCA invente número, data, distância, preço ou fato. Se a resposta depende de algo atual, ou de um número ou fato que você não tem CERTEZA absoluta, use buscar_na_web antes (é rápida) e responda com o que a busca trouxe. Curiosidade também: prefira uma que você sabe com segurança.',
-    'Use tocar_youtube quando pedirem para ouvir ou ver música, clipe ou vídeo.',
+    'Use tocar_youtube quando pedirem para ouvir ou ver música, clipe ou vídeo. Use mostrar_imagens quando pedirem para ver uma foto ou imagem de algo que existe (nunca mande isso para o agente).',
     'Use usar_agente quando for preciso mexer no computador, nas contas ou fazer um trabalho de várias etapas; não tente fazer isso você mesmo.',
     'Nunca diga nomes de ferramentas nem termos técnicos.',
   ]
@@ -138,11 +154,16 @@ async function conversar({ base, chave, modelo, nome, historico = [], texto, mod
       let a = {}
       try { a = JSON.parse(c.args || '{}') } catch {}
       let saida = ''
-      c.nome = /busc|pesquis|search/i.test(c.nome) ? 'buscar_na_web' : /youtube|tocar|musica/i.test(c.nome) ? 'tocar_youtube' : /agente|tarefa/i.test(c.nome) ? 'usar_agente' : /limpar|tela/i.test(c.nome) ? 'limpar_tela' : c.nome
+      const NOMES = ['buscar_na_web', 'mostrar_imagens', 'tocar_youtube', 'usar_agente', 'limpar_tela']
+      if (!NOMES.includes(c.nome)) c.nome = /imag|foto/i.test(c.nome) ? 'mostrar_imagens' : /busc|pesquis|search/i.test(c.nome) ? 'buscar_na_web' : /youtube|tocar|musica/i.test(c.nome) ? 'tocar_youtube' : /agente|tarefa/i.test(c.nome) ? 'usar_agente' : /limpar|tela/i.test(c.nome) ? 'limpar_tela' : c.nome
       emitir({ tipo: 'ferramenta', nome: c.nome, args: a })
       try {
         if (c.nome === 'buscar_na_web') saida = await buscarNaWeb(a.consulta || texto)
-        else if (c.nome === 'tocar_youtube') {
+        else if (c.nome === 'mostrar_imagens') {
+          const lista = await acharImagens(a.busca || texto, a.quantidade || 3)
+          if (lista.length) emitir({ tipo: 'imagens', lista: lista.map((x) => ({ ...x, titulo: (a.busca || '').replace(/^(uma? )?(foto|imagem)s? d[aeo]s? /i, '') })) }) // legenda = o que a pessoa pediu (o título da página vinha até em coreano)
+          saida = lista.length ? `Já estão na tela ${lista.length} fotos de ${a.busca}. Comente em uma frase curta, sem descrever foto por foto.` : 'Não achei fotos disso. Diga isso de forma simples.'
+        } else if (c.nome === 'tocar_youtube') {
           const v = await acharYoutube(a.busca || texto)
           if (v) emitir({ tipo: 'youtube', video: v.id, titulo: v.titulo })
           saida = v ? `Achei e já está tocando na tela: ${v.titulo}. Diga em uma frase curta que está tocando.` : 'Não achei esse vídeo. Diga isso e ofereça tentar outro nome.'
@@ -164,4 +185,4 @@ async function conversar({ base, chave, modelo, nome, historico = [], texto, mod
   emitir({ tipo: 'fim', falado, primeiro, total: Date.now() - t0 })
 }
 
-module.exports = { conversar, buscarNaWeb, acharYoutube, idYoutube, instrucao, FERRAMENTAS }
+module.exports = { conversar, buscarNaWeb, acharYoutube, acharImagens, idYoutube, instrucao, FERRAMENTAS }
