@@ -19,6 +19,10 @@
     <form id="form" autocomplete="on">
       <label>E-mail<input id="email" type="email" name="email" autocomplete="username" required autofocus></label>
       <label>Senha<input id="senha" type="password" name="password" autocomplete="current-password" required></label>
+      <div id="primeiro" hidden>
+        <label>Repita a senha<input id="senha2" type="password" autocomplete="new-password"></label>
+        <label class="termos"><input id="termos" type="checkbox"> Li e aceito os <a href="https://segundocerebro.pro/termos" target="_blank" rel="noopener">Termos de uso</a></label>
+      </div>
       <p id="erro" class="erro" role="alert" hidden></p>
       <button id="entrar" type="submit">Entrar</button>
       <button id="esqueci" class="link" type="button">Esqueci a senha</button>

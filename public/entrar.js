@@ -89,13 +89,30 @@
     }).catch(function () { b.disabled = false; erro('Sem conexão. Tente de novo.') })
   })
 
+  // spec 53: primeiro acesso (comprou e ainda não tem senha): a mesma tela vira "crie sua senha" e já entra
+  var primeiro = false
+  function modoPrimeiro(sim) {
+    primeiro = sim
+    $('primeiro').hidden = !sim
+    $('entrar').textContent = sim ? 'Criar senha e entrar' : 'Entrar'
+    $('senha').setAttribute('autocomplete', sim ? 'new-password' : 'current-password')
+  }
+  $('email').addEventListener('input', function () { if (primeiro) modoPrimeiro(false) })
   $('form').addEventListener('submit', function (e) {
     e.preventDefault()
     erro('')
-    var b = $('entrar'); b.disabled = true; b.textContent = 'Entrando…'
-    api('POST', '/api/entrar', { email: $('email').value.trim(), senha: $('senha').value }).then(function (r) {
-      b.disabled = false; b.textContent = 'Entrar'
+    if (primeiro && $('senha').value !== $('senha2').value) return erro('As duas senhas não são iguais.')
+    if (primeiro && !$('termos').checked) return erro('Para continuar, leia e aceite os Termos de uso.')
+    var b = $('entrar'); var rot = b.textContent; b.disabled = true; b.textContent = primeiro ? 'Criando…' : 'Entrando…'
+    api('POST', '/api/entrar', { email: $('email').value.trim(), senha: $('senha').value, aceite: primeiro }).then(function (r) {
+      b.disabled = false; b.textContent = rot
+      if (r.status !== 200 && r.json && r.json.codigo === 'primeiro_acesso') {
+        modoPrimeiro(true)
+        erro('Bem-vindo! Primeiro acesso: repita a senha e aceite os termos para criar a sua senha.')
+        return $('senha2').focus()
+      }
       if (r.status !== 200) return erro(r.json.erro || 'Não foi possível entrar.')
+      modoPrimeiro(false)
       $('senha').value = ''
       $('quem').textContent = r.json.nome || r.json.email
       mostrarMaquinas(true)

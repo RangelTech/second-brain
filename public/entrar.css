@@ -40,3 +40,4 @@ button.link{background:transparent;border:0;color:var(--texto);opacity:.75;text-
 #ext a#ext-baixar{display:inline-block;justify-self:start;margin-top:4px;padding:9px 14px;border-radius:10px;background:var(--cor);color:#1a120b;font-weight:600;text-decoration:none}
 #ext a#ext-baixar:hover,#ext a#ext-baixar:focus-visible{filter:brightness(1.08);outline:none}
 #ext a#ext-baixar[hidden]{display:none}
+.termos{display:flex;align-items:center;gap:8px;font-size:13px}.termos input{width:auto}

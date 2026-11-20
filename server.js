@@ -253,11 +253,17 @@ const servidor = http.createServer(async (req, res) => {
       if (!b?.email || !b?.senha) return json(res, 400, { erro: 'Informe e-mail e senha.' })
       let r
       try {
-        r = await acessoPost('/v1/auth/verify', { email: String(b.email).slice(0, 200), password: String(b.senha).slice(0, 200) })
+        // spec 53: quem comprou e ainda não tem senha cria aqui mesmo (o aceite dos termos vai junto)
+        r = await acessoPost('/v1/auth/verify', { email: String(b.email).slice(0, 200), password: String(b.senha).slice(0, 200), ...(b.aceite ? { aceite_termos: true } : {}) })
       } catch {
         return json(res, 503, { erro: 'Não consegui falar com o servidor agora. Tente de novo em instantes.' })
       }
-      if (r.status !== 200) return json(res, r.status === 429 ? 429 : r.status >= 500 ? 503 : r.status, { erro: r.json?.error?.message || 'Não foi possível entrar.' })
+      if (r.status !== 200) {
+        const codigo = r.json?.error?.code
+        if (codigo === 'terms_required') return json(res, 400, { codigo: 'primeiro_acesso', erro: '' })
+        const textos = { invalid_credentials: 'E-mail ou senha incorretos.', subscription_inactive: 'Sua assinatura não está ativa. Confira o e-mail da compra.', account_blocked: 'Conta bloqueada. Fale com o suporte.' }
+        return json(res, r.status === 429 ? 429 : r.status >= 500 ? 503 : r.status, { codigo, erro: textos[codigo] || r.json?.error?.message || 'Não foi possível entrar.' })
+      }
       return json(res, 200, { ok: true, email: r.json.email, nome: r.json.name }, { 'Set-Cookie': cookieSessao(criarSessao(r.json), SESSAO_MS / 1000) })
     }
     // "Esqueci a senha": o llm-access manda o link por e-mail e sempre responde igual (não revela se o e-mail existe)
