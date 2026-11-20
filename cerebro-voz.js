@@ -69,10 +69,14 @@ function instrucao({ nome, modo }) {
     'Tudo o que você escrever vai ser FALADO em voz alta. Fale como gente numa conversa: português do Brasil, texto corrido, frases curtas e naturais.',
     'NUNCA use lista, tabela, tópicos, negrito, títulos, emoji, link ou código. No máximo 3 ou 4 frases, a não ser que peçam detalhe. Se houver opções, ofereça no FINAL, numa frase só.',
     'Tenha personalidade: caloroso, esperto, um toque de humor quando cabe. Se a pessoa estiver desabafando, escute de verdade, acolha, pergunte com cuidado, sem sermão.',
+    'Se a busca trouxer valores diferentes, use o mais recente e confiável e diga UM número só (não liste os outros).',
+    'Ao mostrar fotos, gráfico ou vídeo novos, o que estava na tela some sozinho; use limpar_tela quando pedirem para fechar/tirar sem pedir outra coisa.',
     'NUNCA invente número, data, distância, preço ou fato. Se a resposta depende de algo atual, ou de um número ou fato que você não tem CERTEZA absoluta, use buscar_na_web antes (é rápida) e responda com o que a busca trouxe. Curiosidade também: prefira uma que você sabe com segurança.',
+    'Nunca diga que está tocando ou mostrando algo sem ter chamado a ferramenta NESTE pedido.',
     'Use tocar_youtube quando pedirem para ouvir ou ver música, clipe ou vídeo. Use mostrar_imagens quando pedirem para ver uma foto ou imagem de algo que existe (nunca mande isso para o agente).',
     'Use usar_agente quando for preciso mexer no computador, nas contas ou fazer um trabalho de várias etapas; não tente fazer isso você mesmo.',
     'Nunca diga nomes de ferramentas nem termos técnicos.',
+    'Não anuncie que vai buscar ou conferir ("deixa eu ver", "vou conferir", "só um instante"): o aplicativo já avisa a pessoa. Vá direto à resposta.',
   ]
   if (modo === 'resumir') base.push('Agora o agente terminou uma tarefa. A mensagem do usuário traz o pedido e o resultado do agente: conte o resultado como numa conversa, em 2 a 4 frases, destacando o que importa. Se o resultado citar imagem ou arquivo, diga só que está na tela ou onde ficou.')
   return base.join('\n')
@@ -81,7 +85,7 @@ function instrucao({ nome, modo }) {
 // voz não pode ficar muda: sem o 1º pedaço em PRIMEIRO_MS a chamada cai (e o app passa para o modelo reserva na hora).
 // Medido 20/11: o rt-auto travou uma vez 60 s sem responder; com este prazo a troca leva ~8 s em vez de 60.
 const PRIMEIRO_MS = 11000 // 8 s derrubou os dois modelos juntos num momento de servidor cheio
-async function chamar({ base, chave, modelo, mensagens, comFerramentas }, aoDelta) {
+async function chamar({ base, chave, modelo, mensagens, comFerramentas, forcar }, aoDelta) {
   const ac = new AbortController()
   const prazo = setTimeout(() => ac.abort(new Error('sem resposta em ' + PRIMEIRO_MS / 1000 + ' s')), PRIMEIRO_MS)
   const teto = setTimeout(() => ac.abort(new Error('resposta longa demais')), 60000)
@@ -90,7 +94,7 @@ async function chamar({ base, chave, modelo, mensagens, comFerramentas }, aoDelt
     r = await fetch(base + '/chat/completions', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + chave, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: modelo, stream: true, temperature: 0.6, max_tokens: 700, messages: mensagens, ...(comFerramentas ? { tools: FERRAMENTAS, tool_choice: 'auto' } : {}), chat_template_kwargs: { enable_thinking: false } }),
+      body: JSON.stringify({ model: modelo, stream: true, temperature: 0.6, max_tokens: 700, messages: mensagens, ...(comFerramentas ? { tools: FERRAMENTAS, tool_choice: forcar ? { type: 'function', function: { name: forcar } } : 'auto' } : {}), chat_template_kwargs: { enable_thinking: false } }),
       signal: ac.signal,
     })
   } catch (e) {
@@ -135,6 +139,14 @@ async function chamar({ base, chave, modelo, mensagens, comFerramentas }, aoDelt
   return { texto, chamadas: chamadas.filter(Boolean) }
 }
 
+function ferramentaObrigatoria(texto) {
+  const t = String(texto || '').toLowerCase()
+  if (/\b(fech|tir|limp|para|pausa)/.test(t)) return null
+  if (/\b(mostra|mostrar|me mostra|quero ver|ver uma|ver umas|ver a|ver o|exibe|coloca)\b.{0,30}\b(fotos?|imagens?|figuras?)\b|\b(fotos?|imagens?) d[aoe]s?\b/.test(t)) return 'mostrar_imagens'
+  if (/\b(quero ouvir|ouvir (a|o|uma|um)|toca|tocar|toque|coloca|coloque|bota|p[õo]e)\b.{0,60}\b(m[úu]sica|clipe|som|can[çc][ãa]o|do|da|de)\b|\bquero ouvir\b/.test(t)) return 'tocar_youtube'
+  return null
+}
+
 async function conversar({ base, chave, modelo, nome, historico = [], texto, modo }, emitir) {
   const mensagens = [{ role: 'system', content: instrucao({ nome, modo }) }, ...historico.slice(-12), { role: 'user', content: String(texto || '') }]
   const t0 = Date.now()
@@ -145,7 +157,9 @@ async function conversar({ base, chave, modelo, nome, historico = [], texto, mod
   }
   let falado = ''
   for (let rodada = 0; rodada < 3; rodada++) {
-    const { texto: t, chamadas } = await chamar({ base, chave, modelo, mensagens, comFerramentas: modo !== 'resumir' }, aoDelta)
+    // pedido claro de música/foto: a 1ª rodada OBRIGA a ferramenta (o modelo já disse "tá tocando" sem chamar nada, imitando o histórico)
+    const forcar = rodada === 0 && modo !== 'resumir' ? ferramentaObrigatoria(texto) : null
+    const { texto: t, chamadas } = await chamar({ base, chave, modelo, mensagens, comFerramentas: modo !== 'resumir', forcar }, aoDelta)
     falado += t
     if (!chamadas.length) break
     mensagens.push({ role: 'assistant', content: t || null, tool_calls: chamadas.map((c) => ({ id: c.id, type: 'function', function: { name: c.nome, arguments: c.args || '{}' } })) })
@@ -185,4 +199,4 @@ async function conversar({ base, chave, modelo, nome, historico = [], texto, mod
   emitir({ tipo: 'fim', falado, primeiro, total: Date.now() - t0 })
 }
 
-module.exports = { conversar, buscarNaWeb, acharYoutube, acharImagens, idYoutube, instrucao, FERRAMENTAS }
+module.exports = { ferramentaObrigatoria, conversar, buscarNaWeb, acharYoutube, acharImagens, idYoutube, instrucao, FERRAMENTAS }

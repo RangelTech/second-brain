@@ -78,7 +78,17 @@
     if (/ (silencia|silenciar|muta|mutar|desliga|desligar|fecha|fechar|cala|corta|cortar) (o |a )?(meu )?(microfone|mic) /.test(t)) return 'mudo'
     if (/ (fecha|fechar|encerra|encerrar|sai|sair|desliga|desligar|termina|terminar|finaliza|finalizar)( o| a| da| do)? (modo (de )?voz|conversa( por voz)?|voz|chamada) /.test(t)) return 'fechar'
     if (/^ (tchau|ate mais|ate logo|falou|valeu tchau)( cerebro)? $/.test(t)) return 'fechar'
+    // o que está na tela (fotos, gráfico, vídeo): instantâneo, sem modelo
+    if (/ (pausa|pausar|pause|para|parar) (o |a |esse |essa |ai o |ai a )?(video|musica|clipe) /.test(t)) return 'pausar'
+    if (/ (continua|continuar|volta|voltar|solta|despausa|play|retoma|retomar)( o| a| com o| com a)? (video|musica|clipe) /.test(t)) return 'continuar'
+    if (/ (fecha|fechar|tira|tirar|some com|esconde|esconder|limpa|limpar|remove|remover)( essa| esse| essas| esses| a| o| as| os| ai| isso)*( da)? (foto|fotos|imagem|imagens|video|videos|clipe|grafico|tela|isso|ai|tudo) /.test(t)) return 'limpar'
     return null
+  }
+  // enquanto um vídeo toca, o microfone continua ligado mas só vale o que é claramente um pedido em português (a letra da música não)
+  function pareceComando(texto) {
+    const w = palavras(texto)
+    if (w.length < 2 || w.length > 30) return false
+    return /\b(fecha|fechar|tira|tirar|pausa|pausar|para|parar|continua|toca|tocar|coloca|bota|mostra|mostrar|abre|abrir|outra|outro|proxima|proximo|aumenta|abaixa|volume|cerebro|quero|me mostra|pesquisa|qual|quanto)\b/.test(w.join(' '))
   }
   // andamento de uma etapa que continua (2ª vez em diante): nunca repete a frase de anúncio (Lucas: "virou ladainha")
   const ANDAMENTO = {
@@ -91,6 +101,11 @@
   }
   const ANDAMENTO_GERAL = ['Seguindo aqui, falta pouco.', 'Tá andando, só mais um pouquinho.', 'Ainda trabalhando nisso.']
   const fraseDeAndamento = (cat, sortear) => sortear(ANDAMENTO[cat] || ANDAMENTO_GERAL)
+  // frase de "vou ver" do próprio modelo ("Deixa eu conferir a cotação pra você."): se o app já falou a espera, ela é descartada
+  function ehPreambulo(frase) {
+    const t = String(frase || '').trim()
+    return t.length < 110 && /^(deixa eu|deixa comigo|vou (dar|conferir|ver|checar|pesquisar|buscar|procurar|olhar)|j[áa] vou|s[óo] um (instante|minutinho|segundinho|momento)|um (instante|minutinho|segundinho|momento)|um seg|beleza,? vou|ok,? vou|claro,? vou|perai|pera[ií])/i.test(t)
+  }
   const PARAR = new Set(['para', 'pare', 'parar', 'parou', 'chega', 'espera', 'espere', 'perai', 'peraí', 'ei', 'ow', 'calma', 'cala', 'silencio', 'nao', 'stop', 'ok', 'tá', 'ta', 'beleza', 'quero', 'eu', 'não', 'aí', 'ai', 'pera'])
 
   function todas() {
@@ -136,5 +151,5 @@
     return w.length > 0 && w.length <= 4 && w.every((x) => PARAR.has(x))
   }
 
-  return { comandoDeVoz, fraseDeAndamento, ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
+  return { comandoDeVoz, pareceComando, ehPreambulo, fraseDeAndamento, ESPERA, ESPERA_LONGA, ETAPA, INTENCOES, PERGUNTAS, periodo, primeiroNome, saudacao, intencao, fraseDeAbertura, todas, sorteador, fraseDaEtapa, palavras, resto, ehEco, soParar }
 })

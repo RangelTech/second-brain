@@ -89,3 +89,16 @@ test('comandos de voz: fechar e silenciar, sem confundir com pedido', () => {
   for (const t of ['Silencia o microfone', 'mutar o mic', 'desliga o microfone', 'fecha o microfone']) assert.equal(F.comandoDeVoz(t), 'mudo', t)
   for (const t of ['fecha a janela do navegador', 'me conta sobre a conversa de ontem', 'qual a cotação do dólar', 'desliga o computador às 22h']) assert.equal(F.comandoDeVoz(t), null, t)
 })
+
+test('preâmbulo do modelo ("deixa eu conferir") é reconhecido; resposta de verdade não', () => {
+  for (const t of ['Deixa eu conferir a cotação atual do euro para te passar o valor certinho.', 'Vou dar uma olhada rápida.', 'Só um instante.', 'Já vou pesquisar isso pra você.']) assert.ok(F.ehPreambulo(t), t)
+  for (const t of ['O euro está valendo seis reais e cinquenta e três centavos agora.', 'Vou te contar: o dólar subiu hoje.' .replace('Vou te contar: ', 'Olha só: '), 'Deixa de lado o resto, o principal é isso: subiu 1%.'.replace('Deixa de lado o resto, ', '')]) assert.ok(!F.ehPreambulo(t), t)
+})
+
+test('comandos de tela (instantâneos) e filtro de pedido enquanto o vídeo toca', () => {
+  for (const [t, c] of [['Pode fechar essas fotos agora', 'limpar'], ['fecha esse vídeo', 'limpar'], ['tira isso da tela', 'limpar'], ['pausa o vídeo', 'pausar'], ['continua a música', 'continuar'], ['fecha o modo de voz', 'fechar'], ['mostra uma foto do Michael Jackson', null]]) assert.equal(F.comandoDeVoz(t), c, t)
+  assert.ok(!F.pareceComando('you only say that cause I am not around'))
+  assert.ok(!F.pareceComando('better now better now'))
+  assert.ok(F.pareceComando('toca outra música do Post Malone'))
+  assert.ok(F.pareceComando('fecha esse vídeo aí'))
+})

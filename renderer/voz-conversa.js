@@ -229,6 +229,7 @@
     st.ouvido = ''
     st.base = ''
     if (!texto || F.soParar(texto)) return fase('ouvindo', '')
+    if (st.ytAtivo && !F.pareceComando(texto)) return fase('ouvindo', st.legendaVideo || '')
     responder(texto)
   }
 
@@ -280,6 +281,11 @@
     const fala = !st.mudo && rms > Math.max(0.014, st.piso * 2.6)
     if (fala) (st.ultimaVoz = agora), (st.quieto = 0)
     else st.quieto += dt
+    if (st.ytAtivo) {
+      const baixo = (fala && rms > Math.max(0.02, st.piso * 3)) || !!st.tocando
+      if (baixo && !st.ytBaixo) (st.ytBaixo = true), ytComando('setVolume', [15])
+      else if (!baixo && st.ytBaixo && st.quieto > 1500) (st.ytBaixo = false), ytComando('setVolume', [100])
+    }
     if (st.fase === 'ouvindo') {
       if (st.vivo) {
         // pausa grande: já tem texto, o microfone ficou quieto e o texto parou de mudar
@@ -329,7 +335,14 @@
     const valido = () => st === sessao && st.turno === turno
     async function tocarFila() {
       while (fila.length && valido()) {
+        // UM canal só (Lucas: "atropelando uma coisa com a outra"): espera a frase anterior (inclusive a de espera) acabar
+        while (st && st.tocando && valido()) await new Promise((ok) => setTimeout(ok, 60))
+        const pausa = (st.ultimaFalaFim || 0) + (st.ultimaFoiEspera ? 800 : 450) - Date.now()
+        if (pausa > 0) await new Promise((ok) => setTimeout(ok, pausa))
+        if (!valido()) break
         const it = fila.shift()
+        // a espera já foi dita: a frase de "vou ver" do modelo sobra e só atropela
+        if (!comecou && st.esperaDita && F.ehPreambulo(it.frase)) { largarTTS(it.h); continue }
         if (!comecou) (comecou = true), clearTimeout(st.timerEspera), fase('falando', '')
         let foi = false
         if (it.h) foi = await tocarTTS(it.h, it.frase)
@@ -374,6 +387,14 @@
     if (!st) return
     const cmd = F.comandoDeVoz(texto)
     if (cmd === 'mudo') return silenciarPorVoz()
+    if (cmd === 'limpar' || cmd === 'pausar' || cmd === 'continuar') {
+      if (cmd === 'limpar') recolherCartoes()
+      else ytComando(cmd === 'pausar' ? 'pauseVideo' : 'playVideo')
+      const fala = criarFala(st, st.turno)
+      fala.falar(st.sortear(cmd === 'limpar' ? ['Pronto, tirei.', 'Feito.', 'Tá limpo.'] : cmd === 'pausar' ? ['Pausei.', 'Pausado.'] : ['Voltando.', 'Bora.']))
+      await fala.fim()
+      return st && fase('ouvindo', '')
+    }
     if (cmd === 'fechar') {
       const fala = criarFala(st, st.turno)
       fala.falar(st.sortear(['Até mais! Quando quiser, é só me chamar.', 'Fechado. Tô por aqui quando precisar.', 'Beleza, até daqui a pouco!']))
@@ -387,6 +408,7 @@
     st.enviado = texto
     st.cima = 0
     st.cartoesVistos = new Set()
+    st.esperaDita = false
     fase('pensando', '“' + texto + '”')
     const fala = criarFala(sessao, turno)
     const vivo = () => st === sessao && st.turno === turno
@@ -597,7 +619,7 @@
     const c = document.createElement('figure')
     c.className = 'voz-cartao voz-yt'
     const f = document.createElement('iframe')
-    f.src = 'https://www.youtube.com/embed/' + encodeURIComponent(idVideo) + '?autoplay=1&rel=0&modestbranding=1'
+    f.src = 'https://www.youtube.com/embed/' + encodeURIComponent(idVideo) + '?autoplay=1&rel=0&modestbranding=1&enablejsapi=1'
     f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'
     f.referrerPolicy = 'strict-origin-when-cross-origin'
     f.title = titulo || 'Vídeo'
@@ -613,13 +635,21 @@
     if (centro && r.width) (c.style.setProperty('--dx', Math.round(centro.x - (r.left + r.width / 2)) + 'px'), c.style.setProperty('--dy', Math.round(centro.y - (r.top + r.height / 2)) + 'px'))
     c.classList.add('chega')
     st.ytAtivo = c
-    if (!st.mudo) (st.mudoPeloVideo = true), $('voz-palco').querySelector('.voz-mudo').click()
-    $('voz-palco').querySelector('.voz-legenda').textContent = 'Tocando: ' + (titulo || 'vídeo') + '. Para falar comigo, feche o vídeo ou toque no microfone.'
+    st.ytFrame = f
+    // o microfone continua ouvindo (para "fecha o vídeo", "toca outra"); quando a pessoa fala, o vídeo abaixa (ver medir())
+    st.legendaVideo = 'Tocando: ' + (titulo || 'vídeo') + '. É só falar comigo: o som abaixa enquanto você fala.'
+    $('voz-palco').querySelector('.voz-legenda').textContent = st.legendaVideo
+  }
+  // comandos do player do YouTube por mensagem (precisa de enablejsapi=1): setVolume, pauseVideo, playVideo
+  function ytComando(func, args = []) {
+    try { st && st.ytFrame && st.ytFrame.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*') } catch {}
   }
   function fecharYoutube(c) {
     if (c) c.remove()
     if (!st) return
     st.ytAtivo = null
+    st.ytFrame = null
+    st.legendaVideo = ''
     if (st.mudoPeloVideo && st.mudo) $('voz-palco').querySelector('.voz-mudo').click()
     st.mudoPeloVideo = false
   }
@@ -828,7 +858,7 @@
       st.cima = 0
       const fim = () => {
         URL.revokeObjectURL(url)
-        if (st && st.tocando === a) (st.tocando = null), (st.abaixou = 0)
+        if (st && st.tocando === a) (st.tocando = null), (st.abaixou = 0), (st.ultimaFalaFim = Date.now())
         ok()
       }
       a.onended = a.onerror = a.onpause = fim
@@ -838,13 +868,16 @@
   async function falarCurta(frase, narrar) {
     if (!st || !frase) return
     registrar('fala curta: ' + frase)
+    st.esperaDita = true
     let r = st.cache.get(frase)
     if (!r) {
       r = await sintetizar(frase)
       if (r && r.ok && st) st.cache.set(frase, r)
     }
     if (!st || st.fase !== 'pensando' || st.tocando || !r || !r.ok) return
+    st.ultimaFoiEspera = true
     await tocar(r, frase)
+    if (st) st.ultimaFoiEspera = false
   }
   async function falarResposta(texto, turno) {
     const t = paraFala(texto)
