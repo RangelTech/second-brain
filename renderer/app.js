@@ -2204,11 +2204,13 @@
     navUltimo = chave
     NAV.limites({ x: r.x, y: r.y, width: r.width, height: r.height })
   }
+  // spec 53: medir o painel a CADA QUADRO (getBoundingClientRect no requestAnimationFrame) forçava o layout 60 vezes por segundo junto
+  // com as animações do cérebro e da voz (o engasgo com o navegador aberto). O ResizeObserver e os eventos de janela pegam as mudanças
+  // na hora; esta checagem leve de 250 ms só cobre o que mexe sem redimensionar (transições de layout).
   function navVigiar(sim) {
-    cancelAnimationFrame(navLaco)
+    clearInterval(navLaco)
     if (!sim) return
-    const passo = () => { navPos(); navLaco = requestAnimationFrame(passo) }
-    navLaco = requestAnimationFrame(passo)
+    navLaco = setInterval(() => navPos(), 250)
   }
   async function navAbrir(sim) {
     navAberto = !!sim

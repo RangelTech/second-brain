@@ -628,6 +628,7 @@
     const sessao = st
     st.tirarFerr = P().aoFerramenta(aoFerramenta)
     document.body.classList.add('modo-voz')
+    try { window.sb.navegador && window.sb.navegador.miniatura && window.sb.navegador.miniatura(true) } catch {} // navegador vira janelinha
     palco.hidden = false
     P().mostrarCerebro(true)
     $('voz-conversa').classList.add('on')
@@ -660,6 +661,7 @@
     try { s.ctx.close() } catch {}
     try { P().focoOrb(null) } catch {}
     document.body.classList.remove('modo-voz')
+    try { window.sb.navegador && window.sb.navegador.miniatura && window.sb.navegador.miniatura(false) } catch {}
     const p = $('voz-palco')
     if (p) p.hidden = true
     const b = $('voz-conversa')

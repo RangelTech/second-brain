@@ -157,6 +157,8 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     wc.session.setUserAgent(ua, IDIOMAS)
     loginGoogleComoFirefox(wc, ua)
     wc.loadURL(PAGINA_INICIAL).catch(() => {})
+    // o zoom do Chromium fica salvo por site: a cada navegação aplica 0,5 com a janelinha ligada e devolve 1 depois que ela já foi usada
+    wc.on('did-navigate', () => { if (miniaturaUsada) try { wc.setZoomFactor(miniaturaLigada ? 0.5 : 1) } catch {} })
     wc.setWindowOpenHandler(({ url }) => {
       wc.loadURL(url).catch(() => {})
       return { action: 'deny' }
@@ -195,6 +197,14 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     if (aberto) garantir()
     aplicar()
     publicar()
+  }
+  // spec 53: janelinha da conversa por voz. Zoom 0,5 faz a página continuar se vendo com o dobro da largura (layout de computador)
+  let miniaturaLigada = false
+  let miniaturaUsada = false
+  function miniatura(sim) {
+    miniaturaLigada = !!sim
+    if (sim) miniaturaUsada = true
+    if (vista) try { vista.webContents.setZoomFactor(miniaturaLigada ? 0.5 : 1) } catch {}
   }
   function esconderTemporario(sim) {
     escondidoPorModal = !!sim
@@ -542,6 +552,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     definirLimites,
     mostrar,
     esconderTemporario,
+    miniatura,
     atender,
     destacar,
     reencaixar,

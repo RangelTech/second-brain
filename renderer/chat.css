@@ -504,3 +504,9 @@ body.modo-voz .cerebro-fundo canvas{transform:scale(1.12);transition:transform .
 .cerebro-fundo canvas{transition:transform .6s ease}
 @keyframes vozEntra{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.voz-palco{animation:none}}
+/* spec 53: na conversa por voz o navegador vira uma janelinha no canto (o agente continua vendo e mexendo na página, com zoom de 50%
+   para o layout seguir de computador) e não empurra nem cobre o palco da auréola */
+body.modo-voz .app.nav-aberto{grid-template-columns:272px minmax(0,1fr)}
+body.modo-voz .app.nav-aberto.recolhido{grid-template-columns:minmax(0,1fr)}
+body.modo-voz .nav:not([hidden]){position:fixed;right:18px;top:62px;width:min(30vw,400px);height:min(30vh,260px);z-index:45;border:1px solid rgba(255,255,255,.14);border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.55);animation:vozEntra .3s ease-out}
+body.modo-voz .nav .nav-barra,body.modo-voz .nav-fav-menu{display:none}

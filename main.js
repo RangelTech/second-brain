@@ -1056,6 +1056,7 @@ app.whenReady().then(() => {
   ipcMain.handle('navegador:reencaixar', () => nav.reencaixar())
   ipcMain.handle('navegador:mostrar', (_e, sim) => nav.mostrar(sim))
   ipcMain.handle('navegador:esconder-temp', (_e, sim) => nav.esconderTemporario(sim))
+  ipcMain.handle('navegador:miniatura', (_e, sim) => nav.miniatura(sim))
   ipcMain.handle('navegador:acao', (_e, { acao, url }) => nav.acao(acao, url).then(() => ({ ok: true })).catch((err) => ({ ok: false, erro: String(err.message || err) })))
   ipcMain.handle('navegador:estado', () => nav.estado())
   // Conexões (spec 37): contas usadas pelo navegador integrado. "Conectado" = cookie de sessão do site na partição do navegador.
@@ -1202,7 +1203,7 @@ app.whenReady().then(() => {
   })
   // Voz ao vivo (spec 52): a tela manda PCM 16 kHz em pedaços; o conector fala com o servidor de transcrição em streaming (troca de
   // conexão a cada 2 min) e o texto ACUMULADO da fala volta por evento. Usado pelo ditado e pela conversa por voz. Falhou ao abrir ou
-  // caiu antes do primeiro texto: a tela volta sozinha ao caminho antigo (ditado:servidor). SB_VOZ_STREAM_URL/CHAVE: só teste local.
+  // caiu antes do primeiro texto: a tela volta sozinha ao caminho antigo (ditado:servidor). SB_VOZ_STREAM_URL/CHAVE: troca o destino (teste).
   const conectorVoz = require('./conector-ditado')
   const vozesVivas = new Map()
   ipcMain.handle('ditado:vivo:abrir', (e, id) => {
@@ -1211,12 +1212,7 @@ app.whenReady().then(() => {
     if (process.env.SB_VOZ_STREAM_URL) {
       url = process.env.SB_VOZ_STREAM_URL
       auth = 'Bearer ' + (process.env.SB_VOZ_STREAM_CHAVE || '')
-    } else {
-      const m = midiaDoApp()
-      if (!m) return { ok: false }
-      url = conectorVoz.urlDoServidor(m.base)
-      auth = 'Bearer ' + m.chave
-    }
+    } else ({ url, auth } = conectorVoz.destinoPadrao()) // direto no 9Router com a chave só de voz (spec 53)
     vozesVivas.get(id)?.fechar()
     const wc = e.sender
     const manda = (tipo, data) => {

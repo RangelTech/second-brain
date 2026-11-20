@@ -146,6 +146,7 @@
         aoDestacado: (fn) => on('navegador:destacado', fn),
         mostrar: (sim) => invoke('navegador:mostrar', sim),
         esconderTemp: (sim) => invoke('navegador:esconder-temp', sim),
+        miniatura: (sim) => invoke('navegador:miniatura', sim),
         acao: (acao, url) => invoke('navegador:acao', { acao, url }),
         estado: () => invoke('navegador:estado'),
         captura: () => invoke('navegador:captura'),
