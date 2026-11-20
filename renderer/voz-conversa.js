@@ -368,7 +368,12 @@
   // ---------- cartões holográficos (spec 53): o que a IA quer MOSTRAR sai do centro do cérebro e para na lateral ----------
   function imagensDoTexto(texto) {
     const out = []
-    for (const m of String(texto || '').matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) out.push({ src: m[2], alt: m[1] || 'Imagem' })
+    // endereço da internet ou ARQUIVO do computador (gráfico que o agente gerou: C:\...\grafico.png, /home/.../x.png, file:///...)
+    for (const m of String(texto || '').matchAll(/!\[([^\]]*)\]\(<?((?:https?|file):\/\/[^)>\s]+|[A-Za-z]:[\\/][^)>]+|\/[^)>\s]+)>?\)/g)) {
+      let src = m[2].trim()
+      if (!/^(https?|file):/i.test(src)) src = 'file:///' + src.replace(/\\/g, '/').replace(/^\/+/, '')
+      out.push({ src: encodeURI(decodeURI(src)), alt: m[1] || 'Imagem', video: /\.(mp4|webm|mov)$/i.test(src) })
+    }
     return out
   }
   function imagensNaTela() {
