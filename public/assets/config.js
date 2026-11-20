@@ -11,7 +11,7 @@ window.BRAIN = {
   checkoutVmAnual: { light: 'https://pay.cakto.com.br/39dosn2', max: 'https://pay.cakto.com.br/36ar3j6', ultra: 'https://pay.cakto.com.br/s2g2trg' },
   termosVersao: '2026-11-10',  // versão dos Termos de uso que o site mostra e o servidor registra no aceite
   checkoutProprio: true,  // true: o botão de compra abre /assinar (pagamento da Cakto dentro do nosso site); false: vai direto para a página da Cakto
-  web: 'https://remoto.rangeltech.net/',
-  api: 'https://qwen.rangeltech.net',
+  web: 'https://app.segundocerebro.pro/',
+  api: 'https://api.segundocerebro.pro',
   repo: 'RangelTech/second-brain',
 }

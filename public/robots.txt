@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /definir-senha/
-Sitemap: https://brain.rangeltech.net/sitemap.xml
+Sitemap: https://segundocerebro.pro/sitemap.xml

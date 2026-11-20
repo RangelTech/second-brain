@@ -1,7 +1,7 @@
 // Plano Free do Cérebro Pro: cadastro, código por e-mail, chat e, quando o uso de demonstração acaba, a tela de planos.
 // Fala só com a API pública /v1/free/* (sem chave de API). O servidor conta e recusa com 402; a tela NÃO mostra contador nem número de perguntas.
 (function () {
-  var API = ((window.BRAIN && window.BRAIN.api) || 'https://qwen.rangeltech.net').replace(/\/+$/, '')
+  var API = ((window.BRAIN && window.BRAIN.api) || 'https://api.segundocerebro.pro').replace(/\/+$/, '')
   var $ = function (id) { return document.getElementById(id) }
   var CH = 'sbfree'
   var sessao = null // { token, email, nome }
@@ -190,7 +190,7 @@
   api('/v1/free/me', undefined, sessao.token).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j } }) })
     .then(function (r) {
       if (r.s !== 200) return sair()
-      if (r.j.paid) { sair(); return ($('e-auth').textContent = 'Você já é assinante: entre pelo aplicativo ou em remoto.rangeltech.net.') }
+      if (r.j.paid) { sair(); return ($('e-auth').textContent = 'Você já é assinante: entre pelo aplicativo ou em app.segundocerebro.pro.') }
       entrou(sessao, r.j)
     })
     .catch(function () { tela('t-auth') })
