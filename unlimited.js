@@ -116,20 +116,23 @@ function criar({ app, cfgGet, cfgSet, cifrar, decifrar, embed, avisar }) {
     },
     reconferir: () => ciclo(),
     // login: devolve {ok} ou {ok:false, codigo, erro} com texto pronto para mostrar
-    entrar: async (email, senha) => {
+    entrar: async (email, senha, extra = {}) => {
       let r
       try {
-        r = await postar('/auth/login', { email: String(email || '').trim(), password: String(senha || ''), device: os.hostname() })
+        r = await postar('/auth/login', { email: String(email || '').trim(), password: String(senha || ''), device: os.hostname(), ...(extra.aceite ? { aceite_termos: true } : {}) })
       } catch {
         return { ok: false, codigo: 'offline', erro: 'Sem conexão com o servidor. Confira a internet e tente de novo.' }
       }
       if (r.status === 200 && r.json?.api_key) {
-        cfgSet({ unlimitedChave: cifrar(r.json.api_key), unlimitedEmail: r.json.account?.email, unlimitedPlano: r.json.plan?.name, unlimitedPacote: r.json.plan?.skill_pack, unlimitedLigado: false, unlimitedRecusado: false })
+        cfgSet({ unlimitedChave: cifrar(r.json.api_key), unlimitedEmail: r.json.account?.email, unlimitedNome: r.json.account?.name || undefined, unlimitedPlano: r.json.plan?.name, unlimitedPacote: r.json.plan?.skill_pack, unlimitedLigado: false, unlimitedRecusado: false, emailConfirmado: r.json.email_confirmed !== false })
         clearTimeout(timer)
         ciclo()
-        return { ok: true, plano: r.json.plan?.name }
+        return { ok: true, plano: r.json.plan?.name, primeiroAcesso: !!r.json.first_access, emailConfirmado: r.json.email_confirmed !== false }
       }
       const codigo = r.json?.error?.code
+      // spec 53: comprou e ainda não tem senha -> a tela vira "crie sua senha" (o servidor pede o aceite dos termos)
+      if (codigo === 'terms_required') return { ok: false, codigo: 'primeiro_acesso', erro: '' }
+      if (codigo === 'weak_password') return { ok: false, codigo, erro: r.json?.error?.message || 'Escolha uma senha mais forte.' }
       const texto = { invalid_credentials: 'E-mail ou senha incorretos.', awaiting_release: 'Sua conta ainda não foi liberada. Avisaremos assim que estiver pronta.',
         subscription_inactive: 'Sua assinatura não está ativa. Renove para continuar.', account_blocked: 'Conta bloqueada. Fale com o suporte.', too_many_attempts: 'Muitas tentativas. Aguarde alguns minutos.' }
       return { ok: false, codigo, erro: texto[codigo] || r.json?.error?.message || `Não consegui entrar (HTTP ${r.status}).` }

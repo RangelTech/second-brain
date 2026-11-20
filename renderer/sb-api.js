@@ -108,7 +108,8 @@
       importarDados: () => invoke('dados:importar'),
       unlimitedEstado: () => invoke('unlimited:estado'),
       unlimitedRecusar: () => invoke('unlimited:recusar'),
-      unlimitedEntrar: (email, senha) => invoke('unlimited:entrar', { email, senha }),
+      unlimitedEntrar: (email, senha, aceite) => invoke('unlimited:entrar', { email, senha, aceite: !!aceite }),
+      reenviarConfirmacao: () => invoke('conta:reenviar-confirmacao'),
       unlimitedEsqueci: (email) => invoke('unlimited:esqueci', email),
       creditos: () => invoke('creditos:opcoes'), // saldos, pacotes de crédito e próximo plano (pop-up de limite estourado)
       contaUso: () => invoke('conta:uso'),

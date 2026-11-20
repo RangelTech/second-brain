@@ -2387,23 +2387,75 @@
     m.textContent = txt || ''
     m.classList.toggle('ok', !!ok)
   }
+  // spec 53 (cadastro direto): quem comprou e ainda não tem senha cria a senha AQUI e já entra. O servidor avisa que é o primeiro acesso;
+  // a tela troca para "crie sua senha" (repetir a senha + termos) sem a pessoa sair do lugar.
+  let primeiroAcesso = false
+  function modoPrimeiroAcesso(sim) {
+    primeiroAcesso = !!sim
+    $('login-primeiro').hidden = !sim
+    $('login-tit').textContent = sim ? 'Bem-vindo! Crie sua senha' : 'Entre no Cérebro Pro'
+    document.querySelector('#login .login-sub').textContent = sim ? 'Sua compra foi aprovada. Escolha uma senha para este e-mail e pronto: você já entra.' : 'Use o e-mail e a senha da sua assinatura.'
+    $('login-senha').setAttribute('autocomplete', sim ? 'new-password' : 'current-password')
+    $('login-senha').placeholder = sim ? 'Crie uma senha (8 caracteres ou mais)' : 'Sua senha'
+    $('login-entrar').textContent = sim ? 'Criar senha e entrar' : 'Entrar'
+  }
+  $('login-email').addEventListener('input', () => primeiroAcesso && modoPrimeiroAcesso(false))
   $('login-form').onsubmit = async (ev) => {
     ev.preventDefault()
     const btn = $('login-entrar')
+    if (primeiroAcesso) {
+      if ($('login-senha').value !== $('login-senha2').value) return loginMsg('As duas senhas não são iguais.', false)
+      if (!$('login-termos').checked) return loginMsg('Para continuar, leia e aceite os Termos de uso.', false)
+    }
+    const rotulo = btn.textContent
     btn.disabled = true
-    btn.textContent = 'Entrando…'
+    btn.textContent = primeiroAcesso ? 'Criando…' : 'Entrando…'
     loginMsg('')
-    const r = await window.sb.unlimitedEntrar($('login-email').value, $('login-senha').value)
+    const r = await window.sb.unlimitedEntrar($('login-email').value, $('login-senha').value, primeiroAcesso)
     btn.disabled = false
-    btn.textContent = 'Entrar'
+    btn.textContent = rotulo
     if (r.ok) {
       $('login-senha').value = ''
+      $('login-senha2').value = ''
+      modoPrimeiroAcesso(false)
       $('login').hidden = true
       cfg = await window.sb.cfg()
       pintarConta()
+      pintarAvisoEmail()
       perguntarAcessoWeb()
+    } else if (r.codigo === 'primeiro_acesso') {
+      modoPrimeiroAcesso(true)
+      loginMsg('Primeiro acesso: repita a senha e aceite os termos.', true)
+      $('login-senha2').focus()
     } else loginMsg(r.erro, false)
   }
+  // e-mail não confirmado: só um aviso discreto no topo (não bloqueia nada); some ao confirmar ou ao fechar
+  async function pintarAvisoEmail() {
+    const el = $('aviso-email')
+    if (!el) return
+    let ok = cfg?.emailConfirmado !== false
+    if (!ok) {
+      try {
+        const p = await window.sb.contaPainel()
+        if (p && p.ok) ok = p.emailConfirmado !== false
+      } catch {}
+    }
+    el.hidden = ok || !cfg?.unlimitedEmail || sessionStorage.getItem('avisoEmailFechado') === '1'
+    if (!el.hidden) $('aviso-email-txt').textContent = `Confirme seu e-mail: mandamos um link para ${cfg.unlimitedEmail}.`
+  }
+  $('aviso-email-fechar').onclick = () => {
+    try { sessionStorage.setItem('avisoEmailFechado', '1') } catch {}
+    $('aviso-email').hidden = true
+  }
+  $('aviso-email-reenviar').onclick = async (e) => {
+    const b = e.currentTarget
+    b.disabled = true
+    const r = await window.sb.reenviarConfirmacao()
+    b.disabled = false
+    if (r && r.confirmado) return ($('aviso-email').hidden = true)
+    $('aviso-email-txt').textContent = r && r.ok ? 'Link enviado. Confira a caixa de entrada (e o spam).' : (r && r.erro) || 'Não consegui mandar agora.'
+  }
+  setTimeout(() => pintarAvisoEmail(), 4000)
   // Depois do primeiro login neste computador: pergunta UMA vez se a pessoa quer acessá-lo pelo celular ou por outro navegador (app.segundocerebro.pro).
   // Não liga sozinho: o acesso remoto dá controle de arquivos e comandos deste computador. Na tela web (remoto) a chamada é bloqueada e nada acontece.
   async function perguntarAcessoWeb() {

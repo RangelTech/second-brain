@@ -1363,7 +1363,19 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('unlimited:estado', () => unl.estado())
   ipcMain.handle('unlimited:recusar', () => unl.recusar())
-  ipcMain.handle('unlimited:entrar', (_e, { email, senha }) => unl.entrar(email, senha))
+  ipcMain.handle('unlimited:entrar', (_e, { email, senha, aceite }) => unl.entrar(email, senha, { aceite }))
+  // spec 53: o e-mail não confirmado só gera um aviso; este botão manda um link novo
+  ipcMain.handle('conta:reenviar-confirmacao', async () => {
+    if (!cfg.unlimitedChave) return { ok: false }
+    try {
+      const r = await fetch((process.env.SB_UNLIMITED_BASE || 'https://api.segundocerebro.pro/v1').replace(/\/+$/, '') + '/auth/reenviar-confirmacao', { method: 'POST', headers: { Authorization: 'Bearer ' + decifrar(cfg.unlimitedChave) }, signal: AbortSignal.timeout(15000) })
+      const j = await r.json().catch(() => ({}))
+      if (j.email_confirmed) (cfg.emailConfirmado = true), salvarCfg()
+      return { ok: r.ok, confirmado: !!j.email_confirmed, erro: r.ok ? '' : j?.error?.message || 'Não consegui mandar agora.' }
+    } catch {
+      return { ok: false, erro: 'Sem conexão com o servidor.' }
+    }
+  })
   ipcMain.handle('unlimited:esqueci', (_e, email) => unl.esqueci(email))
   ipcMain.handle('creditos:opcoes', () => unl.creditos())
   // painel da conta (spec 37): créditos do Estúdio, limites da sessão e da semana, plano e nível de segurança, numa chamada só (barra do chat e aba Cota)
@@ -1378,6 +1390,7 @@ app.whenReady().then(() => {
       ok: true, email: cfg.unlimitedEmail, plano: eu?.plan?.id || cred?.plan || cfg.unlimitedPlano || '', nivel: eu?.safety_level || null,
       sessao: uso?.session || null, semana: uso?.week || null,
       creditos: cred?.balances?.studio ?? null, pacotes: cred?.studio_packs || [], proximo: cred?.next_plan || null, renova: cred?.renews_at || null, gerenciar: cred?.manage_url || null,
+      emailConfirmado: eu ? eu.email_confirmed !== false : cfg.emailConfirmado !== false, nome: eu?.name || cfg.unlimitedNome || '',
     }
   })
   ipcMain.handle('unlimited:sair', () => unl.sair())
