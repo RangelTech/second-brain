@@ -1232,7 +1232,7 @@ app.whenReady().then(() => {
     const wc = e.sender
     const manda = (tipo, data) => {
       try {
-        if (!wc.isDestroyed()) wc.send('ditado:vivo:evento', { id, tipo, data })
+        if (!(wc.isDestroyed && wc.isDestroyed())) wc.send('ditado:vivo:evento', { id, tipo, data })
       } catch {}
     }
     const c = conectorVoz.abrirStream({ url, auth, idioma: 'pt' }, {
@@ -1260,17 +1260,19 @@ app.whenReady().then(() => {
     const m = midiaDoApp()
     if (!m || !id) return { ok: false }
     const wc = e.sender
-    const emitir = (ev) => { try { if (!wc.isDestroyed()) wc.send('voz:cerebro:evento', { id, ...ev }) } catch {} }
-    // medido 20/11: rt-auto 1a palavra ~1,8 s e escolhe bem as ferramentas; o Qwen da casa (~1,6 s) é a reserva se o primeiro falhar
-    const modelo = p.modelo || process.env.SB_VOZ_MODELO || cfg.vozModelo || 'rt-auto'
+    const emitir = (ev) => { try { if (!(wc.isDestroyed && wc.isDestroyed())) wc.send('voz:cerebro:evento', { id, ...ev }) } catch {} }
+    // Qwen da casa primeiro (1,4–3 s, nunca cai); rt-auto (Claude/GPT) só de reserva: no fim de 20/11 ele ficou 16–22 s ou mudo
+    // (limite das contas), e a voz não pode depender disso. Ordem do Lucas: "o limite do Claude não pode deixar sem resposta".
+    const modelo = p.modelo || process.env.SB_VOZ_MODELO || cfg.vozModelo || 'qwen-abliterated'
+    const reserva = modelo === 'qwen-abliterated' ? 'rt-auto' : 'qwen-abliterated'
     let falou = false
     const emitirVigiando = (ev) => { if (ev.tipo === 'delta' || ev.tipo === 'agente' || ev.tipo === 'youtube') falou = true; emitir(ev) }
     const args = (mod) => ({ base: m.base, chave: m.chave, modelo: mod, nome: p.nome || '', historico: Array.isArray(p.historico) ? p.historico : [], texto: p.texto, modo: p.modo })
     cerebroVoz.conversar(args(modelo), emitirVigiando)
       .catch((err) => {
         registrarAgente(app, 'cerebro de voz (' + modelo + '): ' + String((err && err.message) || err).slice(0, 160))
-        if (falou || modelo === 'qwen-abliterated') throw err
-        return cerebroVoz.conversar(args('qwen-abliterated'), emitir)
+        if (falou || modelo === reserva) throw err
+        return cerebroVoz.conversar(args(reserva), emitir)
       })
       .catch((err) => (registrarAgente(app, 'cerebro de voz (reserva): ' + String((err && err.message) || err).slice(0, 160)), emitir({ tipo: 'erro', data: String((err && err.message) || err) })))
     return { ok: true, modelo }
@@ -1284,7 +1286,7 @@ app.whenReady().then(() => {
     const wc = e.sender
     const manda = (tipo, data) => {
       try {
-        if (!wc.isDestroyed()) wc.send('voz:pedaco', { id, tipo, data })
+        if (!(wc.isDestroyed && wc.isDestroyed())) wc.send('voz:pedaco', { id, tipo, data })
       } catch {}
     }
     const ac = new AbortController()
