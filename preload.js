@@ -6,4 +6,6 @@ contextBridge.exposeInMainWorld('__sbRaw', {
   invoke: (canal, ...args) => ipcRenderer.invoke(canal, ...args),
   on: (canal, fn) => ipcRenderer.on(canal, (_e, d) => fn(d)),
   caminhoDe: (arquivo) => webUtils.getPathForFile(arquivo),
+  // sem resposta (fire-and-forget): só o áudio do "Olá cérebro", ~4 pedaços por segundo quando há voz
+  enviar: (canal, d) => { if (canal === 'ativacao:audio') ipcRenderer.send(canal, d) },
 })

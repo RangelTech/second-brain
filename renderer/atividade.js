@@ -190,6 +190,88 @@
     return s
   }
 
+  // Camada WebGL dos BRILHOS (22/11/2026). Medido no PC do Lucas: parado, cada quadro fazia ~770 drawImage (um brilho de 96x96
+  // reescalado por neurônio, poeira e pulso de sinapse) = 7.300 por segundo e ~72% do tempo da tela. Aqui todos os brilhos do
+  // quadro vão para a placa de vídeo numa chamada só (gl.POINTS, soma aditiva como o 'lighter'); o canvas 2D de cima continua
+  // com as ligações, as orbes, os ícones e os textos. Sem WebGL (ou se o contexto cair) volta sozinho para o desenho antigo.
+  function camadaGL(canvas) {
+    try {
+      const pai = canvas.parentElement
+      if (!pai || !pai.classList.contains('cerebro-fundo') || typeof WebGLRenderingContext === 'undefined') return null
+      const c = document.createElement('canvas')
+      c.className = canvas.className
+      c.setAttribute('aria-hidden', 'true')
+      c.dataset.camada = 'brilhos'
+      pai.insertBefore(c, canvas)
+      const gl = c.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, powerPreference: 'low-power' })
+      if (!gl) { c.remove(); return null }
+      const sh = (tipo, src) => {
+        const s = gl.createShader(tipo)
+        gl.shaderSource(s, src)
+        gl.compileShader(s)
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s))
+        return s
+      }
+      const pr = gl.createProgram()
+      gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p;attribute float s;attribute vec4 c;uniform vec2 tela;varying vec4 vc;' +
+        'void main(){vc=c;gl_Position=vec4(p.x/tela.x*2.0-1.0,1.0-p.y/tela.y*2.0,0.0,1.0);gl_PointSize=s;}'))
+      // o mesmo degradê do sprite antigo: centro branco, 12% cor .95, 38% cor .28, borda 0. Alfa negativo = ponto sólido (neurônio do fundo)
+      gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec4 vc;void main(){float a=abs(vc.a);' +
+        'if(vc.a<0.0){gl_FragColor=vec4(vc.rgb*a,a);return;}float d=length(gl_PointCoord*2.0-1.0);if(d>1.0)discard;vec3 col=vc.rgb;float al;' +
+        'if(d<0.12){float k=d/0.12;col=mix(vec3(1.0),vc.rgb,k);al=mix(1.0,0.95,k);}else if(d<0.38){al=mix(0.95,0.28,(d-0.12)/0.26);}' +
+        'else{al=mix(0.28,0.0,(d-0.38)/0.62);}al*=a;gl_FragColor=vec4(col*al,al);}'))
+      gl.linkProgram(pr)
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr))
+      gl.useProgram(pr)
+      const buf = gl.createBuffer()
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+      const N = 7 * 4
+      const aP = gl.getAttribLocation(pr, 'p'), aS = gl.getAttribLocation(pr, 's'), aC = gl.getAttribLocation(pr, 'c')
+      gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 2, gl.FLOAT, false, N, 0)
+      gl.enableVertexAttribArray(aS); gl.vertexAttribPointer(aS, 1, gl.FLOAT, false, N, 8)
+      gl.enableVertexAttribArray(aC); gl.vertexAttribPointer(aC, 4, gl.FLOAT, false, N, 12)
+      const uTela = gl.getUniformLocation(pr, 'tela')
+      gl.enable(gl.BLEND)
+      gl.blendFunc(gl.ONE, gl.ONE)
+      gl.clearColor(0, 0, 0, 0)
+      const cores = new Map()
+      const cor3 = (h) => {
+        let v = cores.get(h)
+        if (!v) { if (cores.size > 400) cores.clear(); const [r, g, b] = rgb(h); v = [r / 255, g / 255, b / 255]; cores.set(h, v) } // transição de cor cria várias; não cresce sem fim
+        return v
+      }
+      let dados = new Float32Array(7 * 2048), n = 0
+      const camada = {
+        vivo: true,
+        max: Math.max(64, (gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE) || [1, 64])[1]),
+        ponto(x, y, s, a, hex, solido) {
+          if (n * 7 + 7 > dados.length) { const d = new Float32Array(dados.length * 2); d.set(dados); dados = d }
+          const [r, g, b] = cor3(hex)
+          const o = n * 7
+          dados[o] = x; dados[o + 1] = y; dados[o + 2] = s; dados[o + 3] = r; dados[o + 4] = g; dados[o + 5] = b; dados[o + 6] = solido ? -a : a
+          n++
+        },
+        desenhar(w, h) {
+          if (c.width !== w || c.height !== h) { c.width = w; c.height = h }
+          gl.viewport(0, 0, w, h)
+          gl.clear(gl.COLOR_BUFFER_BIT)
+          if (n) {
+            gl.uniform2f(uTela, w, h)
+            gl.bufferData(gl.ARRAY_BUFFER, dados.subarray(0, n * 7), gl.STREAM_DRAW)
+            gl.drawArrays(gl.POINTS, 0, n)
+          }
+          n = 0
+        },
+        descartar() { n = 0 },
+      }
+      c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); camada.vivo = false; c.remove() })
+      return camada
+    } catch (e) {
+      try { console.warn('camada WebGL do cérebro indisponível:', e && e.message) } catch {}
+      return null
+    }
+  }
+
   function icone(cx, id, x, y, s, cor, a) {
     cx.save()
     cx.translate(x, y)
@@ -289,8 +371,10 @@
       canvas.width = Math.round(W * dpr)
       canvas.height = Math.round(H * dpr)
     }
+    const gl = semTela || reduzir ? null : camadaGL(canvas)
     const luz = (cor, x, y, r, a) => {
       if (a <= 0.003) return
+      if (gl && gl.vivo && r * 2 * dpr <= gl.max) return gl.ponto(x * dpr, y * dpr, r * 2 * dpr, Math.min(1, a), cor)
       cx.globalAlpha = Math.min(1, a)
       cx.drawImage(sprite(cor), x - r, y - r, r * 2, r * 2)
     }
@@ -322,13 +406,14 @@
       cx.setTransform(dpr, 0, 0, dpr, 0, 0)
       cx.globalCompositeOperation = 'lighter'
       for (const f of ativas) luz(f.cor, f.ix, f.iy, Math.min(W, H) * 0.28, 0.05 * f.liga)
+      const corPoeira = mix('#ffe2a8', '#9fc8ff', kAtivo) // uma vez por quadro (era calculada para cada grão)
       for (const d of M.poeira) {
         if (kAtivo < 0.15 && d.f > 3) continue // parado: menos poeira
         const x = ((d.x + t * d.v * d.z) % 1) * W + Math.sin(t * 0.3 + d.f) * 6 * d.z
         const y = d.y * H + Math.cos(t * 0.25 + d.f) * 5 * d.z
         const borda = Math.min(x, W - x, y, H - y) / 40
         if (borda <= 0) continue
-        luz(mix('#ffe2a8', '#9fc8ff', kAtivo), x, y, 1.2 + d.z * 2.2, (0.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 1.7 + d.f))) * d.z * (0.5 + 0.5 * kAtivo) * Math.min(1, borda))
+        luz(corPoeira, x, y, 1.2 + d.z * 2.2, (0.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 1.7 + d.f))) * d.z * (0.5 + 0.5 * kAtivo) * Math.min(1, borda))
       }
 
       if (!reduzir) yaw += dt * (0.05 + 0.12 * kAtivo)
@@ -497,10 +582,13 @@
         const alfa = (0.16 + prof * 0.5) * (0.55 + pisca * 0.45) + clarao * 0.5
         if (prof < 0.42 && p.calor < 0.03 && clarao < 0.05) {
           // neurônio do fundo do cérebro (quase apagado): um ponto simples, sem o brilho completo (metade do custo do quadro estava aqui)
-          cx.globalAlpha = Math.min(1, alfa * 1.6)
-          cx.fillStyle = corBase
           const q = Math.max(1, r * 0.32)
-          cx.fillRect(p.sx - q / 2, p.sy - q / 2, q, q)
+          if (gl && gl.vivo) gl.ponto(p.sx * dpr, p.sy * dpr, q * dpr, Math.min(1, alfa * 1.6), corBase, true)
+          else {
+            cx.globalAlpha = Math.min(1, alfa * 1.6)
+            cx.fillStyle = corBase
+            cx.fillRect(p.sx - q / 2, p.sy - q / 2, q, q)
+          }
         } else luz(corBase, p.sx, p.sy, r, alfa)
         if (p.calor > 0.03 && prof > 0.35) luz(ferr[p.cor].cor, p.sx, p.sy, r * (1.5 + p.calor * 1.4), p.calor * (0.55 + prof * 0.45))
       }
@@ -624,6 +712,7 @@
 
       cx.globalCompositeOperation = 'source-over'
       cx.globalAlpha = 1
+      if (gl && gl.vivo) gl.desenhar(canvas.width, canvas.height) // todos os brilhos do quadro numa chamada só
     }
 
     function chip() {

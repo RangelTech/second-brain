@@ -1365,6 +1365,16 @@ app.whenReady().then(() => {
     const f = new Float32Array(ab.buffer ? ab.buffer.slice(ab.byteOffset, ab.byteOffset + ab.byteLength) : ab)
     return whisperChamar({ pcm: f.buffer }, [f.buffer])
   })
+  // "Olá cérebro" nativo (ativacao-nativa.js): a janela manda só o áudio com voz; um processo Vosk nativo confere a frase
+  const ativacaoNativa = require('./ativacao-nativa').criar({
+    app, modeloTgz: modeloEmbutido, registrar: (l) => registrarAgente(app, l),
+    aoOuvir: (t) => { try { janela && !janela.isDestroyed() && janela.webContents.send('ativacao:ouvido', t) } catch {} },
+  })
+  app.on('before-quit', () => ativacaoNativa.fechar())
+  ipcMain.handle('ativacao:abrir', (_e, frase) => ativacaoNativa.abrir(frase))
+  ipcMain.handle('ativacao:fechar', () => (ativacaoNativa.fechar(), true))
+  ipcMain.handle('ativacao:estado', () => ativacaoNativa.estado())
+  ipcMain.on('ativacao:audio', (_e, buf) => ativacaoNativa.audio(buf))
   ipcMain.handle('ditado:embutido', () => !!modeloEmbutido())
   ipcMain.handle('ditado:modelo', async () => {
     if (modeloEmbutido()) return fs.readFileSync(modeloEmbutido()) // já vem com o app: nada para baixar
