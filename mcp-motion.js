@@ -44,6 +44,32 @@ function chamar(nome, args) {
     req.end(corpo)
   })
 }
+// Arquivo citado no HTML que não existe vira vídeo PRETO sem erro nenhum. 22/11/2026: um corte gastou 38 min renderizando preto
+// porque o HTML dizia "gta6-reels-base.mp4" e o arquivo era "gta6-reel-base.mp4". Agora falha na hora dizendo qual falta.
+function arquivosQueFaltam(args) {
+  const fs = require('fs'), path = require('path')
+  let html = args.html
+  if (!html && args.arquivo) { try { html = fs.readFileSync(String(args.arquivo), 'utf8') } catch { return [] } }
+  const saida = String(args.saida || '')
+  if (!html || !path.isAbsolute(saida)) return []
+  const base = path.dirname(saida)
+  const refs = new Set()
+  for (const re of [/\b(?:src|data-src|poster|href)\s*=\s*["']([^"']+)["']/gi, /url\(\s*["']?([^"')]+)["']?\s*\)/gi]) {
+    for (const m of html.matchAll(re)) refs.add(m[1].trim())
+  }
+  const faltam = []
+  for (const r of refs) {
+    if (!r || /^(https?:|data:|blob:|#|about:|javascript:|mailto:)/i.test(r)) continue
+    const limpo = decodeURIComponent(r.replace(/^file:\/\/\/?/i, '').split(/[?#]/)[0])
+    const alvo = path.isAbsolute(limpo) ? limpo : path.join(base, limpo)
+    if (!fs.existsSync(alvo)) {
+      let parecidos = []
+      try { const ext = path.extname(limpo).toLowerCase(); parecidos = fs.readdirSync(path.dirname(alvo)).filter((f) => path.extname(f).toLowerCase() === ext).slice(0, 5) } catch {}
+      faltam.push(`"${r}"` + (parecidos.length ? ` (na pasta existem: ${parecidos.join(', ')})` : ''))
+    }
+  }
+  return faltam
+}
 async function tratar(msg) {
   const { id, method, params } = msg
   if (method === 'initialize') return enviar({ jsonrpc: '2.0', id, result: { protocolVersion: params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'motion', version: '1.0.0' } } })
@@ -52,6 +78,8 @@ async function tratar(msg) {
   if (method === 'tools/list') return enviar({ jsonrpc: '2.0', id, result: { tools: FERRAMENTAS.map((f) => ({ name: 'motion_' + f.nome, description: f.desc, inputSchema: f.schema })) } })
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^motion_/, '')
+    const faltam = arquivosQueFaltam(params?.arguments || {})
+    if (faltam.length) return enviar({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text: 'Não renderizei: o HTML usa arquivo(s) que não existem e o vídeo sairia preto: ' + faltam.join('; ') + '. Caminhos relativos partem da pasta do vídeo de saída. Corrija o nome e chame de novo.' }] } })
     try {
       const r = await chamar(nome, params?.arguments || {})
       if (!r.ok) return enviar({ jsonrpc: '2.0', id, result: { isError: true, content: [{ type: 'text', text: r.erro || 'Falhou.' }] } })
