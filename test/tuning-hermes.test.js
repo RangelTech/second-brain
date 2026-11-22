@@ -7,20 +7,20 @@ const path = require('path')
 const { comMemoria, MEMORIA_MARCA } = require('../ponte-llm')
 const { prepararHome } = require('../agent')
 
-test('memória da tarefa vai no FIM da última mensagem (começo intacto para o cache) e não duplica', () => {
+test('memória da tarefa vai no FIM da última mensagem do usuário (nunca no resultado de ferramenta) e não duplica', () => {
   const j = { messages: [{ role: 'system', content: 'S' }, { role: 'user', content: 'pedido' }, { role: 'assistant', content: '', tool_calls: [{ id: '1' }] }, { role: 'tool', content: 'resultado' }], tools: [{}] }
-  const antes = JSON.stringify(j.messages.slice(0, 3))
   comMemoria(j, '- feito: banco\n- falta: chat')
-  assert.equal(JSON.stringify(j.messages.slice(0, 3)), antes)
-  assert.ok(j.messages[3].content.startsWith('resultado'))
-  assert.ok(j.messages[3].content.includes(MEMORIA_MARCA) && j.messages[3].content.includes('falta: chat'))
+  assert.equal(j.messages[0].content, 'S')
+  assert.equal(j.messages[3].content, 'resultado')
+  assert.ok(j.messages[1].content.startsWith('pedido'))
+  assert.ok(j.messages[1].content.includes(MEMORIA_MARCA) && j.messages[1].content.includes('falta: chat'))
   comMemoria(j, 'outra')
-  assert.equal(j.messages[3].content.split(MEMORIA_MARCA).length, 2)
+  assert.equal(j.messages[1].content.split(MEMORIA_MARCA).length, 2)
   const k = { messages: [{ role: 'user', content: [{ type: 'text', text: 'oi' }] }] }
   comMemoria(k, 'x')
   assert.equal(k.messages[0].content.length, 2)
   const a = { messages: [{ role: 'assistant', content: 'r' }] }
-  assert.equal(comMemoria(a, 'x').messages[0].content, 'r') // última do assistente: não mexe
+  assert.equal(comMemoria(a, 'x').messages[0].content, 'r') // sem mensagem do usuário: não mexe
 })
 
 test('config e SOUL: skills de fábrica fora do índice e regra de economia de skills', () => {

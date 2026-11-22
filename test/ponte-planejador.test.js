@@ -22,7 +22,8 @@ test('comPlano vai no FIM da última mensagem (o começo do pedido não muda: ca
   assert.strictEqual(j.messages.filter((m) => m.role === 'system').length, 1)
   assert.ok(j.messages[1].content.startsWith('u') && j.messages[1].content.includes('PLANO DE EXECUÇÃO') && j.messages[1].content.includes('1. fazer'))
   const k = comPlano({ messages: [{ role: 'system', content: 'base' }, { role: 'user', content: 'u' }, { role: 'tool', content: 'ok' }] }, '1. fazer')
-  assert.ok(k.messages[2].content.includes('1. fazer') && !k.messages[1].content.includes('1. fazer'))
+  // com resultado de ferramenta no fim, o plano vai na última mensagem DO USUÁRIO (dentro da ferramenta o modelo ignorava como injeção)
+  assert.ok(k.messages[1].content.includes('1. fazer') && k.messages[2].content === 'ok')
 })
 
 test('ponte pede o plano 1x e reinsere nos passos seguintes do mesmo pedido', async () => {
@@ -46,6 +47,7 @@ test('ponte pede o plano 1x e reinsere nos passos seguintes do mesmo pedido', as
   assert.strictEqual(chamadas, 1)
   assert.ok(!JSON.stringify(recebidos[0]).includes('1. listar a pasta'), '1º passo sai sem plano (não esperou)')
   assert.strictEqual(recebidos[1].messages[0].content, 'base', 'system intacto')
-  assert.ok(recebidos[1].messages.at(-1).content.includes('1. listar a pasta'), 'plano no fim do passo seguinte')
+  assert.ok(recebidos[1].messages[1].content.includes('1. listar a pasta'), 'plano no fim da mensagem do usuário no passo seguinte')
+  assert.strictEqual(recebidos[1].messages.at(-1).content, 'ok', 'resultado da ferramenta intacto')
   ponte.fechar(); destino.close()
 })

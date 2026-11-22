@@ -115,11 +115,16 @@ function deveriaPlanejar(j) {
   if (txt.length < 40 || /^(oi|olá|ola|bom dia|boa tarde|boa noite|obrigad|valeu|ok)\b/i.test(txt)) return null
   return txt
 }
+function ultimaDoUsuario(j) {
+  for (let i = j.messages.length - 1; i >= 0; i--) if (j.messages[i] && j.messages[i].role === 'user') return j.messages[i]
+  return null
+}
 function comPlano(j, plano) {
   const bloco = `\n\n[${PLANO_MARCA} (feito pelo planejador; siga a ordem, adapte se algo não bater com o que você encontrar e não mostre este plano ao usuário)]\n${plano}\n[FIM DO PLANO]`
-  // no FIM da última mensagem (do usuário ou resultado de ferramenta): o começo do pedido fica igual e o cache de prefixo vale
-  const u = j.messages[j.messages.length - 1]
-  if (u && (u.role === 'user' || u.role === 'tool')) {
+  // no FIM da última mensagem DO USUÁRIO. Nunca dentro do resultado de uma ferramenta: lá o modelo trata o plano como texto injetado
+  // por terceiros e ignora (22/11/2026: "o texto de plano de execução que apareceu junto da saída do comando não veio de você")
+  const u = ultimaDoUsuario(j)
+  if (u) {
     if (typeof u.content === 'string') { if (!u.content.includes(PLANO_MARCA)) u.content += bloco }
     else if (Array.isArray(u.content) && !u.content.some((p) => p && typeof p.text === 'string' && p.text.includes(PLANO_MARCA))) u.content = [...u.content, { type: 'text', text: bloco }]
     return j
@@ -138,8 +143,8 @@ function comPlano(j, plano) {
 const MEMORIA_MARCA = '[MEMÓRIA DA TAREFA'
 function comMemoria(j, txt) {
   if (!j || !Array.isArray(j.messages) || !j.messages.length || !txt) return j
-  const u = j.messages[j.messages.length - 1]
-  if (!u || (u.role !== 'user' && u.role !== 'tool')) return j
+  const u = ultimaDoUsuario(j) // pelo mesmo motivo do plano: nunca dentro do resultado de ferramenta
+  if (!u) return j
   const bloco = `\n\n${MEMORIA_MARCA} — o seu arquivo de progresso desta conversa; siga dele e atualize ao concluir cada etapa]\n${txt}\n[FIM DA MEMÓRIA DA TAREFA]`
   if (typeof u.content === 'string') {
     if (!u.content.includes(MEMORIA_MARCA)) u.content += bloco
