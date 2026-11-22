@@ -144,6 +144,10 @@
       ditadoWhisper: (pcm) => invoke('ditado:whisper', pcm),
       ditadoEmbutido: () => invoke('ditado:embutido'),
       ditadoModelo: () => invoke('ditado:modelo'),
+      ativacaoAbrir: (frase) => invoke('ativacao:abrir', frase), // "Olá cérebro" nativo (processo à parte); { ok } ou { ok: false, erro }
+      ativacaoFechar: () => invoke('ativacao:fechar'),
+      ativacaoAudio: extras.enviar ? (buf) => extras.enviar('ativacao:audio', buf) : null, // só o app instalado (fire-and-forget)
+      aoAtivacaoOuvido: (fn) => on('ativacao:ouvido', fn),
       navegador: {
         limites: (l) => invoke('navegador:limites', l),
         destacar: () => invoke('navegador:destacar'),

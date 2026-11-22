@@ -42,6 +42,21 @@
   // uma escuta por vez: o vigia de 1,5 s chamava escutar() de novo enquanto o modelo carregava (~40 s) e abria dezenas de
   // microfones e reconhecedores em paralelo, todos gastando CPU (medido 21/11/2026)
   let abrindo = false
+  // nativo: null = ainda não tentou; true = o processo nativo do app confere a frase (leve); false = WebAssembly na janela (reserva)
+  let nativo = null
+  const confere = (t) => {
+    if (!t || !N(t).includes(N(frase))) return
+    if (Date.now() - ultimo < 4000) return
+    ultimo = Date.now()
+    registrar('frase ouvida: ' + t)
+    disparar()
+  }
+  if (window.sb.aoAtivacaoOuvido) window.sb.aoAtivacaoOuvido((t) => esc && confere(t))
+  const int16 = (f) => {
+    const o = new Int16Array(f.length)
+    for (let i = 0; i < f.length; i++) o[i] = Math.max(-32768, Math.min(32767, f[i] * 32767))
+    return o
+  }
   async function escutar() {
     if (esc || abrindo || !ligado || (window.SBVozConversa && window.SBVozConversa.ativo())) return
     abrindo = true
@@ -49,7 +64,12 @@
   }
   async function abrirEscuta() {
     try {
-      const m = await garantirModelo()
+      if (nativo === null && window.sb.ativacaoAbrir && window.sb.ativacaoAudio) {
+        const r = await window.sb.ativacaoAbrir(frase).catch((e) => ({ ok: false, erro: e && e.message }))
+        nativo = !!(r && r.ok)
+        registrar(nativo ? 'escuta da frase no processo nativo' : 'reconhecedor nativo indisponível (' + ((r && r.erro) || '?') + '); uso o do navegador')
+      }
+      const m = nativo ? null : await garantirModelo()
       if (esc || !ligado || (window.SBVozConversa && window.SBVozConversa.ativo())) return
       const fluxo = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } })
       // 16 kHz direto do navegador: a 48 kHz o reconhecedor (worker WASM) não dava conta em tempo real, ficava 100% ocupado e a
@@ -57,20 +77,15 @@
       const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 })
       // gramática só com a frase (com e sem acento): o reconhecedor nem tenta entender o resto da conversa da casa
       const gram = [...new Set([frase.toLowerCase(), N(frase)])].concat('[unk]')
-      const rec = new m.KaldiRecognizer(ctx.sampleRate, JSON.stringify(gram))
-      const confere = (t) => {
-        if (!t || !N(t).includes(N(frase))) return
-        if (Date.now() - ultimo < 4000) return
-        ultimo = Date.now()
-        registrar('frase ouvida: ' + t)
-        disparar()
-      }
+      const rec = nativo ? null : new m.KaldiRecognizer(ctx.sampleRate, JSON.stringify(gram))
       // Só manda áudio ao reconhecedor quando tem voz, e nunca deixa fila: o worker do Vosk responde 1 evento por pedaço; com mais
       // de 2 pedaços sem resposta o áudio novo é descartado. Silêncio (quase o tempo todo) não custa nada.
       let pendentes = 0
       const volta = () => { if (pendentes > 0) pendentes-- }
-      rec.on('result', (msg) => (volta(), confere(msg && msg.result && msg.result.text)))
-      rec.on('partialresult', (msg) => (volta(), confere(msg && msg.result && msg.result.partial)))
+      if (rec) {
+        rec.on('result', (msg) => (volta(), confere(msg && msg.result && msg.result.text)))
+        rec.on('partialresult', (msg) => (volta(), confere(msg && msg.result && msg.result.partial)))
+      }
       const src = ctx.createMediaStreamSource(fluxo)
       const proc = ctx.createScriptProcessor(4096, 1, 1) // 4096 a 16 kHz = 256 ms por pedaço
       let piso = 0.004 // ruído de fundo, aprendido devagar
@@ -89,6 +104,12 @@
           else piso = piso * 0.95 + rms * 0.05
           const copia = new Float32Array(d)
           if (agora > falaAte) return void (anterior = copia)
+          if (nativo) { // processo nativo: manda o pedaço e pronto (ele dá conta em tempo real; sem fila na janela)
+            if (anterior) { window.sb.ativacaoAudio(int16(anterior)); anterior = null }
+            envios++
+            window.sb.ativacaoAudio(int16(copia))
+            return
+          }
           if (pendentes > 2 && agora - ultEnvio < 3) return
           if (pendentes > 2) pendentes = 0 // sem resposta há 3 s: não fica surdo por causa da conta
           ultEnvio = agora
@@ -129,7 +150,11 @@
     const mudou = nova !== frase
     frase = nova
     ligado = !!c.ativacaoLigada && !window.__sbWeb // na web (navegador remoto) não: lá quem escuta é o computador
-    if (!ligado || mudou) soltar()
+    if (!ligado || mudou) {
+      soltar()
+      if (nativo && window.sb.ativacaoFechar) window.sb.ativacaoFechar().catch(() => {}) // libera o processo (ou reabre com a frase nova)
+      nativo = null
+    }
     if (ligado) escutar()
   }
   // a conversa por voz pega o microfone; quando ela fecha, a escuta da frase volta
@@ -140,6 +165,6 @@
     else if (!conversa && !esc) escutar()
   }, 1500)
 
-  window.SBAtivacao = { reconfigurar, estado: () => ({ ligado, frase, escutando: !!esc, modelo: !!modelo, envios, medida }), testar: (t) => N(t).includes(N(frase)) }
+  window.SBAtivacao = { reconfigurar, estado: () => ({ ligado, frase, escutando: !!esc, nativo, modelo: !!modelo, envios, medida }), testar: (t) => N(t).includes(N(frase)) }
   setTimeout(reconfigurar, 3000)
 })()
