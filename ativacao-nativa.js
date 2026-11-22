@@ -37,12 +37,18 @@ alvo_pal = gram[0].split()
 LIM = 0.5
 print(json.dumps({'pronto': True}), flush=True)
 entrada = sys.stdin.buffer
+desde = 0
 while True:
     b = entrada.read(4096 * 2)
     if not b:
         break
     if not rec.AcceptWaveform(b):
+        desde += len(b)
+        if desde > 16000 * 2 * 30:  # fala contínua sem fim de frase: zera para a memória não crescer (~1 MB/s, medido)
+            rec.Reset()
+            desde = 0
         continue
+    desde = 0
     ws = json.loads(rec.Result()).get('result') or []
     pal = [w.get('word', '') for w in ws]
     # a frase ABRE a fala (quem chama o assistente começa por ela); "[unk] olá cérebro" é a palavra no meio de uma conversa:
@@ -94,25 +100,45 @@ function criar({ app, modeloTgz, registrar = () => {}, aoOuvir = () => {} }) {
     return prontoP
   }
 
-  function fechar() {
+  // SOB DEMANDA (22/11/2026): o Vosk ocupa ~500 MB com o modelo carregado (i-vector ~270 MB + grafo ~150 MB, medido) e o Kaldi não
+  // devolve a memória ao Windows ao liberar o modelo. Então o processo só existe enquanto há voz no ambiente: em silêncio ele
+  // é ENCERRADO (0 MB); quando a janela manda áudio com voz, ele sobe em ~1 s (carregar = 0,5 s, medido) e o áudio que chegou
+  // nesse meio-tempo fica guardado e é entregue assim que ele fica pronto. Assim o "olá" do começo da frase não se perde.
+  const SILENCIO_MS = 20000
+  const FILA_MAX = 32000 * 6 // até ~6 s de áudio guardado enquanto o processo sobe
+  let pronto = false, subindo = null, fila = [], filaBytes = 0, ultimoAudio = 0, vigia = null, script = '', tgz = ''
+
+  function fechar(esquecer = true) {
     const f = filho
     filho = null
-    gramAtual = ''
+    pronto = false
+    subindo = null
+    fila = []
+    filaBytes = 0
+    if (esquecer) { gramAtual = ''; clearInterval(vigia); vigia = null }
     if (f) try { f.stdin.end(); f.kill() } catch {}
   }
 
-  async function abrir(frase) {
-    const gram = JSON.stringify([...new Set([String(frase).toLowerCase(), String(frase).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()])].concat('[unk]'))
-    if (filho && gramAtual === gram) return { ok: true }
-    fechar()
-    if (!(await preparar()) || !modeloTgz()) return { ok: false, erro: falhou || 'sem modelo' }
-    const script = path.join(raiz, 'escuta.py')
-    try { if (!fs.existsSync(script) || fs.readFileSync(script, 'utf8') !== ESCUTA_PY) fs.writeFileSync(script, ESCUTA_PY) } catch {}
-    const f = spawn(py, [script, modeloTgz(), raiz, gram], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1' } })
+  // o modelo vem DENTRO do pacote do app (app.asar), que o Python não abre: copia para fora uma vez (fs do Electron lê o asar)
+  function modeloFora() {
+    const alvo = path.join(raiz, 'vosk-model-pt.tar.gz')
+    const origem = modeloTgz()
+    if (!origem) return ''
+    try {
+      const pronto = fs.existsSync(path.join(raiz, 'modelo', 'final.mdl')) || fs.existsSync(path.join(raiz, 'modelo', 'am', 'final.mdl'))
+      if (pronto) return alvo
+      if (!fs.existsSync(alvo) || fs.statSync(alvo).size !== fs.statSync(origem).size) fs.writeFileSync(alvo, fs.readFileSync(origem))
+      return alvo
+    } catch (e) { falhou = 'modelo: ' + e.message; return '' }
+  }
+
+  function subir() {
+    if (subindo || filho) return subindo
+    const f = spawn(py, [script, tgz, raiz, gramAtual], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PYTHONUTF8: '1' } })
     filho = f
-    gramAtual = gram
+    pronto = false
     let resto = ''
-    const pronto = new Promise((res) => {
+    subindo = new Promise((res) => {
       f.stdout.on('data', (d) => {
         resto += d
         const linhas = resto.split('\n')
@@ -120,31 +146,63 @@ function criar({ app, modeloTgz, registrar = () => {}, aoOuvir = () => {} }) {
         for (const l of linhas) {
           try {
             const j = JSON.parse(l)
-            if (j.pronto) res(true)
+            if (j.pronto) {
+              pronto = true
+              for (const b of fila) try { f.stdin.write(b) } catch {}
+              fila = []
+              filaBytes = 0
+              res(true)
+            }
             if (j.texto) aoOuvir(j.texto)
             if (j.visto) registrar('ativação ouviu: ' + j.visto.map((w) => w[0] + ' ' + w[1]).join(', '))
           } catch {}
         }
       })
-      f.on('close', () => { if (filho === f) { filho = null; gramAtual = '' } res(false) })
+      f.on('close', () => { if (filho === f) { filho = null; pronto = false; subindo = null } res(false) })
       setTimeout(() => res(false), 120000)
     })
     f.stderr.on('data', () => {})
     f.stdin.on('error', () => {})
-    const r = await pronto
-    if (!r) { fechar(); return { ok: false, erro: 'o reconhecedor nativo não abriu' } }
-    registrar('ativação nativa escutando (pid ' + f.pid + ')')
+    return subindo
+  }
+
+  async function abrir(frase) {
+    const gram = JSON.stringify([...new Set([String(frase).toLowerCase(), String(frase).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()])].concat('[unk]'))
+    if (gramAtual === gram && script) return { ok: true }
+    fechar()
+    if (!(await preparar())) return { ok: false, erro: falhou || 'sem python' }
+    tgz = modeloFora()
+    if (!tgz) return { ok: false, erro: falhou || 'sem modelo' }
+    script = path.join(raiz, 'escuta.py')
+    try { if (!fs.existsSync(script) || fs.readFileSync(script, 'utf8') !== ESCUTA_PY) fs.writeFileSync(script, ESCUTA_PY) } catch {}
+    gramAtual = gram
+    // 1ª vez: sobe uma vez para extrair o modelo e provar que funciona; depois encerra e só volta quando houver voz
+    const ok1 = await subir()
+    if (!ok1) { fechar(); return { ok: false, erro: 'o reconhecedor nativo não abriu' } }
+    registrar('ativação nativa pronta (sob demanda: sobe com voz, encerra após ' + SILENCIO_MS / 1000 + ' s de silêncio)')
+    ultimoAudio = Date.now()
+    clearInterval(vigia)
+    vigia = setInterval(() => { if (filho && Date.now() - ultimoAudio > SILENCIO_MS) fechar(false) }, 5000)
     return { ok: true }
   }
 
   // pedaço de áudio com voz: Int16 mono 16 kHz
   function audio(buf) {
-    if (!filho || !buf) return false
-    try { filho.stdin.write(Buffer.from(buf.buffer ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) : buf)) } catch { return false }
+    if (!gramAtual || !buf) return false
+    const b = Buffer.from(buf.buffer ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) : buf)
+    ultimoAudio = Date.now()
+    if (filho && pronto) {
+      try { filho.stdin.write(b) } catch { return false }
+      return true
+    }
+    fila.push(b)
+    filaBytes += b.length
+    while (filaBytes > FILA_MAX && fila.length > 1) filaBytes -= fila.shift().length
+    subir()
     return true
   }
 
-  return { abrir, fechar, audio, estado: () => ({ vivo: !!filho, pid: filho && filho.pid, falhou }) }
+  return { abrir, fechar, audio, estado: () => ({ vivo: !!filho, pronto, pid: filho && filho.pid, falhou, sobDemanda: true }) }
 }
 
 module.exports = { criar }

@@ -92,6 +92,10 @@
       let falaAte = 0
       let anterior = null // o pedaço (256 ms) de antes da voz começar: o "Olá" não pode ficar de fora
       let ultEnvio = 0
+      // Filtro de "começo de fala" (22/11/2026): quem chama o assistente começa pela frase depois de uma pausa. Só os primeiros
+      // 3,2 s depois de uma pausa de 0,5 s vão ao reconhecedor; fala corrida (TV, curso tocando, conversa) não mantém o processo
+      // nativo carregado. Medido antes: em ambiente com som contínuo a janela mandava ~100% do tempo e ele nunca descansava.
+      let quietoDesde = 0, janelaAte = -1, fechouJanela = true
       proc.onaudioprocess = (e) => {
         try {
           const d = e.inputBuffer.getChannelData(0)
@@ -100,11 +104,24 @@
           const rms = Math.sqrt(s / (d.length / 4))
           medida = { sr: ctx.sampleRate, n: d.length, rms: +rms.toFixed(4), piso: +piso.toFixed(4), pendentes }
           const agora = ctx.currentTime
-          if (rms > Math.max(0.012, piso * 3)) falaAte = agora + 1.2
-          else piso = piso * 0.95 + rms * 0.05
+          const voz = rms > Math.max(0.012, piso * 3)
+          if (voz) {
+            if (quietoDesde && agora - quietoDesde >= 0.5) { janelaAte = agora + 3.2; fechouJanela = false }
+            quietoDesde = 0
+            falaAte = agora + 1.2
+          } else {
+            piso = piso * 0.95 + rms * 0.05
+            if (!quietoDesde) quietoDesde = agora
+          }
           const copia = new Float32Array(d)
           if (agora > falaAte) return void (anterior = copia)
           if (nativo) { // processo nativo: manda o pedaço e pronto (ele dá conta em tempo real; sem fila na janela)
+            if (agora > janelaAte) {
+              // fim da janela no meio da fala: 0,6 s de silêncio para o reconhecedor fechar a frase e dar o resultado final
+              if (!fechouJanela) { fechouJanela = true; window.sb.ativacaoAudio(new Int16Array(9600)) }
+              anterior = copia
+              return
+            }
             if (anterior) { window.sb.ativacaoAudio(int16(anterior)); anterior = null }
             envios++
             window.sb.ativacaoAudio(int16(copia))
