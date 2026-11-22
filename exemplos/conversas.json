@@ -1,44 +1,126 @@
 [
-  {
-    "id": "exemplo-animacao",
-    "titulo": "Vídeo animado com narração",
-    "msgs": [
-      { "role": "user", "content": "Quero um vídeo animado com narrador, estilo canal de curiosidades, explicando por que o céu é azul. Uns 25 segundos, formato de Reels. Pode escolher tudo você." },
-      { "role": "assistant", "content": "Pronto! Fiz um vídeo vertical de 27 segundos, no estilo canal de curiosidades:\n\n- **Roteiro** em 6 cenas: a luz do Sol, as cores escondidas nela, o espalhamento no ar, por que o azul vence e por que o pôr do sol fica laranja.\n- **Narração** com voz natural em português, sincronizada com as cenas.\n- **Animação** com fundo escuro, partículas de luz e legendas grandes, prontas para o celular.\n\nO arquivo está abaixo. Quer que eu faça uma versão com a sua voz, mude a duração ou crie uma série com outros temas (por que o mar é salgado, por que a Lua muda de forma)?", "midias": ["{EXEMPLOS}/animacao-ceu-azul.mp4"] },
-      { "role": "user", "content": "Ficou ótimo. O que você não consegue fazer?" },
-      { "role": "assistant", "content": "Boa pergunta. Algumas coisas que eu **não** faço:\n\n- **Ligar para alguém** por telefone (mas mando mensagem no WhatsApp e no Instagram).\n- **Entrar em contas sem o seu login**: você entra uma vez no navegador integrado e eu passo a usar.\n- **Decidir por você em assunto médico, jurídico ou financeiro sério**: eu pesquiso e explico, mas a decisão final é sua ou de um profissional.\n- **Garantir informação de hoje sem pesquisar**: quando o assunto muda rápido (preço, notícia, horário), eu procuro na internet antes de responder.\n\nTodo o resto (vídeo, imagem, voz, sites, planilhas, organizar arquivos, responder clientes, tarefas agendadas) é só pedir." }
+ {
+  "id": "exemplo-cortes",
+  "titulo": "Cortes automáticos de um podcast",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "faz 3 cortes pra reels desse vídeo https://www.youtube.com/watch?v=WxPzsdKDcig"
+   },
+   {
+    "role": "assistant",
+    "content": "Pronto! Analisei o episódio inteiro (2h35) e separei os 3 momentos mais fortes, cada um com um assunto diferente. Todos em 9:16, com legenda palavra por palavra, título-gancho, barra de progresso e crédito ao canal.\n\n**Corte 1** (52 s): CIA AVISOU O PUTIN E ELE FEZ MESMO\n**Corte 2** (54 s, abaixo): EUROPA ESTÁ PEDINDO COMIDA ESTOCADA\n**Corte 3** (54 s): GRETA JÁ TRANSCENDEU PRO IDEOLOGIA\n\n**Legenda do post (corte 2):** Governos europeus estão alertando a população para estocar comida e se preparar. O que ninguém está falando. #europa #geopolitica #podcast @Flow Podcast\n\nLevei uns 6 minutos. Quer a versão de mais de 1 minuto para monetizar no TikTok, ou o @ do seu canal no vídeo? Dica: poste com o crédito do canal original e, se puder, com a autorização dele.",
+    "midias": [
+     "{EXEMPLOS}/corte-podcast-reels.mp4"
     ]
-  },
-  {
-    "id": "exemplo-imagem",
-    "titulo": "Editar uma foto",
-    "msgs": [
-      { "role": "user", "content": "Mantém a mesma xícara, a mesa e a luz, mas coloca um croissant num pratinho ao lado e um pouco de vapor saindo do café.", "midias": ["{EXEMPLOS}/cafe-original.jpg"] },
-      { "role": "assistant", "content": "Feito! Mantive a caneca, a mesa de madeira, a janela e a luz dourada da manhã, e acrescentei um pratinho com croissant ao lado e o vapor subindo do café. Conferi a imagem: o croissant ficou com sombra e reflexo coerentes com a luz da janela.\n\nPosso também trocar o fundo, deixar a foto pronta para um post (quadrada ou vertical), escrever um título por cima ou criar outras versões para um cardápio.", "midias": ["{EXEMPLOS}/cafe-editado.jpg"] }
+   }
+  ]
+ },
+ {
+  "id": "exemplo-voz-conversa",
+  "titulo": "Conversa por voz",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "Como eu converso com você por voz, sem digitar?"
+   },
+   {
+    "role": "assistant",
+    "content": "É bem simples, tem dois jeitos:\n\n1. **Botão de conversa por voz** (o das barrinhas, ao lado do microfone): clique e fale normalmente. Eu respondo falando, como numa ligação, e você pode me interromper a qualquer momento. Para encerrar, diga \"pode fechar\" ou clique de novo.\n2. **\"Olá cérebro\"**: em Configurações > Agente, ligue **Chamar por voz**. Aí é só falar \"Olá cérebro\" (ou a frase que você escolher) e a conversa abre sozinha, mesmo com o app minimizado. A frase é reconhecida aqui no seu computador, sem mandar áudio para a internet.\n\nNa voz eu também faço tudo: pesquiso a cotação do dólar ou o clima na hora, abro sites, mando mensagem e começo tarefas grandes (um corte, um vídeo) enquanto a gente conversa.\n\nQuer testar? Clique no botão das barrinhas e pergunte: \"quanto está o dólar hoje?\""
+   }
+  ]
+ },
+ {
+  "id": "exemplo-animacao",
+  "titulo": "Vídeo animado com narração",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "Quero um vídeo animado com narrador, estilo canal de curiosidades, explicando por que o céu é azul. Uns 25 segundos, formato de Reels. Pode escolher tudo você."
+   },
+   {
+    "role": "assistant",
+    "content": "Pronto! Fiz um vídeo vertical de 27 segundos, no estilo canal de curiosidades:\n\n- **Roteiro** em 6 cenas: a luz do Sol, as cores escondidas nela, o espalhamento no ar, por que o azul vence e por que o pôr do sol fica laranja.\n- **Narração** com voz natural em português, sincronizada com as cenas.\n- **Animação** com fundo escuro, partículas de luz e legendas grandes, prontas para o celular.\n\nO arquivo está abaixo. Quer que eu faça uma versão com a sua voz, mude a duração ou crie uma série com outros temas (por que o mar é salgado, por que a Lua muda de forma)?",
+    "midias": [
+     "{EXEMPLOS}/animacao-ceu-azul.mp4"
     ]
-  },
-  {
-    "id": "exemplo-voz",
-    "titulo": "Voz natural e voz clonada",
-    "msgs": [
-      { "role": "user", "content": "Grava uma locução curta apresentando o Cérebro Pro, com voz natural." },
-      { "role": "assistant", "content": "Aqui está a locução, com a voz natural em português (feminina). Também tenho voz masculina.\n\nO que mais dá para fazer com voz:\n\n- **Ouvir as minhas respostas**: clique no ícone de alto-falante embaixo de qualquer resposta.\n- **Voz clonada**: me mande 1 a 3 minutos de áudio limpo de quem vai falar e eu leio qualquer texto com aquela voz.\n- **Trocar a voz de um vídeo** mantendo o ritmo e a emoção da fala original.\n- **Dublar** um vídeo para outro idioma com a voz do próprio locutor.", "midias": ["{EXEMPLOS}/narracao-voz-natural.mp3"] }
+   },
+   {
+    "role": "user",
+    "content": "Ficou ótimo. O que você não consegue fazer?"
+   },
+   {
+    "role": "assistant",
+    "content": "Boa pergunta. Algumas coisas que eu **não** faço:\n\n- **Ligar para alguém** por telefone (mas mando mensagem no WhatsApp e no Instagram).\n- **Entrar em contas sem o seu login**: você entra uma vez no navegador integrado e eu passo a usar.\n- **Decidir por você em assunto médico, jurídico ou financeiro sério**: eu pesquiso e explico, mas a decisão final é sua ou de um profissional.\n- **Garantir informação de hoje sem pesquisar**: quando o assunto muda rápido (preço, notícia, horário), eu procuro na internet antes de responder.\n\nTodo o resto (vídeo, imagem, voz, sites, planilhas, organizar arquivos, responder clientes, tarefas agendadas) é só pedir."
+   }
+  ]
+ },
+ {
+  "id": "exemplo-imagem",
+  "titulo": "Editar uma foto",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "Mantém a mesma xícara, a mesa e a luz, mas coloca um croissant num pratinho ao lado e um pouco de vapor saindo do café.",
+    "midias": [
+     "{EXEMPLOS}/cafe-original.jpg"
     ]
-  },
-  {
-    "id": "exemplo-atendimento",
-    "titulo": "WhatsApp respondendo sozinho",
-    "msgs": [
-      { "role": "user", "content": "Quero que meu WhatsApp responda sozinho os clientes da minha loja de açaí (Açaí da Vila, entrega R$ 5, aberto das 14h às 23h). Liga em modo de teste, sem enviar nada de verdade." },
-      { "role": "assistant", "content": "Pronto, o atendimento automático da **Açaí da Vila** está ligado em **modo de teste**: eu leio as mensagens novas e escrevo a resposta só no histórico, sem enviar nada.\n\n**Como está configurado**\n- Confiro o WhatsApp a cada **10 segundos** e respondo em 1 a 5 segundos.\n- Tom simpático, com as informações da loja: entrega R$ 5, aberto das 14h às 23h.\n- Não respondo grupos, figurinhas nem mensagens de \"ok\".\n- Se pedirem para falar com uma pessoa, digo que você responde em instantes.\n\n**Teste que acabei de fazer**\n> Cliente: Oi, vocês entregam no Centro? Quanto fica?\n> Resposta (simulada): Oi! Entregamos sim no Centro 😊 A taxa de entrega é R$ 5 e estamos abertos das 14h às 23h. Quer ver o cardápio?\n\nQuando gostar das respostas, é só me dizer \"pode enviar de verdade\". Você acompanha tudo em **Configurações > Workflows**, onde também dá para mudar as instruções ou desligar." }
+   },
+   {
+    "role": "assistant",
+    "content": "Feito! Mantive a caneca, a mesa de madeira, a janela e a luz dourada da manhã, e acrescentei um pratinho com croissant ao lado e o vapor subindo do café. Conferi a imagem: o croissant ficou com sombra e reflexo coerentes com a luz da janela.\n\nPosso também trocar o fundo, deixar a foto pronta para um post (quadrada ou vertical), escrever um título por cima ou criar outras versões para um cardápio.",
+    "midias": [
+     "{EXEMPLOS}/cafe-editado.jpg"
     ]
-  },
-  {
-    "id": "exemplo-site",
-    "titulo": "Site de um produto",
-    "msgs": [
-      { "role": "user", "content": "Cria um site de lançamento para um perfume chamado Âmbar Nº 7, bem elegante, com o frasco girando em 3D." },
-      { "role": "assistant", "content": "Criei o site do **Âmbar Nº 7**: página escura e elegante, com o frasco em 3D girando sobre um pedestal enquanto a pessoa rola a tela, textos curtos sobre as notas do perfume e um botão \"Quero conhecer\" no topo.\n\nO site já está na sua pasta de trabalho, em **Sites/perfume-ambar**. Abra o arquivo index.html para ver no navegador.\n\nPosso colocar o link de compra, trocar as cores, criar uma versão em inglês ou publicar o site na internet com um endereço próprio.", "midias": ["{EXEMPLOS}/site-perfume.jpg"] }
+   }
+  ]
+ },
+ {
+  "id": "exemplo-voz",
+  "titulo": "Voz natural e voz clonada",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "Grava uma locução curta apresentando o Cérebro Pro, com voz natural."
+   },
+   {
+    "role": "assistant",
+    "content": "Aqui está a locução, com a voz natural em português (feminina). Também tenho voz masculina.\n\nO que mais dá para fazer com voz:\n\n- **Ouvir as minhas respostas**: clique no ícone de alto-falante embaixo de qualquer resposta.\n- **Voz clonada**: me mande 1 a 3 minutos de áudio limpo de quem vai falar e eu leio qualquer texto com aquela voz.\n- **Trocar a voz de um vídeo** mantendo o ritmo e a emoção da fala original.\n- **Dublar** um vídeo para outro idioma com a voz do próprio locutor.",
+    "midias": [
+     "{EXEMPLOS}/narracao-voz-natural.mp3"
     ]
-  }
+   }
+  ]
+ },
+ {
+  "id": "exemplo-atendimento",
+  "titulo": "WhatsApp respondendo sozinho",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "Quero que meu WhatsApp responda sozinho os clientes da minha loja de açaí (Açaí da Vila, entrega R$ 5, aberto das 14h às 23h). Liga em modo de teste, sem enviar nada de verdade."
+   },
+   {
+    "role": "assistant",
+    "content": "Pronto, o atendimento automático da **Açaí da Vila** está ligado em **modo de teste**: eu leio as mensagens novas e escrevo a resposta só no histórico, sem enviar nada.\n\n**Como está configurado**\n- Confiro o WhatsApp a cada **10 segundos** e respondo em 1 a 5 segundos.\n- Tom simpático, com as informações da loja: entrega R$ 5, aberto das 14h às 23h.\n- Não respondo grupos, figurinhas nem mensagens de \"ok\".\n- Se pedirem para falar com uma pessoa, digo que você responde em instantes.\n\n**Teste que acabei de fazer**\n> Cliente: Oi, vocês entregam no Centro? Quanto fica?\n> Resposta (simulada): Oi! Entregamos sim no Centro 😊 A taxa de entrega é R$ 5 e estamos abertos das 14h às 23h. Quer ver o cardápio?\n\nQuando gostar das respostas, é só me dizer \"pode enviar de verdade\". Você acompanha tudo em **Configurações > Workflows**, onde também dá para mudar as instruções ou desligar."
+   }
+  ]
+ },
+ {
+  "id": "exemplo-site",
+  "titulo": "Site de um produto",
+  "msgs": [
+   {
+    "role": "user",
+    "content": "Cria um site de lançamento para um perfume chamado Âmbar Nº 7, bem elegante, com o frasco girando em 3D."
+   },
+   {
+    "role": "assistant",
+    "content": "Criei o site do **Âmbar Nº 7**: página escura e elegante, com o frasco em 3D girando sobre um pedestal enquanto a pessoa rola a tela, textos curtos sobre as notas do perfume e um botão \"Quero conhecer\" no topo.\n\nO site já está na sua pasta de trabalho, em **Sites/perfume-ambar**. Abra o arquivo index.html para ver no navegador.\n\nPosso colocar o link de compra, trocar as cores, criar uma versão em inglês ou publicar o site na internet com um endereço próprio.",
+    "midias": [
+     "{EXEMPLOS}/site-perfume.jpg"
+    ]
+   }
+  ]
+ }
 ]

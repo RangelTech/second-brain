@@ -2,21 +2,28 @@
 // Abre sozinho uma vez por versão do tour (localStorage) e pelo botão "Ver o tour" (window.SBTour.abrir()).
 // Passo cujo elemento não existe ou está escondido (web no celular, menu recolhido) vira balão no centro.
 ;(() => {
-  const VERSAO = 1
+  const VERSAO = 2 // 22/11/2026: tour refeito (voz, Olá cérebro, cortes automáticos, workflows, memória, acesso pelo celular)
   const CHAVE = 'sb.tourVisto'
-  const PASSOS = [
-    { titulo: 'Bem-vindo ao Cérebro Pro', texto: 'Eu sou seu assistente que lembra de tudo e faz de tudo por você. Em um minuto eu te mostro onde fica cada coisa.', icone: '🧠' },
+  const cfg = (aba) => () => window.SBConfig && window.SBConfig.abrir(aba)
+  const TODOS = [
+    { titulo: 'Bem-vindo ao Cérebro Pro', texto: 'Eu sou seu assistente que lembra de tudo e faz de tudo por você: vídeos, cortes, imagens, voz, sites, atendimento e tarefas no computador. Em um minuto eu te mostro onde fica cada coisa.', icone: '🧠' },
     { alvo: '#texto', titulo: 'É só pedir', texto: 'Escreva aqui o que você precisa, do jeito que falaria com uma pessoa. Eu leio arquivos, pesquiso na internet, mexo no computador e entrego pronto.' },
-    { alvo: '#microfone', titulo: 'Fale em vez de digitar', texto: 'Clique no microfone e fale. O texto vai aparecendo enquanto você fala. Clique de novo para terminar.' },
+    { alvo: '#voz-conversa', titulo: 'Converse comigo por voz', texto: 'Clique aqui e fale normalmente: eu respondo falando, como numa ligação. Pode me interromper a qualquer momento. Cotação, clima ou notícia eu pesquiso na hora antes de responder.' },
+    { alvo: '#abrir-config', titulo: 'Diga "Olá cérebro"', texto: 'Ligue "Chamar por voz" e é só falar "Olá cérebro" (ou a frase que você escolher) para a conversa por voz abrir sozinha, mesmo com o app minimizado. A frase é reconhecida no seu computador.', acao: { rotulo: 'Ligar agora', fazer: cfg('agente') }, so: 'desktop' },
+    { alvo: '#microfone', titulo: 'Ditar em vez de digitar', texto: 'Prefere ditar a mensagem? Clique no microfone, fale e clique de novo: o texto aparece na caixa para você conferir antes de enviar.' },
     { alvo: '#anexar', titulo: 'Mande arquivos', texto: 'Anexe PDF, planilha, foto, áudio ou vídeo. Eu leio, resumo, edito e respondo sobre eles.' },
-    { alvo: '#modelo', titulo: 'Nossa IA Unlimited', texto: 'Já vem com a nossa IA Unlimited, que responde tudo, sem frescura. Use com responsabilidade: ela não recusa pedidos, então confira bem o que você pede e o que ela entrega.' },
-    { alvo: '#abrir-config', titulo: 'Conecte outras IAs', texto: 'Em Configurações > Provedores você conecta outras IAs. Tem assinatura do Claude Code, ChatGPT ou Gemini? Conecte e eu fico ainda mais esperto.', acao: { rotulo: 'Ver provedores', fazer: () => window.SBConfig && window.SBConfig.abrir('prov') } },
-    { alvo: '#abrir-config', titulo: 'Monte um combo', texto: 'Um combo junta IAs: uma planeja (por exemplo o Claude) e outra executa sem limite (a Unlimited). Se uma falhar, a próxima assume. Fica em Configurações > Combos.', acao: { rotulo: 'Ver combos', fazer: () => window.SBConfig && window.SBConfig.abrir('combo') } },
-    { titulo: 'O que eu faço', icone: '✨', lista: ['🎬 Vídeos e animações com narração', '🖼️ Imagens e edição de fotos', '🎙️ Voz natural, voz clonada e dublagem', '💬 Atendimento automático no WhatsApp e Instagram', '⏰ Tarefas agendadas (relatório, lembrete, vigiar um site)', '🌐 Sites e páginas prontos para publicar'] },
-    { alvo: '#lista', titulo: 'Veja exemplos prontos', texto: 'Deixei algumas conversas de exemplo aqui na lateral, marcadas como "Exemplo". Abra para ver o que eu já fiz. Você pode apagar quando quiser.' },
-    { alvo: '#abrir-nav', titulo: 'Navegador integrado', texto: 'Eu uso este navegador para entrar em sites, preencher formulários e conferir redes sociais com o seu login.' },
-    { titulo: 'Pronto!', icone: '🚀', texto: 'Agora é com você. Me peça qualquer coisa. Para ver este tour de novo, use Configurações > Sobre > Ver o tour.' },
+    { titulo: 'Cortes automáticos', icone: '✂️', texto: 'Cole o link de uma live, podcast ou vídeo do YouTube e peça "faz 3 cortes pra reels". Eu acho os melhores momentos sozinho e entrego os vídeos verticais prontos em poucos minutos: legenda palavra por palavra, título-gancho, barra de progresso e o @ do seu canal, com a legenda do post.' },
+    { titulo: 'O que mais eu faço', icone: '✨', lista: ['🎬 Vídeos com IA, animações e vídeos animados com narração', '🖼️ Imagens e edição de fotos', '🎙️ Voz natural, voz clonada e dublagem', '💬 Atendimento automático no WhatsApp e Instagram', '🌐 Sites e páginas de venda prontos para publicar', '📄 Documentos, planilhas e apresentações'] },
+    { alvo: '#lista', titulo: 'Veja exemplos prontos', texto: 'Deixei conversas de exemplo aqui na lateral, marcadas como "Exemplo": cortes, vídeo animado, foto editada, voz, WhatsApp e site. Abra para ver como pedir. Pode apagar quando quiser.' },
+    { alvo: '#abrir-nav', titulo: 'Navegador integrado', texto: 'Eu uso este navegador para entrar em sites, preencher formulários e cuidar das suas redes sociais com o seu login. Você entra uma vez e eu passo a usar.' },
+    { alvo: '#abrir-config', titulo: 'Tarefas que rodam sozinhas', texto: 'Em Configurações > Workflows você agenda tarefas: um relatório toda manhã, um lembrete, vigiar o preço de um produto ou um site. Também dá para pedir na conversa: "todo dia às 8h me manda...".', acao: { rotulo: 'Ver workflows', fazer: cfg('rotinas') } },
+    { alvo: '#abrir-config', titulo: 'Eu lembro de você', texto: 'Guardo o que importa (seus gostos, seus clientes, como você trabalha) em Memória, e aprendo jeitos novos de fazer as coisas em Skills. Você vê e edita tudo lá.', acao: { rotulo: 'Ver memória', fazer: cfg('memoria') } },
+    { alvo: '#abrir-config', titulo: 'Use pelo celular', texto: 'Em Configurações > Acesso web você liga este computador ao site e passa a me usar pelo celular, com o mesmo login da sua conta. O computador precisa estar ligado com o app aberto.', acao: { rotulo: 'Ligar acesso web', fazer: cfg('acessoweb') }, so: 'desktop' },
+    { alvo: '#modelo', titulo: 'Nossa IA Unlimited', texto: 'Já vem com a nossa IA Unlimited, que responde tudo, sem frescura. Use com responsabilidade: confira bem o que você pede e o que ela entrega. Em Configurações > Provedores dá para conectar outras IAs que você assina.' },
+    { alvo: '#abrir-conta', titulo: 'Sua conta e créditos', texto: 'Aqui você vê o seu plano e quanto já usou. Imagem, vídeo e voz gastam créditos; se acabar, dá para comprar mais sem trocar de plano.' },
+    { titulo: 'Pronto!', icone: '🚀', texto: 'Agora é com você. Me peça qualquer coisa, por texto ou por voz. Para ver este tour de novo: Configurações > Sobre > Ver o tour.' },
   ]
+  let PASSOS = TODOS
 
   let i = 0
   let raiz = null
@@ -124,6 +131,7 @@
   }
   function abrir() {
     if (raiz) return
+    PASSOS = TODOS.filter((p) => !(p.so === 'desktop' && window.__sbWeb))
     i = 0
     montar()
     desenhar()
@@ -144,5 +152,5 @@
     }
     abrir()
   }
-  window.SBTour = { abrir, fechar, talvezAbrir, PASSOS }
+  window.SBTour = { abrir, fechar, talvezAbrir, PASSOS: TODOS }
 })()
