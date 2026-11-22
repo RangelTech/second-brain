@@ -108,6 +108,33 @@ function salvarCfg() {
 }
 
 // Chave local do motor de provedores (o chat e o agente usam esta chave em 127.0.0.1).
+// Uma chamada direta à IA ativa do app (sem agente), para scripts de skill que precisam da LLM: o juiz e a tradução dos cortes
+// automáticos (mecânica do Viralizaí rodando no computador do cliente). Recebe {mensagens | prompt, max_tokens, temperatura, json}.
+async function llmTexto(args = {}) {
+  const est = embed.estado()
+  if (!est.pronto) throw new Error(est.erro || 'motor de provedores iniciando')
+  const chave = await chaveLocal()
+  const mensagens = Array.isArray(args.mensagens) ? args.mensagens : [{ role: 'user', content: String(args.prompt || '') }]
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), Math.min(600, Number(args.limite_s) || 300) * 1000)
+  try {
+    const r = await fetch(est.origem + '/v1/chat/completions', {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', ...(chave ? { Authorization: 'Bearer ' + chave } : {}) },
+      body: JSON.stringify({
+        model: args.modelo || cfg.ativo || 'unlimited', stream: false, max_tokens: Math.min(16000, Number(args.max_tokens) || 4000),
+        temperature: args.temperatura ?? 0.3, chat_template_kwargs: { enable_thinking: false },
+        ...(args.json ? { response_format: { type: 'json_object' } } : {}), messages: mensagens,
+      }),
+    })
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 300))
+    const j = await r.json()
+    return { texto: String(j.choices?.[0]?.message?.content || '') }
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 async function chaveLocal() {
   const arqChave = arq('router-chave.bin')
   try {
@@ -1019,6 +1046,7 @@ app.whenReady().then(() => {
     avisarDestacada: (sim) => janela?.webContents.send('navegador:destacado', !!sim),
     editor: (nome, args) => ferramentaEditor(nome, args),
     motion: (nome, args) => ferramentaMotion(nome, args),
+    llm: (args) => llmTexto(args),
     extensao: () => (remoto && remoto.extensao) || null, // o acesso remoto é criado depois; a extensão fala por ele
     modoServidor: MODO_SERVIDOR,
   })
