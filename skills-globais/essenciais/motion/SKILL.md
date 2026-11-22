@@ -49,6 +49,20 @@ Você escreve UMA página HTML do tamanho exato do vídeo. Já vêm carregados:
 - Movimento com intenção: cada elemento entra com easing (nunca linear), em cascata de 0,1 a 0,2 s; nada pisca; uma coisa de cada vez para o olho acompanhar. Segure o quadro final por 1 s antes de sair.
 - Sempre algo vivo no fundo (luz que anda, grade que desliza, partículas lentas), sem roubar a atenção do texto.
 - Nada sobreposto sem querer: confira título x barra x número na prévia.
+- **Foto ou vídeo sempre preenchendo a tela, do primeiro ao último quadro**: nunca borda preta, nunca a imagem pequena no meio.
+  No HTML: `object-fit: cover` (ou `background-size: cover`) e o zoom vai de `scale(1)` para cima (1,0 → 1,15), nunca abaixo de 1.
+  Confira o PRIMEIRO e o ÚLTIMO quadro na prévia: se aparecer preto nas bordas, está errado.
+
+## 0.1 Foto com movimento de câmera (zoom lento, "Ken Burns") — o jeito rápido e certo
+Pedido "anima essa foto", "zoom cinematográfico", "movimento de câmera" numa imagem: use esta receita (12 s de trabalho, testada
+em 22/11/2026). Ela primeiro cobre a tela inteira e só então dá o zoom, com aceleração suave no começo e no fim:
+```
+ffmpeg -loop 1 -i foto.png -vf "scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='1+0.18*(1-cos(PI*on/179))/2':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=180:s=1080x1920:fps=30,format=yuv420p" -frames:v 180 -c:v libx264 -crf 18 Videos/foto-zoom.mp4
+```
+- 180 quadros = 6 s a 30 fps (para outra duração troque 180 e 179 por quadros e quadros−1). 16:9: `3840:2160` e `s=1920x1080`.
+- Zoom saindo: `z='1.18-0.18*(1-cos(PI*on/179))/2'`. Panorâmica para a direita: troque `x` por `x='(iw-iw/zoom)*on/179'`.
+- Rosto ou assunto fora do centro: ajuste `x`/`y` para o zoom terminar nele.
+- Com título ou legenda por cima, faça a animação no HTML (seção 0) usando o MP4 desta receita como `<video>` de fundo.
 
 ## Onde está o FFmpeg
 - Windows: `%APPDATA%\SegundoCerebro\hermes\tools\ffmpeg-*\bin\ffmpeg.exe`
