@@ -74,7 +74,7 @@ const LINK_EXTENSAO = 'https://segundocerebro.pro/extensao/'
 // falhas de TRANSPORTE da extensão (nada chegou a rodar no Chrome); erro da própria ferramenta (elemento sumiu) não entra aqui
 const FALHAS_TRANSPORTE = new Set(['sem_extensao', 'pausado', 'desconectada', 'timeout'])
 
-function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false, editor = null, motion = null, preload = '', avisarDestacada = () => {} }) {
+function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false, editor = null, motion = null, llm = null, preload = '', avisarDestacada = () => {} }) {
   const token = crypto.randomBytes(24).toString('hex')
   const pastaCaps = path.join(app.getPath('userData'), 'navegador-capturas')
   let vista = null
@@ -512,6 +512,7 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     args = args || {}
     if (nome.startsWith('editor_') && editor) return editor(nome.slice(7), args) // ferramentas do app para o editor de vídeo (mcp-editor.js)
     if (nome.startsWith('motion_') && motion) return motion(nome.slice(7), args) // Motion desenhado: HTML vira MP4 (mcp-motion.js)
+    if (nome === 'llm_texto' && llm) return llm(args) // scripts das skills (cortes do Viralizaí: juiz e tradução) chamam a MESMA IA do app, sem chave no ambiente
     if (nome === 'chrome_estado') return estadoChrome()
     const onde = ['integrado', 'chrome'].includes(args.onde) ? args.onde : 'auto'
     const querChrome = nome !== 'esperar' && !nome.startsWith('whatsapp_') && !nome.startsWith('instagram_') && (onde === 'chrome' || (onde === 'auto' && modoServidor))

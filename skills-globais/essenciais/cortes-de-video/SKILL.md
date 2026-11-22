@@ -1,42 +1,36 @@
 ---
 name: cortes-de-video
 description: |
-  Workflow AUTOMÁTICO de cortes (motor do Viralizaí: link do YouTube → 3 cortes prontos em ~3 min, legenda karaokê, gancho, barra, @). Fazer CORTES de vídeo longo (live, podcast, gameplay, entrevista, aula) para TikTok, Reels e Shorts: achar os melhores momentos (chat da live, mapa de "mais assistidos" do YouTube, transcrição), ler o contexto e cortar a HISTÓRIA COMPLETA (começo, clímax e reação, sem cortar frase no meio), enquadrar o rosto/câmera, legenda palavra por palavra, título-gancho e moldura com o Motion, e entregar o MP4 vertical pronto para postar. Inclui as regras para monetizar no TikTok (vídeo com mais de 1 minuto, conteúdo transformado, autorização do criador). Use quando pedirem "faz cortes", "pega os melhores momentos da live", "clipes para TikTok", "cortes do podcast", "transforma esse vídeo em vários shorts".
+  Workflow AUTOMÁTICO de cortes (mecânica do Viralizaí no computador do usuário: link do YouTube OU arquivo de vídeo → cortes prontos em poucos minutos, juiz por IA, rosto seguido, legenda karaokê em português, gancho, barra, @). Fazer CORTES de vídeo longo (live, podcast, gameplay, entrevista, aula) para TikTok, Reels e Shorts: achar os melhores momentos (chat da live, mapa de "mais assistidos" do YouTube, transcrição), ler o contexto e cortar a HISTÓRIA COMPLETA (começo, clímax e reação, sem cortar frase no meio), enquadrar o rosto/câmera, legenda palavra por palavra, título-gancho e moldura com o Motion, e entregar o MP4 vertical pronto para postar. Inclui as regras para monetizar no TikTok (vídeo com mais de 1 minuto, conteúdo transformado, autorização do criador). Use quando pedirem "faz cortes", "pega os melhores momentos da live", "clipes para TikTok", "cortes do podcast", "transforma esse vídeo em vários shorts".
 ---
 
 # Cortes de vídeo (lives, podcasts, gameplay)
 
-## MODO AUTOMÁTICO (padrão para qualquer pedido de corte de link do YouTube)
-Motor do Viralizaí no computador do usuário: o script acha os momentos pelos sinais, você só JULGA, e ele monta tudo num
-passe de FFmpeg (sem Motion, sem créditos). Medido em 22/11/2026: podcast de 2h20 → análise em 41 s, 3 cortes prontos em
-1 min 46 s. Use o modo manual (mais abaixo) só se o usuário pedir layout especial (jogo em cima + câmera embaixo, moldura
-do Motion, narrador).
+## MODO AUTOMÁTICO (padrão para qualquer pedido de cortes: link OU arquivo do usuário)
+A mecânica inteira do Viralizaí rodando no computador do usuário, num comando só: sinais (legenda, chat, "mais vistos",
+comentários com tempo, volume e sons como risada/grito/tiro via YAMNet), candidatos com a história inteira, juiz pela
+MESMA IA do app (nota, porquê, gancho, legenda do post, hashtags), tradução para português se a fala for de outra língua,
+Whisper no processador quando não há legenda (arquivo do usuário, vídeo sem legenda), enquadramento seguindo o ROSTO cena a
+cena e render num passe de FFmpeg (legenda karaokê, gancho em caixa, barra de progresso, @). Sem créditos, sem Motion.
+Medido em 22/11/2026: link de podcast de 2h40 → 3 cortes prontos em 4 min; arquivo local de 12 min → 2 cortes em 6 min.
+Na 1ª vez no computador ele monta o motor sozinho (~2 min + 450 MB do modelo de transcrição); avise que a 1ª demora mais.
 
-1. **Candidatos** (1 chamada):
-   `python "<skill>/scripts/auto.py" candidatos --url "<link>" --pasta "Videos/cortes-<nome>" --objetivo viral --quantos 3`
-   `--objetivo`: `viral` (20-40 s, alcance, PADRÃO), `reels` (30-60 s), `tiktok` (61-90 s, só se ele falar em monetizar).
-   Ele devolve 6 a 12 candidatos, cada um com o tempo, os SINAIS (chat explodiu, público reviu, voz empolgada) e a FALA.
-2. **Julgar** (você, sem ferramenta): leia os candidatos como editor-chefe de canal de cortes. Escolha os `--quantos`
-   melhores com assuntos DIFERENTES. Descarte abertura, "fala galera", pedido de inscrito, leitura de doação, trecho que
-   não se entende sozinho. Para cada escolhido escreva o **gancho** (até 8 palavras, MAIÚSCULAS, faz parar de rolar, sem
-   mentir) e a **legenda do post** (1 linha + chamada para comentar + 3 a 5 hashtags + crédito "@canal original").
-   Se a resposta tiver campo `frases` (vídeo em outra língua), traduza CADA frase para o português na mesma ordem e mesma
-   quantidade, em `traducao`. Grave `escolhas.json` na pasta:
-   `[{"id": 2, "gancho": "ELE NÃO ESPERAVA ISSO", "legenda_post": "...", "ajuste_inicio": 0, "ajuste_fim": 0}]`
-   (`ajuste_*` em segundos, -10 a 10, só se a fala mostrar que começa/termina cedo ou tarde demais).
-3. **Render** (1 chamada):
-   `python "<skill>/scripts/auto.py" render --pasta "Videos/cortes-<nome>" --escolhas "Videos/cortes-<nome>/escolhas.json" [--arroba "@canal-do-usuario"]`
-   Baixa só o trecho de cada corte e entrega MP4 1080x1920 com legenda palavra por palavra (karaokê amarelo), gancho em
-   caixa o vídeo todo, barra de progresso, @ e áudio normalizado. `--layout auto` (padrão: conversa = quadro inteiro
-   com fundo desfocado; jogo = centro ampliado), `cheio` (tela toda, só se a pessoa estiver no centro), `--rede`
-   tiktok/instagram/youtube (margens seguras), `--cor "#rrggbb"` (cor do gancho).
-4. **Conferir**: olhe as capas (`capa` de cada corte) com `vision_analyze` numa chamada só. Rosto cortado ou gente fora do
-   quadro → render de novo só daquele corte com outro `--layout`. Se `ok` for false, leia `problemas`.
-5. **Entregar**: caminho de cada MP4 numa linha, duração, gancho e a legenda do post. Uma linha sobre direitos (crédito ao
-   canal, ideal ter autorização). Pronto. Não pergunte nada antes: link + "faz cortes" já basta.
+1. **Rodar** (1 chamada; não pergunte nada antes, link/arquivo + "faz cortes" já basta):
+   `python "<skill>/scripts/auto.py" auto --url "<link>" --pasta "Videos/cortes-<nome>" --quantos 3 [--arroba "@canal-do-usuario"]`
+   Arquivo do usuário: `--arquivo "<caminho do vídeo>"` no lugar de `--url`.
+   `--objetivo`: `viral` (20-40 s, alcance, PADRÃO), `reels` (30-60 s, se ele pedir reels/shorts), `tiktok` (61-90 s, só se falar
+   em monetizar). `--layout auto` (padrão: conversa = segue o rosto; jogo = centro ampliado); `inteiro` (quadro todo com
+   fundo desfocado), `cheio`, `centro`. `--rede` tiktok/instagram/youtube (margens seguras), `--cor "#rrggbb"` (cor do gancho).
+2. **Conferir**: olhe as capas (`capa` de cada corte) com `vision_analyze` numa chamada só. Rosto cortado ou gente fora do
+   quadro → `auto.py render --pasta P --escolhas P/escolhas.json --layout inteiro` (refaz só a montagem). Se `ok` for false,
+   leia `problemas`/`erro`.
+3. **Entregar**: caminho de cada MP4 numa linha, duração, gancho, o porquê e a legenda do post (já vem pronta). Uma linha sobre
+   direitos (crédito ao canal original, ideal ter autorização). Ofereça a versão de mais de 1 min se ele quiser monetizar.
 
-Vídeo sem fala (trailer, clipe): o script usa o mapa de "mais vistos" e o volume; o gancho vem do que se vê (olhe a capa).
-Arquivo do usuário (não é link): use o modo manual.
+Quer escolher à mão? `auto.py candidatos ...` (lista com sinais e fala) → escreva `escolhas.json`
+(`[{"id": 2, "gancho": "...", "legenda_post": "...", "ajuste_inicio": 0, "ajuste_fim": 0}]`) ou `auto.py julgar --pasta P` →
+`auto.py render --pasta P --escolhas P/escolhas.json`.
+Vídeo sem fala (trailer, clipe): o motor usa o mapa de "mais vistos", o volume e os sons; confira o gancho olhando a capa.
 
 ## Modo manual (layout especial)
 Tudo no computador do usuário e sem créditos. Ferramentas:
