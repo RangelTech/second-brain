@@ -213,19 +213,29 @@ def rosto(arquivo, ini, fim, largura_rel):
             if img is None:
                 continue
             ro = det.maior(img)
-            achados.append((ini + i * 0.5 + 0.25, (ro[0] + ro[2] / 2) / img.shape[1] if ro else None))
-    out, com_rosto = [], 0
+            achados.append((ini + i * 0.5 + 0.25, (ro[0] + ro[2] / 2) / img.shape[1] if ro else None, ro[2] / img.shape[1] if ro else 0))
+    out, com_rosto, dentro, total = [], 0, 0.0, 0.0
+    meia = largura_rel / 2
     for a, b in zip(cenas, cenas[1:]):
-        xs = [cx for t, cx in achados if a <= t < b and cx is not None]
+        xs = [(cx, lw) for t, cx, lw in achados if a <= t < b and cx is not None]
         if xs:
             com_rosto += 1
-            cx = statistics.median(xs)
+            cx = statistics.median(x for x, _ in xs)
         else:
             cx = out[-1][1] if out else 0.5
-        meia = largura_rel / 2
-        out.append((round(a - ini, 2), round(min(1 - meia, max(meia, cx)), 4)))
+        cx = min(1 - meia, max(meia, cx))
+        out.append((round(a - ini, 2), round(cx, 4)))
+        # 22/11/2026: em cena aberta (várias pessoas) ou com o rosto andando, o recorte parado deixava meio rosto fora da tela.
+        # Conta o tempo em que o rosto inteiro (centro +- meia largura do rosto) cabe com folga no recorte desta cena.
+        for x, lw in xs:
+            total += 1
+            dentro += 1 if abs(x - cx) + lw / 2 <= meia * 0.92 else 0
     n = len(cenas) - 1
     if n <= 0 or com_rosto < max(1, n / 2):
+        return None
+    log(f"rosto dentro do recorte: {100 * dentro / max(1, total):.0f}% dos quadros com rosto")
+    if total and dentro / total < 0.8:
+        log(f"rosto fora do recorte em {100 - 100 * dentro / total:.0f}% do tempo: melhor o quadro inteiro")
         return None
     junto = [out[0]]
     for p in out[1:]:  # cenas seguidas com o mesmo enquadramento viram uma só
