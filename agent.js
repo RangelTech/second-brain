@@ -740,6 +740,11 @@ function prepararHome(app, { base, modelo, pasta, raciocinio, visao, nivel, gate
     'timeouts:',
     '  mcp:',
     '    tool_call: 3600',
+    // e o executor do agente corta o LOTE de ferramentas em 420 s: um corte de 35 s em 1080x1920 no motion_animar passou disso,
+    // o agente achou que falhou e renderizou de novo (22/11/2026). 30 min cobre render longo; ferramenta travada de verdade cai antes pelo vigia de atividade.
+    '  tools:',
+    '    concurrent_batch: 1800',
+    '    sequential_call: 1800',
     'compression:',
     '  enabled: true',
     `  threshold_tokens: ${COMPRIMIR_EM}`, // igual ao piso do Hermes para janela < 512 mil (75%)

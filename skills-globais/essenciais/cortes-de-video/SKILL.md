@@ -27,6 +27,14 @@ O pico (chat explodiu, risada) é só onde a história **termina**. O corte bom:
 | YouTube Shorts | até 60 s (até 3 min é aceito, mas 60 s rende mais) | |
 Para monetizar, junte a história inteira (setup + desenvolvimento + clímax); se o momento é curto, escolha outro momento que tenha história de 1 minuto, em vez de esticar com enrolação.
 
+**Pedido simples ("um corte disso", "o melhor momento pra reels/shorts/tiktok") sem falar em monetizar: NÃO pergunte e NÃO faça
+a versão de 1 minuto.** Faça UM corte de alcance (20 a 45 s) e ofereça a versão de monetização no fim, em uma linha. Meta de tempo:
+o corte pronto em 5 a 8 minutos. (22/11/2026: um "corte pra reels" de um trailer virou versão de 65 s e levou mais de 25 min.)
+
+**Vídeo sem fala** (trailer, clipe musical, gameplay sem narração): pule transcrição e legenda; escolha o momento pelo mapa de
+"mais assistidos" + olhando 4 a 6 quadros do trecho; corte de 15 a 30 s no ritmo das cenas; título-gancho curto. Música/clipe:
+corte no começo de um compasso e termine no fim da frase musical.
+
 ## Monetização: diga ao usuário com honestidade (em 2 ou 3 linhas, uma vez)
 - O TikTok paga por vídeo **original**. Repostar trecho de outra pessoa sem transformação é "conteúdo não original": não monetiza e pode derrubar o alcance da conta. O que conta como transformação: edição de verdade (enquadramento, legenda, título-gancho, cortes de ritmo), e o ideal é ter comentário/narração própria ou ser corte de canal **autorizado**.
 - **Autorização do criador:** muitos streamers liberam canais de cortes (às vezes com regras: marcar o canal, dividir receita). Sem autorização, há risco de remoção por direitos autorais. Sugira ao usuário pedir/conferir a autorização do dono da live; para o próprio conteúdo dele, não há problema.
