@@ -676,7 +676,10 @@
         // fundo de tela inteira a 60 quadros/s custava ~130-150% de CPU no processo de GPU e outro tanto no da tela (medido 18/11/2026):
         // 30 quadros/s com a janela em foco e 10 sem foco; o movimento usa o relógio, então só fica menos fluido, não mais lento
         // spec 53: com o navegador integrado aberto a página dele também pinta; o cérebro cai para 15 quadros/s e libera a máquina
-        const intervalo = !document.hasFocus() ? 100 : document.body.classList.contains('nav-leve') ? 66 : 33
+        // parado (sem pergunta, sem voz, sem orbe puxada): o cérebro só gira devagar, então 12 quadros/s com foco e 4 sem foco bastam.
+        // Medido 21/11/2026: parado a 30 quadros/s custava ~90% de CPU na tela e ~55% no processo de GPU, sem ninguém usando o app.
+        const ocioso = alvoAtivo === 0 && kAtivo < 0.05 && !foco &&!document.body.classList.contains('modo-voz')
+        const intervalo = ocioso ? (document.hasFocus() ? 83 : 250) : !document.hasFocus() ? 100 : document.body.classList.contains('nav-leve') ? 66 : 33
         // só desenha com a janela visível e o cartão na tela (vários chats trabalhando não pesam: só o da tela anima)
         if (!document.hidden && canvas.isConnected && ts - ultimoQuadro >= intervalo - 2) { // sem offsetParent: ele forçava recalcular o layout a cada quadro (19% do tempo); quem esconde chama parar()
           ultimoQuadro = ts

@@ -11,6 +11,8 @@
   let ultimo = 0
   let frase = PADRAO
   let ligado = false
+  let envios = 0 // pedaços de áudio mandados ao reconhecedor (medição)
+  let medida = null
 
   const registrar = (m) => { try { console.info('[ativacao]', m) } catch {} }
   function carregarScript() {
@@ -37,13 +39,22 @@
     return carregando
   }
 
+  // uma escuta por vez: o vigia de 1,5 s chamava escutar() de novo enquanto o modelo carregava (~40 s) e abria dezenas de
+  // microfones e reconhecedores em paralelo, todos gastando CPU (medido 21/11/2026)
+  let abrindo = false
   async function escutar() {
-    if (esc || !ligado || (window.SBVozConversa && window.SBVozConversa.ativo())) return
+    if (esc || abrindo || !ligado || (window.SBVozConversa && window.SBVozConversa.ativo())) return
+    abrindo = true
+    try { await abrirEscuta() } finally { abrindo = false }
+  }
+  async function abrirEscuta() {
     try {
       const m = await garantirModelo()
       if (esc || !ligado || (window.SBVozConversa && window.SBVozConversa.ativo())) return
       const fluxo = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } })
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      // 16 kHz direto do navegador: a 48 kHz o reconhecedor (worker WASM) não dava conta em tempo real, ficava 100% ocupado e a
+      // fila de áudio crescia sem fim até derrubar a janela (medido 21/11/2026). O modelo é de 16 kHz, então não perde nada.
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 })
       // gramática só com a frase (com e sem acento): o reconhecedor nem tenta entender o resto da conversa da casa
       const gram = [...new Set([frase.toLowerCase(), N(frase)])].concat('[unk]')
       const rec = new m.KaldiRecognizer(ctx.sampleRate, JSON.stringify(gram))
@@ -54,14 +65,43 @@
         registrar('frase ouvida: ' + t)
         disparar()
       }
-      rec.on('result', (msg) => confere(msg && msg.result && msg.result.text))
-      rec.on('partialresult', (msg) => confere(msg && msg.result && msg.result.partial))
+      // Só manda áudio ao reconhecedor quando tem voz, e nunca deixa fila: o worker do Vosk responde 1 evento por pedaço; com mais
+      // de 2 pedaços sem resposta o áudio novo é descartado. Silêncio (quase o tempo todo) não custa nada.
+      let pendentes = 0
+      const volta = () => { if (pendentes > 0) pendentes-- }
+      rec.on('result', (msg) => (volta(), confere(msg && msg.result && msg.result.text)))
+      rec.on('partialresult', (msg) => (volta(), confere(msg && msg.result && msg.result.partial)))
       const src = ctx.createMediaStreamSource(fluxo)
-      const proc = ctx.createScriptProcessor(4096, 1, 1)
-      proc.onaudioprocess = (e) => { try { rec.acceptWaveformFloat(e.inputBuffer.getChannelData(0), ctx.sampleRate) } catch {} }
+      const proc = ctx.createScriptProcessor(4096, 1, 1) // 4096 a 16 kHz = 256 ms por pedaço
+      let piso = 0.004 // ruído de fundo, aprendido devagar
+      let falaAte = 0
+      let anterior = null // o pedaço (256 ms) de antes da voz começar: o "Olá" não pode ficar de fora
+      let ultEnvio = 0
+      proc.onaudioprocess = (e) => {
+        try {
+          const d = e.inputBuffer.getChannelData(0)
+          let s = 0
+          for (let i = 0; i < d.length; i += 4) s += d[i] * d[i]
+          const rms = Math.sqrt(s / (d.length / 4))
+          medida = { sr: ctx.sampleRate, n: d.length, rms: +rms.toFixed(4), piso: +piso.toFixed(4), pendentes }
+          const agora = ctx.currentTime
+          if (rms > Math.max(0.012, piso * 3)) falaAte = agora + 1.2
+          else piso = piso * 0.95 + rms * 0.05
+          const copia = new Float32Array(d)
+          if (agora > falaAte) return void (anterior = copia)
+          if (pendentes > 2 && agora - ultEnvio < 3) return
+          if (pendentes > 2) pendentes = 0 // sem resposta há 3 s: não fica surdo por causa da conta
+          ultEnvio = agora
+          if (anterior) { pendentes++; rec.acceptWaveformFloat(anterior, ctx.sampleRate); anterior = null }
+          pendentes++
+          envios++
+          rec.acceptWaveformFloat(copia, ctx.sampleRate)
+        } catch {}
+      }
       src.connect(proc)
       proc.connect(ctx.destination)
       esc = { fluxo, ctx, proc, rec }
+      if (!ligado || (window.SBVozConversa && window.SBVozConversa.ativo())) return void soltar() // desligaram enquanto abria
       registrar('escutando a frase "' + frase + '"')
     } catch (e) {
       registrar('não consegui escutar: ' + ((e && e.message) || e))
@@ -100,6 +140,6 @@
     else if (!conversa && !esc) escutar()
   }, 1500)
 
-  window.SBAtivacao = { reconfigurar, estado: () => ({ ligado, frase, escutando: !!esc, modelo: !!modelo }), testar: (t) => N(t).includes(N(frase)) }
+  window.SBAtivacao = { reconfigurar, estado: () => ({ ligado, frase, escutando: !!esc, modelo: !!modelo, envios, medida }), testar: (t) => N(t).includes(N(frase)) }
   setTimeout(reconfigurar, 3000)
 })()
