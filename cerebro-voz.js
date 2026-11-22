@@ -141,9 +141,12 @@ async function chamar({ base, chave, modelo, mensagens, comFerramentas, forcar }
 
 function ferramentaObrigatoria(texto) {
   const t = String(texto || '').toLowerCase()
-  if (/\b(fech|tir|limp|para|pausa)/.test(t)) return null
+  if (/\b(fech|tir[ae]\b|limp|para de\b|pára\b|pausa)/.test(t)) return null // comando de fechar/parar ("para" sozinho é preposição: "previsão para amanhã")
   if (/\b(mostra|mostrar|me mostra|quero ver|ver uma|ver umas|ver a|ver o|exibe|coloca)\b.{0,30}\b(fotos?|imagens?|figuras?)\b|\b(fotos?|imagens?) d[aoe]s?\b/.test(t)) return 'mostrar_imagens'
   if (/\b(quero ouvir|ouvir (a|o|uma|um)|toca|tocar|toque|coloca|coloque|bota|p[õo]e)\b.{0,60}\b(m[úu]sica|clipe|som|can[çc][ãa]o|do|da|de)\b|\bquero ouvir\b/.test(t)) return 'tocar_youtube'
+  // dado do momento (cotação, preço, clima, placar, notícia): pesquisa ANTES de falar. Sem isso o modelo dizia um número
+  // inventado e só depois o certo (21/11/2026: "5,28" e em seguida "5,91" para o dólar)
+  if (/\b(cota[çc][ãa]o|d[óo]lar|euro|bitcoin|a[çc][õo]es|bolsa|ibovespa|pre[çc]o|quanto (custa|est[áa]|t[áa])|clima|previs[ãa]o do tempo|temperatura|placar|resultado do jogo|not[íi]cias?|aconteceu hoje)\b/.test(t)) return 'buscar_na_web'
   return null
 }
 
