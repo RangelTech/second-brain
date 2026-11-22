@@ -1586,7 +1586,7 @@ app.whenReady().then(() => {
   })
   // Conversas de exemplo (spec 38 A): na 1ª abertura copia exemplos/ do pacote para a pasta de dados e coloca 5 conversas
   // prontas na lateral (selo "Exemplo"). Uma vez por versão dos exemplos; apagada pela pessoa não volta (chats-apagados).
-  const VERSAO_EXEMPLOS = 1
+  const VERSAO_EXEMPLOS = 2 // 2: cortes automáticos e conversa por voz (22/11/2026)
   function instalarExemplos() {
     if ((cfg.exemplosV || 0) >= VERSAO_EXEMPLOS) return
     try {
