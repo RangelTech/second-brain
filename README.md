@@ -1,3 +1,37 @@
+<!-- readme-padrao -->
+# Segundo Cérebro (app)
+
+> O Segundo Cérebro (Cérebro Pro): o harness. App de computador (Windows, Linux e macOS) com o agente Hermes, que roda comandos e ferramentas; também usado pelo navegador e pelo celular (ponte remota). Vai virar o monorepo de tudo do Segundo Cérebro (spec 57, seção 3.3).
+
+![Tela principal](docs/img/principal.webp)
+
+## O que é
+O Segundo Cérebro (Cérebro Pro): o harness. App de computador (Windows, Linux e macOS) com o agente Hermes, que roda comandos e ferramentas; também usado pelo navegador e pelo celular (ponte remota). Vai virar o monorepo de tudo do Segundo Cérebro (spec 57, seção 3.3).
+
+Estado: **no ar (clientes se atualizam sozinhos pelas releases)**.
+
+## Onde está no ar
+- https://brain.rangeltech.net
+
+## Onde faz o deploy
+Tag `v*` → o workflow `release.yml` gera os instaladores (Windows, Linux, macOS) e publica a release; ela só vira "latest" depois dos três instaladores prontos. Os apps dos clientes e as VMs se atualizam sozinhos pela release "latest". Não há deploy na VPS.
+
+## Como funciona por dentro
+Resumo acima; os detalhes estão nas notas técnicas (README anterior) abaixo e na spec 57.
+
+## Segredos
+Nenhum valor de segredo fica neste repositório. Os segredos dos serviços ficam no Infisical (mapa em `vps_rt_infra/scripts/infisical/mapa_envs.json`) e chegam à VPS gerados no deploy.
+
+## Rodar e testar localmente
+Ver as notas técnicas abaixo (cada repositório tem o seu jeito); os testes de QA em produção são por cliques reais, com evidência em `new_ragente/qa/evidencias`.
+
+## Links
+- Repositório: https://github.com/RangelTech/second-brain
+- Painel único: https://painel.rangeltech.net
+- Spec de organização geral: `new_ragente/specs/57_ORGANIZACAO_GERAL_PRODUTOS_E_PAINEL.md`
+
+## Notas técnicas (README anterior)
+
 # Cérebro Pro
 
 Agente de IA para desktop da Rangel Tech. Windows e Linux (macOS em uma segunda etapa).
