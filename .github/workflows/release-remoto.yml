@@ -1,0 +1,67 @@
+name: release-remoto
+# Publica a imagem da ponte + release-manifest.remoto.json com tag própria remoto-v* (spec 57 §3.3.3). NÃO faz deploy (só o
+# vps_rt_infra: deploy.yml -f service=segundo-cerebro-remoto). Nunca vira "latest" (a latest é do app, tag v*).
+on:
+  push:
+    tags: ['remoto-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'tag completa (ex.: remoto-v0.4.6)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: remoto/package-lock.json
+      - name: Versão
+        id: v
+        run: |
+          V="${{ inputs.version }}"; [ -n "$V" ] || V="${GITHUB_REF_NAME}"
+          case "$V" in remoto-v*) ;; *) echo "tag precisa começar com remoto-v"; exit 1;; esac
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - run: cd remoto && npm ci && npm test
+      - name: Build da imagem
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          docker build -t "segundo-cerebro-remoto:${V}" remoto
+          docker save "segundo-cerebro-remoto:${V}" | gzip -9 > image.tar.gz
+          echo "IMAGE_ID=sha256:$(gunzip -c image.tar.gz | tar -xO manifest.json | python3 -c "import sys,json,re;print(re.sub(r'^.*/','',json.load(sys.stdin)[0]['Config']).replace('.json',''))")" >> "$GITHUB_ENV"
+          echo "ARCHIVE_SHA=$(sha256sum image.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - name: Manifesto
+        run: |
+          python3 - <<'PY'
+          import json, os, datetime
+          v = "${{ steps.v.outputs.version }}"
+          m = {"schema": 1, "service": "segundo-cerebro-remoto", "repo": "RangelTech/second-brain", "commit": os.environ["GITHUB_SHA"][:7], "version": v,
+               "artifact": {"type": "docker-archive", "asset": "image.tar.gz", "sha256": os.environ["ARCHIVE_SHA"], "image_id": os.environ["IMAGE_ID"], "tag": "segundo-cerebro-remoto:" + v},
+               "built_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+               "healthcheck": {"path": "/health", "expect": 200, "timeout_s": 60, "port": 8080},
+               "env": {"required": []}, "resources": {"memory": "128m", "cpus": "0.25"}}
+          json.dump(m, open("release-manifest.remoto.json", "w"), indent=2)
+          PY
+      - name: GitHub Release (sem virar latest)
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          gh release create "$V" release-manifest.remoto.json image.tar.gz --title "Ponte $V" --notes "Ponte web e celular do Cérebro Pro. Artefato docker-archive. Deploy: somente vps_rt_infra." --target "${GITHUB_SHA}" --latest=false \
+            || gh release upload "$V" release-manifest.remoto.json image.tar.gz --clobber
+      - name: A latest continua sendo o app (tag v*)
+        run: |
+          L=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name)
+          echo "latest: $L"
+          if ! echo "$L" | grep -Eq '^v[0-9]'; then
+            A=$(gh release list --limit 50 --json tagName,isDraft,isPrerelease -q '[.[] | select((.tagName|test("^v[0-9]")) and (.isDraft|not) and (.isPrerelease|not))][0].tagName')
+            gh release edit "$A" --latest
+            echo "::error::a latest tinha virado $L; devolvida para $A"; exit 1
+          fi

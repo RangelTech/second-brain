@@ -1,0 +1,21 @@
+name: _remoto
+# CI da ponte web e celular (pasta remoto/, Node 24).
+on:
+  workflow_call:
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: remoto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: remoto/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: docker build -t segundo-cerebro-remoto:ci .
