@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: read   # o filtro de caminhos lista os arquivos do PR pela API
+
 jobs:
   detectar:
     runs-on: ubuntu-latest
