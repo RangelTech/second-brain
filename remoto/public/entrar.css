@@ -1,0 +1,43 @@
+:root{--bg:#16110d;--card:#1f1a15;--borda:#33291f;--texto:#f3ece4;--suave:#a89b8c;--cor:#e8a35c;--cor-texto:#1a120a;--erro:#ff8a7a}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--texto);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{min-height:100dvh;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+main{width:100%;max-width:420px}
+.marca{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.marca img{border-radius:14px}
+h1{font-size:1.5rem;margin:0;letter-spacing:-.01em}
+.sub{color:var(--suave);margin:8px 0 22px}
+form{display:grid;gap:14px;background:var(--card);border:1px solid var(--borda);border-radius:16px;padding:20px}
+label{display:grid;gap:6px;font-size:.9rem;color:var(--suave)}
+input{font:inherit;color:var(--texto);background:#120e0a;border:1px solid var(--borda);border-radius:10px;padding:12px 14px;min-height:46px}
+input:focus{outline:2px solid var(--cor);outline-offset:1px;border-color:transparent}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 16px;min-height:46px;cursor:pointer;background:var(--cor);color:var(--cor-texto)}
+button:disabled{opacity:.6;cursor:default}
+button.sec{background:transparent;color:var(--texto);border:1px solid var(--borda)}
+.erro{color:var(--erro);margin:0;font-size:.9rem}
+ul{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:10px}
+li a{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--texto);background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:16px;min-height:64px}
+li a:hover,li a:focus-visible{border-color:var(--cor);outline:none}
+li .nome{font-weight:600}
+li .det{display:block;font-size:.82rem;color:var(--suave)}
+li .ponto{width:10px;height:10px;border-radius:50%;background:#58c27d;flex:none}
+.vazio{color:var(--suave);background:var(--card);border:1px dashed var(--borda);border-radius:14px;padding:16px}
+.acoes{display:flex;gap:10px}
+.acoes button{flex:1}
+[hidden]{display:none!important}
+h2{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--suave);margin:18px 0 8px;font-weight:600}
+.contratar{display:grid;gap:2px;text-decoration:none;color:var(--texto);background:linear-gradient(135deg,#2a1f14,#1f1a15);border:1px solid var(--borda);border-radius:14px;padding:14px 16px;margin:6px 0 16px}
+.contratar:hover,.contratar:focus-visible{border-color:var(--cor);outline:none}
+.contratar span{color:var(--suave);font-size:.88rem}
+button.link{background:transparent;border:0;color:var(--texto);opacity:.75;text-decoration:underline;font-size:.9rem;padding:8px 0;cursor:pointer}
+.aviso{color:var(--texto);opacity:.85;margin:0;font-size:.9rem}
+
+/* bloco "Deixe a IA usar o seu Chrome": título, texto e link em linhas separadas, link legível no tema escuro */
+#ext{display:grid;gap:6px}
+#ext b{display:block}
+#ext span{display:block;line-height:1.5}
+#ext ul{list-style:none;margin:4px 0 0;padding:0}
+#ext a#ext-baixar{display:inline-block;justify-self:start;margin-top:4px;padding:9px 14px;border-radius:10px;background:var(--cor);color:#1a120b;font-weight:600;text-decoration:none}
+#ext a#ext-baixar:hover,#ext a#ext-baixar:focus-visible{filter:brightness(1.08);outline:none}
+#ext a#ext-baixar[hidden]{display:none}
+.termos{display:flex;align-items:center;gap:8px;font-size:13px}.termos input{width:auto}

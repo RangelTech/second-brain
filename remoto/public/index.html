@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16110d">
+<title>Cérebro Pro</title>
+<link rel="icon" href="icone-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="entrar.css">
+</head>
+<body>
+<main>
+  <div class="marca"><img src="icone-192.png" alt="" width="56" height="56"><h1>Cérebro Pro</h1></div>
+
+  <section id="login" hidden>
+    <p class="sub">Entre com a sua conta para controlar o seu Cérebro Pro de qualquer lugar.</p>
+    <p class="aviso" id="aviso-ext" hidden>Entre aqui uma vez: a extensão do Chrome fica conectada sozinha, sem senha nela.</p>
+    <form id="form" autocomplete="on">
+      <label>E-mail<input id="email" type="email" name="email" autocomplete="username" required autofocus></label>
+      <label>Senha<input id="senha" type="password" name="password" autocomplete="current-password" required></label>
+      <div id="primeiro" hidden>
+        <label>Repita a senha<input id="senha2" type="password" autocomplete="new-password"></label>
+        <label class="termos"><input id="termos" type="checkbox"> Li e aceito os <a href="https://segundocerebro.pro/termos" target="_blank" rel="noopener">Termos de uso</a></label>
+      </div>
+      <p id="erro" class="erro" role="alert" hidden></p>
+      <button id="entrar" type="submit">Entrar</button>
+      <button id="esqueci" class="link" type="button">Esqueci a senha</button>
+      <p id="esqueci-msg" class="aviso" role="status" hidden></p>
+    </form>
+  </section>
+
+  <section id="escolha" hidden>
+    <p class="sub">Olá, <b id="quem"></b>. <span id="titulo-escolha">Qual computador você quer controlar?</span></p>
+    <div id="grupos"></div>
+    <p id="vazio" class="vazio" hidden>Nenhum computador conectado agora. No Cérebro Pro instalado, abra Configurações e ligue <b>Permitir acesso pela web</b>. Se for uma máquina virtual, confira se ela está ligada.</p>
+    <a id="contratar" class="contratar" href="https://segundocerebro.pro/#maquina-virtual" target="_blank" rel="noopener"><b>Quer uma máquina virtual só sua?</b><span>Seu Cérebro Pro rodando 24 horas, sem instalar nada. Saiba mais</span></a>
+    <section id="ext" class="contratar" style="display:block" hidden>
+      <b>Deixe a IA usar o seu Chrome</b>
+      <span id="ext-txt"></span>
+      <ul id="ext-lista"></ul>
+      <a id="ext-baixar" href="https://segundocerebro.pro/extensao/" target="_blank" rel="noopener">Baixar a extensão do Chrome</a>
+    </section>
+    <a id="ir-remoto" class="contratar" href="/?remoto=1" hidden><b>Acessar meus computadores</b><span>Controle os computadores onde o Cérebro Pro está instalado.</span></a>
+    <a id="ir-vm" class="contratar" href="/" hidden><b>Voltar para a minha máquina virtual</b><span>O seu Cérebro Pro que roda 24 horas.</span></a>
+    <div class="acoes"><button id="atualizar" class="sec" type="button">Atualizar</button><button id="sair" class="sec" type="button">Sair</button></div>
+  </section>
+</main>
+<script src="entrar.js"></script>
+</body>
+</html>
