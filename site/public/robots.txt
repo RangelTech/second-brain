@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /definir-senha/
+Sitemap: https://segundocerebro.pro/sitemap.xml

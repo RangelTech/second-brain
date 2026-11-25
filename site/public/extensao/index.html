@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Extensão do Chrome · Cérebro Pro</title>
+<meta name="description" content="Deixe o Cérebro Pro usar o seu Chrome, com as suas contas já abertas. Instalação em 3 minutos, sem senha na extensão.">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/style.css?v=0.1.21">
+<script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>
+.ex-passos{counter-reset:p;list-style:none;padding:0;margin:22px 0}
+.ex-passos li{counter-increment:p;position:relative;padding:14px 16px 14px 62px;margin:0 0 12px;border:1px solid rgba(127,127,127,.3);border-radius:14px;line-height:1.55}
+.ex-passos li::before{content:counter(p);position:absolute;left:16px;top:12px;width:32px;height:32px;border-radius:50%;background:#c97a3a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.ex-caixa{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.ex-caixa code{background:rgba(127,127,127,.15);border-radius:8px;padding:6px 10px;font-size:14px}
+.ex-nota{font-size:14px;color:var(--mut);margin:6px 0 0}
+.ex-grade{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin:18px 0}
+.ex-grade div{border:1px solid rgba(127,127,127,.3);border-radius:14px;padding:14px 16px}
+.ex-grade h3{margin:0 0 6px;font-size:17px}
+</style>
+</head>
+<body>
+<header class="topo"><div class="wrap"><a class="marca" href="/"><img src="/assets/img/logo.png" alt="" width="34" height="34">Cérebro Pro</a></div></header>
+<main class="wrap pag">
+  <h1>Extensão do Chrome</h1>
+  <p>Com a extensão, o Cérebro Pro usa o <b>seu Chrome</b>: as contas que você já tem abertas (WhatsApp Web, Instagram, TikTok, Facebook, Gmail e outras) funcionam sem pedir login de novo, e sem aquela desconfiança de robô. Também deixa você entrar no Claude, no ChatGPT e no Gemini com um clique, sem copiar e colar endereço.</p>
+  <p><a class="btn pri" id="baixar" href="/extensao/segundo-cerebro-chrome.zip" download>Baixar a extensão</a> <span class="ex-nota" id="versao"></span></p>
+
+  <div class="ex-grade">
+    <div><h3>No aplicativo instalado</h3><p>O Cérebro Pro continua usando o navegador de dentro do aplicativo. Se você pedir "use o meu Chrome", ele passa a usar o seu.</p></div>
+    <div><h3>No Cérebro Pro Web</h3><p>Na versão web (celular ou máquina virtual) ele usa sempre o seu Chrome, por isso a extensão é necessária lá.</p></div>
+    <div><h3>Sem senha na extensão</h3><p>Ela se conecta sozinha à sua conta: pelo aplicativo aberto no mesmo computador ou quando você entra no site do Cérebro Pro Web.</p></div>
+  </div>
+
+  <h2>Como instalar (3 minutos)</h2>
+  <ol class="ex-passos">
+    <li><b>Baixe e extraia o arquivo.</b> Clique em "Baixar a extensão", abra o arquivo baixado e extraia (clique com o botão direito, <i>Extrair tudo</i>) numa pasta que você não vai apagar, por exemplo <i>Documentos\Cérebro Pro Chrome</i>.</li>
+    <li><b>Abra a página de extensões do navegador.</b> Copie o endereço abaixo, abra uma aba nova e cole.
+      <div class="ex-caixa"><code id="end">chrome://extensions</code><button class="btn sec peq" type="button" id="copiar">Copiar</button></div>
+      <p class="ex-nota">No Edge use <code>edge://extensions</code> e no Brave <code>brave://extensions</code>.</p></li>
+    <li><b>Ligue o "Modo do desenvolvedor".</b> É o botão no canto superior direito da página.</li>
+    <li><b>Clique em "Carregar sem compactação"</b> e escolha a pasta que você extraiu no passo 1. A extensão "Cérebro Pro no Chrome" aparece na lista.</li>
+    <li><b>Conecte.</b> Clique no ícone da extensão (a peça de quebra-cabeça, depois o alfinete ao lado do Cérebro Pro). Se o aplicativo está aberto neste computador, ela já fica <b>Conectada</b> sozinha. Se não, clique em <b>Entrar</b>: abre o site, você entra com o seu e-mail e senha uma vez e pronto, a extensão fica conectada junto.</li>
+  </ol>
+  <p class="ex-nota">O Chrome mostra um aviso sobre "extensões em modo desenvolvedor" quando abre. É normal para este tipo de instalação: pode fechar o aviso. Não apague a pasta da extensão. Quando sair versão nova, o site avisa e você repete o passo 1 e clica em "Atualizar" na página de extensões.</p>
+
+  <h2>O que ela faz e o que não faz</h2>
+  <ul class="termos-lista">
+    <li>Só age quando você pede uma tarefa ao Cérebro Pro, e trabalha numa aba separada, dentro do grupo "Cérebro Pro".</li>
+    <li>Você pode <b>pausar</b> ou <b>desconectar</b> a qualquer momento pelo ícone. Também dá para desconectar pelo site do Cérebro Pro Web.</li>
+    <li>Enquanto está trabalhando, o Chrome mostra uma faixa avisando que a página está sendo depurada. É o aviso normal do Chrome para qualquer extensão que clica e digita por você.</li>
+    <li>Não guarda o conteúdo das páginas nos nossos servidores e não lê as senhas salvas no Chrome.</li>
+    <li>Funciona no Chrome, Edge e Brave para Windows, Mac e Linux (Chrome 116 ou mais novo).</li>
+  </ul>
+  <p>Ao usar, valem os <a href="/termos-de-uso/">Termos de uso</a>. Problemas? Fale com o suporte pelo canal informado na sua compra.</p>
+</main>
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i) }
+  $('copiar').addEventListener('click', function () {
+    var el = $('end')
+    var fim = function () { $('copiar').textContent = 'Copiado!'; setTimeout(function () { $('copiar').textContent = 'Copiar' }, 1800) }
+    if (navigator.clipboard) navigator.clipboard.writeText(el.textContent).then(fim, function () {})
+  })
+  // nome do navegador no passo 2
+  var ua = navigator.userAgent
+  if (/Edg\//.test(ua)) $('end').textContent = 'edge://extensions'
+  else if (/Brave/.test(ua) || (navigator.brave)) $('end').textContent = 'brave://extensions'
+  fetch('/extensao/versao.json').then(function (r) { return r.json() }).then(function (j) { $('versao').textContent = 'Versão ' + j.versao }).catch(function () {})
+})()
+</script>
+</body>
+</html>

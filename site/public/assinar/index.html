@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assinar · Cérebro Pro</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/style.css?v=0.1.21">
+<script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>
+.as-wrap{display:grid;gap:24px;grid-template-columns:minmax(0,420px) minmax(0,1fr);align-items:start;margin:28px auto 60px}
+@media(max-width:900px){.as-wrap{grid-template-columns:1fr}}
+.as-card{border:1px solid rgba(127,127,127,.3);border-radius:18px;padding:22px;background:rgba(127,127,127,.05)}
+.as-card h1{font-size:26px;margin:0 0 6px}
+.as-resumo .preco{font-size:34px;font-weight:700;margin:8px 0 2px}.as-resumo s{opacity:.55;font-size:18px;font-weight:400}
+.as-resumo .selo{display:inline-block;background:#16a34a;color:#fff;border-radius:999px;padding:2px 10px;font-size:13px;margin-left:8px;vertical-align:middle}
+.as-resumo .cupom-ok{color:#15803d;margin:8px 0 0;font-size:15px}
+.as-form label.l{display:block;font-size:14px;color:var(--mut);margin:12px 0 4px}
+.as-form input[type=text],.as-form input[type=email]{width:100%;height:46px;padding:0 14px;border-radius:12px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;font-size:16px}
+.as-termos summary{cursor:pointer;color:var(--mut);font-size:14px;margin:10px 0 6px}
+.as-pag{min-height:640px}
+.as-pag iframe{width:100%;height:760px;border:0;border-radius:14px;background:#fff}
+@media(max-width:900px){.as-pag iframe{height:calc(100vh - 140px);min-height:640px}}
+.as-fallback{margin:12px 0 0;font-size:14px;color:var(--mut)}
+.as-ok{text-align:center;padding:40px 10px}.as-ok h2{font-size:28px}
+.as-seg{font-size:13px;color:var(--mut);margin:10px 0 0}
+</style>
+</head>
+<body>
+<header class="topo"><div class="wrap"><a class="marca" href="/"><img src="/assets/img/logo.png" alt="" width="34" height="34">Cérebro Pro</a></div></header>
+<main class="wrap">
+  <div class="as-wrap">
+    <section class="as-card as-resumo" id="resumo" aria-live="polite">
+      <h1>Finalize a sua assinatura</h1>
+      <p id="r-erro" class="msg" role="alert" hidden></p>
+      <div id="r-corpo" hidden>
+        <p id="r-plano"></p>
+        <div class="preco" id="r-preco"></div>
+        <p class="legal" id="r-ciclo"></p>
+        <p class="cupom-ok" id="r-cupom" hidden></p>
+        <form class="as-form" id="f" novalidate>
+          <label class="l" for="nome">Nome</label>
+          <input id="nome" type="text" autocomplete="name" maxlength="80" placeholder="Seu nome">
+          <label class="l" for="email">E-mail (é com ele que você vai entrar)</label>
+          <input id="email" type="email" autocomplete="email" maxlength="200" required placeholder="voce@exemplo.com">
+          <details class="as-termos"><summary>Ler os Termos de uso</summary><div class="aceite-caixa" id="caixa">Carregando…</div></details>
+          <label class="aceite" for="aceite"><input id="aceite" type="checkbox"><span>Li e aceito os <a href="/termos-de-uso/" target="_blank" rel="noopener">Termos de uso</a> e a <a href="/politica-de-privacidade/" target="_blank" rel="noopener">Política de privacidade</a>. Vou receber um comprovante por e-mail.</span></label>
+          <div class="msg" id="m" role="alert" hidden></div>
+          <button class="btn pri" id="b" type="submit" style="width:100%">Continuar para o pagamento</button>
+        </form>
+        <p class="as-seg">Pagamento seguro pela Cakto. Pix ou cartão de crédito, em até 12x no anual. Os dados do cartão não passam pelos nossos servidores.</p>
+        <p class="as-seg"><a href="/#planos">Trocar de plano</a></p>
+      </div>
+    </section>
+    <section class="as-card as-pag" id="pag" aria-live="polite">
+      <div id="pag-vazio"><h2>Pagamento</h2><p style="color:var(--mut)">Preencha os dados ao lado e aceite os termos. O pagamento aparece aqui, sem sair do site.</p></div>
+      <div id="pag-quadro" hidden>
+        <iframe id="quadro" title="Pagamento seguro" allow="payment *; clipboard-write" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>
+        <p class="as-fallback">O pagamento não apareceu ou travou? <a id="abrir-aba" href="#" target="_blank" rel="noopener">Abra o pagamento seguro numa nova aba</a>. Esta página avisa quando for aprovado.</p>
+      </div>
+      <div class="as-ok" id="pag-ok" hidden>
+        <h2>Pagamento aprovado!</h2>
+        <p id="ok-txt">Enviamos um e-mail para criar a sua senha. Se não chegar em poucos minutos, olhe o spam.</p>
+        <p><a class="btn pri" href="/#baixar">Baixar o aplicativo</a></p>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="/assets/config.js?v=0.1.21"></script>
+<script src="/assets/termos.js?v=0.1.21"></script>
+<script src="/assets/assinar.js?v=0.1.21"></script>
+</body>
+</html>

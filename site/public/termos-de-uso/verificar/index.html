@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conferir aceite · Segundo Cérebro</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/style.css?v=0.1.21">
+<script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="topo"><div class="wrap"><a class="marca" href="/"><img src="/assets/img/logo.png" alt="" width="34" height="34">Segundo Cérebro</a></div></header>
+<main class="wrap pag">
+  <h1>Conferir um aceite dos Termos de uso</h1>
+  <p>Digite o código de verificação que veio no e-mail de comprovante. Mostramos a versão aceita, a data e a hora, e confirmamos que o registro não foi alterado.</p>
+  <form class="form" id="f" novalidate>
+    <label for="c">Código de verificação</label>
+    <input id="c" type="text" autocomplete="off" maxlength="64" required placeholder="Ex.: 3fa9c1d27b40">
+    <div class="msg" id="m" role="alert" hidden></div>
+    <button class="btn pri" id="b" type="submit">Conferir</button>
+  </form>
+  <div id="res" class="msg ok" hidden></div>
+</main>
+<script src="/assets/config.js?v=0.1.21"></script>
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i) }
+  var q = new URLSearchParams(location.search).get('codigo'); if (q) $('c').value = q
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] }) }
+  function conferir() {
+    var cod = $('c').value.trim(); if (!cod) return
+    $('m').hidden = true; $('res').hidden = true
+    fetch((window.BRAIN.api || '') + '/v1/termos/verificar?codigo=' + encodeURIComponent(cod)).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j } }) }).then(function (r) {
+      if (!r.ok) { $('m').textContent = 'Informe o código completo do comprovante (pelo menos 12 caracteres).'; $('m').hidden = false; return }
+      if (r.j.valido) {
+        $('res').innerHTML = '<b>Aceite válido.</b><br>Versão dos termos: ' + esc(r.j.versao) + '<br>Data e hora (UTC): ' + esc(r.j.aceito_em) + '<br>E-mail: ' + esc(r.j.email) + '<br>Canal: ' + esc(r.j.canal) + '<br><a href="/termos-de-uso/?versao=' + encodeURIComponent(r.j.versao) + '">Ler a versão aceita</a>'
+        $('res').hidden = false
+      } else { $('m').textContent = 'Não encontramos um aceite válido com esse código.'; $('m').hidden = false }
+    }).catch(function () { $('m').textContent = 'Sem conexão com o servidor. Tente de novo.'; $('m').hidden = false })
+  }
+  $('f').addEventListener('submit', function (e) { e.preventDefault(); conferir() })
+  if (q) conferir()
+})()
+</script>
+</body>
+</html>

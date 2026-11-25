@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Como usar o Cérebro Pro</title>
+<meta name="description" content="Manual completo do Cérebro Pro, com prints de cada tela: instalar, entrar, fazer o primeiro pedido, anexar arquivos, conectar o Claude e o ChatGPT, usar skills, navegador, acesso web e mais.">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/style.css?v=0.1.21">
+<script>try{var t=localStorage.getItem('tema');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>
+.man{display:grid;grid-template-columns:250px minmax(0,1fr);gap:40px;align-items:start;margin:28px auto 70px}
+.man-toc{position:sticky;top:84px;max-height:calc(100vh - 110px);overflow:auto;font-size:14px;border-right:1px solid rgba(127,127,127,.25);padding-right:14px}
+.man-toc b{display:block;margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.man-toc a{display:block;padding:6px 8px;border-radius:8px;color:inherit;text-decoration:none;line-height:1.35}
+.man-toc a:hover{background:rgba(127,127,127,.14)}
+.man-toc a.on{background:rgba(201,122,58,.18);color:inherit;font-weight:600}
+.man article{min-width:0}
+.man h1{font-size:clamp(30px,4vw,42px);margin:0 0 10px;max-width:none;width:auto}
+.man .lede{font-size:19px;color:var(--mut);margin:0 0 26px;line-height:1.55}
+.man section{padding-top:26px;margin-top:20px;border-top:1px solid rgba(127,127,127,.2)}
+.man h2{font-size:clamp(23px,3vw,29px);margin:0 0 6px}
+.man h2 small{display:block;font-size:13px;font-weight:600;color:#c97a3a;letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
+.man h3{font-size:18px;margin:22px 0 6px}
+.man p,.man li{line-height:1.65}
+.man ol.passos{counter-reset:p;list-style:none;padding:0;margin:14px 0}
+.man ol.passos>li{counter-increment:p;position:relative;padding:4px 0 10px 44px}
+.man ol.passos>li::before{content:counter(p);position:absolute;left:0;top:2px;width:30px;height:30px;border-radius:50%;background:#c97a3a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.man figure{margin:16px 0 22px}
+.man figure img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid rgba(127,127,127,.3);box-shadow:0 10px 34px rgba(0,0,0,.28)}
+.man figcaption{font-size:14px;color:var(--mut);margin-top:8px;line-height:1.5}
+.man .dica,.man .atencao{border-radius:12px;padding:12px 16px;margin:16px 0;font-size:15px;line-height:1.6}
+.man .dica{background:rgba(34,160,90,.12);border:1px solid rgba(34,160,90,.35)}
+.man .atencao{background:rgba(224,160,48,.13);border:1px solid rgba(224,160,48,.4)}
+.man .dica b,.man .atencao b{display:block;margin-bottom:2px}
+.man .pedidos{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin:12px 0}
+.man .pedidos div{border:1px solid rgba(127,127,127,.3);border-radius:12px;padding:10px 14px;font-size:15px;background:rgba(127,127,127,.06)}
+.man table{border-collapse:collapse;width:100%;font-size:15px;margin:12px 0}
+.man th,.man td{border:1px solid rgba(127,127,127,.3);padding:9px 12px;text-align:left;vertical-align:top}
+.man th{background:rgba(127,127,127,.12)}
+.man kbd{background:rgba(127,127,127,.18);border-radius:6px;padding:1px 7px;font-size:13px}
+@media(max-width:900px){.man{grid-template-columns:1fr}.man-toc{position:static;max-height:none;border:0;padding:0;columns:2}.man-toc b{column-span:all}}
+</style>
+</head>
+<body>
+<header class="topo"><div class="wrap"><a class="marca" href="/"><img src="/assets/img/logo.png" alt="" width="34" height="34">Cérebro Pro</a><nav class="menu" aria-label="Principal"><a href="/#planos">Planos</a><a href="/#baixar">Baixar</a><a href="/como-usar/">Como usar</a><a href="/extensao/">Extensão do Chrome</a></nav></div></header>
+<main class="wrap man">
+<nav class="man-toc" id="toc" aria-label="Neste manual">
+  <b>Neste manual</b>
+  <a href="#comecar">1. Instalar e entrar</a>
+  <a href="#tela">2. Conhecendo a tela</a>
+  <a href="#pedido">3. Seu primeiro pedido</a>
+  <a href="#anexos">4. Anexar arquivos</a>
+  <a href="#ia">5. Escolher a IA e o modo</a>
+  <a href="#permissoes">6. Permissões do agente</a>
+  <a href="#provedores">7. Conectar Claude, ChatGPT e Gemini</a>
+  <a href="#combos">8. Combos</a>
+  <a href="#skills">9. Skills</a>
+  <a href="#navegador">10. Navegador e Chrome</a>
+  <a href="#cerebro">11. O cérebro ao vivo</a>
+  <a href="#midia">12. Imagem, vídeo e voz</a>
+  <a href="#uso">13. Uso, limites e créditos</a>
+  <a href="#web">14. Pelo navegador e pelo celular</a>
+  <a href="#problemas">15. Se algo der errado</a>
+</nav>
+<article>
+  <h1>Como usar o Cérebro Pro</h1>
+  <p class="lede">Do download ao primeiro pedido, e depois a tudo o que ele faz: este manual segue o caminho de quem está começando, com a tela de cada passo. Dá para ler do começo ao fim ou ir direto ao que você precisa pelo índice.</p>
+
+<section id="comecar">
+  <h2><small>Passo 1</small>Instalar e entrar</h2>
+  <p>O Cérebro Pro é um aplicativo para Windows, Mac e Linux. Ele conversa com você, mas também trabalha: lê e cria arquivos na sua pasta, pesquisa na internet, abre sites, gera imagens e mais. Também dá para usar pelo navegador, sem instalar nada (veja o <a href="#web">passo 14</a>).</p>
+  <ol class="passos">
+    <li><b>Baixe o aplicativo</b> na <a href="/#baixar">página inicial</a>. O site já mostra o botão certo para o seu sistema.</li>
+    <li><b>Instale.</b> No Windows, abra o arquivo baixado e siga o assistente. Se o Windows avisar "O Windows protegeu o computador", clique em <b>Mais informações</b> e depois em <b>Executar assim mesmo</b>: o aplicativo ainda não tem assinatura digital paga. No Mac, arraste o app para a pasta Aplicativos e, na primeira vez, abra com o botão direito do mouse e escolha <b>Abrir</b>.</li>
+    <li><b>Abra o Cérebro Pro</b> e entre com o <b>e-mail e a senha</b> da sua assinatura (a senha você criou pelo e-mail que enviamos depois da compra). Esqueceu? Use <b>Esqueci a senha</b> na própria tela de entrada.</li>
+    <li><b>Espere a preparação da primeira vez.</b> O aplicativo prepara o assistente que trabalha no seu computador. Uma tela mostra o cérebro, a barra de 0 a 100% e quanto falta. Acontece só uma vez; depois o assistente abre em segundos.</li>
+  </ol>
+  <div class="dica"><b>Dica</b>Deixe o aplicativo aberto durante a preparação. Se a internet cair, ele continua de onde parou quando voltar.</div>
+</section>
+
+<section id="tela">
+  <h2><small>Passo 2</small>Conhecendo a tela</h2>
+  <figure><img src="img/01-chat-novo.webp" alt="Tela inicial do Cérebro Pro com conversa nova, barra lateral e caixa de mensagem" loading="lazy"><figcaption>A tela de uma conversa nova.</figcaption></figure>
+  <table>
+    <tr><th>Onde</th><th>O que é</th></tr>
+    <tr><td><b>Barra lateral (esquerda)</b></td><td><b>Nova conversa</b>, a busca e a lista das suas conversas (as fixadas ficam no alto). Embaixo estão a sua conta e as <b>Configurações</b>. O botão no topo recolhe a barra.</td></tr>
+    <tr><td><b>Topo</b></td><td>O nome da conversa e dois botões: <b>Cérebro</b> (mostra o assistente trabalhando) e <b>Navegador</b> (abre um navegador ao lado do chat).</td></tr>
+    <tr><td><b>Caixa de mensagem</b></td><td>Onde você escreve. Embaixo dela: <b>clipe</b> (anexar), <b>Agente</b> (modo de trabalho), <b>Pensar</b> (quanto raciocinar), <b>escudo</b> (permissões), a <b>IA</b> escolhida, o <b>microfone</b> (ditado por voz) e o botão de <b>enviar</b>.</td></tr>
+    <tr><td><b>Rodapé</b></td><td>A <b>pasta de trabalho</b> (onde o assistente lê e cria arquivos) e o medidor do tamanho da conversa.</td></tr>
+  </table>
+</section>
+
+<section id="pedido">
+  <h2><small>Passo 3</small>Seu primeiro pedido</h2>
+  <p>Escreva do jeito que você falaria com uma pessoa e aperte <kbd>Enter</kbd>. Para quebrar linha, use <kbd>Shift</kbd> + <kbd>Enter</kbd>.</p>
+  <figure><img src="img/02-escrevendo.webp" alt="Mensagem sendo escrita na caixa do chat" loading="lazy"><figcaption>Escreva o pedido na caixa de mensagem.</figcaption></figure>
+  <p>Enquanto trabalha, o cérebro acende e uma frase mostra o que ele está fazendo naquele momento ("Escrevendo", "Abrindo a internet", "Lendo uma skill"). Você pode continuar falando: sua nova mensagem entra no meio do trabalho para corrigir o rumo.</p>
+  <figure><img src="img/02b-trabalhando.webp" alt="Assistente trabalhando, com o cérebro animado e a frase do passo atual" loading="lazy"><figcaption>Trabalhando: o cérebro mostra o que está acontecendo.</figcaption></figure>
+  <p>Quando termina, a resposta aparece num cartão. Clique em <b>"Trabalhou por X s"</b> para ver cada passo que ele deu (arquivos lidos, comandos, buscas).</p>
+  <figure><img src="img/02c-resposta-pronta.webp" alt="Resposta pronta em um cartão, com o estado Em repouso" loading="lazy"><figcaption>Resposta pronta. "Em repouso" quer dizer que ele está livre para o próximo pedido.</figcaption></figure>
+  <h3>Pedidos que funcionam bem</h3>
+  <div class="pedidos">
+    <div>"Resuma este PDF e me diga os 3 pontos mais importantes."</div>
+    <div>"Crie uma planilha com meus gastos do mês a partir deste arquivo."</div>
+    <div>"Pesquise na internet o preço médio de X e me mande um resumo."</div>
+    <div>"Organize a pasta Downloads por tipo de arquivo."</div>
+    <div>"Escreva um e-mail cordial cobrando uma fatura atrasada."</div>
+    <div>"Gere uma imagem de um café aconchegante para o meu post."</div>
+  </div>
+  <div class="dica"><b>Quanto mais claro, melhor</b>Diga o objetivo, para quem é e como quer receber (arquivo, texto, tabela). Se faltar algo importante, ele pergunta antes de começar.</div>
+</section>
+
+<section id="anexos">
+  <h2><small>Passo 4</small>Anexar arquivos</h2>
+  <ol class="passos">
+    <li>Clique no <b>clipe</b> da caixa de mensagem e escolha os arquivos, <b>ou arraste e solte</b> direto na tela do chat.</li>
+    <li>Acompanhe a barra de envio (arquivos grandes, como vídeos, sobem em pedaços).</li>
+    <li>Escreva o que quer fazer com eles e envie.</li>
+  </ol>
+  <p>Funciona com documentos (PDF, Word, Excel), imagens, áudios e vídeos. Também funciona pelo acesso web, no celular.</p>
+</section>
+
+<section id="ia">
+  <h2><small>Passo 5</small>Escolher a IA e o modo</h2>
+  <p>No canto direito da caixa de mensagem fica a <b>IA que vai responder</b>. Clique nela para trocar.</p>
+  <figure><img src="img/03-escolher-modelo.webp" alt="Menu de escolha da IA com combos e modelos" loading="lazy"><figcaption>O menu mostra seus <b>combos</b> e as IAs conectadas. A "Unlimited" é a IA da casa, incluída na assinatura.</figcaption></figure>
+  <h3>Pensar</h3>
+  <p>Controla o quanto a IA reflete antes de responder. Para perguntas rápidas deixe no automático; para problemas difíceis (contas, estratégia, código) aumente.</p>
+  <figure><img src="img/05-raciocinio.webp" alt="Menu Pensar com níveis de raciocínio" loading="lazy"><figcaption>Níveis do "Pensar".</figcaption></figure>
+  <h3>Agente ou só conversa</h3>
+  <p>No modo <b>Agente</b> ele usa ferramentas de verdade (arquivos, internet, comandos). Desligado, ele só conversa, mais rápido e sem mexer em nada.</p>
+</section>
+
+<section id="permissoes">
+  <h2><small>Passo 6</small>Permissões do agente</h2>
+  <p>O assistente trabalha no seu computador, então você decide o quanto ele pode fazer sozinho. Clique no <b>escudo</b>.</p>
+  <figure><img src="img/04-permissoes.webp" alt="Menu de permissões do agente" loading="lazy"><figcaption>Quatro níveis de permissão.</figcaption></figure>
+  <table>
+    <tr><th>Modo</th><th>Quando usar</th></tr>
+    <tr><td><b>Manual</b></td><td>Pergunta antes de escrever arquivos e rodar comandos. O mais seguro, ótimo para começar.</td></tr>
+    <tr><td><b>Editar sozinho</b></td><td>Edita arquivos da pasta de trabalho sem perguntar; pergunta para o resto.</td></tr>
+    <tr><td><b>Automático</b></td><td>Aprova o que é seguro (ler, editar na pasta, comandos comuns) e pergunta o que for arriscado.</td></tr>
+    <tr><td><b>Ignorar permissões</b></td><td>Nunca pergunta. Só use numa pasta de teste: ele pode apagar e alterar arquivos.</td></tr>
+  </table>
+  <div class="atencao"><b>Atenção</b>Troque a pasta de trabalho (rodapé do chat) para uma pasta só para o assistente se for usar modos mais soltos.</div>
+</section>
+
+<section id="provedores">
+  <h2><small>Passo 7</small>Conectar Claude, ChatGPT e Gemini</h2>
+  <p>Você pode usar a sua própria assinatura do <b>Claude</b>, do <b>ChatGPT</b> ou do <b>Gemini</b> dentro do Cérebro Pro, ao lado da nossa IA. Todas passam a ter a mesma memória e as mesmas skills. Você não precisa de chave de API.</p>
+  <ol class="passos">
+    <li>Clique em <b>Configurações</b> (embaixo, à esquerda) e abra <b>Provedores</b>.</li>
+    <li>Em <b>Disponíveis</b>, escolha <b>Claude Code</b> (assinatura Claude), <b>OpenAI Codex</b> (assinatura ChatGPT) ou <b>Gemini CLI</b>. Use a busca ou o filtro <b>Assinatura</b> para achar.</li>
+  </ol>
+  <figure><img src="img/08-provedores.webp" alt="Tela Provedores com a lista de IAs disponíveis e a Unlimited conectada" loading="lazy"><figcaption>Provedores: os conectados no alto, os disponíveis embaixo.</figcaption></figure>
+  <ol class="passos" start="3">
+    <li>Na janela que abrir, clique em <b>Entrar com a conta</b>.</li>
+  </ol>
+  <figure><img src="img/09-conectar-claude.webp" alt="Janela para conectar o Claude Code com o botão Entrar com a conta" loading="lazy"><figcaption>Conectar o Claude Code.</figcaption></figure>
+  <ol class="passos" start="4">
+    <li>Abre uma <b>janela do próprio Cérebro Pro</b> com o login da empresa. Entre com a sua conta e, no fim, a janela <b>fecha sozinha</b> e a conta aparece conectada. Você não precisa copiar nenhum endereço.</li>
+    <li>Pronto: a IA aparece no menu de escolha, e você pode usá-la numa conversa ou montar um combo.</li>
+  </ol>
+  <figure><img src="img/09b-conectar-chatgpt.webp" alt="Janela para conectar o ChatGPT (OpenAI Codex)" loading="lazy"><figcaption>O ChatGPT é conectado pelo mesmo caminho.</figcaption></figure>
+  <div class="dica"><b>O que conta no limite</b>O que você usa pelo Claude ou pelo ChatGPT gasta o limite da <b>sua assinatura deles</b>, não o da assinatura do Cérebro Pro. Só o que passa pela IA da casa (Unlimited) conta nos seus limites daqui.</div>
+  <div class="atencao"><b>Usando pelo navegador (acesso web)?</b>Instale a <a href="/extensao/">extensão do Chrome</a>: com ela o login abre no seu próprio Chrome e é capturado sozinho. Sem a extensão, o app pede para colar o endereço completo da barra depois do login.</div>
+  <div class="atencao"><b>Não conectou?</b>O login só funciona com assinatura paga ativa da empresa (Claude Pro/Max, ChatGPT Plus/Pro). Se a janela foi fechada antes do fim, é só clicar em <b>Entrar com a conta</b> de novo.</div>
+</section>
+
+<section id="combos">
+  <h2><small>Passo 8</small>Combos: várias IAs trabalhando juntas</h2>
+  <p>Um <b>combo</b> é um grupo de IAs numa ordem. Se a primeira falhar ou atingir o limite, ele passa para a seguinte sozinho. Ou divide o trabalho entre elas (rodízio).</p>
+  <figure><img src="img/10-combos.webp" alt="Tela de Combos" loading="lazy"><figcaption>Em <b>Configurações → Combos</b> você cria e edita os seus.</figcaption></figure>
+  <p>Cada IA que você conecta ganha um combo automático. Além disso, o próprio assistente sabe consultar outra IA para uma parte do trabalho: peça, por exemplo, <i>"planeje com o Claude e execute com a Unlimited"</i> ou <i>"peça uma segunda opinião ao ChatGPT"</i>.</p>
+</section>
+
+<section id="skills">
+  <h2><small>Passo 9</small>Skills: ensinando o assistente</h2>
+  <p>Uma <b>skill</b> é um manual de como fazer uma tarefa do jeito certo (montar um vídeo, escrever um contrato, analisar uma planilha). O assistente consulta as skills sozinho quando o pedido combina com elas, e você também pode pedir uma pelo nome.</p>
+  <h3>Pedir uma skill</h3>
+  <div class="pedidos">
+    <div>"Use a skill de <b>front-end</b> para criar a página do meu restaurante."</div>
+    <div>"Quais skills você tem para <b>vídeo</b>?"</div>
+    <div>"Siga a skill de <b>escrita e documentos</b> para montar a proposta."</div>
+  </div>
+  <h3>Ver, buscar e criar</h3>
+  <ol class="passos">
+    <li>Abra <b>Configurações → Skills</b>.</li>
+    <li>Use a busca ou abra as pastas para ver as skills disponíveis. As da Rangel Tech são somente leitura (para editar, copie).</li>
+    <li>Clique em <b>Nova skill</b> para criar a sua, ou peça: <i>"crie uma skill com o jeito que eu escrevo e-mails"</i>. Ele escreve e guarda.</li>
+  </ol>
+  <figure><img src="img/15-skills.webp" alt="Tela de Skills com a árvore de pastas e o botão Nova skill" loading="lazy"><figcaption>As skills em <b>Configurações → Skills</b>. Também dá para sincronizar com o GitHub.</figcaption></figure>
+  <div class="dica"><b>Aprendizado próprio</b>O assistente também guarda sozinho o que aprendeu sobre o seu jeito de trabalhar, para não precisar repetir.</div>
+</section>
+
+<section id="navegador">
+  <h2><small>Passo 10</small>Navegador e Chrome</h2>
+  <p>Clique em <b>Navegador</b> no topo para abrir um navegador ao lado do chat. O assistente usa esse navegador para abrir sites, ler páginas, preencher formulários e tirar prints, e você vê tudo acontecendo. Você também pode usá-lo normalmente.</p>
+  <figure><img src="img/06-navegador-integrado.webp" alt="Navegador integrado ao lado do chat" loading="lazy"><figcaption>O navegador do assistente ao lado da conversa.</figcaption></figure>
+  <h3>Em outra janela</h3>
+  <p>Prefere uma tela grande? Clique no ícone <b>"abrir em outra janela"</b> (ao lado do X). O navegador sai do painel e vira uma <b>janela própria</b>, com a mesma página e as mesmas abas; o assistente continua controlando. Para voltar, clique em <b>Reencaixar</b>.</p>
+  <figure><img src="img/06b-navegador-janela.webp" alt="Navegador do Cérebro Pro em janela própria" loading="lazy"><figcaption>O navegador em janela própria.</figcaption></figure>
+  <h3>Usar o seu Chrome (com as suas contas abertas)</h3>
+  <p>Para o assistente usar o <b>seu</b> Chrome, com WhatsApp, Instagram, Gmail e outras contas que você já tem abertas, instale a <a href="/extensao/">extensão do Chrome</a>. Depois, em <b>Configurações → Chrome</b>, toque em <b>Conectar o Chrome</b>. No aplicativo o navegador padrão continua sendo o integrado; peça <i>"use o meu Chrome"</i> quando quiser trocar.</p>
+  <figure><img src="img/13-chrome.webp" alt="Tela de configurações do Chrome com o botão Conectar o Chrome" loading="lazy"><figcaption>Configurações → Chrome.</figcaption></figure>
+  <div class="atencao"><b>Você no controle</b>Pause ou desconecte a extensão a qualquer momento pelo ícone dela. Ela só age quando há uma tarefa sua em andamento, numa aba separada.</div>
+</section>
+
+<section id="cerebro">
+  <h2><small>Passo 11</small>O cérebro ao vivo</h2>
+  <p>O botão <b>Cérebro</b> mostra, em tela cheia, o assistente pensando: o cérebro acende e se liga ao que ele está usando naquele momento (arquivos, internet, skills, memória, imagem). Serve para acompanhar tarefas longas sem ler cada passo.</p>
+  <figure><img src="img/07-cerebro.webp" alt="Tela do cérebro em tela cheia" loading="lazy"><figcaption>Cérebro em tela cheia.</figcaption></figure>
+</section>
+
+<section id="midia">
+  <h2><small>Passo 12</small>Imagem, vídeo e voz</h2>
+  <p>Peça direto no chat. O assistente escolhe a ferramenta certa:</p>
+  <div class="pedidos">
+    <div>"Gere uma imagem de uma cafeteria aconchegante, estilo foto."</div>
+    <div>"Crie um vídeo de 5 segundos de um balão subindo."</div>
+    <div>"Clone esta voz e leia este texto com ela." (com amostra de 3 a 25 s)</div>
+    <div>"Dubla este vídeo para o inglês mantendo a minha voz."</div>
+  </div>
+  <p>Vídeos e trocas de voz levam alguns minutos: o app avisa no chat quando o arquivo fica pronto, e você pode seguir conversando. Os arquivos ficam nas pastas <b>Imagens</b> e <b>Videos</b> dentro da sua pasta de trabalho. A quantidade por mês depende do plano; passou do limite, você pode comprar <b>créditos avulsos</b>.</p>
+  <div class="atencao"><b>Direitos</b>Use rostos, vozes e imagens de outras pessoas só com autorização delas (veja os <a href="/termos-de-uso/">Termos de uso</a>).</div>
+</section>
+
+<section id="uso">
+  <h2><small>Passo 13</small>Uso, limites e créditos</h2>
+  <p>Em <b>Configurações → Uso</b> você vê quanto da assinatura já usou: a <b>janela de 5 horas</b> e a <b>semana</b>, com quando cada uma zera. Embaixo, o <b>Uso por IA</b> mostra quanto cada IA conectada trabalhou neste computador.</p>
+  <figure><img src="img/11-uso.webp" alt="Tela de Uso com a janela atual, a semana e o uso por IA" loading="lazy"><figcaption>Uso: janela de 5 horas, semana e uso por IA.</figcaption></figure>
+  <p>Quando o limite do plano acaba, o aplicativo avisa e oferece: <b>esperar zerar</b>, <b>comprar créditos avulsos</b> ou <b>subir de plano</b>. Em <b>Cota</b> você acompanha o que sobra nas contas que conectou.</p>
+  <figure><img src="img/12-cota.webp" alt="Tela de Cota das contas conectadas" loading="lazy"><figcaption>Cota das contas conectadas.</figcaption></figure>
+</section>
+
+<section id="web">
+  <h2><small>Passo 14</small>Pelo navegador e pelo celular</h2>
+  <p>Você pode conversar com o Cérebro Pro de qualquer lugar. O trabalho acontece no seu computador (ou na sua máquina virtual); a tela web é só o controle remoto.</p>
+  <h3>1. Ligue no computador</h3>
+  <p>No aplicativo: <b>Configurações → Acesso web</b> e ligue <b>Permitir acesso pela web</b>. Se você tem uma máquina virtual, ela já vem ligada.</p>
+  <figure><img src="img/14-acesso-web.webp" alt="Tela Acesso web do aplicativo" loading="lazy"><figcaption>Configurações → Acesso web.</figcaption></figure>
+  <h3>2. Entre pelo navegador</h3>
+  <ol class="passos">
+    <li>Abra <b>app.segundocerebro.pro</b> no celular ou em qualquer computador.</li>
+    <li>Entre com o <b>mesmo e-mail e a mesma senha</b> do aplicativo.</li>
+  </ol>
+  <figure><img src="img/w01-entrar.webp" alt="Tela de entrada do acesso web" loading="lazy"><figcaption>Entrada do acesso web.</figcaption></figure>
+  <ol class="passos" start="3">
+    <li>Escolha o computador que quer controlar (se tiver só um, ele abre direto).</li>
+  </ol>
+  <figure><img src="img/w02-escolher-computador.webp" alt="Escolha do computador no acesso web" loading="lazy"><figcaption>Escolha do computador, com o estado de conexão.</figcaption></figure>
+  <ol class="passos" start="4">
+    <li>Converse como no aplicativo: as mesmas conversas, os mesmos arquivos, o mesmo assistente.</li>
+  </ol>
+  <figure><img src="img/w04-resposta-web.webp" alt="Conversa no acesso web" loading="lazy"><figcaption>O chat pelo navegador.</figcaption></figure>
+  <div class="dica"><b>No celular</b>Dá para adicionar à tela inicial e usar como um aplicativo. Anexos e vídeos grandes também funcionam.</div>
+  <div class="atencao"><b>Algumas coisas só no computador</b>Escolher a pasta de trabalho e abrir arquivos no programa deles ficam no aplicativo. Pela web você baixa o resultado.</div>
+</section>
+
+<section id="problemas">
+  <h2><small>Passo 15</small>Se algo der errado</h2>
+  <table>
+    <tr><th>O que aconteceu</th><th>O que fazer</th></tr>
+    <tr><td>Esqueci a senha</td><td>Na tela de entrada (aplicativo ou web) clique em <b>Esqueci a senha</b>. Chega um e-mail com o link; olhe o spam.</td></tr>
+    <tr><td>A preparação da primeira vez está demorando</td><td>Depende da internet. Deixe aberto; ela continua se a conexão voltar. Se parar por mais de 10 minutos, feche e abra o aplicativo.</td></tr>
+    <tr><td>O Windows bloqueou a instalação</td><td>Clique em <b>Mais informações → Executar assim mesmo</b>.</td></tr>
+    <tr><td>"Limite atingido"</td><td>Veja em <b>Configurações → Uso</b> quando zera, ou compre créditos avulsos, ou suba de plano.</td></tr>
+    <tr><td>O login do Claude/ChatGPT não conclui</td><td>Confira se a assinatura deles está ativa. Feche a janela de login e tente de novo. Pela web, instale a <a href="/extensao/">extensão do Chrome</a>.</td></tr>
+    <tr><td>O acesso web diz que o computador está offline</td><td>No computador, abra o aplicativo e confira <b>Configurações → Acesso web</b>. O computador precisa estar ligado e com internet.</td></tr>
+    <tr><td>Quero ver o que aconteceu por trás</td><td>Em <b>Configurações → Sobre</b> há o botão para abrir os registros; envie-os ao suporte.</td></tr>
+  </table>
+  <figure><img src="img/16-sobre.webp" alt="Tela Sobre com a versão e atualizações" loading="lazy"><figcaption>Configurações → Sobre: versão, atualizações e registros.</figcaption></figure>
+  <p>Ainda com dúvida? Fale com a nossa equipe pelo canal informado na confirmação da sua compra.</p>
+</section>
+</article>
+</main>
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'))
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute('href')) }).filter(Boolean)
+  function atual() {
+    var y = window.scrollY + 120, ativo = secs[0]
+    secs.forEach(function (s) { if (s.offsetTop <= y) ativo = s })
+    links.forEach(function (a) { a.classList.toggle('on', ativo && a.getAttribute('href') === '#' + ativo.id) })
+  }
+  window.addEventListener('scroll', atual, { passive: true }); atual()
+})()
+</script>
+</body>
+</html>
