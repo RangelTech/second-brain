@@ -1,0 +1,56 @@
+name: ci
+# Esteira particionada do monorepo (spec 57 §3.3.3): cada pasta tem o seu CI; mudar o app (a raiz) roda tudo.
+# A proteção da branch exige só o job "ci-ok" (jobs pulados por filtro não travam a verificação).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  detectar:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.f.outputs.app }}
+      extensao: ${{ steps.f.outputs.extensao }}
+      site: ${{ steps.f.outputs.site }}
+      remoto: ${{ steps.f.outputs.remoto }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          predicate-quantifier: every
+          filters: |
+            extensao:
+              - 'extensao/**'
+            site:
+              - 'site/**'
+            remoto:
+              - 'remoto/**'
+            app:
+              - '**'
+              - '!extensao/**'
+              - '!site/**'
+              - '!remoto/**'
+
+  app:
+    needs: detectar
+    if: needs.detectar.outputs.app == 'true'
+    uses: ./.github/workflows/_app.yml
+
+  extensao:
+    needs: detectar
+    if: needs.detectar.outputs.extensao == 'true' || needs.detectar.outputs.app == 'true'
+    uses: ./.github/workflows/_extensao.yml
+
+  ci-ok:
+    needs: [detectar, app, extensao]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resumo
+        run: |
+          echo "app=${{ needs.app.result }} extensao=${{ needs.extensao.result }}"
+          for r in "${{ needs.detectar.result }}" "${{ needs.app.result }}" "${{ needs.extensao.result }}"; do
+            case "$r" in success|skipped) ;; *) echo "falhou: $r"; exit 1;; esac
+          done

@@ -1,0 +1,47 @@
+name: release-extensao
+# Release da extensão (spec 57 §3.3.3): tag própria extensao-v*, publicada SEM virar "latest" (o app se atualiza pela
+# latest, que tem de continuar sendo uma tag v*). Commit na main não gera release.
+on:
+  push:
+    tags: ['extensao-v*']
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: 'versão (ex.: 0.1.2), igual à do manifest.json'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Versão
+        id: v
+        run: |
+          V="${{ github.event.inputs.versao }}"; [ -n "$V" ] || V="${GITHUB_REF_NAME#extensao-v}"
+          M=$(node -p "require('./extensao/manifest.json').version")
+          [ "$V" = "$M" ] || { echo "tag $V diferente do manifest $M"; exit 1; }
+          echo "versao=$V" >> "$GITHUB_OUTPUT"
+      - run: cd extensao && node scripts/montar.js && node scripts/checar-id.js && cd dist && zip -qr ../../segundo-cerebro-chrome.zip .
+      - name: Publicar (sem virar latest)
+        run: |
+          T="extensao-v${{ steps.v.outputs.versao }}"
+          gh release create "$T" segundo-cerebro-chrome.zip --target "$GITHUB_SHA" --title "Extensão do Chrome $T" \
+            --notes "Extensão do Chrome do Cérebro Pro (ID cdhhngjakiihefobehjmpdhlpedlkanp)." --latest=false
+      - name: A latest continua sendo o app (tag v*)
+        run: |
+          L=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name)
+          echo "latest: $L"
+          if ! echo "$L" | grep -Eq '^v[0-9]'; then
+            A=$(gh release list --limit 50 --json tagName,isDraft,isPrerelease -q '[.[] | select((.tagName|test("^v[0-9]")) and (.isDraft|not) and (.isPrerelease|not))][0].tagName')
+            gh release edit "$A" --latest
+            echo "::error::a latest tinha virado $L; devolvida para $A"; exit 1
+          fi

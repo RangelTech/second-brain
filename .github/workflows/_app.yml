@@ -1,0 +1,20 @@
+name: _app
+# CI leve do app (raiz). O build dos instaladores continua só no release.yml (tags v*).
+on:
+  workflow_call:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: for i in 1 2 3; do npm ci --ignore-scripts && exit 0; rm -rf node_modules; sleep $((i*15)); done; exit 1
+        shell: bash
+      - run: node scripts/checar-pacote.js
+      - run: node --test test/atualizador.test.js

@@ -1,0 +1,23 @@
+name: _extensao
+# Build da extensão do Chrome (pasta extensao/): monta o dist, confere o ID fixo e guarda o zip como artefato.
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extensao
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/montar.js
+      - run: node scripts/checar-id.js
+      - run: cd dist && zip -qr ../segundo-cerebro-chrome.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extensao-zip
+          path: extensao/segundo-cerebro-chrome.zip
