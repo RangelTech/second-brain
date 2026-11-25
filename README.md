@@ -5,6 +5,19 @@
 
 ![Tela principal](docs/img/principal.webp)
 
+
+## Componentes deste repositório (monorepo, spec 57 §3.3)
+
+| Pasta | O que é | CI | Release (tag) | Deploy |
+|---|---|---|---|---|
+| raiz | App Cérebro Pro (Electron, Hermes, instaladores) | `_app.yml` | `v*` (`release.yml`; vira a "latest" que os clientes usam) | auto-atualização pelas releases |
+| `extensao/` | Extensão do Chrome (ID `cdhhngjakiihefobehjmpdhlpedlkanp`) | `_extensao.yml` | `extensao-v*` (nunca vira "latest") | zip baixado pelo site |
+| `site/` | Site `segundocerebro.pro` | `_site.yml` | `site-v*` (nunca vira "latest") | `vps_rt_infra`: `deploy.yml -f service=brain-site -f version=site-vX` |
+| `remoto/` | Ponte web e celular `remoto.rangeltech.net` | `_remoto.yml` | `remoto-v*` (nunca vira "latest") | `vps_rt_infra`: `deploy.yml -f service=segundo-cerebro-remoto -f version=remoto-vX` |
+
+O roteador `ci.yml` roda só o CI da pasta que mudou; mudar a raiz (o app) roda tudo. A verificação obrigatória é o job `ci-ok`.
+Commit na `main` não gera release nem deploy. Os repositórios antigos (`segundo_cerebro_site`, `segundo-cerebro-remoto`) estão arquivados, com o histórico e as releases antigas para rollback.
+
 ## O que é
 O Segundo Cérebro (Cérebro Pro): o harness. App de computador (Windows, Linux e macOS) com o agente Hermes, que roda comandos e ferramentas; também usado pelo navegador e pelo celular (ponte remota). Vai virar o monorepo de tudo do Segundo Cérebro (spec 57, seção 3.3).
 
