@@ -1,0 +1,16 @@
+// Monta a pasta dist/ (ou dist-teste/) a partir dos arquivos da extensão: injeta a chave pública (ID fixo) no manifesto.
+// node scripts/montar.js            -> dist/ (o que vai para o cliente)
+// node scripts/montar.js --teste    -> dist-teste/ (também vale em http://127.0.0.1 e http://localhost, para os testes locais; nunca publicar)
+const fs = require('fs'), path = require('path')
+const raiz = path.join(__dirname, '..')
+const teste = process.argv.includes('--teste')
+const saida = path.join(raiz, teste ? 'dist-teste' : 'dist')
+fs.rmSync(saida, { recursive: true, force: true })
+fs.mkdirSync(saida, { recursive: true })
+for (const f of ['background.js', 'nucleo.js', 'content-remoto.js', 'popup.html', 'popup.js']) fs.copyFileSync(path.join(raiz, f), path.join(saida, f))
+fs.cpSync(path.join(raiz, 'icons'), path.join(saida, 'icons'), { recursive: true })
+const m = JSON.parse(fs.readFileSync(path.join(raiz, 'manifest.json'), 'utf8'))
+m.key = JSON.parse(fs.readFileSync(path.join(raiz, 'chave.json'), 'utf8')).key
+if (teste) m.content_scripts[0].matches.push('http://127.0.0.1/*', 'http://localhost/*')
+fs.writeFileSync(path.join(saida, 'manifest.json'), JSON.stringify(m, null, 2))
+console.log('montado em', saida, 'versão', m.version, teste ? '(TESTE)' : '')
