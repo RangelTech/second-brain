@@ -47,14 +47,19 @@ jobs:
     if: needs.detectar.outputs.extensao == 'true' || needs.detectar.outputs.app == 'true'
     uses: ./.github/workflows/_extensao.yml
 
+  site:
+    needs: detectar
+    if: needs.detectar.outputs.site == 'true' || needs.detectar.outputs.app == 'true'
+    uses: ./.github/workflows/_site.yml
+
   ci-ok:
-    needs: [detectar, app, extensao]
+    needs: [detectar, app, extensao, site]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Resumo
         run: |
-          echo "app=${{ needs.app.result }} extensao=${{ needs.extensao.result }}"
-          for r in "${{ needs.detectar.result }}" "${{ needs.app.result }}" "${{ needs.extensao.result }}"; do
+          echo "app=${{ needs.app.result }} extensao=${{ needs.extensao.result }} site=${{ needs.site.result }}"
+          for r in "${{ needs.detectar.result }}" "${{ needs.app.result }}" "${{ needs.extensao.result }}" "${{ needs.site.result }}"; do
             case "$r" in success|skipped) ;; *) echo "falhou: $r"; exit 1;; esac
           done
