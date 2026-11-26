@@ -245,6 +245,7 @@ body.nav-leve:not(.modo-voz) .cerebro-fundo{opacity:.55;transition:opacity .4s}
 .ponto-ctl{width:7px;height:7px;border-radius:50%;background:var(--ac);animation:pulsa 1s infinite}
 .nav-host{flex:1;min-height:0;position:relative;background:#0e0d0b}
 .nav-vazio{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mut);padding:30px;line-height:1.7}
+.nav-vazio[hidden]{display:none}
 .nav.carregando .nav-barra{box-shadow:inset 0 -2px 0 var(--ac)}
 @media (max-width:820px){.nav{position:absolute;inset:0;z-index:40}.app.nav-aberto,.app.nav-aberto.recolhido{grid-template-columns:1fr}}
 @media (max-width:560px){.chip-topo span{display:none}.chip-topo{padding:5px 8px}}
@@ -531,6 +532,8 @@ body.modo-voz .app.nav-aberto{grid-template-columns:272px minmax(0,1fr)}
 body.modo-voz .app.nav-aberto.recolhido{grid-template-columns:minmax(0,1fr)}
 body.modo-voz .nav:not([hidden]){position:fixed;right:18px;top:62px;width:min(30vw,400px);height:min(30vh,260px);z-index:45;border:1px solid rgba(255,255,255,.14);border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.55);animation:vozEntra .3s ease-out}
 body.modo-voz .nav .nav-barra,body.modo-voz .nav-fav-menu{display:none}
+/* navegador WebAssembly da web (spec 60): na telinha da voz o motor continua do tamanho de um computador e só é reduzido na tela */
+body.modo-voz #nav-host > iframe{width:250% !important;height:250% !important;transform:scale(.4);transform-origin:0 0}
 /* spec 53: cartões holográficos da conversa por voz. O que a IA quer mostrar nasce no centro do cérebro, voa até a lateral e fica
    flutuando como projeção: vidro escuro, borda ciano viva, linhas de varredura correndo. Clique amplia. */
 .voz-cartoes{position:absolute;left:28px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;pointer-events:auto;z-index:2;max-height:84%}
