@@ -90,3 +90,11 @@ test('nunca rebaixa: versão de teste mais nova que a publicada não é "atualiz
   assert.equal(maisNova('0.6.81-teste.10', '0.6.81-teste.9'), true)
   assert.equal(maisNova('0.6.80', '0.6.80'), false)
 })
+
+test('Windows: aceita só instalador assinado pelo certificado da Rangel Tech (autoassinado)', () => {
+  const { conferirAssinatura, DIGITAL_RANGEL } = require('../atualizador.js')
+  assert.equal(conferirAssinatura('a.exe', () => DIGITAL_RANGEL.toLowerCase() + '\r\n'), null)
+  assert.match(conferirAssinatura('a.exe', () => 'OUTRO'), /não é assinado pela Rangel Tech/)
+  assert.match(conferirAssinatura('a.exe', () => ''), /sem assinatura/)
+  assert.match(conferirAssinatura('a.exe', () => { throw new Error('powershell sumiu') }), /Não consegui conferir/)
+})

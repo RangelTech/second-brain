@@ -26,6 +26,21 @@ function trocaAutomatica(processo = process) {
   return false
 }
 
+// O instalador do Windows é assinado com o certificado PRÓPRIO da Rangel Tech (autoassinado, raiz não confiável para o Windows). O
+// electron-updater exige assinatura "confiável" e recusava toda atualização ("Não consegui baixar agora"). A conferência passa a ser:
+// o arquivo veio do GitHub por HTTPS com o sha512 do latest.yml (o electron-updater já confere) E foi assinado exatamente pelo nosso
+// certificado (impressão digital abaixo, válido até 2036).
+const DIGITAL_RANGEL = 'E50B573BBB40D703A55B1F9A3810F8334C0CDA3E'
+function conferirAssinatura(arquivo, executar = require('child_process').execFileSync) {
+  try {
+    const cmd = `(Get-AuthenticodeSignature -LiteralPath '${String(arquivo).replace(/'/g, "''")}').SignerCertificate.Thumbprint`
+    const r = String(executar('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60000, windowsHide: true })).trim().toUpperCase()
+    return r === DIGITAL_RANGEL ? null : `O instalador baixado não é assinado pela Rangel Tech (${r || 'sem assinatura'}).`
+  } catch (e) {
+    return 'Não consegui conferir a assinatura do instalador: ' + String(e.message || e).slice(0, 120)
+  }
+}
+
 function criar({ app, cfgGet, enviar, updater }) {
   let au = updater
   if (!au) {
@@ -76,6 +91,7 @@ function criar({ app, cfgGet, enviar, updater }) {
       emitir({ fase: 'pronta' })
       if (instalarJa) instalar(silencioso)
     } catch (e) {
+      try { console.error('atualização: falha ao baixar/conferir:', String(e && e.message || e).slice(0, 400)) } catch {}
       emitir({ fase: 'disponivel', erro: 'Não consegui baixar agora. Tente de novo em instantes.' })
     }
     return est
@@ -92,6 +108,7 @@ function criar({ app, cfgGet, enviar, updater }) {
     if (process.env.SB_TESTE_ATUALIZACAO) setTimeout(() => emitir({ fase: 'disponivel', versao: process.env.SB_TESTE_ATUALIZACAO }), 4000) // só para ensaiar a tela
     if (!au || !app.isPackaged) return
     au.autoDownload = false
+    if (process.platform === 'win32') au.verifyUpdateCodeSignature = async (_publicadores, arquivo) => conferirAssinatura(arquivo)
     au.autoInstallOnAppQuit = true // se baixou e o usuário só fechou o app, a troca acontece ao sair
     au.allowPrerelease = false
     setTimeout(() => conferir(true), 3000).unref?.() // abertura: confere logo e força a atualização (ver conferir)
@@ -101,4 +118,4 @@ function criar({ app, cfgGet, enviar, updater }) {
   return { iniciar, conferir, baixar, instalar, estado: () => ({ ...est }), trocaAutomatica }
 }
 
-module.exports = { criar, trocaAutomatica, maisNova, PAGINA }
+module.exports = { conferirAssinatura, DIGITAL_RANGEL, criar, trocaAutomatica, maisNova, PAGINA }
