@@ -548,7 +548,8 @@ async function tratar(msg) {
           texto = l.length ? 'Coloque estas linhas na resposta, do jeito que estão (o chat mostra as fotos):\n' + l.map((x) => `![${String(a.busca).replace(/[\[\]]/g, '')}](${x.src})`).join('\n') : 'Não achei fotos disso.'
         } else {
           const v = await cv.acharYoutube(a.busca)
-          texto = v ? `Coloque este link na resposta (o chat mostra o player): [${v.titulo.replace(/[\[\]]/g, '')}](https://www.youtube.com/watch?v=${v.id})` : 'Não achei esse vídeo no YouTube.'
+          texto = v ? `Coloque este link na resposta (o chat mostra o player): [${v.titulo.replace(/[\[\]]/g, '')}](https://www.youtube.com/watch?v=${v.id})
+Se a pessoa pediu para ABRIR, ver ou tocar o vídeo (e não é conversa por voz), chame agora navegador_abrir com https://www.youtube.com/watch?v=${v.id}: o vídeo toca no painel do navegador ao lado do chat.` : 'Não achei esse vídeo no YouTube.'
         }
         return enviar({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: texto }] } })
       }
