@@ -233,7 +233,10 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
   async function garantirVisivel() {
     garantir()
     if (estaDestacado()) { aplicar(); return }
-    if (!aberto) pedirPainel()
+    // VM/web (25/11/2026): quem "abre" o painel é a tela interna do app na VM, que ninguém vê; ela já fica com aberto=true e o
+    // aviso nunca mais chegava às telas da web, onde o painel continuava fechado ("a IA abriu mas ficou escondido").
+    // No modo servidor toda ação do navegador pede o painel: cada tela da web abre o dela se estiver fechado.
+    if (!aberto || modoServidor) pedirPainel()
     const fim = Date.now() + 4000
     while (!(aberto && limites) && Date.now() < fim) await new Promise((r) => setTimeout(r, 100))
     if (!(aberto && limites)) {

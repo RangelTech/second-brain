@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{NOME}} | {{CIDADE}}</title>
+<meta name="description" content="{{DESCRICAO_1_FRASE}}">
+<!-- Modelo NEGÓCIO LOCAL: restaurante, café, clínica, salão, loja, oficina, concessionária, imobiliária.
+     Claro e elegante, foto grande, serviços/cardápio, galeria, avaliações, horário + mapa + WhatsApp. Copie a pasta kit/ junto. -->
+<link rel="stylesheet" href="kit/kit.css">
+<link rel="stylesheet" href="kit/efeitos.css">
+<style>
+  :root { --destaque: #c2410c; --destaque-2: #ea580c; --fonte-titulo: 'Playfair Display', Georgia, serif; } /* troque pela cor da marca */
+  body.claro { --fundo: #fbf8f3; --fundo-2: #f3ede4; }
+  .hero { color: #fff; }
+  .hero .lead { color: rgba(255,255,255,.85); }
+  /* sobre a foto escura do topo: textos e vidros claros (o tema claro vale do resto da página para baixo) */
+  .topo:not(.rolou) .marca, .topo:not(.rolou) .menu a { color: #fff; }
+  .hero .selo, .hero .btn-sec { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); color: #fff; }
+  .hero-midia::after { background: linear-gradient(90deg, rgba(10,8,6,.82) 0%, rgba(10,8,6,.45) 55%, rgba(10,8,6,.15) 100%); }
+  .item { display: flex; justify-content: space-between; gap: 18px; padding: 16px 0; border-bottom: 1px dashed var(--borda); }
+  .item b { font-family: var(--fonte); font-weight: 600; } .item span { color: var(--destaque); font-weight: 700; white-space: nowrap; }
+  .galeria { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 220px; gap: 14px; }
+  .galeria .foto { box-shadow: none; } .galeria .foto img { aspect-ratio: auto; height: 100%; }
+  .galeria .g-largo { grid-column: span 2; } .galeria .g-alto { grid-row: span 2; }
+  @media (max-width: 760px) { .galeria { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 160px; } }
+  .mapa { border: 0; width: 100%; height: 100%; min-height: 340px; border-radius: var(--raio); filter: grayscale(.2); }
+  .zap { position: fixed; right: 20px; bottom: 20px; z-index: 70; width: 60px; height: 60px; border-radius: 50%; background: #25d366; display: grid; place-items: center; box-shadow: 0 12px 30px -8px rgba(37,211,102,.7); }
+  .zap svg { width: 32px; height: 32px; fill: #fff; }
+  @media (max-width: 760px) { .zap { bottom: 86px; } }
+</style>
+</head>
+<body class="claro">
+<div class="progresso"></div>
+
+<header class="topo">
+  <div class="caixa">
+    <a class="marca" href="#"><b>{{INICIAL}}</b>{{NOME}}</a>
+    <nav class="menu"><a href="#servicos">{{NOME_MENU_SERVICOS}}</a><a href="#galeria">Fotos</a><a href="#avaliacoes">Avaliações</a><a href="#visite">Como chegar</a></nav>
+    <a class="btn btn-pri" href="https://wa.me/{{WHATSAPP_SO_NUMEROS}}?text={{MENSAGEM_WHATS_URL}}">{{CHAMADA_CURTA}}</a>
+  </div>
+</header>
+
+<section class="hero">
+  <!-- topo com VÍDEO de fundo (melhor que foto): troque por <video src="videos/topo.mp4" poster="imagens/topo.jpg" autoplay muted loop playsinline></video> -->
+  <div class="hero-midia kenburns"><img src="{{FOTO_PRINCIPAL_GRANDE}}" alt="{{NOME}}"></div>
+  <div class="caixa">
+    <div style="max-width:640px">
+      <span class="selo revelar"><i></i>{{CIDADE}} · desde {{ANO_FUNDACAO}}</span>
+      <h1 class="t-mega palavras" style="--atraso:.08s;margin-top:22px">{{TITULO}} <span class="t-serif">{{TITULO_ITALICO}}</span></h1>
+      <p class="lead revelar" style="--atraso:.16s">{{SUBTITULO}}</p>
+      <div class="botoes revelar" style="--atraso:.24s;margin-top:32px">
+        <a class="btn btn-pri btn-grande btn-brilho pulsar" href="https://wa.me/{{WHATSAPP_SO_NUMEROS}}?text={{MENSAGEM_WHATS_URL}}">{{CHAMADA}}</a>
+        <a class="btn btn-sec btn-grande" href="#servicos">{{CHAMADA_SECUNDARIA}}</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao">
+  <div class="caixa grade g3 escada">
+    <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg></div><h3>{{DIFERENCIAL_1}}</h3><p>{{DIFERENCIAL_1_TEXTO}}</p></div>
+    <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></div><h3>{{DIFERENCIAL_2}}</h3><p>{{DIFERENCIAL_2_TEXTO}}</p></div>
+    <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h3>{{DIFERENCIAL_3}}</h3><p>{{DIFERENCIAL_3_TEXTO}}</p></div>
+  </div>
+</section>
+
+<section class="secao alt" id="servicos">
+  <div class="caixa lado-a-lado" style="align-items:start">
+    <div class="revelar">
+      <h2 class="t-1">{{TITULO_SERVICOS}}</h2>
+      <p class="lead">{{SUBTITULO_SERVICOS}}</p>
+      <div style="margin-top:24px">
+        <div class="item"><div><b>{{SERVICO_1}}</b><div class="mut">{{SERVICO_1_DESC}}</div></div><span>{{PRECO_1}}</span></div>
+        <div class="item"><div><b>{{SERVICO_2}}</b><div class="mut">{{SERVICO_2_DESC}}</div></div><span>{{PRECO_2}}</span></div>
+        <div class="item"><div><b>{{SERVICO_3}}</b><div class="mut">{{SERVICO_3_DESC}}</div></div><span>{{PRECO_3}}</span></div>
+        <div class="item"><div><b>{{SERVICO_4}}</b><div class="mut">{{SERVICO_4_DESC}}</div></div><span>{{PRECO_4}}</span></div>
+        <div class="item"><div><b>{{SERVICO_5}}</b><div class="mut">{{SERVICO_5_DESC}}</div></div><span>{{PRECO_5}}</span></div>
+      </div>
+    </div>
+    <div class="foto kenburns revelar" style="--proporcao:4/5" data-parallax="0.08"><img src="{{FOTO_SERVICOS}}" alt=""></div>
+  </div>
+</section>
+
+<section class="secao" id="galeria">
+  <div class="caixa">
+    <h2 class="t-2 centro revelar" style="margin-bottom:40px">{{TITULO_GALERIA}}</h2>
+    <div class="galeria escada">
+      <div class="foto g-largo g-alto"><img src="{{FOTO_GAL_1}}" alt=""></div>
+      <div class="foto"><img src="{{FOTO_GAL_2}}" alt=""></div>
+      <div class="foto"><img src="{{FOTO_GAL_3}}" alt=""></div>
+      <div class="foto g-largo"><img src="{{FOTO_GAL_4}}" alt=""></div>
+    </div>
+  </div>
+</section>
+
+<section class="secao alt" id="avaliacoes">
+  <div class="caixa">
+    <div class="centro" style="margin-bottom:44px"><div class="numero revelar">{{NOTA_GOOGLE}} ★</div><p class="mut revelar">{{QTD_AVALIACOES}} avaliações no Google</p></div>
+    <div class="grade g3 escada">
+      <blockquote class="cartao depo" style="margin:0"><div class="estrelas">★★★★★</div>“{{AVALIACAO_1}}”<footer>{{NOME_AVALIACAO_1}}</footer></blockquote>
+      <blockquote class="cartao depo" style="margin:0"><div class="estrelas">★★★★★</div>“{{AVALIACAO_2}}”<footer>{{NOME_AVALIACAO_2}}</footer></blockquote>
+      <blockquote class="cartao depo" style="margin:0"><div class="estrelas">★★★★★</div>“{{AVALIACAO_3}}”<footer>{{NOME_AVALIACAO_3}}</footer></blockquote>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="visite">
+  <div class="caixa lado-a-lado">
+    <div class="pilha revelar">
+      <h2 class="t-1">Venha nos visitar</h2>
+      <p class="lead">{{ENDERECO_COMPLETO}}</p>
+      <div class="cartao" style="padding:22px"><b>Horário</b><div class="mut">{{HORARIO_LINHA_1}}<br>{{HORARIO_LINHA_2}}</div></div>
+      <div class="botoes"><a class="btn btn-pri" href="https://wa.me/{{WHATSAPP_SO_NUMEROS}}">Chamar no WhatsApp</a><a class="btn btn-sec" href="https://maps.google.com/?q={{ENDERECO_URL}}">Abrir no mapa</a></div>
+    </div>
+    <iframe class="mapa revelar" loading="lazy" src="https://maps.google.com/maps?q={{ENDERECO_URL}}&output=embed" title="Mapa"></iframe>
+  </div>
+</section>
+
+<footer class="rodape"><div class="caixa"><span>© {{ANO}} {{NOME}} · {{CNPJ_OU_CIDADE}}</span><span>{{INSTAGRAM}}</span></div></footer>
+<a class="zap" href="https://wa.me/{{WHATSAPP_SO_NUMEROS}}" aria-label="WhatsApp"><svg viewBox="0 0 32 32"><path d="M16 3a13 13 0 0 0-11.3 19.4L3 29l6.8-1.7A13 13 0 1 0 16 3zm0 23.6c-2 0-3.9-.5-5.6-1.5l-.4-.2-4 1 1.1-3.9-.3-.4A10.6 10.6 0 1 1 16 26.6zm5.8-7.9c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2l-1 1.2c-.2.2-.4.2-.7.1a8.7 8.7 0 0 1-4.3-3.8c-.3-.6.3-.5.9-1.7.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.2-1.2 2.9s1.2 3.4 1.4 3.6c.2.2 2.4 3.7 5.8 5.2 2.2.9 3 1 4.1.8.7-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg></a>
+<div class="fixo-celular"><a class="btn btn-pri btn-grande" href="https://wa.me/{{WHATSAPP_SO_NUMEROS}}?text={{MENSAGEM_WHATS_URL}}">{{CHAMADA}}</a></div>
+<script src="kit/kit.js"></script>
+<script src="kit/efeitos.js"></script>
+</body>
+</html>

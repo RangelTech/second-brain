@@ -1,16 +1,72 @@
 ---
 name: sites-cinematograficos
 description: |
-  Criar landing pages e sites de venda com cara de cinema (fundo escuro, vídeo no topo, cartões de vídeo verticais, faixa correndo, botão pulsando, oferta com contagem regressiva, depoimentos, perguntas frequentes), no nível das páginas de lançamento que vendem bem. Inclui como fazer os VÍDEOS de graça a partir de fotos (Motion, câmera cinematográfica) ou com o Estúdio (créditos). Use quando o usuário pedir "faz um site", "landing page", "página de vendas", "página do meu produto/curso/imóvel", "site com vídeo", "site bonito/moderno/cinematográfico".
+  Criar QUALQUER site ou página (institucional, negócio local, restaurante, loja, concessionária, clínica, produto, app, curso, portfólio, landing page, página de vendas) com qualidade de agência: kit de design pronto (kit/), modelos completos (modelos/) e muito vídeo e efeito visual (vídeo no topo, faixa de vídeos estilo Reels, parallax, zoom lento, título palavra por palavra, borda viva, brilho no cursor). Inclui como fazer vídeos de graça a partir de fotos (Motion) ou com o Estúdio, as regras anti-feio e a conferência obrigatória por print. Use sempre que pedirem "faz um site", "cria uma página", "landing page", "página de vendas", "site do meu negócio/produto/curso/imóvel", "site bonito/moderno/cinematográfico".
 ---
 
 # Sites cinematográficos
 
-O que faz um site desses impressionar: **vídeo de verdade** (topo e cartões), **contraste** (fundo quase preto, uma cor quente de destaque), **tipografia grande**, **movimento discreto** (faixa correndo, entrada suave ao rolar, botão que pulsa) e **estrutura de venda** (promessa, prova, passos, depoimentos, oferta com prazo, garantia, dúvidas). Tudo isso já está no modelo.
+**Regra nº 1: você NÃO desenha o site do zero.** Sites feitos do zero saem com cara de amador (fonte padrão, tudo centralizado,
+espaço apertado, cor sem contraste). Esta skill traz um **kit de design pronto** e **modelos completos**, feitos no nível de
+agência. Seu trabalho é: escolher o modelo, trocar o conteúdo, as fotos/vídeos e as cores, e **conferir por print** até ficar
+perfeito. Use e abuse de **vídeo e efeitos visuais**: é isso que faz o cliente dizer "uau".
 
-## Modelos desta skill (use, não comece do zero)
-- `modelos/landing-cinema.html`: a página inteira, um arquivo só, sem dependências, responsiva (celular com botão fixo embaixo). Troque os `{{CAMPOS}}`, as cores em `:root` e os vídeos em `videos/`.
-- `modelos/camera-cinema.html`: transforma **uma foto** em vídeo de cinema (câmera lenta com zoom e deslize, luz passando, poeira no ar, barras de cinema, texto entrando). Renderize com `motion_animar` (Motion, de graça, no computador do usuário). Troque `FOTO`, `TITULO`, `SUBTITULO` e a duração `D`.
+## 1. O kit (copie a pasta `kit/` inteira para dentro do site)
+- `kit/kit.css` + `kit/kit.js`: fontes (Inter, Space Grotesk, Playfair), escala de títulos que se ajusta ao celular, espaços,
+  topo com vidro, botões, cartões com brilho no mouse, grade "bento" (estilo Apple), faixa correndo, números que contam,
+  depoimentos, preços, perguntas frequentes, chamada final, rodapé, botão fixo no celular e entrada suave ao rolar.
+- `kit/efeitos.css` + `kit/efeitos.js`: **efeitos e vídeo**:
+  - `.progresso` barra de leitura; `.granulado` textura de cinema; `.hero.letterbox` barras de cinema;
+  - `.video-card` (vídeo vertical estilo Reels) e `.faixa-trilho.videos` (faixa de vídeos correndo);
+  - `.kenburns` (zoom lento na foto); `data-parallax="0.1"` (camada que se move ao rolar);
+  - `.palavras` (título entrando palavra por palavra); `.borda-viva` (borda em degradê girando, use no plano principal);
+  - `.inclinar` (cartão inclina em 3D com o mouse); `.holofote` (luz que segue o cursor na seção);
+  - `.btn-brilho` e `.pulsar` (botão com brilho passando e pulso).
+- Para mudar a cara inteira: só as variáveis no `:root` (`--destaque`, `--destaque-2`, `--fundo`, `--fonte-titulo`). Tema claro:
+  `<body class="claro">`.
+
+## 2. Os modelos (comece SEMPRE por um deles)
+| Pedido | Modelo |
+|---|---|
+| Produto, app, SaaS, curso online, serviço digital | `modelos/site-produto.html` (escuro, aurora, bento, vídeos correndo, números, preços, FAQ) |
+| Negócio local: restaurante, café, clínica, salão, loja, oficina, **concessionária**, imobiliária | `modelos/site-negocio-local.html` (claro e elegante, foto/vídeo grande, serviços com preço, galeria, avaliações, mapa, WhatsApp) |
+| Página de venda/lançamento com contagem regressiva | `modelos/landing-cinema.html` |
+| Produto girando conforme rola (efeito Apple) | `modelos/rolagem-quadros.html` (seção abaixo) |
+1. Crie `Sites/<nome>/`, copie o modelo como `index.html` e a pasta `kit/`, e crie `videos/` e `imagens/`.
+2. Troque **todos** os `{{CAMPOS}}`. No fim, nenhum `{{` pode sobrar (confira com uma busca no arquivo).
+3. Ajuste a cor da marca no `:root` do modelo. Remova seções que não fazem sentido, em vez de deixar texto genérico.
+4. Pode reordenar e duplicar seções e trocar ícones. **Não** reescreva o CSS das classes do kit nem invente classes novas para o
+   que o kit já faz.
+
+## 3. Vídeos e imagens (o que mais pesa no "uau")
+- **Topo com vídeo** sempre que der: `<div class="hero-midia"><video src="videos/topo.mp4" poster="imagens/topo.jpg" autoplay muted loop playsinline></video></div>`.
+- **Faixa de vídeos verticais** (Reels do cliente, produto em uso, bastidores) com `.video-card`.
+- De onde tirar:
+  - fotos do cliente viram vídeo de cinema **de graça** com o Motion (`modelos/camera-cinema.html` + `motion_animar`);
+  - bancos livres: Pexels (pexels.com/videos) e Mixkit;
+  - Estúdio (créditos, `midia_orcar` antes);
+  - fotos de banco: Unsplash (`https://images.unsplash.com/<id>?auto=format&fit=crop&w=1600&q=75`).
+- Comprima tudo: `ffmpeg -i in.mp4 -vf scale=-2:1080 -c:v libx264 -crf 28 -preset slow -an -movflags +faststart out.mp4`
+  (até ~3 MB por vídeo de fundo). Sempre com `poster`. Fotos: no máximo 1600 px de largura.
+- Foto parada grande? Coloque `.kenburns` (ganha movimento). Foto secundária? `data-parallax="0.08"`.
+
+## 4. Regras anti-feio (confira uma por uma antes de entregar)
+1. Título do topo grande (`t-mega`), curto (até 8 palavras) e com uma parte em destaque (`.t-grad` ou `.t-serif`).
+2. Uma cor de destaque só, contra fundo quase preto ou quase branco. Nada de arco-íris, nada de `#000` ou `#fff` puros.
+3. Espaço sobrando: cada seção com `.secao`; nunca empilhe textos sem respiro.
+4. Nada de emoji como ícone: use os SVG do modelo (estilo Lucide).
+5. Texto sobre foto sempre com o escurecido do `.hero-midia` e com contraste alto.
+6. Todo botão leva a algum lugar real (WhatsApp, checkout, âncora). No celular, `.fixo-celular` com a ação principal.
+7. Imagens e vídeos sem esticar (`object-fit: cover`), sem marca d'água e coerentes com o negócio.
+8. Seção nova só se tiver conteúdo de verdade. Depoimentos e números só reais, ou marcados como exemplo para trocar.
+
+## 5. Conferir com os próprios olhos (obrigatório, até ficar perfeito)
+1. Abra o `index.html` no navegador integrado (`navegador_abrir` com `file:///...`) ou tire print com o Edge/Chrome sem janela:
+   `msedge --headless=new --hide-scrollbars --virtual-time-budget=6000 --window-size=1440,900 --screenshot=desk.png file:///.../index.html`
+   e o mesmo com `--window-size=500,950` para o celular.
+2. Olhe os prints com visão e dê uma nota de 0 a 10 para cada regra anti-feio. **Abaixo de 9 em qualquer uma, corrija e tire
+   novo print.**
+3. Entregue: a pasta, os prints (computador e celular) e a oferta de publicar.
 
 ### Rolagem quadro a quadro (estilo Apple) — `modelos/rolagem-quadros.html` + `scripts/quadros.py`
 O produto gira, a câmera entra no carro, o prédio se monta CONFORME a pessoa rola. É o efeito que mais impressiona e vende (agências cobram caro).
@@ -20,7 +76,7 @@ O produto gira, a câmera entra no carro, o prédio se monta CONFORME a pessoa r
 3. Copie o modelo para `Sites/<nome>/index.html`, troque os textos das `.frase` (cada uma aparece entre `data-de` e `data-ate`, de 0 a 1 da rolagem), as cores e a chamada final. `alturaVh` (400 a 700) controla quanto rola.
 4. Teste com servidor local (o modelo lê `quadros/quadros.json`): `python -m http.server` na pasta e abra no navegador integrado; role e confira os textos legíveis sobre o vídeo.
 
-## Ritmo (importante)
+## Ritmo
 O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primeira**: planeje antes (textos, cores, cenas), use os modelos sem reinventar, confira a prévia contra o padrão de qualidade e corrija tudo de uma vez. Escreva o `index.html` **logo depois do primeiro vídeo pronto**, para o usuário já ver a página, e continue refinando (vídeos, textos, prints) até ficar perfeito. Diga em uma frase o que está melhorando a cada rodada.
 
 ## Roteiro

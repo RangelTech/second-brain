@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{NOME}} | {{PROMESSA_CURTA}}</title>
+<meta name="description" content="{{DESCRICAO_1_FRASE}}">
+<!-- Modelo PRODUTO / SaaS / app / curso online. Copie a pasta kit/ junto. Troque os {{CAMPOS}} e as cores em :root do kit (ou aqui embaixo). -->
+<link rel="stylesheet" href="kit/kit.css">
+<link rel="stylesheet" href="kit/efeitos.css">
+<style>
+  :root { --destaque: #7c5cff; --destaque-2: #22d3ee; } /* cor da marca aqui */
+  .hero-app { margin-top: 64px; }
+  .logo-cliente { display: flex; align-items: center; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="progresso"></div><div class="granulado"></div>
+
+<header class="topo">
+  <div class="caixa">
+    <a class="marca" href="#"><b>{{INICIAL}}</b>{{NOME}}</a>
+    <nav class="menu"><a href="#recursos">Recursos</a><a href="#como">Como funciona</a><a href="#precos">Preços</a><a href="#faq">Dúvidas</a></nav>
+    <a class="btn btn-pri" href="{{LINK_CHAMADA}}">{{CHAMADA_CURTA}}</a>
+  </div>
+</header>
+
+<section class="hero holofote">
+  <div class="aurora"></div><div class="grade-fundo"></div>
+  <div class="caixa centro">
+    <span class="selo revelar"><i></i>{{NOVIDADE_OU_SELO}}</span>
+    <h1 class="t-mega palavras" style="--atraso:.08s;margin-top:22px">{{TITULO_PARTE_1}} <span class="t-grad">{{TITULO_DESTAQUE}}</span></h1>
+    <p class="lead revelar" style="--atraso:.16s">{{SUBTITULO_2_FRASES}}</p>
+    <div class="botoes revelar" style="--atraso:.24s;margin-top:34px">
+      <a class="btn btn-pri btn-grande btn-brilho pulsar" href="{{LINK_CHAMADA}}">{{CHAMADA}} →</a>
+      <a class="btn btn-sec btn-grande" href="#como">Ver como funciona</a>
+    </div>
+    <div class="moldura-app hero-app revelar flutuar" style="--atraso:.32s">
+      <img src="{{PRINT_DO_PRODUTO_OU_IMAGEM}}" alt="{{NOME}} em uso" style="aspect-ratio:16/9;object-fit:cover;width:100%">
+    </div>
+  </div>
+</section>
+
+<section class="secao" style="padding-top:0">
+  <div class="caixa centro">
+    <p class="mut" style="font-size:.9rem;margin-bottom:22px">{{PROVA_SOCIAL_FRASE}}</p>
+    <div class="faixa"><div class="faixa-trilho">
+      <span>{{CLIENTE_1}}</span><span>{{CLIENTE_2}}</span><span>{{CLIENTE_3}}</span><span>{{CLIENTE_4}}</span><span>{{CLIENTE_5}}</span><span>{{CLIENTE_6}}</span>
+    </div></div>
+  </div>
+</section>
+
+<section class="secao" id="recursos">
+  <div class="caixa">
+    <div class="centro" style="margin-bottom:56px">
+      <span class="selo revelar"><i></i>Recursos</span>
+      <h2 class="t-1 revelar" style="margin-top:18px">{{TITULO_RECURSOS}}</h2>
+      <p class="lead revelar">{{SUBTITULO_RECURSOS}}</p>
+    </div>
+    <div class="bento escada">
+      <article class="cartao brilho largo alto inclinar">
+        <div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <h3>{{RECURSO_PRINCIPAL}}</h3><p>{{RECURSO_PRINCIPAL_TEXTO}}</p>
+        <div class="foto" style="margin-top:24px;--proporcao:16/8"><img src="{{IMAGEM_RECURSO}}" alt=""></div>
+      </article>
+      <article class="cartao brilho"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h3>{{RECURSO_2}}</h3><p>{{RECURSO_2_TEXTO}}</p></article>
+      <article class="cartao brilho"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3>{{RECURSO_3}}</h3><p>{{RECURSO_3_TEXTO}}</p></article>
+      <article class="cartao brilho meio"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div><h3>{{RECURSO_4}}</h3><p>{{RECURSO_4_TEXTO}}</p></article>
+      <article class="cartao brilho meio"><div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><h3>{{RECURSO_5}}</h3><p>{{RECURSO_5_TEXTO}}</p></article>
+    </div>
+  </div>
+</section>
+
+
+<!-- VÍDEOS em toda parte: cartões verticais correndo. Use vídeos do usuário, do Estúdio, do Motion (foto vira vídeo) ou de bancos
+     livres (Pexels/Mixkit). Sempre comprimidos (ffmpeg ... -crf 28 -an), com poster. -->
+<section class="secao alt" style="overflow:hidden">
+  <div class="caixa centro" style="margin-bottom:40px"><h2 class="t-2 revelar">{{TITULO_VIDEOS}}</h2><p class="lead revelar">{{SUBTITULO_VIDEOS}}</p></div>
+  <div class="faixa"><div class="faixa-trilho videos">
+    <div class="video-card"><video src="videos/{{VIDEO_1}}.mp4" poster="imagens/{{VIDEO_1}}.jpg" muted loop playsinline preload="none"></video><div class="legenda">{{LEGENDA_VIDEO_1}}</div></div>
+    <div class="video-card"><video src="videos/{{VIDEO_2}}.mp4" poster="imagens/{{VIDEO_2}}.jpg" muted loop playsinline preload="none"></video><div class="legenda">{{LEGENDA_VIDEO_2}}</div></div>
+    <div class="video-card"><video src="videos/{{VIDEO_3}}.mp4" poster="imagens/{{VIDEO_3}}.jpg" muted loop playsinline preload="none"></video><div class="legenda">{{LEGENDA_VIDEO_3}}</div></div>
+    <div class="video-card"><video src="videos/{{VIDEO_4}}.mp4" poster="imagens/{{VIDEO_4}}.jpg" muted loop playsinline preload="none"></video><div class="legenda">{{LEGENDA_VIDEO_4}}</div></div>
+    <div class="video-card"><video src="videos/{{VIDEO_5}}.mp4" poster="imagens/{{VIDEO_5}}.jpg" muted loop playsinline preload="none"></video><div class="legenda">{{LEGENDA_VIDEO_5}}</div></div>
+  </div></div>
+</section>
+
+<section class="secao alt" id="como">
+  <div class="caixa lado-a-lado">
+    <div class="pilha">
+      <span class="selo revelar"><i></i>Como funciona</span>
+      <h2 class="t-1 revelar">{{TITULO_COMO}}</h2>
+      <div class="pilha escada" style="margin-top:28px">
+        <div class="cartao"><div class="numero t-grad" style="font-size:1.6rem">01</div><h3 style="margin-top:8px">{{PASSO_1}}</h3><p>{{PASSO_1_TEXTO}}</p></div>
+        <div class="cartao"><div class="numero t-grad" style="font-size:1.6rem">02</div><h3 style="margin-top:8px">{{PASSO_2}}</h3><p>{{PASSO_2_TEXTO}}</p></div>
+        <div class="cartao"><div class="numero t-grad" style="font-size:1.6rem">03</div><h3 style="margin-top:8px">{{PASSO_3}}</h3><p>{{PASSO_3_TEXTO}}</p></div>
+      </div>
+    </div>
+    <div class="foto kenburns revelar" style="--proporcao:4/5" data-parallax="0.08"><img src="{{IMAGEM_COMO}}" alt=""></div>
+  </div>
+</section>
+
+<section class="secao">
+  <div class="caixa grade g4 centro escada">
+    <div><div class="numero"><span class="contar" data-ate="{{NUM_1}}" data-sufixo="{{SUF_1}}">0</span></div><p class="mut">{{NUM_1_LEGENDA}}</p></div>
+    <div><div class="numero"><span class="contar" data-ate="{{NUM_2}}" data-sufixo="{{SUF_2}}">0</span></div><p class="mut">{{NUM_2_LEGENDA}}</p></div>
+    <div><div class="numero"><span class="contar" data-ate="{{NUM_3}}" data-sufixo="{{SUF_3}}">0</span></div><p class="mut">{{NUM_3_LEGENDA}}</p></div>
+    <div><div class="numero"><span class="contar" data-ate="{{NUM_4}}" data-sufixo="{{SUF_4}}">0</span></div><p class="mut">{{NUM_4_LEGENDA}}</p></div>
+  </div>
+</section>
+
+<section class="secao alt">
+  <div class="caixa">
+    <h2 class="t-2 centro revelar" style="margin-bottom:48px">{{TITULO_DEPOIMENTOS}}</h2>
+    <div class="grade g3 escada">
+      <blockquote class="cartao depo" style="margin:0"><div class="estrelas">★★★★★</div>“{{DEPO_1}}”<footer><img src="{{FOTO_DEPO_1}}" alt="">{{NOME_DEPO_1}} · {{CARGO_DEPO_1}}</footer></blockquote>
+      <blockquote class="cartao depo" style="margin:0"><div class="estrelas">★★★★★</div>“{{DEPO_2}}”<footer><img src="{{FOTO_DEPO_2}}" alt="">{{NOME_DEPO_2}} · {{CARGO_DEPO_2}}</footer></blockquote>
+      <blockquote class="cartao depo" style="margin:0"><div class="estrelas">★★★★★</div>“{{DEPO_3}}”<footer><img src="{{FOTO_DEPO_3}}" alt="">{{NOME_DEPO_3}} · {{CARGO_DEPO_3}}</footer></blockquote>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="precos">
+  <div class="caixa">
+    <div class="centro" style="margin-bottom:48px"><h2 class="t-1 revelar">{{TITULO_PRECOS}}</h2><p class="lead revelar">{{SUBTITULO_PRECOS}}</p></div>
+    <div class="grade g3 escada">
+      <div class="cartao preco"><h3>{{PLANO_1}}</h3><div class="valor">{{VALOR_1}}<span class="mut" style="font-size:1rem">/mês</span></div><ul><li>{{P1_ITEM_1}}</li><li>{{P1_ITEM_2}}</li><li>{{P1_ITEM_3}}</li></ul><a class="btn btn-sec" href="{{LINK_1}}">Começar</a></div>
+      <div class="cartao preco destaque borda-viva"><span class="selo" style="align-self:flex-start"><i></i>Mais escolhido</span><h3>{{PLANO_2}}</h3><div class="valor">{{VALOR_2}}<span class="mut" style="font-size:1rem">/mês</span></div><ul><li>{{P2_ITEM_1}}</li><li>{{P2_ITEM_2}}</li><li>{{P2_ITEM_3}}</li><li>{{P2_ITEM_4}}</li></ul><a class="btn btn-pri" href="{{LINK_2}}">Assinar agora</a></div>
+      <div class="cartao preco"><h3>{{PLANO_3}}</h3><div class="valor">{{VALOR_3}}<span class="mut" style="font-size:1rem">/mês</span></div><ul><li>{{P3_ITEM_1}}</li><li>{{P3_ITEM_2}}</li><li>{{P3_ITEM_3}}</li></ul><a class="btn btn-sec" href="{{LINK_3}}">Falar com a gente</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="secao alt" id="faq">
+  <div class="caixa lado-a-lado" style="align-items:start">
+    <div><h2 class="t-1 revelar">Dúvidas frequentes</h2><p class="lead revelar">{{SUBTITULO_FAQ}}</p></div>
+    <div class="faq revelar">
+      <details><summary>{{PERGUNTA_1}}</summary><p>{{RESPOSTA_1}}</p></details>
+      <details><summary>{{PERGUNTA_2}}</summary><p>{{RESPOSTA_2}}</p></details>
+      <details><summary>{{PERGUNTA_3}}</summary><p>{{RESPOSTA_3}}</p></details>
+      <details><summary>{{PERGUNTA_4}}</summary><p>{{RESPOSTA_4}}</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="secao">
+  <div class="caixa"><div class="cta-final revelar">
+    <h2 class="t-1">{{CHAMADA_FINAL_TITULO}}</h2><p class="lead" style="margin-inline:auto">{{CHAMADA_FINAL_TEXTO}}</p>
+    <div class="botoes" style="justify-content:center;margin-top:30px"><a class="btn btn-pri btn-grande" href="{{LINK_CHAMADA}}">{{CHAMADA}} →</a></div>
+  </div></div>
+</section>
+
+<footer class="rodape"><div class="caixa"><span>© {{ANO}} {{NOME}}</span><span>{{CONTATO}}</span></div></footer>
+<div class="fixo-celular"><a class="btn btn-pri btn-grande" href="{{LINK_CHAMADA}}">{{CHAMADA}}</a></div>
+<script src="kit/kit.js"></script>
+<script src="kit/efeitos.js"></script>
+</body>
+</html>
