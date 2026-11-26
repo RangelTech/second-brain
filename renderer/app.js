@@ -153,6 +153,7 @@
     f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'
     f.allowFullscreen = true
     f.referrerPolicy = 'strict-origin-when-cross-origin'
+    f.setAttribute('credentialless', '') // a versão web é isolada entre origens (navegador WebAssembly): o player entra sem cookies
     p.replaceChildren(f)
     p.classList.add('tocando')
   })
@@ -1392,6 +1393,8 @@
 
   async function enviar() {
     const t = $('texto').value.trim()
+    // versão web: liga o navegador da página escondido já no envio; se a IA for usar o navegador, ele está pronto (sem esperar ~5 s)
+    if (t && window.SBNavWasm && window.SBNavWasm.suportado) window.SBNavWasm.aquecer($('nav-host'))
     if (anexosPendentes.some((x) => x.enviando)) return aviso('Espere o anexo terminar de carregar para enviar.')
     if (respostas.has(atual)) {
       if (!t && !anexosPendentes.length) {
@@ -2261,10 +2264,18 @@
   let webNavTimer = null
   let webNavImg = null
   let webNavDim = { largura: 1, altura: 1 }
+  // spec 60 §8: com isolamento entre origens (Chrome/Edge no computador), o painel é o navegador WebAssembly rodando nesta aba
+  const WASM = window.SBNavWasm && window.SBNavWasm.suportado ? window.SBNavWasm : null
   function webNavLigar(sim) {
     clearInterval(webNavTimer)
     if (!sim) return
     const host = $('nav-host')
+    if (WASM) {
+      host.style.position = 'relative'
+      WASM.montar(host)
+      $('nav-vazio').hidden = true
+      return
+    }
     if (!webNavImg) {
       host.style.position = 'relative'
       host.innerHTML = '<img id="nav-web-img" alt="Página do navegador da máquina" tabindex="0" draggable="false" style="width:100%;height:100%;object-fit:contain;object-position:top left;display:block;outline:none;cursor:pointer;background:#fff"><form id="nav-web-teclado" style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:8px;background:rgba(20,16,12,.92)"><input id="nav-web-texto" placeholder="Digitar na página (clique antes no campo)" autocomplete="off" style="flex:1;min-width:0"><button type="submit" class="primario">Digitar</button><button type="button" id="nav-web-enter">Enter</button></form>'
@@ -2345,13 +2356,30 @@
   if (window.__sbWeb) $('nav-destacar').hidden = true
   $('nav-destacar').onclick = async () => { await NAV.destacar(); navAbrir(false) }
   NAV.aoDestacado?.((sim) => { $('abrir-nav').classList.toggle('on', !!sim) })
-  $('nav-voltar').onclick = () => NAV.acao('voltar')
-  $('nav-avancar').onclick = () => NAV.acao('avancar')
-  $('nav-recarregar').onclick = () => NAV.acao('recarregar')
+  // na web com o motor WebAssembly, a barra do painel comanda o motor desta aba (não o navegador da máquina)
+  const navAcao = (acao, url) => {
+    if (!WASM) return NAV.acao(acao, url)
+    const m = { voltar: 'voltar', avancar: 'avancar', recarregar: 'recarregar', ir: 'abrir' }[acao]
+    return WASM.comando(m, acao === 'ir' ? [url] : []).then(() => ({ ok: true }), (e) => ({ ok: false, erro: e.message }))
+  }
+  $('nav-voltar').onclick = () => navAcao('voltar')
+  $('nav-avancar').onclick = () => navAcao('avancar')
+  $('nav-recarregar').onclick = () => navAcao('recarregar')
   $('nav-form').onsubmit = async (e) => {
     e.preventDefault()
-    const r = await NAV.acao('ir', $('nav-url').value)
+    const r = await navAcao('ir', $('nav-url').value)
     if (r && r.ok === false) aviso('Não consegui abrir: ' + r.erro)
+  }
+  if (WASM) {
+    WASM.on('url', (e) => {
+      navUrlAtual = { url: e.url || '', titulo: e.titulo || '' }
+      if (document.activeElement !== $('nav-url')) $('nav-url').value = e.url || ''
+      $('nav-voltar').disabled = false
+      $('nav-avancar').disabled = false
+      $('nav-vazio').hidden = true
+    })
+    WASM.on('ligar', () => { if (!navAberto) navAbrir(true) }) // a IA vai usar o navegador: abre o painel (e o motor) ao lado, na hora
+    WASM.on('estado', (e) => { if (e && e.erro) aviso('O navegador não abriu neste aparelho: ' + e.erro) })
   }
   // favoritos: estrela salva/remove a página atual; o menu lista e importa dos marcadores do Chrome/Edge/Brave
   let navUrlAtual = { url: '', titulo: '' }
@@ -2383,15 +2411,17 @@
     await desenharFavoritos()
   }
   NAV.aoEstado((e) => {
-    navUrlAtual = { url: e.url || '', titulo: e.titulo || '' }
-    if (document.activeElement !== $('nav-url')) $('nav-url').value = e.url || ''
-    $('nav-voltar').disabled = !e.podeVoltar
-    $('nav-avancar').disabled = !e.podeAvancar
+    if (!WASM) {
+      navUrlAtual = { url: e.url || '', titulo: e.titulo || '' }
+      if (document.activeElement !== $('nav-url')) $('nav-url').value = e.url || ''
+      $('nav-voltar').disabled = !e.podeVoltar
+      $('nav-avancar').disabled = !e.podeAvancar
+    }
     $('nav-ctl').hidden = !e.controlando
     $('nav-ctl').lastChild.textContent = e.controlando ? e.acao || 'Agente' : 'Agente'
     $('nav').classList.toggle('agente', !!e.controlando)
     $('nav').classList.toggle('carregando', !!e.carregando)
-    $('nav-vazio').hidden = !!e.url
+    if (!WASM) $('nav-vazio').hidden = !!e.url
   })
   // divisória arrastável entre o chat e o navegador (spec 53): a largura fica guardada neste computador
   ;(() => {

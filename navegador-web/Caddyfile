@@ -1,0 +1,29 @@
+{
+	email contato@rangeltech.net
+}
+nav.rangeltech.net {
+	@wisp path /wisp /wisp/*
+	handle @wisp {
+		reverse_proxy wisp-relay:8080
+	}
+	handle {
+		root * /srv
+		header {
+			Cross-Origin-Opener-Policy same-origin
+			Cross-Origin-Embedder-Policy require-corp
+			Cross-Origin-Resource-Policy cross-origin
+			Content-Security-Policy "frame-ancestors https://app.segundocerebro.pro https://remoto.rangeltech.net http://127.0.0.1:* http://localhost:*"
+			X-Content-Type-Options nosniff
+			-Server
+		}
+		@motor path /motor/*
+		header @motor Cache-Control "public, max-age=31536000, immutable"
+		@pagina path / /index.html
+		header @pagina Cache-Control "no-cache"
+		# o motor (.wasm, 150 MB) vai pré-compactado (zstd 34 MB / gzip 48 MB) e cru para o navegador compilar em streaming e guardar em cache
+		encode zstd gzip
+		file_server {
+			precompressed zstd gzip
+		}
+	}
+}

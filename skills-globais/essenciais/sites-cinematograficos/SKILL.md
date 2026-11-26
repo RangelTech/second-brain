@@ -66,7 +66,11 @@ perfeito. Use e abuse de **vídeo e efeitos visuais**: é isso que faz o cliente
    e o mesmo com `--window-size=500,950` para o celular.
 2. Olhe os prints com visão e dê uma nota de 0 a 10 para cada regra anti-feio. **Abaixo de 9 em qualquer uma, corrija e tire
    novo print.**
-3. Entregue: a pasta, os prints (computador e celular) e a oferta de publicar.
+3. **Deixe o site aberto no navegador integrado** para a pessoa ver na hora, ao lado do chat: termine sempre com
+   `navegador_abrir` no caminho do `index.html` (ex.: `C:\...\meu-site\index.html` ou `/home/.../meu-site/index.html`). Funciona no
+   app instalado e na versão web (lá o navegador roda na aba da pessoa e o arquivo da máquina vira um endereço temporário).
+   **Não ofereça download** nem mande abrir a pasta: o site já está na frente dela.
+4. Entregue: uma frase do que foi feito, o caminho da pasta e a oferta de publicar.
 
 ### Rolagem quadro a quadro (estilo Apple) — `modelos/rolagem-quadros.html` + `scripts/quadros.py`
 O produto gira, a câmera entra no carro, o prédio se monta CONFORME a pessoa rola. É o efeito que mais impressiona e vende (agências cobram caro).
@@ -89,7 +93,7 @@ O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primei
    - **Com créditos (Estúdio):** cena nova gerada por IA (ex.: "drone sobre o condomínio ao pôr do sol"). Sempre `midia_orcar` antes e espere o "sim".
    - Comprima: `ffmpeg -i in.mp4 -vf scale=-2:1080 -c:v libx264 -crf 28 -preset slow -an -movflags +faststart out.mp4` (vídeo de fundo sem áudio, até ~3 MB cada).
 5. **Confira com os próprios olhos**: abra o `index.html` no navegador integrado (`navegador_abrir` com `file:///...`), tire print (`navegador_print`) em largura de computador e veja o celular. Corrija sobreposição, texto cortado, contraste.
-6. Entregue: caminho da pasta, um print, e ofereça publicar.
+6. Entregue com o site **aberto no navegador integrado** (`navegador_abrir` no `index.html`, sem oferecer download), o caminho da pasta e a oferta de publicar.
 
 ## Publicar
 - Rápido e grátis: o usuário arrasta a pasta em app.netlify.com/drop (gera um link na hora).

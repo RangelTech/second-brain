@@ -19,6 +19,10 @@ const PUBLICO = path.join(__dirname, 'public')
 const COOKIE = 'sb_web'
 const TEMPO_HTTP_MS = 20000
 const RECONFERIR_MS = +process.env.RECONFERIR_MS || 5 * 60 * 1000
+// navegador WebAssembly da web (spec 60 §8): passe curto para o relay de São Paulo, assinado com o segredo compartilhado com ele
+const WISP_SEGREDO = process.env.WISP_SEGREDO || ''
+const NAV_ORIGEM = process.env.NAV_ORIGEM || 'https://nav.rangeltech.net'
+const PASSE_MS = 8 * 3600 * 1000
 
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex')
 const aleatorio = (n = 12) => crypto.randomBytes(n).toString('base64url')
@@ -195,7 +199,8 @@ function comandoParaExtensao(conta, maquinaWs, msg) {
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' }
 const CABECALHOS = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' }
 // spec 54: player do YouTube no cartão da voz (frame-src) e mídia de endereço https nos cartões
-const CSP_APP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; script-src 'self' 'wasm-unsafe-eval'; worker-src blob: 'self'; connect-src 'self' wss: ws: blob: data:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; frame-ancestors 'none'"
+const CSP_APP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; script-src 'self' 'wasm-unsafe-eval'; worker-src blob: 'self'; connect-src 'self' wss: ws: blob: data:; frame-src https://www.youtube.com https://www.youtube-nocookie.com " + NAV_ORIGEM + "; frame-ancestors 'none'"
+const ISOLAR = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless' }
 const CSP_LOGIN = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'"
 
 function json(res, status, corpo, extra = {}) {
@@ -286,6 +291,14 @@ const servidor = http.createServer(async (req, res) => {
       const s = sessaoDe(req)
       return s ? json(res, 200, { email: s.email, nome: s.nome }) : json(res, 401, { erro: 'Faça login.' })
     }
+    if (req.method === 'POST' && url.pathname === '/api/nav-passe') {
+      const s = sessaoDe(req)
+      if (!s) return json(res, 401, { erro: 'Faça login.' })
+      if (!WISP_SEGREDO) return json(res, 503, { erro: 'Navegador da página indisponível.' })
+      if (!limite(ip, 'nav-passe', 120 * LIM, 3600000)) return json(res, 429, { erro: 'Muitas tentativas.' })
+      const dados = Buffer.from(JSON.stringify({ c: s.conta, x: Date.now() + PASSE_MS })).toString('base64url')
+      return json(res, 200, { t: dados + '.' + crypto.createHmac('sha256', WISP_SEGREDO).update(dados).digest('base64url') })
+    }
     if (req.method === 'GET' && url.pathname === '/api/maquinas') {
       const s = sessaoDe(req)
       return s ? json(res, 200, { lista: publicas(s.conta) }) : json(res, 401, { erro: 'Faça login.' })
@@ -346,6 +359,17 @@ const servidor = http.createServer(async (req, res) => {
 
     // a interface do app, buscada no próprio app pelo túnel
     const mm = req.method === 'GET' && /^\/m\/([\w-]{4,64})(\/.*)?$/.exec(url.pathname)
+    const ms = req.method === 'GET' && /^\/m\/([\w-]{4,64})\/site\/([\w-]{8,40})\/(.*)$/.exec(url.pathname)
+    if (ms) {
+      if (!limite(ip, 'site', 3000 * LIM, 600000)) return json(res, 429, { erro: 'Muitas tentativas.' })
+      let m = null
+      for (const lista of maquinas.values()) if (lista.has(ms[1])) { m = lista.get(ms[1]); break }
+      if (!m) return json(res, 404, { erro: 'Este computador não está conectado agora.' })
+      const novo = await pedirAoApp(m, 'site/' + ms[2] + '/' + ms[3])
+      if (!novo) return json(res, 504, { erro: 'O computador não respondeu.' })
+      res.writeHead(novo.status || 200, { 'Content-Type': novo.tipo || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' })
+      return res.end(Buffer.from(novo.b64 || '', 'base64'))
+    }
     if (mm) {
       const s = sessaoDe(req)
       if (!s) {
@@ -370,10 +394,10 @@ const servidor = http.createServer(async (req, res) => {
         if (r.status === 200) guardarEstatico(chave, r)
       }
       if (r.status === 200 && req.headers['if-none-match'] === r.etag) {
-        res.writeHead(304, { ETag: r.etag, 'Cache-Control': 'no-cache', ...CABECALHOS })
+        res.writeHead(304, { ETag: r.etag, 'Cache-Control': 'no-cache', ...ISOLAR, ...CABECALHOS })
         return res.end()
       }
-      res.writeHead(r.status, { 'Content-Type': r.tipo, 'Cache-Control': 'no-cache', ETag: r.etag, 'Content-Security-Policy': CSP_APP, ...CABECALHOS })
+      res.writeHead(r.status, { 'Content-Type': r.tipo, 'Cache-Control': 'no-cache', ETag: r.etag, 'Content-Security-Policy': CSP_APP, ...ISOLAR, ...CABECALHOS })
       return res.end(r.corpo)
     }
 

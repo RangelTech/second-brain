@@ -1037,8 +1037,12 @@ app.whenReady().then(() => {
     }
   })
   ipcMain.handle('sistema:definir', (_e, m) => bandeja?.definir({ ...(m && 'inicio' in m ? { iniciarComSistema: !!m.inicio } : {}), ...(m && 'bandeja' in m ? { fecharParaBandeja: !!m.bandeja } : {}) }))
+  // navegador WebAssembly na aba do cliente (versão web, spec 60 §8)
+  const navWasm = require('./navegador-wasm').criar()
   nav = navegadorMod.criar({
     app,
+    wasm: navWasm,
+    enderecoWeb: () => { const e = remoto && remoto.estado(); return e && e.conectado ? `${e.url}/m/${encodeURIComponent(e.maquinaId)}/` : '' },
     janela: () => janela,
     avisar: (e) => janela?.webContents.send('navegador:estado', e),
     pedirPainel: () => janela?.webContents.send('navegador:abrir-painel'),
@@ -1094,6 +1098,8 @@ app.whenReady().then(() => {
     }
     setTimeout(tentar, 2500)
   }
+  ipcMain.handle('navwasm:registrar', (e, dados) => navWasm.registrar(e && e.sender, dados || {}))
+  ipcMain.handle('navwasm:resposta', (_e, dados) => navWasm.responder(dados || {}))
   ipcMain.handle('navegador:limites', (_e, l) => nav.definirLimites(l))
   ipcMain.handle('navegador:destacar', () => nav.destacar())
   ipcMain.handle('navegador:reencaixar', () => nav.reencaixar())
@@ -1687,6 +1693,7 @@ app.whenReady().then(() => {
     app,
     janela: () => janela,
     tipo: MODO_SERVIDOR ? 'vm' : 'desktop',
+    sites: (caminho) => navWasm.lerDoSite(caminho),
     chave: () => (cfg.unlimitedChave ? decifrar(cfg.unlimitedChave) : ''),
     invocar: (canal, args, sender) => {
       const fn = handlersIpc.get(canal)
