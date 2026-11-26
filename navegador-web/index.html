@@ -22,6 +22,13 @@
   #carga .trilho i { display: block; height: 100%; width: 0; background: var(--destaque); transition: width .3s; }
   body.embutido #barra, body.embutido #progresso { display: none; }
   body.embutido #palco, body.embutido #carga { top: 0; inset: 0; }
+  #faixa { position: absolute; left: 0; right: 0; top: 46px; z-index: 7; display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #2a1f14; color: #f3ece4; border-bottom: 1px solid #5a4630; font-size: 13px; }
+  #faixa[hidden] { display: none; }
+  #faixa span { flex: 1; }
+  #faixa button { border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  #faixa-abrir { background: var(--destaque); color: #1a120c; font-weight: 600; }
+  #faixa-fechar { background: transparent; color: var(--mut); }
+  body.embutido #faixa { top: 0; }
   #progresso { position: absolute; top: 46px; left: 0; height: 2px; width: 0; background: var(--destaque); transition: width .25s, opacity .4s; z-index: 6; }
 </style>
 </head>
@@ -34,6 +41,7 @@
   <span id="seg" title="Saída de internet">🔒 BR</span>
 </div>
 <div id="progresso"></div>
+<div id="faixa" hidden><span>Este site está fazendo uma verificação de segurança que este navegador não consegue concluir.</span><button id="faixa-abrir" type="button">Abrir no meu Chrome</button><button id="faixa-fechar" type="button" aria-label="Fechar">✕</button></div>
 <div id="palco"><canvas id="tela"></canvas></div>
 <div id="carga"><div class="caixa"><div id="carga-txt">Preparando o navegador…</div><div class="trilho"><i id="carga-barra"></i></div></div></div>
 
@@ -190,7 +198,17 @@ $('avancar').onclick = () => window.cerebroNav.avancar()
 $('recarregar').onclick = () => window.cerebroNav.recarregar()
 let pend; addEventListener('resize', () => { clearTimeout(pend); pend = setTimeout(() => gecko.resize(palco.clientWidth, palco.clientHeight), 150) })
 let ultimaUrl = ''
-setInterval(async () => { const u = await urlAtual(); if (!u || u === 'about:blank') return; chrome(DISFARCE).catch(() => {}); if (document.activeElement !== $('url')) $('url').value = u; if (u !== ultimaUrl) { ultimaUrl = u; avisarPai({ ev: 'url', url: u, titulo: await chrome('document.title') }) } }, 1500)
+setInterval(async () => { const u = await urlAtual(); if (!u || u === 'about:blank') return; chrome(DISFARCE).catch(() => {}); if (document.activeElement !== $('url')) $('url').value = u; const titulo = await chrome('document.title'); conferirVerificacao(u, titulo); if (u !== ultimaUrl) { ultimaUrl = u; avisarPai({ ev: 'url', url: u, titulo }) } }, 1500)
+// tela de verificação que o motor não conclui (Cloudflare no modo rígido): oferece abrir no Chrome da pessoa (IP dela, passa sozinho)
+let verificandoDesde = 0, faixaFechadaPara = ''
+function conferirVerificacao(u, titulo) {
+  const verif = /^(Um momento|Just a moment|Attention Required|Aguarde|Checking your browser|Verificando)/i.test(String(titulo || ''))
+  if (!verif) { verificandoDesde = 0; $('faixa').hidden = true; return }
+  if (!verificandoDesde) verificandoDesde = Date.now()
+  if (Date.now() - verificandoDesde > 12000 && faixaFechadaPara !== u) { $('faixa').hidden = false; $('faixa').dataset.url = u; avisarPai({ ev: 'verificacao', url: u }) }
+}
+$('faixa-abrir').onclick = () => { window.open($('faixa').dataset.url, '_blank', 'noopener'); $('faixa').hidden = true }
+$('faixa-fechar').onclick = () => { faixaFechadaPara = $('faixa').dataset.url; $('faixa').hidden = true }
 
 // ---------- vigia: motor travado (site com muito JavaScript) reinicia sozinho na mesma página ----------
 // Travado = a fila de comandos do motor só cresce (as pinturas se acumulam). O perfil (login e cookies) fica no OPFS e continua.
