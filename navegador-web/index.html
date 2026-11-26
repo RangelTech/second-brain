@@ -38,7 +38,7 @@
 <div id="carga"><div class="caixa"><div id="carga-txt">Preparando o navegador…</div><div class="trilho"><i id="carga-barra"></i></div></div></div>
 
 <script type="module">
-import { Gecko } from './motor/0.0.1/gecko.js'
+import { Gecko } from './motor/0.0.1-rt2/gecko.js'
 
 // Configuração: relay Wisp (saída de internet) vem pela URL (?wisp=...) — na web do Cérebro a ponte entrega a chave do usuário.
 const params = new URLSearchParams(location.search)
@@ -49,7 +49,14 @@ const $ = (id) => document.getElementById(id)
 if (params.get('embutido') === '1') document.body.classList.add('embutido')
 const palco = $('palco'), canvas = $('tela')
 
-const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1/gecko.wasm' }, profile: 'cerebro-perfil',
+// Identidade (anti-robô): idioma e preferências entram no pacote do motor (motor/0.0.1-rt1, greprefs editado); fuso de São Paulo
+// pelo ambiente. Depois de cada carga a página ganha o tamanho de janela de um navegador comum (o motor sem janela devolve 0).
+const DISFARCE = `(() => { if (window.__sbDisf) return 'ja'; window.__sbDisf = 1; const d = (o, k, f) => { try { Object.defineProperty(o, k, { get: f, configurable: true }) } catch (e) {} };
+  d(window, 'outerWidth', () => window.innerWidth + 16); d(window, 'outerHeight', () => window.innerHeight + 85);
+  d(window, 'screenX', () => 0); d(window, 'screenY', () => 0); d(screen, 'availHeight', () => screen.height - 40); return 'ok' })()`
+const MODO_GPU = params.get('gpu') === '1'
+// as preferências entram como arquivo padrão do motor (defaults/pref): o modo embutido não lê o user.js do perfil
+const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1-rt2/gecko.wasm' }, profile: 'cerebro-perfil', env: { TZ: 'America/Sao_Paulo', LANG: 'pt_BR.UTF-8', LC_ALL: 'pt_BR.UTF-8', ...(MODO_GPU ? { GECKO_GPU: '1' } : {}) },
   width: palco.clientWidth, height: palco.clientHeight, print: () => {}, printErr: () => {} })
 
 // ---------- ajudantes no contexto privilegiado do motor ----------
@@ -79,7 +86,7 @@ function progresso(p) { const b = $('progresso'); b.style.opacity = 1; b.style.w
 async function esperarCarga(ms) {
   const fim = Date.now() + ms
   await new Promise((r) => setTimeout(r, 600))
-  while (Date.now() < fim) { if ((await estado()) === 'complete') return true; await new Promise((r) => setTimeout(r, 400)) }
+  while (Date.now() < fim) { const e = await estado(); if (e && e !== 'uninitialized') chrome(DISFARCE).catch(() => {}); if (e === 'complete') return true; await new Promise((r) => setTimeout(r, 300)) }
   return false
 }
 
@@ -179,7 +186,7 @@ $('avancar').onclick = () => window.cerebroNav.avancar()
 $('recarregar').onclick = () => window.cerebroNav.recarregar()
 let pend; addEventListener('resize', () => { clearTimeout(pend); pend = setTimeout(() => gecko.resize(palco.clientWidth, palco.clientHeight), 150) })
 let ultimaUrl = ''
-setInterval(async () => { const u = await urlAtual(); if (!u || u === 'about:blank') return; if (document.activeElement !== $('url')) $('url').value = u; if (u !== ultimaUrl) { ultimaUrl = u; avisarPai({ ev: 'url', url: u, titulo: await chrome('document.title') }) } }, 1500)
+setInterval(async () => { const u = await urlAtual(); if (!u || u === 'about:blank') return; chrome(DISFARCE).catch(() => {}); if (document.activeElement !== $('url')) $('url').value = u; if (u !== ultimaUrl) { ultimaUrl = u; avisarPai({ ev: 'url', url: u, titulo: await chrome('document.title') }) } }, 1500)
 
 // ---------- partida ----------
 // o service worker guarda o motor no navegador (baixa uma vez); na 1ª visita ele só passa a valer na próxima
