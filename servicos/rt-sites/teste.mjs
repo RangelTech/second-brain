@@ -64,7 +64,9 @@ test('publica na raiz e em /nome/, só na pasta da própria conta', async () => 
   assert.equal(fs.readFileSync(path.join(raiz, 'index.html'), 'utf8'), '<h1>Juca</h1>')
   assert.ok(!fs.existsSync(path.join(raiz, 'virus.exe')))
   r = await publicar('chave-juca-0000000000000000', { site: 'Promoção de Natal', arquivos: [{ caminho: 'index.html', b64: b64('natal') }] })
-  assert.equal((await r.json()).url, 'https://juca-automoveis.rangeltech.net/promocao-de-natal/')
+  const pub = await r.json()
+  assert.equal(pub.url, 'https://juca-automoveis.rangeltech.net/promocao-de-natal/')
+  assert.equal(pub.subdominio, 'https://promocao-de-natal.juca-automoveis.rangeltech.net/')
   // republicar a raiz não apaga o outro site e tira o arquivo velho
   r = await publicar('chave-juca-0000000000000000', { arquivos: [{ caminho: 'index.html', b64: b64('v2') }] })
   assert.equal(r.status, 200)
@@ -92,6 +94,10 @@ test('ask do certificado: só nome registrado e não bloqueado; admin bloqueia',
   assert.equal((await fetch(base + '/ask?domain=juca-automoveis.rangeltech.net')).status, 200)
   assert.equal((await fetch(base + '/ask?domain=inventado.rangeltech.net')).status, 404)
   assert.equal((await fetch(base + '/ask?domain=a.b.rangeltech.net')).status, 404)
+  // subdomínio do cliente: só para site publicado, um nível só
+  assert.equal((await fetch(base + '/ask?domain=promocao-de-natal.juca-automoveis.rangeltech.net')).status, 200)
+  assert.equal((await fetch(base + '/ask?domain=nao-publicado.juca-automoveis.rangeltech.net')).status, 404)
+  assert.equal((await fetch(base + '/ask?domain=x.promocao-de-natal.juca-automoveis.rangeltech.net')).status, 404)
   assert.equal((await fetch(base + '/api/admin/bloquear/juca-automoveis', { method: 'POST' })).status, 401)
   assert.equal((await fetch(base + '/api/admin/bloquear/juca-automoveis', { method: 'POST', headers: { Authorization: 'Bearer admin-de-teste' } })).status, 200)
   assert.equal((await fetch(base + '/ask?domain=juca-automoveis.rangeltech.net')).status, 404)

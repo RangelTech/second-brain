@@ -42,6 +42,19 @@ https:// {
 	tls {
 		on_demand
 	}
+	# <site>.<cliente>.rangeltech.net -> /sites/<cliente>/<site>/ (um nível só)
+	@sub header_regexp sub Host ^([a-z0-9-]{1,63})\.([a-z0-9-]{3,40})\.rangeltech\.net$
+	handle @sub {
+		root * /sites/{re.sub.2}/{re.sub.1}
+		header {
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+			-Server
+		}
+		encode zstd gzip
+		try_files {path} {path}/index.html {path}.html =404
+		file_server
+	}
 	@cliente header_regexp nome Host ^([a-z0-9-]{3,40})\.rangeltech\.net$
 	handle @cliente {
 		root * /sites/{re.nome.1}

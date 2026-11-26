@@ -1051,7 +1051,7 @@ app.whenReady().then(() => {
     if (acao === 'endereco') {
       const j = await chamar('GET', '/api/endereco')
       return { texto: `Endereço do usuário: ${j.url}
-Sites publicados: ${j.sites.length ? j.sites.map((s) => s.url).join(', ') : 'nenhum ainda'}
+Sites publicados: ${j.sites.length ? j.sites.map((s) => s.subdominio || s.url).join(', ') : 'nenhum ainda'}
 Espaço: ${j.usado_mb} de ${j.cota_mb} MB` }
     }
     if (acao === 'remover') {
@@ -1079,7 +1079,7 @@ Espaço: ${j.usado_mb} de ${j.cota_mb} MB` }
     }
     andar(pasta, '')
     const j = await chamar('POST', '/api/publicar', { site: args.site || '', arquivos })
-    return { texto: `Publicado: ${j.url} (${(j.bytes / 1048576).toFixed(1)} MB). Abra com navegador_abrir para conferir e mande o link ao usuário.` }
+    return { texto: `Publicado: ${j.url}${j.subdominio ? ' (também em ' + j.subdominio + ')' : ''} (${(j.bytes / 1048576).toFixed(1)} MB). Abra com navegador_abrir para conferir e mande o link ao usuário (o endereço curto, se houver).` }
   }
   // navegador WebAssembly na aba do cliente (versão web, spec 60 §8)
   const navWasm = require('./navegador-wasm').criar()

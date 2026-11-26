@@ -100,6 +100,7 @@ const lerCorpo = (req, max) => new Promise((ok, erro) => {
 })
 const json = (res, st, o) => { res.writeHead(st, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)) }
 const urlDe = (nome, site) => `https://${nome}.${DOMINIO}/${site ? encodeURIComponent(site) + '/' : ''}`
+const subDe = (nome, site) => (site ? `https://${site}.${nome}.${DOMINIO}/` : '')
 const limites = new Map()
 function limite(chave, max, ms) { const a = Date.now(); const j = limites.get(chave) || { n: 0, ate: a + ms }; if (a > j.ate) { j.n = 0; j.ate = a + ms } j.n++; limites.set(chave, j); return j.n <= max }
 
@@ -155,7 +156,7 @@ async function publicar(conta, corpo) {
     fs.rmSync(tmp, { recursive: true, force: true })
     throw e
   }
-  return { ok: true, url: urlDe(reg.nome, site), nome: reg.nome, bytes: total }
+  return { ok: true, url: urlDe(reg.nome, site), subdominio: subDe(reg.nome, site), nome: reg.nome, bytes: total }
 }
 
 const servidor = http.createServer(async (req, res) => {
@@ -166,8 +167,12 @@ const servidor = http.createServer(async (req, res) => {
     if (u.pathname === '/ask') {
       const d = String(u.searchParams.get('domain') || '').toLowerCase()
       const m = d.endsWith('.' + DOMINIO) ? d.slice(0, -(DOMINIO.length + 1)) : ''
-      const id = m && !m.includes('.') ? db.nomes[m] : null
-      res.writeHead(id && !db.contas[id]?.bloqueado ? 200 : 404).end()
+      const partes = m ? m.split('.') : []
+      // <cliente>.rangeltech.net, ou <site>.<cliente>.rangeltech.net (um nível só, e o site precisa estar publicado)
+      const nome = partes.length === 1 ? partes[0] : partes.length === 2 ? partes[1] : ''
+      const id = nome ? db.nomes[nome] : null
+      const siteOk = partes.length === 1 || (/^[a-z0-9-]{1,63}$/.test(partes[0]) && fs.existsSync(path.join(RAIZ, nome, partes[0], 'index.html')))
+      res.writeHead(id && !db.contas[id]?.bloqueado && siteOk ? 200 : 404).end()
       return
     }
     if (u.pathname === '/saude') return json(res, 200, { ok: true, contas: Object.keys(db.contas).length })
@@ -193,7 +198,7 @@ const servidor = http.createServer(async (req, res) => {
     if (u.pathname === '/api/endereco' && req.method === 'GET') {
       const reg = nomeDaConta(conta)
       const base = path.join(RAIZ, reg.nome)
-      return json(res, 200, { nome: reg.nome, url: urlDe(reg.nome, ''), sites: listarSites(base).map((s) => ({ site: s || '(principal)', url: urlDe(reg.nome, s) })), usado_mb: +(tamanhoPasta(base) / 1048576).toFixed(1), cota_mb: Math.round(COTA / 1048576), bloqueado: !!reg.bloqueado })
+      return json(res, 200, { nome: reg.nome, url: urlDe(reg.nome, ''), sites: listarSites(base).map((s) => ({ site: s || '(principal)', url: urlDe(reg.nome, s), subdominio: subDe(reg.nome, s) })), usado_mb: +(tamanhoPasta(base) / 1048576).toFixed(1), cota_mb: Math.round(COTA / 1048576), bloqueado: !!reg.bloqueado })
     }
     if (u.pathname === '/api/publicar' && req.method === 'POST') {
       if (!limite('conta:' + conta.id, 30, 3600000)) return json(res, 429, { erro: 'Muitas publicações nesta hora. Tente daqui a pouco.' })
