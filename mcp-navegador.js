@@ -37,6 +37,9 @@ const FERRAMENTAS = [
   { nome: 'esperar', desc: 'Espera alguns milissegundos (máximo 15000), útil depois de uma ação que carrega conteúdo.', schema: obj({ ms: { type: 'number' } }) },
   { nome: 'js', desc: 'Executa JavaScript na página e devolve o resultado. O código é o corpo de uma função assíncrona: use return para devolver algo.', schema: obj({ codigo: { type: 'string' } }, ['codigo']) },
   { nome: 'chrome_estado', desc: 'Diz se o Chrome do usuário está conectado pela extensão (e se está pausada), qual é o navegador padrão e o link para baixar a extensão. Rode antes de usar onde="chrome" ou quando o usuário perguntar sobre a extensão.', schema: obj({}) },
+  { nome: 'site_publicar', desc: 'PUBLICA um site da pasta de trabalho na internet, de graça, no endereço próprio do usuário na Rangel Tech (https://<nome-do-cliente>.rangeltech.net). A pasta precisa ter index.html; vão só arquivos de site (html, css, js, imagens, vídeos, fontes). Sem "site" vai para a página principal do endereço; com "site" vai para /<site>/ (vários sites no mesmo endereço). Publicar de novo troca a versão. Depois de publicar, abra o link com navegador_abrir e mande o link ao usuário.', schema: obj({ pasta: { type: 'string', description: 'Caminho completo da pasta do site (a que tem o index.html)' }, site: { type: 'string', description: 'Nome curto do site (vira /nome/ no endereço). Vazio = página principal.' } }, ['pasta']) },
+  { nome: 'site_endereco', desc: 'Mostra o endereço do usuário na Rangel Tech (https://<nome>.rangeltech.net), os sites já publicados e o espaço usado.', schema: obj({}) },
+  { nome: 'site_remover', desc: 'Tira do ar um site publicado em /<site>/ do endereço do usuário. Confirme com o usuário antes.', schema: obj({ site: { type: 'string' } }, ['site']) },
   { nome: 'print', desc: 'Tira uma captura de tela da página e salva num arquivo PNG. Devolve o caminho; use vision_analyze nele para olhar a imagem.', schema: obj({}) },
 ]
 
@@ -53,7 +56,7 @@ async function tratar(msg) {
   if (method === 'initialize') return enviar({ jsonrpc: '2.0', id, result: { protocolVersion: params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'navegador', version: '1.0.0' } } })
   if (method === 'notifications/initialized' || (method && method.startsWith('notifications/'))) return
   if (method === 'ping') return enviar({ jsonrpc: '2.0', id, result: {} })
-  if (method === 'tools/list') return enviar({ jsonrpc: '2.0', id, result: { tools: FERRAMENTAS.map((f) => ({ name: 'navegador_' + f.nome, description: f.desc, inputSchema: f.nome === 'esperar' || f.nome === 'chrome_estado' ? f.schema : { ...f.schema, properties: { ...f.schema.properties, onde: ONDE } } })) } })
+  if (method === 'tools/list') return enviar({ jsonrpc: '2.0', id, result: { tools: FERRAMENTAS.map((f) => ({ name: 'navegador_' + f.nome, description: f.desc, inputSchema: f.nome === 'esperar' || f.nome === 'chrome_estado' || f.nome.startsWith('site_') ? f.schema : { ...f.schema, properties: { ...f.schema.properties, onde: ONDE } } })) } })
   if (method === 'tools/call') {
     const nome = String(params?.name || '').replace(/^navegador_/, '')
     try {

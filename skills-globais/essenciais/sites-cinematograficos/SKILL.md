@@ -70,7 +70,7 @@ perfeito. Use e abuse de **vídeo e efeitos visuais**: é isso que faz o cliente
    `navegador_abrir` no caminho do `index.html` (ex.: `C:\...\meu-site\index.html` ou `/home/.../meu-site/index.html`). Funciona no
    app instalado e na versão web (lá o navegador roda na aba da pessoa e o arquivo da máquina vira um endereço temporário).
    **Não ofereça download** nem mande abrir a pasta: o site já está na frente dela.
-4. Entregue: uma frase do que foi feito, o caminho da pasta e a oferta de publicar.
+4. Entregue: uma frase do que foi feito, o caminho da pasta e a oferta de **publicar no endereço dele** (`navegador_site_publicar`).
 
 ### Rolagem quadro a quadro (estilo Apple) — `modelos/rolagem-quadros.html` + `scripts/quadros.py`
 O produto gira, a câmera entra no carro, o prédio se monta CONFORME a pessoa rola. É o efeito que mais impressiona e vende (agências cobram caro).
@@ -96,8 +96,13 @@ O resultado tem que ficar perfeito, e o caminho para isso é **acertar de primei
 6. Entregue com o site **aberto no navegador integrado** (`navegador_abrir` no `index.html`, sem oferecer download), o caminho da pasta e a oferta de publicar.
 
 ## Publicar
-- Rápido e grátis: o usuário arrasta a pasta em app.netlify.com/drop (gera um link na hora).
-- Com domínio próprio: Cloudflare Pages, Vercel ou a hospedagem dele. Faça junto com ele, pelo navegador integrado.
+- **Padrão (grátis, já incluso no Cérebro Pro):** `navegador_site_publicar` com a pasta do site. Vai para o endereço próprio do
+  usuário na Rangel Tech, `https://<nome-dele>.rangeltech.net/` (o nome é dele, fixo, criado no primeiro uso). Vários sites:
+  passe `site` (vira `/<site>/`). Publicar de novo troca a versão. Depois abra o link com `navegador_abrir` e mande o link.
+  `navegador_site_endereco` mostra o endereço e os sites já no ar. Limites: 50 MB por site, 300 MB por conta (comprima vídeos).
+- Antes de publicar com dados de exemplo (telefone, endereço, depoimentos), avise que estão como exemplo.
+- Domínio próprio do cliente (ex.: padariapaodourado.com.br): depois de publicar no endereço da Rangel Tech, ajude pela
+  hospedagem dele (Cloudflare Pages, Vercel) pelo navegador integrado.
 
 ## Regras de qualidade
 - Depoimentos e números só reais. Se o usuário não tiver, use textos de exemplo marcados e avise para trocar antes de publicar.

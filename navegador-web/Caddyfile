@@ -1,5 +1,9 @@
 {
 	email contato@rangeltech.net
+	# sites dos clientes (spec 69): certificado só para subdomínio registrado no rt-sites
+	on_demand_tls {
+		ask http://rt-sites:8090/ask
+	}
 }
 nav.rangeltech.net {
 	@wisp path /wisp /wisp/*
@@ -26,4 +30,37 @@ nav.rangeltech.net {
 			precompressed zstd gzip
 		}
 	}
+}
+
+# API de publicação dos sites dos clientes (spec 69)
+sites.rangeltech.net {
+	reverse_proxy rt-sites:8090
+}
+
+# sites dos clientes: <nome>.rangeltech.net -> /sites/<nome>/ (nomes que já têm registro próprio no DNS nem chegam aqui)
+https:// {
+	tls {
+		on_demand
+	}
+	@cliente header_regexp nome Host ^([a-z0-9-]{3,40})\.rangeltech\.net$
+	handle @cliente {
+		root * /sites/{re.nome.1}
+		header {
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+			-Server
+		}
+		@html path *.html /
+		header @html Cache-Control "no-cache"
+		encode zstd gzip
+		try_files {path} {path}/index.html {path}.html =404
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}
+
+http:// {
+	redir https://{host}{uri} 308
 }
