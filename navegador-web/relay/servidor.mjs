@@ -24,9 +24,52 @@ class Fila {
   close() { this.q = []; let f; while ((f = this.esperaGet.shift())) f(); while ((f = this.esperaPut.shift())) f() }
   get size() { return this.q.length }
 }
+// Saída residencial/4G (opcional): os sites que barram IP de servidor saem por um proxy residencial brasileiro, com um IP FIXO por
+// cliente (a sessão do proxy é a conta), para o "não sou robô" não voltar a cada página. SAIDA_RESIDENCIAL = http://usuario:senha@host:porta,
+// onde {sessao} no usuário vira o código da conta. Sem a variável, tudo sai por São Paulo como antes.
+const SAIDA_RESIDENCIAL = process.env.SAIDA_RESIDENCIAL || ''
+const DOMINIOS_RESIDENCIAIS = (process.env.DOMINIOS_RESIDENCIAIS || 'instagram.com,cdninstagram.com,facebook.com,fbcdn.net,messenger.com,whatsapp.com,whatsapp.net,youtube.com,youtu.be,googlevideo.com,ytimg.com,ggpht.com,accounts.google.com,google.com,gstatic.com,googleapis.com,tiktok.com,tiktokcdn.com,tiktokv.com,byteoversea.com,x.com,twitter.com,twimg.com,linkedin.com,licdn.com,threads.net,threads.com,mercadolivre.com.br,mercadolibre.com,shopee.com.br,netflix.com,spotify.com').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean)
+const usaResidencial = (host) => { const h = String(host).toLowerCase(); return !!SAIDA_RESIDENCIAL && DOMINIOS_RESIDENCIAIS.some((d) => h === d || h.endsWith('.' + d)) }
+function tunelResidencial(host, port, conta) {
+  const u = new URL(SAIDA_RESIDENCIAL)
+  const sessao = crypto.createHash('sha256').update('sessao:' + conta).digest('hex').slice(0, 12)
+  const usuario = decodeURIComponent(u.username).replace('{sessao}', sessao)
+  const auth = u.username ? 'Proxy-Authorization: Basic ' + Buffer.from(usuario + ':' + decodeURIComponent(u.password)).toString('base64') + '\r\n' : ''
+  return new Promise((ok, erro) => {
+    const s = net.connect({ host: u.hostname, port: +u.port || 80 })
+    let buf = Buffer.alloc(0)
+    const falhar = (e) => { s.destroy(); erro(e) }
+    s.setTimeout(20000, () => falhar(new Error('proxy sem resposta')))
+    s.once('error', falhar)
+    s.on('connect', () => s.write(`CONNECT ${host}:${port} HTTP/1.1\r\nHost: ${host}:${port}\r\n${auth}\r\n`))
+    const ler = (d) => {
+      buf = Buffer.concat([buf, d])
+      const fim = buf.indexOf('\r\n\r\n')
+      if (fim < 0) { if (buf.length > 16384) falhar(new Error('resposta do proxy grande demais')); return }
+      s.off('data', ler); s.off('error', falhar); s.setTimeout(0)
+      const linha = buf.slice(0, buf.indexOf('\r\n')).toString()
+      if (!/^HTTP\/1\.[01] 200/.test(linha)) return falhar(new Error('proxy recusou: ' + linha))
+      ok({ socket: s, sobra: buf.slice(fim + 4) })
+    }
+    s.on('data', ler)
+  })
+}
 class ConexaoTCP {
   constructor(hostname, port) { this.hostname = hostname; this.port = port; this.socket = null; this.paused = false; this.connected = false; this.data_queue = new Fila(128) }
   async connect() {
+    if (usaResidencial(this.hostname) && this.conta) {
+      try {
+        const { socket: s, sobra } = await tunelResidencial(this.hostname, this.port, this.conta)
+        this.socket = s; this.connected = true
+        s.setNoDelay(true)
+        if (sobra.length) this.data_queue.put(sobra)
+        s.on('data', (d) => this.data_queue.put(d))
+        s.on('close', () => { this.data_queue.close(); this.socket = null })
+        s.on('error', () => {})
+        s.on('end', () => { if (this.socket) { this.socket.destroy(); this.socket = null } })
+        return
+      } catch (e) { console.warn('saída residencial falhou, indo por São Paulo:', e.message) }
+    }
     let host = this.hostname
     if (!net.isIP(host)) host = (await dns.promises.lookup(host)).address
     if (host === IP_PUBLICO) host = CADDY_INTERNO
@@ -73,6 +116,7 @@ srv.on('upgrade', (req, socket, head) => {
   abertas.set(quem, n + 1)
   socket.once('close', () => { const k = (abertas.get(quem) || 1) - 1; if (k > 0) abertas.set(quem, k); else abertas.delete(quem) })
   req.url = '/wisp/' // a chave já foi conferida; o wisp decide o modo pelo final do caminho
-  wisp.routeRequest(req, socket, head, { TCPSocket: ConexaoTCP })
+  class DaConta extends ConexaoTCP { constructor(h, p) { super(h, p); this.conta = quem } }
+  wisp.routeRequest(req, socket, head, { TCPSocket: DaConta })
 })
 srv.listen(8080, '0.0.0.0', () => console.log('relay wisp na porta 8080'))

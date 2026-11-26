@@ -1,6 +1,6 @@
 // Guarda o motor do navegador (arquivos versionados em /motor/<versão>/) no Cache Storage deste navegador: baixa uma vez só.
 // O cache HTTP do Chrome não guarda o .wasm (passa do limite por entrada). Versões antigas são apagadas ao ativar uma nova.
-const CACHE = 'motor-v6'
+const CACHE = 'motor-v7'
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k)

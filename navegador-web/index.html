@@ -38,7 +38,7 @@
 <div id="carga"><div class="caixa"><div id="carga-txt">Preparando o navegador…</div><div class="trilho"><i id="carga-barra"></i></div></div></div>
 
 <script type="module">
-import { Gecko } from './motor/0.0.1-rt2/gecko.js'
+import { Gecko } from './motor/0.0.1-rt3/gecko.js'
 
 // Configuração: relay Wisp (saída de internet) vem pela URL (?wisp=...) — na web do Cérebro a ponte entrega a chave do usuário.
 const params = new URLSearchParams(location.search)
@@ -56,7 +56,7 @@ const DISFARCE = `(() => { if (window.__sbDisf) return 'ja'; window.__sbDisf = 1
   d(window, 'screenX', () => 0); d(window, 'screenY', () => 0); d(screen, 'availHeight', () => screen.height - 40); return 'ok' })()`
 const MODO_GPU = params.get('gpu') === '1'
 // as preferências entram como arquivo padrão do motor (defaults/pref): o modo embutido não lê o user.js do perfil
-const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1-rt2/gecko.wasm' }, profile: 'cerebro-perfil', env: { TZ: 'America/Sao_Paulo', LANG: 'pt_BR.UTF-8', LC_ALL: 'pt_BR.UTF-8', ...(MODO_GPU ? { GECKO_GPU: '1' } : {}) },
+const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1-rt3/gecko.wasm' }, profile: 'cerebro-perfil', env: { TZ: 'America/Sao_Paulo', LANG: 'pt_BR.UTF-8', LC_ALL: 'pt_BR.UTF-8', ...(MODO_GPU ? { GECKO_GPU: '1' } : {}) },
   width: palco.clientWidth, height: palco.clientHeight, print: () => {}, printErr: () => {} })
 
 // ---------- ajudantes no contexto privilegiado do motor ----------
