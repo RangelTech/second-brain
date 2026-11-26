@@ -55,8 +55,9 @@ const DISFARCE = `(() => { if (window.__sbDisf) return 'ja'; window.__sbDisf = 1
   d(window, 'outerWidth', () => window.innerWidth + 16); d(window, 'outerHeight', () => window.innerHeight + 85);
   d(window, 'screenX', () => 0); d(window, 'screenY', () => 0); d(screen, 'availHeight', () => screen.height - 40); return 'ok' })()`
 const MODO_GPU = params.get('gpu') === '1'
+const MODO_JIT = params.get('jit') !== '0' && (params.get('jit') === '1' || localStorage.getItem('sbJit') === '1')
 // as preferências entram como arquivo padrão do motor (defaults/pref): o modo embutido não lê o user.js do perfil
-const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1-rt3/gecko.wasm' }, profile: 'cerebro-perfil', env: { TZ: 'America/Sao_Paulo', LANG: 'pt_BR.UTF-8', LC_ALL: 'pt_BR.UTF-8', ...(MODO_GPU ? { GECKO_GPU: '1' } : {}) },
+const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1-rt3/gecko.wasm' }, profile: 'cerebro-perfil', env: { TZ: 'America/Sao_Paulo', LANG: 'pt_BR.UTF-8', LC_ALL: 'pt_BR.UTF-8', ...(MODO_GPU ? { GECKO_GPU: '1' } : {}), ...(MODO_JIT ? { GECKO_WASMJIT: '1' } : {}) },
   width: palco.clientWidth, height: palco.clientHeight, print: () => {}, printErr: () => {} })
 
 // ---------- ajudantes no contexto privilegiado do motor ----------
@@ -65,6 +66,7 @@ const DOC = `document`
 // o motor só aceita comandos depois do init(); antes disso a fila interna do gecko.js quebra e trava para sempre
 let motorPronto = false
 let abrirDepois = ''
+let ultimoPedido = ''
 const chrome = (js) => motorPronto ? gecko.evalChrome(js) : Promise.resolve('')
 
 async function urlAtual() { try { return await chrome(`(${DOC} || {}).URL || ''`) } catch { return '' } }
@@ -75,7 +77,9 @@ async function abrir(destino) {
   if (!u || u === 'about:blank') return // about:blank trava a fila do motor
   if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = /\.[a-z]{2,}(\/|$)/i.test(u) && !/\s/.test(u) ? 'https://' + u : 'https://duckduckgo.com/?q=' + encodeURIComponent(u)
   $('url').value = u
-  if (!motorPronto) { abrirDepois = u; return } // o motor ainda está subindo: abre assim que ficar pronto
+  ultimoPedido = u
+  if (!motorPronto) { abrirDepois = u; return }
+  if (filaMotor() >= 15) return reiniciarMotor(u) // motor ocupado/travado com a página anterior: reabre direto no endereço novo // o motor ainda está subindo: abre assim que ficar pronto
   progresso(.15)
   await gecko.load(u)
   await esperarCarga(20000)
@@ -187,6 +191,25 @@ $('recarregar').onclick = () => window.cerebroNav.recarregar()
 let pend; addEventListener('resize', () => { clearTimeout(pend); pend = setTimeout(() => gecko.resize(palco.clientWidth, palco.clientHeight), 150) })
 let ultimaUrl = ''
 setInterval(async () => { const u = await urlAtual(); if (!u || u === 'about:blank') return; chrome(DISFARCE).catch(() => {}); if (document.activeElement !== $('url')) $('url').value = u; if (u !== ultimaUrl) { ultimaUrl = u; avisarPai({ ev: 'url', url: u, titulo: await chrome('document.title') }) } }, 1500)
+
+// ---------- vigia: motor travado (site com muito JavaScript) reinicia sozinho na mesma página ----------
+// Travado = a fila de comandos do motor só cresce (as pinturas se acumulam). O perfil (login e cookies) fica no OPFS e continua.
+let travadoDesde = 0
+const filaMotor = () => (gecko.queue || []).length
+function reiniciarMotor(alvo) {
+  const p = new URLSearchParams(location.search)
+  alvo = alvo || ultimoPedido || ultimaUrl
+  if (alvo && /^https?:/.test(alvo)) p.set('inicio', alvo)
+  p.set('reinicio', String(Date.now()))
+  avisarPai({ ev: 'reiniciando' })
+  location.replace(location.pathname + '?' + p.toString())
+}
+setInterval(() => {
+  if (!motorPronto) return
+  if (filaMotor() < 25) { travadoDesde = 0; return }
+  if (!travadoDesde) { travadoDesde = Date.now(); return }
+  if (Date.now() - travadoDesde >= 20000) reiniciarMotor()
+}, 2000)
 
 // ---------- partida ----------
 // o service worker guarda o motor no navegador (baixa uma vez); na 1ª visita ele só passa a valer na próxima

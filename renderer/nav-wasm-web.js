@@ -70,6 +70,7 @@
       return
     }
     if (m.ev === 'url') return avisar('url', { url: m.url, titulo: m.titulo })
+    if (m.ev === 'reiniciando') { pronto = false; registrar(); insistirOla(); return } // o motor travou e está reabrindo na mesma página
     if (m.ev === 'falhou') { falhou = m.erro || 'falhou'; avisar('estado', { pronto: false, erro: falhou }); return }
     if (m.id && pend[m.id]) {
       var p = pend[m.id]
