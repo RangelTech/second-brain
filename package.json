@@ -29,7 +29,6 @@
     "icon": "build/icon.png",
     "files": [
       "mcp-navegador.js",
-      "transcricao-worker.js",
       "mcp-midia.js",
       "midia-detalhar.js",
       "mcp-memoria.js",
@@ -82,7 +81,13 @@
       "embed-router.js",
       "renderer/**",
       "exemplos/**",
-      "package.json"
+      "package.json",
+      "!node_modules/@huggingface/**",
+      "!node_modules/onnxruntime-node/**",
+      "!node_modules/onnxruntime-web/**",
+      "!node_modules/onnxruntime-common/**",
+      "!node_modules/sharp/**",
+      "!node_modules/@img/**"
     ],
     "win": {
       "target": [
@@ -172,13 +177,6 @@
         "to": "mcp-motion.js"
       },
       {
-        "from": "modelos",
-        "to": "modelos",
-        "filter": [
-          "whisper-small/**/*"
-        ]
-      },
-      {
         "from": "build/liberdade-vm.sh",
         "to": "liberdade-vm.sh"
       }
@@ -194,12 +192,7 @@
       "artifactName": "Segundo-Cerebro-Windows-Portatil.${ext}"
     },
     "asarUnpack": [
-      "transcricao-worker.js",
-      "ponte_gateway.py",
-      "node_modules/onnxruntime-node/**",
-      "node_modules/@huggingface/**",
-      "node_modules/sharp/**",
-      "node_modules/@img/**"
+      "ponte_gateway.py"
     ],
     "deb": {
       "afterInstall": "build/liberdade-vm.sh",

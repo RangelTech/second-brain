@@ -36,6 +36,18 @@ $antes = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyConti
 foreach ($d in 'tests', 'contributors', 'website', 'evals', 'docker', 'apps\desktop', 'node_modules', 'web\node_modules', 'ui-tui\node_modules') {
     Remove-Item -Recurse -Force (Join-Path $agente $d) -ErrorAction SilentlyContinue
 }
+# historico do git do Hermes (~320 MB): o app nao usa "hermes update"; o Hermes so le HEAD/refs (impressao digital da versao) e vive sem o resto
+$git = Join-Path $agente '.git'
+foreach ($d in 'objects', 'logs', 'hooks', 'lfs', 'modules') { Remove-Item -Recurse -Force (Join-Path $git $d) -ErrorAction SilentlyContinue }
+New-Item -ItemType Directory -Force (Join-Path $git 'objects') | Out-Null
+# ferramentas: ffplay (player, ~145 MB) e documentacao nao sao usados pelo agente; ffmpeg e ffprobe ficam
+$ferr = Join-Path $raiz 'tools'
+Get-ChildItem $ferr -Recurse -Force -Filter 'ffplay.exe' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+Get-ChildItem $ferr -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {
+    foreach ($d in 'doc', 'usr\share\doc', 'usr\share\man', 'usr\share\info', 'ucrt64\share\doc', 'mingw64\share\doc', 'ucrt64\share\man', 'mingw64\share\man') {
+        Remove-Item -Recurse -Force (Join-Path $_.FullName $d) -ErrorAction SilentlyContinue
+    }
+}
 $depois = (Get-ChildItem $agente -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object).Count
 "codigo do Hermes enxugado: $antes -> $depois arquivos"
 # atalhos (junction/symlink) do pnpm que apontavam para o que saiu ficam quebrados e o 7za reclama: remove os que nao levam a lugar nenhum
