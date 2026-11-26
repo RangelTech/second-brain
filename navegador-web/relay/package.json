@@ -1,0 +1,1 @@
+{ "name": "wisp-relay", "type": "module", "private": true, "dependencies": { "@mercuryworkshop/wisp-js": "0.3.3" } }

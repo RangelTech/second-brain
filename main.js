@@ -1037,8 +1037,57 @@ app.whenReady().then(() => {
     }
   })
   ipcMain.handle('sistema:definir', (_e, m) => bandeja?.definir({ ...(m && 'inicio' in m ? { iniciarComSistema: !!m.inicio } : {}), ...(m && 'bandeja' in m ? { fecharParaBandeja: !!m.bandeja } : {}) }))
+  // sites do cliente em <nome>.rangeltech.net (spec 69): o app manda a pasta com a chave da conta; o servidor de sites só grava no nome dela
+  const RT_SITES = (process.env.SB_SITES_URL || 'https://sites.rangeltech.net').replace(/\/+$/, '')
+  async function ferramentaSites(acao, args = {}) {
+    const chave = cfg.unlimitedChave ? decifrar(cfg.unlimitedChave) : ''
+    if (!chave) throw new Error('Entre na sua conta do Cérebro Pro para publicar sites.')
+    const chamar = async (metodo, rota, corpo) => {
+      const r = await fetch(RT_SITES + rota, { method: metodo, headers: { Authorization: 'Bearer ' + chave, 'Content-Type': 'application/json' }, body: corpo ? JSON.stringify(corpo) : undefined, signal: AbortSignal.timeout(180000) })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.erro || 'Não consegui publicar agora. Tente de novo.')
+      return j
+    }
+    if (acao === 'endereco') {
+      const j = await chamar('GET', '/api/endereco')
+      return { texto: `Endereço do usuário: ${j.url}
+Sites publicados: ${j.sites.length ? j.sites.map((s) => s.url).join(', ') : 'nenhum ainda'}
+Espaço: ${j.usado_mb} de ${j.cota_mb} MB` }
+    }
+    if (acao === 'remover') {
+      await chamar('DELETE', '/api/sites/' + encodeURIComponent(String(args.site || '')))
+      return { texto: 'Site tirado do ar.' }
+    }
+    if (acao !== 'publicar') throw new Error('Ação de site desconhecida.')
+    let pasta = String(args.pasta || '').trim()
+    if (pasta && fs.existsSync(pasta) && fs.statSync(pasta).isFile()) pasta = path.dirname(pasta)
+    if (!pasta || !fs.existsSync(path.join(pasta, 'index.html'))) throw new Error('A pasta precisa existir e ter um index.html: ' + pasta)
+    const arquivos = []
+    let total = 0
+    const andar = (dir, rel) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.name.startsWith('.') || e.name === 'node_modules') continue
+        const f = path.join(dir, e.name), r = rel ? rel + '/' + e.name : e.name
+        if (e.isDirectory()) { andar(f, r); continue }
+        if (!e.isFile()) continue
+        const tam = fs.statSync(f).size
+        total += tam
+        if (total > 50 * 1024 * 1024) throw new Error('O site passou de 50 MB. Comprima os vídeos (ffmpeg, crf 28) e tente de novo.')
+        if (arquivos.length >= 3000) throw new Error('O site tem arquivos demais (limite de 3000).')
+        arquivos.push({ caminho: r, b64: fs.readFileSync(f).toString('base64') })
+      }
+    }
+    andar(pasta, '')
+    const j = await chamar('POST', '/api/publicar', { site: args.site || '', arquivos })
+    return { texto: `Publicado: ${j.url} (${(j.bytes / 1048576).toFixed(1)} MB). Abra com navegador_abrir para conferir e mande o link ao usuário.` }
+  }
+  // navegador WebAssembly na aba do cliente (versão web, spec 60 §8)
+  const navWasm = require('./navegador-wasm').criar()
   nav = navegadorMod.criar({
     app,
+    wasm: navWasm,
+    sites: (acao, args) => ferramentaSites(acao, args),
+    enderecoWeb: () => { const e = remoto && remoto.estado(); return e && e.conectado ? `${e.url}/m/${encodeURIComponent(e.maquinaId)}/` : '' },
     janela: () => janela,
     avisar: (e) => janela?.webContents.send('navegador:estado', e),
     pedirPainel: () => janela?.webContents.send('navegador:abrir-painel'),
@@ -1094,6 +1143,8 @@ app.whenReady().then(() => {
     }
     setTimeout(tentar, 2500)
   }
+  ipcMain.handle('navwasm:registrar', (e, dados) => navWasm.registrar(e && e.sender, dados || {}))
+  ipcMain.handle('navwasm:resposta', (_e, dados) => navWasm.responder(dados || {}))
   ipcMain.handle('navegador:limites', (_e, l) => nav.definirLimites(l))
   ipcMain.handle('navegador:destacar', () => nav.destacar())
   ipcMain.handle('navegador:reencaixar', () => nav.reencaixar())
@@ -1687,6 +1738,7 @@ app.whenReady().then(() => {
     app,
     janela: () => janela,
     tipo: MODO_SERVIDOR ? 'vm' : 'desktop',
+    sites: (caminho) => navWasm.lerDoSite(caminho),
     chave: () => (cfg.unlimitedChave ? decifrar(cfg.unlimitedChave) : ''),
     invocar: (canal, args, sender) => {
       const fn = handlersIpc.get(canal)

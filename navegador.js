@@ -74,7 +74,7 @@ const LINK_EXTENSAO = 'https://segundocerebro.pro/extensao/'
 // falhas de TRANSPORTE da extensão (nada chegou a rodar no Chrome); erro da própria ferramenta (elemento sumiu) não entra aqui
 const FALHAS_TRANSPORTE = new Set(['sem_extensao', 'pausado', 'desconectada', 'timeout'])
 
-function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false, editor = null, motion = null, llm = null, preload = '', avisarDestacada = () => {} }) {
+function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoServidor = false, editor = null, motion = null, llm = null, preload = '', avisarDestacada = () => {}, wasm = null, enderecoWeb = () => '', sites = null }) {
   const token = crypto.randomBytes(24).toString('hex')
   const pastaCaps = path.join(app.getPath('userData'), 'navegador-capturas')
   let vista = null
@@ -474,6 +474,98 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     },
   }
 
+
+  // ---- navegador WebAssembly na aba do cliente (versão web, spec 60 §8): mesmas ferramentas, executadas no motor que roda no Chrome
+  // da pessoa (ela vê na hora, ao lado do chat, e a internet sai por São Paulo). Primitivas: abrir, info, avaliar, clicarPonto, inserir,
+  // tecla, rolarPonto, voltar, printPng (navegador-web/index.html).
+  const W = (op, ...args) => wasm.pedir(op, args, op === 'abrir' ? 60000 : 40000)
+  // endereço que o motor consegue abrir: arquivo da VM vira o site servido pela ponte com chave curta
+  function enderecoParaWasm(entrada) {
+    let u = resolverEntrada(String(entrada || '').trim())
+    if (/^file:/i.test(u)) {
+      const local = require('url').fileURLToPath(u.split('#')[0].split('?')[0])
+      if (!fs.existsSync(local)) throw new Error('Arquivo não encontrado: ' + local)
+      const alvo = fs.statSync(local).isDirectory() ? path.join(local, 'index.html') : local
+      if (!/\.(html?|pdf|png|jpe?g|gif|webp|svg|mp4|webm|txt|md|json|csv)$/i.test(alvo)) throw new Error('Só abro páginas, PDFs, imagens, vídeos e textos do computador.')
+      const base = enderecoWeb()
+      if (!base) throw new Error('O acesso web desta máquina está desligado; não consigo mostrar o arquivo no navegador da página.')
+      return base + wasm.caminhoDoSite(alvo)
+    }
+    if (!/^https?:/i.test(u)) throw new Error('Só aceito endereços http, https ou arquivos do computador.')
+    return u
+  }
+  const ferramentasWasm = {
+    async abrir({ url }) {
+      pedirPainel()
+      await W('abrir', enderecoParaWasm(url))
+      const i = await W('info')
+      return { texto: `Aberto: ${i.titulo || '(sem título)'} — ${i.url}` }
+    },
+    async ler() {
+      const r = await W('avaliar', SCRIPT_LER)
+      const els = r.elementos.map((e) => `[${e.id}] ${e.tipo}${e.texto ? ' "' + e.texto + '"' : ''}${e.href ? ' → ' + e.href : ''}`).join('\n')
+      return { texto: `Título: ${r.titulo}\nURL: ${r.url}\nRolagem: ${r.rolagem.y}/${r.rolagem.altura} (janela ${r.rolagem.janela})\n\n--- TEXTO DA PÁGINA ---\n${r.texto}\n\n--- ELEMENTOS CLICÁVEIS (use o número em navegador_clicar e navegador_digitar) ---\n${els || '(nenhum)'}` }
+    },
+    async clicar({ id, x, y }) {
+      if (id !== undefined && id !== null) {
+        const r = await W('avaliar', `(() => { const e = document.querySelector('[data-sb-id="${Number(id)}"]'); if (!e) return { ok: false }; e.scrollIntoView({ block: 'center' }); const b = e.getBoundingClientRect(); return { ok: true, x: b.left + b.width / 2, y: b.top + b.height / 2 } })()`)
+        if (!r.ok) throw new Error(`Elemento ${id} não existe mais. Rode navegador_ler de novo para atualizar os ids.`)
+        await esperar(150)
+        x = r.x
+        y = r.y
+      }
+      if (typeof x !== 'number' || typeof y !== 'number') throw new Error('Informe id (de navegador_ler) ou x e y.')
+      await W('clicarPonto', x, y)
+      await esperar(900)
+      const i = await W('info')
+      return { texto: `Cliquei em (${Math.round(x)}, ${Math.round(y)}). Agora em: ${i.url}` }
+    },
+    async digitar({ id, texto, enter }) {
+      if (id !== undefined && id !== null) {
+        const ok = await W('avaliar', `(() => { const e = document.querySelector('[data-sb-id="${Number(id)}"]'); if (!e) return false; e.scrollIntoView({ block: 'center' }); e.focus(); if (e.select) e.select(); return true })()`)
+        if (!ok) throw new Error(`Elemento ${id} não existe mais. Rode navegador_ler de novo.`)
+      }
+      await W('inserir', String(texto ?? ''))
+      if (enter) {
+        await W('tecla', 'Enter')
+        await esperar(900)
+      }
+      return { texto: `Digitei ${String(texto ?? '').length} caracteres${enter ? ' e apertei Enter' : ''}.` }
+    },
+    async rolar({ direcao, pixels }) {
+      const d = String(direcao || 'baixo')
+      const px = Number(pixels) || 600
+      const r = await W('avaliar', `(() => { const d = ${JSON.stringify(d)}; const px = ${px}; if (d === 'topo') scrollTo(0, 0); else if (d === 'fim') scrollTo(0, document.documentElement.scrollHeight); else scrollBy(0, d === 'cima' ? -px : px); return { y: Math.round(scrollY), altura: document.documentElement.scrollHeight } })()`)
+      await esperar(300)
+      return { texto: `Rolagem em ${r.y} de ${r.altura}.` }
+    },
+    async voltar() {
+      await W('voltar')
+      await esperar(900)
+      const i = await W('info')
+      return { texto: `Voltei para ${i.url}` }
+    },
+    async js({ codigo }) {
+      const r = await W('avaliar', `(async () => { ${String(codigo)} })()`)
+      return { texto: typeof r === 'string' ? r.slice(0, 6000) : JSON.stringify(r)?.slice(0, 6000) ?? 'undefined' }
+    },
+    async print() {
+      await esperar(300)
+      const r = await W('printPng')
+      fs.mkdirSync(pastaCaps, { recursive: true })
+      const arq = path.join(pastaCaps, `captura-${Date.now()}.png`)
+      fs.writeFileSync(arq, Buffer.from(r.png, 'base64'))
+      return { texto: `Captura salva em ${arq} (${r.largura}x${r.altura}). Use vision_analyze nesse caminho para olhar a imagem.`, imagem: r.png, arquivo: arq }
+    },
+  }
+  // na web, com uma tela capaz aberta, o navegador da página é o padrão (o Chrome só se o agente pedir onde="chrome")
+  async function usarWasm(nome, onde) {
+    if (!modoServidor || !wasm || onde === 'chrome' || !ferramentasWasm[nome]) return false
+    if (wasm.online()) return true
+    if (!wasm.disponivel()) return false
+    return wasm.garantir()
+  }
+
   // ---- Chrome do usuário (extensão): mesma lista de ferramentas, executada no Chrome dele, com as sessões que ele já tem
   function salvarCaptura(png64) {
     fs.mkdirSync(pastaCaps, { recursive: true })
@@ -517,7 +609,17 @@ function criar({ app, janela, avisar, pedirPainel, extensao = () => null, modoSe
     if (nome.startsWith('motion_') && motion) return motion(nome.slice(7), args) // Motion desenhado: HTML vira MP4 (mcp-motion.js)
     if (nome === 'llm_texto' && llm) return llm(args) // scripts das skills (cortes do Viralizaí: juiz e tradução) chamam a MESMA IA do app, sem chave no ambiente
     if (nome === 'chrome_estado') return estadoChrome()
+    if (nome.startsWith('site_') && sites) return sites(nome.slice(5), args) // sites do cliente em <nome>.rangeltech.net (spec 69)
     const onde = ['integrado', 'chrome'].includes(args.onde) ? args.onde : 'auto'
+    if (await usarWasm(nome, onde)) {
+      acaoAtual = descreverAcao(nome, args)
+      marcarControle()
+      try {
+        return await ferramentasWasm[nome](args)
+      } finally {
+        marcarControle()
+      }
+    }
     const querChrome = nome !== 'esperar' && !nome.startsWith('whatsapp_') && !nome.startsWith('instagram_') && (onde === 'chrome' || (onde === 'auto' && modoServidor))
     if (querChrome) {
       marcarControle()

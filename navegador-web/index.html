@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navegador do Cérebro</title>
+<style>
+  :root { --fundo: #14110f; --barra: #1d1916; --borda: rgba(255,255,255,.08); --texto: #ece9e4; --mut: #9a948c; --destaque: #e8835c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--texto); font: 14px/1.4 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+  #barra { display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 8px; background: var(--barra); border-bottom: 1px solid var(--borda); }
+  #barra button { width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--texto); cursor: pointer; font-size: 16px; }
+  #barra button:hover { background: rgba(255,255,255,.06); }
+  #url { flex: 1; height: 32px; border: 1px solid var(--borda); border-radius: 10px; background: rgba(255,255,255,.04); color: var(--texto); padding: 0 12px; font: inherit; outline: none; }
+  #url:focus { border-color: var(--destaque); }
+  #seg { font-size: 12px; color: var(--mut); padding: 0 4px; white-space: nowrap; }
+  #palco { position: absolute; top: 46px; left: 0; right: 0; bottom: 0; }
+  #palco canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #carga { position: absolute; inset: 46px 0 0; display: grid; place-items: center; background: var(--fundo); z-index: 5; }
+  #carga .caixa { width: min(360px, 80vw); text-align: center; color: var(--mut); }
+  #carga .trilho { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 14px; }
+  #carga .trilho i { display: block; height: 100%; width: 0; background: var(--destaque); transition: width .3s; }
+  body.embutido #barra, body.embutido #progresso { display: none; }
+  body.embutido #palco, body.embutido #carga { top: 0; inset: 0; }
+  #progresso { position: absolute; top: 46px; left: 0; height: 2px; width: 0; background: var(--destaque); transition: width .25s, opacity .4s; z-index: 6; }
+</style>
+</head>
+<body>
+<div id="barra">
+  <button id="voltar" title="Voltar">←</button>
+  <button id="avancar" title="Avançar">→</button>
+  <button id="recarregar" title="Recarregar">↻</button>
+  <input id="url" spellcheck="false" placeholder="Pesquise ou digite um endereço">
+  <span id="seg" title="Saída de internet">🔒 BR</span>
+</div>
+<div id="progresso"></div>
+<div id="palco"><canvas id="tela"></canvas></div>
+<div id="carga"><div class="caixa"><div id="carga-txt">Preparando o navegador…</div><div class="trilho"><i id="carga-barra"></i></div></div></div>
+
+<script type="module">
+import { Gecko } from './motor/0.0.1-rt2/gecko.js'
+
+// Configuração: relay Wisp (saída de internet) vem pela URL (?wisp=...) — na web do Cérebro a ponte entrega a chave do usuário.
+const params = new URLSearchParams(location.search)
+// passe curto da ponte (?t=) ou relay explícito (?wisp=, testes)
+const WISP = params.get('wisp') || (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/wisp/?t=' + encodeURIComponent(params.get('t') || '')
+const INICIO = params.get('inicio') || 'https://duckduckgo.com/'
+const $ = (id) => document.getElementById(id)
+if (params.get('embutido') === '1') document.body.classList.add('embutido')
+const palco = $('palco'), canvas = $('tela')
+
+// Identidade (anti-robô): idioma e preferências entram no pacote do motor (motor/0.0.1-rt1, greprefs editado); fuso de São Paulo
+// pelo ambiente. Depois de cada carga a página ganha o tamanho de janela de um navegador comum (o motor sem janela devolve 0).
+const DISFARCE = `(() => { if (window.__sbDisf) return 'ja'; window.__sbDisf = 1; const d = (o, k, f) => { try { Object.defineProperty(o, k, { get: f, configurable: true }) } catch (e) {} };
+  d(window, 'outerWidth', () => window.innerWidth + 16); d(window, 'outerHeight', () => window.innerHeight + 85);
+  d(window, 'screenX', () => 0); d(window, 'screenY', () => 0); d(screen, 'availHeight', () => screen.height - 40); return 'ok' })()`
+const MODO_GPU = params.get('gpu') === '1'
+// as preferências entram como arquivo padrão do motor (defaults/pref): o modo embutido não lê o user.js do perfil
+const gecko = new Gecko({ canvas, wispUrl: WISP, wasm: { url: './motor/0.0.1-rt2/gecko.wasm' }, profile: 'cerebro-perfil', env: { TZ: 'America/Sao_Paulo', LANG: 'pt_BR.UTF-8', LC_ALL: 'pt_BR.UTF-8', ...(MODO_GPU ? { GECKO_GPU: '1' } : {}) },
+  width: palco.clientWidth, height: palco.clientHeight, print: () => {}, printErr: () => {} })
+
+// ---------- ajudantes no contexto privilegiado do motor ----------
+// No gecko.js embutido o evalChrome roda direto no contexto da página carregada (window/document dela).
+const DOC = `document`
+// o motor só aceita comandos depois do init(); antes disso a fila interna do gecko.js quebra e trava para sempre
+let motorPronto = false
+let abrirDepois = ''
+const chrome = (js) => motorPronto ? gecko.evalChrome(js) : Promise.resolve('')
+
+async function urlAtual() { try { return await chrome(`(${DOC} || {}).URL || ''`) } catch { return '' } }
+async function estado() { try { return await chrome(`(${DOC} || {}).readyState || ''`) } catch { return '' } }
+
+async function abrir(destino) {
+  let u = String(destino || '').trim()
+  if (!u || u === 'about:blank') return // about:blank trava a fila do motor
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = /\.[a-z]{2,}(\/|$)/i.test(u) && !/\s/.test(u) ? 'https://' + u : 'https://duckduckgo.com/?q=' + encodeURIComponent(u)
+  $('url').value = u
+  if (!motorPronto) { abrirDepois = u; return } // o motor ainda está subindo: abre assim que ficar pronto
+  progresso(.15)
+  await gecko.load(u)
+  await esperarCarga(20000)
+  progresso(1)
+  $('url').value = await urlAtual() || u
+}
+function progresso(p) { const b = $('progresso'); b.style.opacity = 1; b.style.width = (p * 100) + '%'; if (p >= 1) setTimeout(() => { b.style.opacity = 0; b.style.width = 0 }, 400) }
+async function esperarCarga(ms) {
+  const fim = Date.now() + ms
+  await new Promise((r) => setTimeout(r, 600))
+  while (Date.now() < fim) { const e = await estado(); if (e && e !== 'uninitialized') chrome(DISFARCE).catch(() => {}); if (e === 'complete') return true; await new Promise((r) => setTimeout(r, 300)) }
+  return false
+}
+
+// ---------- API de controle para a IA (window.cerebroNav) ----------
+window.cerebroNav = {
+  abrir,
+  url: urlAtual,
+  esperar: esperarCarga,
+  voltar: () => chrome(`(${DOC}).defaultView.history.back(); 'ok'`),
+  avancar: () => chrome(`(${DOC}).defaultView.history.forward(); 'ok'`),
+  recarregar: () => chrome(`(${DOC}).defaultView.location.reload(); 'ok'`),
+  // JS na própria página (como Runtime.evaluate do CDP): recebe o texto de uma função (doc, win) => valor
+  js: (fn) => chrome(`(() => { const d = ${DOC}; const r = (${fn})(d, d.defaultView); return typeof r === 'string' ? r : JSON.stringify(r) })()`),
+  ler: (max = 6000) => chrome(`(() => { const d = ${DOC}; return JSON.stringify({ titulo: d.title, url: d.URL, texto: (d.body ? d.body.innerText : '').slice(0, ${+max}) }) })()`),
+  // elementos clicáveis/preenchíveis com referência estável (data-cerebro-ref)
+  elementos: () => chrome(`(() => { const d = ${DOC}; let n = 0; const out = []; for (const el of d.querySelectorAll('a[href],button,input,textarea,select,[role=button],[onclick]')) { const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue; if (!el.dataset.cerebroRef) el.dataset.cerebroRef = 'e' + (++n); out.push({ ref: el.dataset.cerebroRef, tag: el.tagName.toLowerCase(), tipo: el.type || '', texto: (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 80) }); if (out.length >= 150) break } return JSON.stringify(out) })()`),
+  clicar: (ref) => chrome(`(() => { const el = (${DOC}).querySelector('[data-cerebro-ref="${ref}"]'); if (!el) return 'não achei ${ref}'; el.scrollIntoView({ block: 'center' }); el.click(); return 'clicado' })()`),
+  digitar: (ref, texto, enviar = false) => chrome(`(() => {
+    const d = ${DOC}; const el = d.querySelector('[data-cerebro-ref="' + ${JSON.stringify(ref)} + '"]'); if (!el) return 'não achei';
+    el.focus(); el.value = ${JSON.stringify(String(texto))};
+    el.dispatchEvent(new d.defaultView.Event('input', { bubbles: true })); el.dispatchEvent(new d.defaultView.Event('change', { bubbles: true }));
+    if (${enviar ? 'true' : 'false'} && el.form) { el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit() }
+    return 'digitado' })()`),
+  rolar: (px = 600) => chrome(`(${DOC}).defaultView.scrollBy(0, ${+px}); 'ok'`),
+  print: () => canvas.toDataURL('image/jpeg', .7),
+  // ---- primitivas do agente (entrada de verdade no motor, como o CDP Input.dispatch*) ----
+  info: async () => ({ url: await urlAtual(), titulo: await chrome('document.title') }),
+  // avalia uma expressão JS na página; aceita Promise (o motor só devolve valores síncronos: o resultado é buscado depois)
+  avaliar: async (expr, ms = 30000) => {
+    const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ID = JSON.stringify(id)
+    const r0 = await chrome(`(() => { const k = Symbol.for('sbNavR'); const caixa = window[k] = window[k] || {}; let p; try { p = Promise.resolve((${expr}
+)) } catch (e) { p = Promise.reject(e) } p.then((v) => { let j; try { j = JSON.stringify(v === undefined ? null : v) } catch (e) { j = JSON.stringify(String(v)) } caixa[${ID}] = { ok: 1, j } }, (e) => { caixa[${ID}] = { ok: 0, j: JSON.stringify(String((e && e.message) || e)) } }); return 'ok' })()`)
+    if (r0 !== 'ok') throw new Error('Código inválido para a página.')
+    const fim = Date.now() + ms
+    while (Date.now() < fim) {
+      const r = await chrome(`(() => { const caixa = window[Symbol.for('sbNavR')] || {}; const r = caixa[${JSON.stringify(id)}]; if (!r) return ''; delete caixa[${JSON.stringify(id)}]; return JSON.stringify(r) })()`)
+      if (r) { const o = JSON.parse(r); const v = JSON.parse(o.j); if (!o.ok) throw new Error(v); return v }
+      await new Promise((r) => setTimeout(r, 40))
+    }
+    throw new Error('A página não respondeu a tempo.')
+  },
+  clicarPonto: async (x, y) => {
+    x = Math.round(+x || 0); y = Math.round(+y || 0)
+    await gecko.run({ op: 1, evType: 0, x, y, buttons: 0 })
+    await gecko.run({ op: 1, evType: 1, x, y, button: 0, buttons: 1, clickCount: 1 })
+    await gecko.run({ op: 1, evType: 2, x, y, button: 0, buttons: 0, clickCount: 1 })
+    return 'ok'
+  },
+  // texto entra tecla por tecla, como uma pessoa digitando (não mexe na área de transferência do usuário); texto longo entra colado
+  inserir: async (texto) => {
+    const t = String(texto ?? '')
+    // texto mais longo: insertText no campo focado (gera os eventos de digitação, rápido e sem área de transferência)
+    if ([...t].length > 24) {
+      const ok = await window.cerebroNav.avaliar(`document.execCommand('insertText', false, ${JSON.stringify(t)})`).catch(() => false)
+      if (ok) return 'ok'
+    }
+    for (const ch of t) {
+      if (ch === String.fromCharCode(10)) { await window.cerebroNav.tecla('Enter'); continue }
+      const cp = ch.codePointAt(0), kc = /[a-z0-9]/i.test(ch) ? ch.toUpperCase().charCodeAt(0) : 0
+      gecko.run({ op: 2, evType: 0, key: ch, keyCode: kc, charCode: cp })
+      gecko.run({ op: 2, evType: 1, key: ch, keyCode: kc, charCode: cp })
+    }
+    await gecko.run({ op: 4 }) // a fila é serial: quando esta pintura volta, todas as teclas já entraram
+    return 'ok'
+  },
+  tecla: async (nome) => {
+    const k = { Enter: 13, Tab: 9, Escape: 27, Backspace: 8, Delete: 46, ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35, PageUp: 33, PageDown: 34, ' ': 32 }
+    const key = String(nome || 'Enter'), keyCode = k[key] || (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0)
+    const charCode = key.length === 1 ? key.codePointAt(0) : 0 // teclas de controle vão sem charCode (igual ao teclado de verdade)
+    await gecko.run({ op: 2, evType: 0, key, keyCode, charCode })
+    await gecko.run({ op: 2, evType: 1, key, keyCode, charCode })
+    return 'ok'
+  },
+  rolarPonto: async (dy, x = 200, y = 200) => { await gecko.run({ op: 3, x: Math.round(+x), y: Math.round(+y), deltaX: 0, deltaY: Math.round(+dy || 0) }); return 'ok' },
+  printPng: () => ({ png: canvas.toDataURL('image/png').split(',')[1], largura: canvas.width, altura: canvas.height }),
+}
+
+// ---------- ponte com a página do Cérebro (o painel lateral que hospeda este quadro) ----------
+const ORIGENS = ['https://app.segundocerebro.pro', 'https://remoto.rangeltech.net']
+const origemOk = (o) => ORIGENS.includes(o) || /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(o)
+let pai = null
+const avisarPai = (dados) => { if (pai) try { parent.postMessage({ sbNav: 1, ...dados }, pai) } catch {} }
+addEventListener('message', async (e) => {
+  const m = e.data
+  if (!m || m.sbNav !== 1 || !origemOk(e.origin)) return
+  pai = e.origin
+  if (m.ola) return avisarPai({ ev: 'estado', pronto: !!window.cerebroNav.pronto, url: await urlAtual() })
+  const f = window.cerebroNav[m.metodo]
+  if (typeof f !== 'function') return avisarPai({ id: m.id, ok: false, erro: 'método desconhecido: ' + m.metodo })
+  try { avisarPai({ id: m.id, ok: true, valor: await f(...(m.args || [])) }) } catch (err) { avisarPai({ id: m.id, ok: false, erro: String(err && err.message || err) }) }
+})
+
+// ---------- barra ----------
+$('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') abrir($('url').value) })
+$('voltar').onclick = () => window.cerebroNav.voltar()
+$('avancar').onclick = () => window.cerebroNav.avancar()
+$('recarregar').onclick = () => window.cerebroNav.recarregar()
+let pend; addEventListener('resize', () => { clearTimeout(pend); pend = setTimeout(() => gecko.resize(palco.clientWidth, palco.clientHeight), 150) })
+let ultimaUrl = ''
+setInterval(async () => { const u = await urlAtual(); if (!u || u === 'about:blank') return; chrome(DISFARCE).catch(() => {}); if (document.activeElement !== $('url')) $('url').value = u; if (u !== ultimaUrl) { ultimaUrl = u; avisarPai({ ev: 'url', url: u, titulo: await chrome('document.title') }) } }, 1500)
+
+// ---------- partida ----------
+// o service worker guarda o motor no navegador (baixa uma vez); na 1ª visita ele só passa a valer na próxima
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
+const t0 = performance.now()
+let fake = 0; const tick = setInterval(() => { fake = Math.min(92, fake + 3); $('carga-barra').style.width = fake + '%' }, 400)
+try {
+  await gecko.init()
+  motorPronto = true
+  clearInterval(tick); $('carga-barra').style.width = '100%'
+  $('carga').remove()
+  window.cerebroNav.pronto = true
+  window.cerebroNav.segundosPartida = Math.round((performance.now() - t0) / 100) / 10
+  avisarPai({ ev: 'pronto', segundos: window.cerebroNav.segundosPartida })
+  await abrir(abrirDepois || INICIO)
+} catch (e) {
+  avisarPai({ ev: 'falhou', erro: String(e && e.message || e) })
+  clearInterval(tick); $('carga-txt').textContent = 'Não consegui abrir o navegador: ' + (e && e.message || e)
+}
+</script>
+</body>
+</html>

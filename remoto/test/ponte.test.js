@@ -1,9 +1,11 @@
 // Ponte v2: login pela conta, sessão, máquinas conectadas, relay web<->app e interface servida pelo app.
 process.env.LIMITE_MULT = '1000'
 process.env.SESSION_SECRET = 'segredo-de-teste'
+process.env.WISP_SEGREDO = 'segredo-do-relay-de-teste'
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const http = require('http')
+const crypto = require('crypto')
 const WebSocket = require('ws')
 
 let acesso, ponte, urlPonte, portaPonte
@@ -219,4 +221,48 @@ test('Esqueci a senha: pede o link ao servidor, responde igual e valida o e-mail
   assert.equal((await post({ email: 'sem-arroba' })).status, 400)
   assert.equal((await post({})).status, 400)
   assert.equal(esqueceu.length, 2)
+})
+
+test('navegador WebAssembly: telas do app isoladas, passe do relay assinado e só com sessão', async () => {
+  const m = await maquina()
+  const { cookie } = await entrar()
+  const p = await get('/m/pc-da-ana/', cookie)
+  assert.equal(p.headers.get('cross-origin-opener-policy'), 'same-origin')
+  assert.equal(p.headers.get('cross-origin-embedder-policy'), 'credentialless')
+  assert.match(p.headers.get('content-security-policy'), /frame-src [^;]*https:\/\/nav\.rangeltech\.net/)
+  assert.equal((await post('/api/nav-passe', {})).status, 401)
+  const r = await post('/api/nav-passe', {}, cookie)
+  assert.equal(r.status, 200)
+  const { t } = await r.json()
+  const [dados, sig] = t.split('.')
+  assert.equal(sig, crypto.createHmac('sha256', 'segredo-do-relay-de-teste').update(dados).digest('base64url'))
+  const o = JSON.parse(Buffer.from(dados, 'base64url').toString())
+  assert.equal(o.c, '7')
+  assert.ok(o.x > Date.now() + 3600 * 1000)
+  m.close()
+})
+
+test('site da pasta de trabalho: servido sem sessão (a chave do caminho autoriza), sem cache e sem a CSP do app', async () => {
+  const w = await abrir('/ws/maquina', { headers: { Authorization: 'Bearer ' + CHAVE } })
+  const ok = proxima(w, (x) => x.t === 'ok')
+  w.send(JSON.stringify({ t: 'hello', maquinaId: 'vm-site', nome: 'VM', tipo: 'vm', versao: '0.6.92' }))
+  await ok
+  const caminhos = []
+  w.on('message', (d) => {
+    const x = JSON.parse(String(d))
+    if (x.t !== 'http') return
+    caminhos.push(x.caminho)
+    const achou = x.caminho === 'site/chaveDeTeste123/index.html'
+    w.send(JSON.stringify({ t: 'http-r', rid: x.rid, status: achou ? 200 : 404, tipo: 'text/html; charset=utf-8', b64: Buffer.from(achou ? '<h1>meu site</h1>' : '').toString('base64') }))
+  })
+  const r = await get('/m/vm-site/site/chaveDeTeste123/index.html')
+  assert.equal(r.status, 200)
+  assert.equal(await r.text(), '<h1>meu site</h1>')
+  assert.equal(r.headers.get('cache-control'), 'no-store')
+  assert.equal(r.headers.get('content-security-policy'), null)
+  assert.equal((await get('/m/vm-site/site/chaveDeTeste123/outro.html')).status, 404)
+  assert.equal((await get('/m/vm-site/site/curta/index.html')).status, 302) // chave fora do formato cai na rota normal (pede login)
+  assert.equal((await get('/m/maquina-que-nao-existe/site/chaveDeTeste123/index.html')).status, 404)
+  assert.deepEqual(caminhos, ['site/chaveDeTeste123/index.html', 'site/chaveDeTeste123/outro.html'])
+  w.close()
 })

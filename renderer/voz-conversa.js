@@ -622,6 +622,7 @@
     f.src = 'https://www.youtube.com/embed/' + encodeURIComponent(idVideo) + '?autoplay=1&rel=0&modestbranding=1&enablejsapi=1'
     f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen'
     f.referrerPolicy = 'strict-origin-when-cross-origin'
+    f.setAttribute('credentialless', '') // a versão web é isolada entre origens (navegador WebAssembly): o player entra sem cookies
     f.title = titulo || 'Vídeo'
     c.appendChild(f)
     const leg = document.createElement('figcaption')

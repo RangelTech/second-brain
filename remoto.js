@@ -30,7 +30,7 @@ const reviver = (v) => {
 }
 const serializar = (v) => (v instanceof Uint8Array ? { $b64: Buffer.from(v).toString('base64') } : v)
 
-function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
+function criar({ app, janela, chave, invocar, tipo = 'desktop', sites = () => null }) {
   const arq = path.join(app.getPath('userData'), 'acessoweb.json')
   let cfg = { ativo: false, url: URL_PADRAO, maquinaId: '', nome: '' }
   try {
@@ -64,13 +64,19 @@ function criar({ app, janela, chave, invocar, tipo = 'desktop' }) {
   function paginaWeb() {
     let h = fs.readFileSync(path.join(RENDERER, 'index.html'), 'utf8')
     h = h.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, '')
-    h = h.replace('<script src="sb-api.js"></script>', '<script src="sb-web.js"></script>\n<script src="sb-api.js"></script>')
+    h = h.replace('<script src="sb-api.js"></script>', '<script src="sb-web.js"></script>\n<script src="nav-wasm-web.js"></script>\n<script src="sb-api.js"></script>')
     return Buffer.from(h)
   }
   function responderHttp(m) {
     const falha = (status) => enviar({ t: 'http-r', rid: m.rid, status, tipo: 'text/plain', b64: '' })
     try {
       if (m.caminho === 'web.html') return enviar({ t: 'http-r', rid: m.rid, status: 200, tipo: TIPOS['.html'], b64: paginaWeb().toString('base64') })
+      // site da pasta de trabalho aberto no navegador da página (spec 60 F3): "site/<chave>/<arquivo>"
+      if (String(m.caminho || '').startsWith('site/')) {
+        const r = sites(m.caminho)
+        if (!r) return falha(404)
+        return enviar({ t: 'http-r', rid: m.rid, status: r.status, tipo: r.tipo || 'text/plain', b64: r.corpo ? r.corpo.toString('base64') : '', site: true })
+      }
       const rel = path.normalize(String(m.caminho || '')).replace(/^([\\/])+/, '')
       const arquivo = path.join(RENDERER, rel)
       if (!arquivo.startsWith(RENDERER + path.sep) || !fs.existsSync(arquivo) || !fs.statSync(arquivo).isFile()) return falha(404)
