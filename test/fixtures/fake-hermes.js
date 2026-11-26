@@ -87,7 +87,7 @@ rl.on('line', (linha) => {
         return enviar({ jsonrpc: '2.0', id: j.id, error: { code: -32603, message: 'Internal error', data: { details: 'Gateway disconnected; turn outcome is unknown. Resume the printed session ID to check whether it completed or was interrupted; do not resend the work.' } } })
       }
     }
-    const eco = process.env.SB_FAKE_ECO ? ':' + JSON.stringify(j.params.prompt[0].text).slice(0, 4000) : ''
+    const eco = process.env.SB_FAKE_ECO ? ':' + JSON.stringify(j.params.prompt[0].text) : ''
     enviar({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' + eco } } } })
     return enviar({ jsonrpc: '2.0', id: j.id, result: { stopReason: 'end_turn', usage: { totalTokens: 1 } } })
   }

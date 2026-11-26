@@ -55,7 +55,8 @@ function capturar({ BrowserWindow, url, retorno, pai, userAgent, particao = 'per
     }
     const wc = w.webContents
     if (userAgent) wc.setUserAgent(userAgent)
-    if (userAgent) require('./navegador').loginGoogleComoFirefox(wc, userAgent) // login do Google recusa navegador embutido: nessas páginas vira Firefox
+    // login do Google recusa navegador embutido: nessas páginas vira Firefox. Se o disfarce falhar, a janela de login continua.
+    if (userAgent) try { require('./navegador').loginGoogleComoFirefox(wc, userAgent) } catch {}
     wc.on('will-redirect', (ev, alvo) => olhar(ev, alvo))
     wc.on('will-navigate', (ev, alvo) => olhar(ev, alvo))
     wc.on('did-navigate', (_ev, alvo) => olhar(null, alvo))
