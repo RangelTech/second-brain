@@ -2420,7 +2420,7 @@
       div.addEventListener('pointercancel', soltar, { once: true })
     })
   })()
-  NAV.aoAbrirPainel(() => navAbrir(true))
+  NAV.aoAbrirPainel(() => { if (!navAberto) navAbrir(true) }) // toda ação do navegador pede o painel: só abre se estiver fechado (sem piscar)
   NAV.aoReposicionar(() => navPos(true))
   new ResizeObserver(() => navPos(true)).observe($('nav-host'))
   window.addEventListener('resize', () => navPos(true))

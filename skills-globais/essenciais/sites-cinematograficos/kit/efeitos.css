@@ -1,0 +1,58 @@
+/* ==================== EFEITOS VISUAIS E VÍDEO (use e abuse; todos leves) ====================
+   Inclua depois do kit.css: <link rel="stylesheet" href="kit/efeitos.css"> e no fim do body <script src="kit/efeitos.js"></script> */
+
+/* barra de progresso da leitura no topo: <div class="progresso"></div> logo depois do <body> */
+.progresso { position: fixed; inset: 0 0 auto; height: 3px; z-index: 80; background: var(--degrade); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }
+
+/* granulado de cinema por cima de tudo: <div class="granulado"></div> */
+.granulado { position: fixed; inset: -50%; z-index: 90; pointer-events: none; opacity: .06; mix-blend-mode: overlay; animation: grao .9s steps(4) infinite;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@keyframes grao { 25% { transform: translate(-3%, 2%); } 50% { transform: translate(2%, -3%); } 75% { transform: translate(-2%, -2%); } }
+
+/* barras de cinema no hero: class="hero letterbox" */
+.letterbox::before, .letterbox::after { content: ""; position: absolute; left: 0; right: 0; height: 7vh; background: #000; z-index: 1; }
+.letterbox::before { top: 0; } .letterbox::after { bottom: 0; }
+
+/* cartão de vídeo vertical (estilo Reels); toca quando aparece na tela */
+.video-card { position: relative; border-radius: var(--raio); overflow: hidden; aspect-ratio: 9/16; border: 1px solid var(--borda); box-shadow: var(--sombra); background: var(--fundo-2); }
+.video-card video, .video-card img { width: 100%; height: 100%; object-fit: cover; transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
+.video-card:hover video { transform: scale(1.06); }
+.video-card .legenda { position: absolute; inset: auto 0 0; padding: 18px; background: linear-gradient(transparent, rgba(0,0,0,.8)); color: #fff; font-weight: 600; }
+/* faixa de vídeos correndo: .faixa > .faixa-trilho.videos com vários .video-card */
+.faixa-trilho.videos { gap: 18px; } .faixa-trilho.videos > * { width: 230px; opacity: 1; flex: none; }
+
+/* zoom lento em foto (Ken Burns): <div class="foto kenburns"><img ...></div> */
+.kenburns { overflow: hidden; } .kenburns img { animation: kenburns 22s ease-in-out infinite alternate; }
+@keyframes kenburns { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.14) translate(-2%, -2%); } }
+
+/* parallax: data-parallax="0.15" em qualquer elemento (efeitos.js move conforme a rolagem) */
+[data-parallax] { will-change: transform; }
+
+/* título que entra palavra por palavra: class="palavras" */
+.palavras .pal { display: inline-block; opacity: 0; transform: translateY(.6em) rotate(2deg); filter: blur(6px); transition: opacity .7s, transform .7s cubic-bezier(.2,.7,.2,1), filter .7s; transition-delay: calc(var(--i) * 55ms); }
+.palavras.visivel .pal { opacity: 1; transform: none; filter: none; }
+
+/* borda em degradê girando (cartão de destaque, plano mais vendido): class="cartao borda-viva" */
+@property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.borda-viva { position: relative; isolation: isolate; }
+.borda-viva::after { content: ""; position: absolute; inset: 0; padding: 1.5px; border-radius: inherit; z-index: -1; pointer-events: none;
+  background: conic-gradient(from var(--ang), var(--destaque), var(--destaque-2), transparent 40%, var(--destaque)); animation: girar 5s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+@keyframes girar { to { --ang: 360deg; } }
+
+/* inclinação 3D ao passar o mouse: class="inclinar" */
+.inclinar { transform-style: preserve-3d; transition: transform .25s ease-out; }
+
+/* holofote que segue o cursor na seção: class="secao holofote" */
+.holofote { --cx: 50%; --cy: 30%; }
+.holofote::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(600px circle at var(--cx) var(--cy), color-mix(in srgb, var(--destaque) 14%, transparent), transparent 60%); }
+.holofote > * { position: relative; z-index: 1; }
+
+/* botão com brilho passando e pulso */
+.btn-brilho { position: relative; overflow: hidden; }
+.btn-brilho::after { content: ""; position: absolute; inset: 0; transform: translateX(-120%); background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.45), transparent 70%); animation: passar 3.2s ease-in-out infinite; }
+@keyframes passar { 60%, 100% { transform: translateX(120%); } }
+.pulsar { animation: pulsar 2.4s ease-out infinite; }
+@keyframes pulsar { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--destaque) 55%, transparent); } 70% { box-shadow: 0 0 0 18px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+@media (prefers-reduced-motion: reduce) { .granulado, .kenburns img, .borda-viva::after, .btn-brilho::after, .pulsar { animation: none !important; } }
